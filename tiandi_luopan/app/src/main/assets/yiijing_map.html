@@ -184,6 +184,64 @@
             will-change: transform;
             border-radius: 50%;
         }
+        /* 强磁/金属干扰悬浮告警条 */
+        .mag-alert-banner {
+            display: none;
+            width: min(90vw, 460px);
+            background: rgba(180, 40, 40, 0.92);
+            border: 1px solid rgba(231, 76, 60, 0.85);
+            color: #fff;
+            padding: 7px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.45);
+            text-align: center;
+            margin: 2px auto 6px auto;
+            animation: alertPulse 1.8s infinite;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            z-index: 100;
+        }
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(231, 76, 60, 0.45); transform: scale(1); }
+            50% { box-shadow: 0 4px 25px rgba(231, 76, 60, 0.85); transform: scale(1.01); }
+        }
+
+        /* 风水罗盘天心十道（十字瞄准红线与准星） */
+        .crosshair-vertical {
+            position: absolute;
+            top: 0; bottom: 0;
+            left: 50%;
+            width: 1.5px;
+            background: linear-gradient(to bottom, rgba(231, 76, 60, 0.9) 0%, rgba(231, 76, 60, 0.2) 50%, rgba(231, 76, 60, 0.9) 100%);
+            transform: translateX(-50%);
+            pointer-events: none;
+            z-index: 5;
+        }
+        .crosshair-horizontal {
+            position: absolute;
+            left: 0; right: 0;
+            top: 50%;
+            height: 1.5px;
+            background: linear-gradient(to right, rgba(231, 76, 60, 0.9) 0%, rgba(231, 76, 60, 0.2) 50%, rgba(231, 76, 60, 0.9) 100%);
+            transform: translateY(-50%);
+            pointer-events: none;
+            z-index: 5;
+        }
+        .crosshair-front-pointer {
+            position: absolute;
+            top: 1px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #e74c3c;
+            font-size: 14px;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(231, 76, 60, 0.9);
+            pointer-events: none;
+            z-index: 6;
+            line-height: 1;
+        }
         canvas {
             width: 100% !important;
             height: 100% !important;
@@ -235,16 +293,21 @@
         <div class="subtitle">
             <span id="today-line"></span> · <span id="now-time" style="color:#e74c3c;font-weight:bold"></span>
         </div>
-        <div class="direction-mark">↑南 | ↓北 | ←东 | →西</div>
+        <div class="direction-mark" id="direction-mark">🎯 十字天心瞄准 · 正前实测立向 (红线所指为当前山向)</div>
         <div class="tab-bar">
-            <button class="tab-btn active" id="tab-post">后天八卦罗盘</button>
-            <button class="tab-btn" id="tab-pre">先天八卦罗盘</button>
+            <button class="tab-btn active" id="tab-post">后天八卦</button>
+            <button class="tab-btn" id="tab-pre">先天八卦</button>
+            <button class="tab-btn" id="tab-rot-mode" onclick="toggleCompassMode()" style="flex:1.2; color:#f1c40f; border-color:#534321; font-weight:bold;">🔄 盘随向转</button>
         </div>
         <div class="compass-bar" id="compass-bar" onclick="toggleCalibModal(true)">
             <div class="compass-info-box">
                 <span class="calib-dot" id="calib-dot"></span>
                 <span class="compass-info" id="compass-info">🧭 朝向：正北 0° · 子山</span>
             </div>
+        </div>
+        <!-- 强磁干扰悬浮告警条 -->
+        <div class="mag-alert-banner" id="mag-alert-banner" onclick="toggleCalibModal(true)">
+            ⚠️ 监测到金属/窗框强磁干扰 · 陀螺仪惯性锁已激活 · 建议移步室内
         </div>
     </div>
 
@@ -258,6 +321,10 @@
             <div class="calib-status-row">
                 <span>当前地磁传感器精度：</span>
                 <span class="calib-acc-badge" id="calib-acc-badge">✓ 极高 (已自动校准)</span>
+            </div>
+            <div class="calib-status-row" style="margin-bottom: 8px;">
+                <span>环境磁场干扰状态：</span>
+                <span class="calib-acc-badge" id="calib-mag-badge" style="background:#153828;color:#2ecc71">✓ 正常 (地磁均匀)</span>
             </div>
             <div class="calib-status-row" style="margin-bottom: 8px;">
                 <span>当前经纬度坐标：</span>
@@ -294,6 +361,10 @@
             <div class="compass-transform-box" id="compass-transform-box">
                 <canvas id="compass"></canvas>
             </div>
+            <!-- 风水罗盘天心十道十字瞄准线与准星 -->
+            <div class="crosshair-vertical"></div>
+            <div class="crosshair-horizontal"></div>
+            <div class="crosshair-front-pointer">▲</div>
         </div>
         <div class="info-panel">
             <div class="info-title" id="info-heading">当前选中：子山 (坎宫)</div>
@@ -570,18 +641,64 @@
             drawCompass();
         }
         // ========== 指南针（设备方向传感器） ==========
-        // Android 原生方向回调
-
+        let isTouching = false;
+        let compassMode = 'rotateDisk'; // 'rotateDisk'=盘随向转(实测立向推荐), 'fixedDisk'=固定盘面
+        let isMagDistorted = false;
+        let currentMagStrength = 0;
         let targetHeading = 0;
         let isAnimatingCompass = false;
 
+        window.toggleCompassMode = function() {
+            compassMode = compassMode === 'rotateDisk' ? 'fixedDisk' : 'rotateDisk';
+            const btn = document.getElementById('tab-rot-mode');
+            const mark = document.getElementById('direction-mark');
+            if (btn) {
+                btn.innerText = compassMode === 'rotateDisk' ? '🔄 盘随向转' : '🧭 固定盘面';
+                btn.style.color = compassMode === 'rotateDisk' ? '#f1c40f' : '#ccc';
+            }
+            if (mark) {
+                mark.innerText = compassMode === 'rotateDisk'
+                    ? '🎯 十字天心瞄准 · 正前实测立向 (红线所指为当前山向)'
+                    : '↑南 | ↓北 | ←东 | →西 (固定盘面模式)';
+            }
+            updateCompassInfo();
+            drawCompass();
+        };
+
+        window.onNativeMagneticFieldUpdate = function(isDistorted, strength) {
+            isMagDistorted = !!isDistorted;
+            currentMagStrength = strength || 0;
+            const banner = document.getElementById('mag-alert-banner');
+            if (banner) {
+                if (isDistorted) {
+                    banner.style.display = 'block';
+                    banner.innerHTML = `⚠️ 监测到金属/窗框强磁干扰 (${strength}μT) · 陀螺仪惯性锁已激活 · 建议移步室内`;
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+            const badge = document.getElementById('calib-mag-badge');
+            if (badge) {
+                if (isDistorted) {
+                    badge.innerText = `⚠️ 强磁干扰 (${strength}μT)`;
+                    badge.style.background = '#3d1717';
+                    badge.style.color = '#e74c3c';
+                } else {
+                    badge.innerText = `✓ 正常 (${strength}μT)`;
+                    badge.style.background = '#153828';
+                    badge.style.color = '#2ecc71';
+                }
+            }
+            updateCompassInfo();
+        };
+
         function animateCompassStep() {
             let diff = ((targetHeading - currentHeading + 540) % 360) - 180;
-            if (Math.abs(diff) < 0.05) {
+            if (Math.abs(diff) < 0.08) {
                 currentHeading = targetHeading;
                 isAnimatingCompass = false;
             } else {
-                currentHeading = (currentHeading + diff * 0.25 + 360) % 360;
+                currentHeading = (currentHeading + diff * 0.55 + 360) % 360;
                 requestAnimationFrame(animateCompassStep);
             }
             updateCompassInfo();
@@ -680,16 +797,22 @@
 
             // 真实方位→罗盘角度：罗盘0°=正南，真实0°=正北
             const compassDeg = (heading + 180) % 360;
-            let nearest = MOUNTAINS_DATA[13], minDiff = 360; // 默认子山
+            let nearest = MOUNTAINS_DATA[13], minDiff = 360, nearestIdx = 13;
             for(let i=0;i<24;i++){
                 let diff = Math.abs(MOUNTAINS_DATA[i].deg - compassDeg);
                 diff = Math.min(diff, 360 - diff);
-                if(diff < minDiff){ minDiff = diff; nearest = MOUNTAINS_DATA[i]; }
+                if(diff < minDiff){ minDiff = diff; nearest = MOUNTAINS_DATA[i]; nearestIdx = i; }
+            }
+
+            if (compassMode === 'rotateDisk' && !isTouching) {
+                hoveredIndex = nearestIdx;
+                updateInfo(hoveredIndex);
             }
 
             const declAbs = Math.abs(currentDeclination).toFixed(1);
             const declText = currentDeclination < 0 ? `偏西${declAbs}°` : (currentDeclination > 0 ? `偏东${declAbs}°` : '无偏');
-            el.innerHTML = `<span style="color:#2ecc71">磁: ${dirNameMag} ${heading.toFixed(0)}°·${nearest.name}山</span> <span style="color:#555">|</span> <span style="color:#f1c40f">真: ${dirNameTrue} ${trueHeading.toFixed(0)}°</span> <span style="color:#888;font-size:11px">(${declText})</span>`;
+            const magWarn = isMagDistorted ? ` <span style="color:#e74c3c;font-size:11px">⚠️近处有金属/磁干扰</span>` : '';
+            el.innerHTML = `<span style="color:#2ecc71">磁: ${dirNameMag} ${heading.toFixed(0)}°·${nearest.name}山</span> <span style="color:#555">|</span> <span style="color:#f1c40f">真: ${dirNameTrue} ${trueHeading.toFixed(0)}°</span> <span style="color:#888;font-size:11px">(${declText})</span>${magWarn}`;
         }
         updateCompassInfo();
 
@@ -848,6 +971,20 @@
 
         function drawCompass(){
             ctx.clearRect(0,0,W,H);
+
+            let diskRotDeg = 0;
+            if (compassMode === 'rotateDisk' && currentHeading !== null) {
+                diskRotDeg = (180 - currentHeading + 360) % 360;
+            }
+
+            // ---------- 盘面旋转包裹（支持盘随向转） ----------
+            ctx.save();
+            if (diskRotDeg !== 0) {
+                ctx.translate(CX, CY);
+                ctx.rotate(diskRotDeg * Math.PI / 180);
+                ctx.translate(-CX, -CY);
+            }
+
             // ========== 1.八卦八宫环 ==========
             const palaces = getPalaces();
             for(let i=0;i<8;i++){
@@ -1118,6 +1255,8 @@
                 ctx.fill();
             }
 
+            ctx.restore(); // 闭合盘面旋转
+
             // ========== 双指针系统：地磁北（绿色·磁）与地理真北（金色·真） ==========
             if(compassEnabled && currentHeading !== null){
                 // 1. 地磁北屏幕角（物理地磁实际指向，0°=北）
@@ -1280,6 +1419,11 @@
             // 上南下北：atan2得到角度，转换为0°=正南(画布顶部)顺时针
             let ang = Math.atan2(y, x) * 180 / Math.PI;
             ang = (ang + 90 + 360) % 360;
+            let diskRotDeg = 0;
+            if (compassMode === 'rotateDisk' && currentHeading !== null) {
+                diskRotDeg = (180 - currentHeading + 360) % 360;
+            }
+            ang = (ang - diskRotDeg + 720) % 360;
 
             for(let i = 0; i < 24; i++){
                 const m = MOUNTAINS_DATA[i];
@@ -1342,7 +1486,7 @@
         }
 
         // 触控交互（双指捏合缩放、单指拖拽平移、双击放大、点击选中）
-        let isTouching = false;
+        isTouching = false;
         let touchStartDist = 0;
         let touchStartScale = 1.0;
         let touchStartX = 0, touchStartY = 0;

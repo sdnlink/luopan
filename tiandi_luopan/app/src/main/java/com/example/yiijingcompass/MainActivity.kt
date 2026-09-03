@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var rotationSensor: Sensor? = null
     private var accelerometer: Sensor? = null
     private var magnetometer: Sensor? = null
+    private var gyroscope: Sensor? = null
     @Suppress("DEPRECATION")
     private var orientationSensor: Sensor? = null
 
@@ -84,6 +85,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
+        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         @Suppress("DEPRECATION")
         orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
 
@@ -461,23 +463,37 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var smoothSin = 0.0
     private var smoothCos = 0.0
     private var hasSmoothHeading = false
-    private val SMOOTHING_ALPHA = 0.12 // 0.12 带来丝滑阻尼滤波，彻底消除微抖动
+    private val adjustedMatrix = FloatArray(9)
+    private var currentMagStrength = 0f
+    private var lastDistortionNoticeTime = 0L
+
+    // 陀螺仪角速度融合与抗突变状态
+    private var gyroAngularSpeed = 0f // 物理角速度 (rad/s)
+    private var lastGyroTimestamp = 0L
 
     private fun startListeningSensors() {
         if (isSensorListening) return
         var registered = false
         if (rotationSensor != null) {
-            // 优先且仅注册高精度旋转矢量传感器
+            // 优先注册高精度旋转矢量传感器
             sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
             registered = true
             Log.i(TAG, "Registered rotationSensor")
-        } else if (accelerometer != null && magnetometer != null) {
-            // 无旋转矢量时才注册加速度计与地磁传感器
+        }
+        // 注册物理陀螺仪以实现角速度惯性锁与抗突发磁干扰
+        if (gyroscope != null) {
+            sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME)
+            Log.i(TAG, "Registered gyroscope for anti-magnetic-jolt fusion")
+        }
+        // 始终监听磁场传感器以实时监测环境硬磁/软磁干扰强度(μT)
+        if (magnetometer != null) {
+            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        if (rotationSensor == null && accelerometer != null && magnetometer != null) {
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
-            sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_GAME)
             registered = true
             Log.i(TAG, "Registered accelerometer & magnetometer")
-        } else if (orientationSensor != null) {
+        } else if (rotationSensor == null && orientationSensor != null) {
             sensorManager.registerListener(this, orientationSensor, SensorManager.SENSOR_DELAY_GAME)
             registered = true
             Log.i(TAG, "Registered fallback orientationSensor")
@@ -492,42 +508,68 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.unregisterListener(this)
         isSensorListening = false
         hasSmoothHeading = false
+        gyroAngularSpeed = 0f
         Log.i(TAG, "Stopped sensor listening")
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
         val now = System.currentTimeMillis()
-        if (now - lastUpdateTimestamp < 20) return // ~50fps 均匀刷新
 
         var azimuthDegrees: Float? = null
 
+        if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
+            // 陀螺仪测量机身真实旋转角速度，完全不受铁磁干扰！
+            val gx = event.values[0]
+            val gy = event.values[1]
+            val gz = event.values[2]
+            gyroAngularSpeed = Math.sqrt((gx * gx + gy * gy + gz * gz).toDouble()).toFloat()
+            lastGyroTimestamp = now
+            return
+        }
+
         if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+            if (now - lastUpdateTimestamp < 16) return // ~60fps 刷新
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-            SensorManager.getOrientation(rotationMatrix, orientationAngles)
-            val azimuthRad = orientationAngles[0]
-            azimuthDegrees = (Math.toDegrees(azimuthRad.toDouble()).toFloat() + 360f) % 360f
+            azimuthDegrees = getAccurateAzimuth(rotationMatrix)
         } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            if (now - lastUpdateTimestamp < 20) return
             System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
             hasAccData = true
-            if (hasMagData) {
+            if (hasMagData && rotationSensor == null) {
                 azimuthDegrees = calculateOrientationFromAccMag()
             }
         } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
             System.arraycopy(event.values, 0, magnetometerReading, 0, magnetometerReading.size)
             hasMagData = true
-            if (hasAccData) {
+            // 计算环境磁场总强度 (μT)
+            val mx = event.values[0]
+            val my = event.values[1]
+            val mz = event.values[2]
+            currentMagStrength = Math.sqrt((mx * mx + my * my + mz * mz).toDouble()).toFloat()
+            // 正常地球表面地磁约为 30~65 μT，若靠近钢筋铁窗或强磁体常突增至 75~200+ μT
+            val isDistorted = currentMagStrength > 75f || currentMagStrength < 20f
+            if (now - lastDistortionNoticeTime > 800) {
+                lastDistortionNoticeTime = now
+                val strengthFormatted = String.format(java.util.Locale.US, "%.0f", currentMagStrength)
+                webView.post {
+                    webView.evaluateJavascript("if(window.onNativeMagneticFieldUpdate){window.onNativeMagneticFieldUpdate($isDistorted, $strengthFormatted);}", null)
+                }
+            }
+
+            if (hasAccData && rotationSensor == null) {
+                if (now - lastUpdateTimestamp < 20) return
                 azimuthDegrees = calculateOrientationFromAccMag()
             }
         } else {
             @Suppress("DEPRECATION")
-            if (event.sensor.type == Sensor.TYPE_ORIENTATION) {
+            if (event.sensor.type == Sensor.TYPE_ORIENTATION && rotationSensor == null) {
+                if (now - lastUpdateTimestamp < 20) return
                 azimuthDegrees = (event.values[0] + 360f) % 360f
             }
         }
 
         azimuthDegrees?.let { rawDeg ->
-            // 圆周平滑低通滤波（利用 sin/cos 分解解决 0°/360° 跨越跳变）
             val rad = Math.toRadians(rawDeg.toDouble())
             val sinVal = Math.sin(rad)
             val cosVal = Math.cos(rad)
@@ -537,13 +579,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 smoothCos = cosVal
                 hasSmoothHeading = true
             } else {
-                smoothSin += SMOOTHING_ALPHA * (sinVal - smoothSin)
-                smoothCos += SMOOTHING_ALPHA * (cosVal - smoothCos)
+                // 陀螺仪角速度自适应滤波抗磁跳变核心：
+                // 如果陀螺仪显示手机基本静止（角速度 < 0.08 rad/s），但磁场出现异常或跳变，
+                // 启动惯性锁保护（降低跟随权重至 0.06），牢牢压制靠近窗框时的突发磁吸偏；
+                // 当手真正转动手机（角速度 >= 0.08 rad/s）时，放行高动态跟随（权重 0.38），即转即随！
+                val isStatic = gyroAngularSpeed < 0.08f
+                val isFieldAbnormal = currentMagStrength > 75f || currentMagStrength < 20f
+                val adaptiveAlpha = when {
+                    isStatic && isFieldAbnormal -> 0.04 // 靠近铁窗且静止：极大压制磁突变
+                    isStatic -> 0.18                    // 原地微停：极致沉稳平滑
+                    gyroAngularSpeed > 0.4f -> 0.45     // 快速转身：极速跟随
+                    else -> 0.32                        // 常规旋转：兼顾平滑与极速响应
+                }
+
+                smoothSin += adaptiveAlpha * (sinVal - smoothSin)
+                smoothCos += adaptiveAlpha * (cosVal - smoothCos)
             }
 
             val filteredDeg = (Math.toDegrees(Math.atan2(smoothSin, smoothCos)).toFloat() + 360f) % 360f
             val diff = Math.abs(filteredDeg - lastHeading)
-            if (diff > 0.15f || lastHeading < 0) {
+            if (diff > 0.08f || lastHeading < 0) {
                 lastHeading = filteredDeg
                 lastUpdateTimestamp = now
                 val formatted = String.format(java.util.Locale.US, "%.1f", filteredDeg)
@@ -554,6 +609,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    /**
+     * 水平面三维向量投影算法：彻底消除手持倾角（30°~60°）下的欧拉角万向锁与剧烈偏航跳变
+     */
+    private fun getAccurateAzimuth(matrix: FloatArray): Float {
+        // matrix[7] 是手机 Y 轴在垂直天空方向（Z轴）上的分量 = sin(pitch)
+        val sinPitch = matrix[7]
+        val rad: Double
+        if (Math.abs(sinPitch) > 0.85f) {
+            // 当手机几乎直立立起时，重映射坐标系将 Z 轴变换为视线方向
+            if (SensorManager.remapCoordinateSystem(matrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, adjustedMatrix)) {
+                rad = Math.atan2(adjustedMatrix[1].toDouble(), adjustedMatrix[4].toDouble())
+            } else {
+                rad = Math.atan2(matrix[1].toDouble(), matrix[4].toDouble())
+            }
+        } else {
+            // 平放及自然手持（倾角 0° ~ 60°）：手机顶部轴在世界东向和北向的真实水平投影
+            rad = Math.atan2(matrix[1].toDouble(), matrix[4].toDouble())
+        }
+        return ((Math.toDegrees(rad).toFloat() % 360f) + 360f) % 360f
+    }
+
     private fun calculateOrientationFromAccMag(): Float? {
         val success = SensorManager.getRotationMatrix(
             rotationMatrix,
@@ -562,9 +638,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             magnetometerReading
         )
         if (success) {
-            SensorManager.getOrientation(rotationMatrix, orientationAngles)
-            val azimuthRad = orientationAngles[0]
-            return (Math.toDegrees(azimuthRad.toDouble()).toFloat() + 360f) % 360f
+            return getAccurateAzimuth(rotationMatrix)
         }
         return null
     }

@@ -1,0 +1,16 @@
+# 操作系统与编辑器
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# 小程序构建产物与依赖
+miniprogram_npm/
+node_modules/
+
+# 微信开发者工具：个人本地配置（含本机项目名、局域网调试等开关），不应入库
+project.private.config.json
+
+# 日志
+*.log

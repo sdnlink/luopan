@@ -1,0 +1,13 @@
+{
+  "navigationBarTitleText": "演象 · 时空罗盘",
+  "navigationBarBackgroundColor": "#12131a",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#12131a",
+  "disableScroll": false,
+  "usingComponents": {
+    "calib-modal": "/components/calib-modal/calib-modal"
+  },
+  "componentPlaceholder": {
+    "calib-modal": "view"
+  }
+}

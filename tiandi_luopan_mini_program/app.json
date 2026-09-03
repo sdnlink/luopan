@@ -1,0 +1,23 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#12131a",
+    "navigationBarTitleText": "演象 · 时空罗盘",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#12131a"
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于计算您所在地理位置的真实地磁偏角，校准罗盘真北朝向"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,133 @@
+/* components/calib-modal/calib-modal.wxss */
+
+/* 校准弹窗模态框 */
+.calib-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8rpx);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+}
+
+.calib-card {
+  background: #1e1f2b;
+  border: 1px solid #3c3e54;
+  border-radius: 28rpx;
+  width: 90vw;
+  max-width: 640rpx;
+  padding: 36rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.8);
+}
+
+.calib-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.calib-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #d4af37;
+}
+
+.calib-close {
+  font-size: 32rpx;
+  color: #888888;
+  padding: 8rpx;
+}
+
+.calib-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 26rpx;
+  color: #cccccc;
+  margin-bottom: 16rpx;
+}
+
+.calib-acc-badge {
+  font-weight: bold;
+  font-size: 24rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  background: #153828;
+  color: #2ecc71;
+}
+
+.calib-acc-badge.med {
+  background: #3d2f14;
+  color: #f39c12;
+}
+
+.calib-acc-badge.low {
+  background: #3d1717;
+  color: #e74c3c;
+}
+
+.calib-decl-badge {
+  font-weight: bold;
+  font-size: 24rpx;
+}
+
+.calib-figure8-box {
+  display: flex;
+  gap: 20rpx;
+  align-items: center;
+  background: #14151e;
+  border: 1px solid #2d2e40;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.figure8-icon {
+  font-size: 48rpx;
+  color: #d4af37;
+  flex-shrink: 0;
+}
+
+.calib-figure8-text {
+  font-size: 24rpx;
+  color: #bbbbbb;
+  line-height: 1.5;
+}
+
+.bold-text {
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.calib-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.calib-btn {
+  flex: 1;
+  background: #d4af37;
+  color: #111111;
+  font-weight: bold;
+  border-radius: 16rpx;
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+.calib-btn-sub {
+  background: #2d2e40;
+  color: #cccccc;
+  border-radius: 16rpx;
+  padding: 16rpx 28rpx;
+  font-size: 26rpx;
+  line-height: 1.4;
+}

@@ -4,7 +4,8 @@ param(
 
 $ErrorActionPreference = "Continue"
 
-$baseDir = "E:\code\destiny\android-app"
+$baseDir = $PSScriptRoot
+if (-not $baseDir) { $baseDir = "E:\code\android\tiandi_luopan" }
 $toolsDir = Join-Path $baseDir ".tools"
 $jdkDir = Join-Path $toolsDir "jdk-17"
 $sdkDir = Join-Path $toolsDir "android-sdk"

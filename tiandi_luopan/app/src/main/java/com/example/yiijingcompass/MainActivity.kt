@@ -230,13 +230,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 checkAndRequestLocation()
             }
         }
+
+        @JavascriptInterface
+        fun refreshLocation() {
+            runOnUiThread {
+                if (hasLocationPermission()) {
+                    startLocationUpdates()
+                } else {
+                    checkAndRequestLocation()
+                }
+            }
+        }
+    }
+
+    private var lastKnownBestLocation: Location? = null
+    private var isLocationListening = false
+
+    private fun hasLocationPermission(): Boolean {
+        val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return fineGranted || coarseGranted
     }
 
     private fun checkAndRequestLocation() {
-        val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (fineGranted || coarseGranted) {
-            fetchLocationAndCalculateDeclination()
+        if (hasLocationPermission()) {
+            startLocationUpdates()
         } else {
             ActivityCompat.requestPermissions(
                 this,
@@ -251,44 +269,156 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (requestCode == PERMISSION_REQUEST_LOCATION) {
             val anyGranted = grantResults.isNotEmpty() && grantResults.any { it == PackageManager.PERMISSION_GRANTED }
             if (anyGranted) {
-                fetchLocationAndCalculateDeclination()
+                startLocationUpdates()
+            } else {
+                Log.w(TAG, "Location permissions denied by user")
             }
         }
     }
 
-    private val locationListener = LocationListener { location ->
-        updateDeclinationFromLocation(location)
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            if (isBetterLocation(location, lastKnownBestLocation)) {
+                lastKnownBestLocation = location
+                updateLocationAndDeclination(location)
+            }
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+
+        override fun onProviderEnabled(provider: String) {
+            Log.i(TAG, "Location provider enabled: $provider")
+            if (hasLocationPermission()) {
+                startLocationUpdates()
+            }
+        }
+
+        override fun onProviderDisabled(provider: String) {
+            Log.i(TAG, "Location provider disabled: $provider")
+        }
+    }
+
+    /**
+     * 判断新定位是否优于或新鲜于当前最佳定位
+     */
+    private fun isBetterLocation(location: Location, currentBestLocation: Location?): Boolean {
+        if (currentBestLocation == null) {
+            return true
+        }
+
+        val timeDelta: Long = location.time - currentBestLocation.time
+        val isSignificantlyNewer: Boolean = timeDelta > 15000L // 15秒后新坐标优先
+        val isSignificantlyOlder: Boolean = timeDelta < -15000L
+        val isNewer: Boolean = timeDelta > 0L
+
+        if (isSignificantlyNewer) {
+            return true
+        } else if (isSignificantlyOlder) {
+            return false
+        }
+
+        val accuracyDelta: Float = location.accuracy - currentBestLocation.accuracy
+        val isLessAccurate: Boolean = accuracyDelta > 0f
+        val isMoreAccurate: Boolean = accuracyDelta < 0f
+        val isSignificantlyLessAccurate: Boolean = accuracyDelta > 50f
+
+        val isFromSameProvider: Boolean = location.provider == currentBestLocation.provider
+
+        return when {
+            isMoreAccurate -> true
+            isNewer && !isLessAccurate -> true
+            isNewer && !isSignificantlyLessAccurate && isFromSameProvider -> true
+            isNewer && location.provider == LocationManager.GPS_PROVIDER -> true
+            else -> false
+        }
     }
 
     @SuppressLint("MissingPermission")
-    private fun fetchLocationAndCalculateDeclination() {
+    private fun startLocationUpdates() {
+        if (!hasLocationPermission()) return
         try {
             val mgr = locationManager ?: getSystemService(LOCATION_SERVICE) as? LocationManager ?: return
             locationManager = mgr
-            var bestLoc: Location? = null
-            for (p in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)) {
-                if (mgr.isProviderEnabled(p)) {
-                    val loc = mgr.getLastKnownLocation(p)
-                    if (loc != null && (bestLoc == null || loc.accuracy < bestLoc.accuracy)) {
-                        bestLoc = loc
+
+            // 1. 获取现有缓存中最佳的位置用于即时显示
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER,
+                LocationManager.PASSIVE_PROVIDER
+            )
+            for (p in providers) {
+                try {
+                    if (mgr.isProviderEnabled(p)) {
+                        val loc = mgr.getLastKnownLocation(p)
+                        if (loc != null && (lastKnownBestLocation == null || isBetterLocation(loc, lastKnownBestLocation))) {
+                            lastKnownBestLocation = loc
+                        }
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "getLastKnownLocation error for $p: ${e.message}")
                 }
             }
-            if (bestLoc != null) {
-                updateDeclinationFromLocation(bestLoc)
+            lastKnownBestLocation?.let {
+                updateLocationAndDeclination(it)
             }
-            for (p in listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)) {
-                if (mgr.isProviderEnabled(p)) {
-                    mgr.requestLocationUpdates(p, 60000L, 1000f, locationListener)
-                    break
+
+            // 2. 移除旧监听，防止重复注册
+            try {
+                mgr.removeUpdates(locationListener)
+            } catch (_: Exception) {}
+
+            // 3. 同时向 GPS_PROVIDER 和 NETWORK_PROVIDER 注册实时高频监听（1秒 / 0米）
+            var registeredCount = 0
+            if (mgr.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                try {
+                    mgr.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
+                    registeredCount++
+                    Log.i(TAG, "Registered GPS_PROVIDER location updates (1000ms, 0m)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to register GPS_PROVIDER", e)
+                }
+            } else {
+                Log.w(TAG, "GPS_PROVIDER is disabled on device")
+            }
+
+            if (mgr.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                try {
+                    mgr.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 0f, locationListener)
+                    registeredCount++
+                    Log.i(TAG, "Registered NETWORK_PROVIDER location updates (1000ms, 0m)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to register NETWORK_PROVIDER", e)
                 }
             }
+
+            try {
+                if (mgr.isProviderEnabled(LocationManager.PASSIVE_PROVIDER)) {
+                    mgr.requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 1000L, 0f, locationListener)
+                    registeredCount++
+                    Log.i(TAG, "Registered PASSIVE_PROVIDER location updates")
+                }
+            } catch (_: Exception) {}
+
+            isLocationListening = registeredCount > 0
+            Log.i(TAG, "startLocationUpdates completed, active providers: $registeredCount")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to get location for declination", e)
+            Log.e(TAG, "Failed in startLocationUpdates", e)
         }
     }
 
-    private fun updateDeclinationFromLocation(location: Location) {
+    private fun stopLocationUpdates() {
+        if (!isLocationListening && locationManager == null) return
+        try {
+            locationManager?.removeUpdates(locationListener)
+            isLocationListening = false
+            Log.i(TAG, "stopLocationUpdates completed")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop location updates", e)
+        }
+    }
+
+    private fun updateLocationAndDeclination(location: Location) {
         try {
             val altitude = if (location.hasAltitude()) location.altitude.toFloat() else 0f
             val field = GeomagneticField(
@@ -305,14 +435,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             hasAltitude = location.hasAltitude()
             currentAltitude = if (hasAltitude) location.altitude else 0.0
 
-            val latStr = String.format(java.util.Locale.US, "%.4f°%s", Math.abs(currentLatitude), if (currentLatitude >= 0) "N" else "S")
-            val lonStr = String.format(java.util.Locale.US, "%.4f°%s", Math.abs(currentLongitude), if (currentLongitude >= 0) "E" else "W")
+            // 5位小数精度（约1.1米分辨率），让走动或微移时能直观看到坐标实时刷新
+            val latStr = String.format(java.util.Locale.US, "%.5f°%s", Math.abs(currentLatitude), if (currentLatitude >= 0) "N" else "S")
+            val lonStr = String.format(java.util.Locale.US, "%.5f°%s", Math.abs(currentLongitude), if (currentLongitude >= 0) "E" else "W")
             val altStr = if (hasAltitude) String.format(java.util.Locale.US, " · 海拔 %.0fm", currentAltitude) else ""
-            coordsDesc = "$latStr, $lonStr$altStr"
+            val accStr = if (location.hasAccuracy() && location.accuracy > 0f) String.format(java.util.Locale.US, " (±%.0fm)", location.accuracy) else ""
+            coordsDesc = "$latStr, $lonStr$altStr$accStr"
 
             val dirStr = if (currentDeclination < 0) "西偏" else if (currentDeclination > 0) "东偏" else "无偏"
             locationDesc = "$latStr, $lonStr · 磁偏角 ${String.format(java.util.Locale.US, "%.1f", Math.abs(currentDeclination))}°($dirStr)"
-            Log.i(TAG, "Geomagnetic declination & coordinates updated: $coordsDesc ($locationDesc)")
+            Log.i(TAG, "Location & declination updated: $coordsDesc (provider=${location.provider})")
 
             val declinationFormatted = String.format(java.util.Locale.US, "%.2f", currentDeclination)
             val escapedDesc = locationDesc.replace("'", "\\'")
@@ -322,7 +454,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($currentLatitude, $currentLongitude, $currentAltitude, $hasAltitude, '$escapedCoords');}", null)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error calculating GeomagneticField", e)
+            Log.e(TAG, "Error calculating GeomagneticField or updating location", e)
         }
     }
 
@@ -451,16 +583,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         webView.onResume()
         enterFullScreen()
         startListeningSensors()
+        if (hasLocationPermission()) {
+            startLocationUpdates()
+        }
     }
 
     override fun onPause() {
         super.onPause()
         webView.onPause()
         stopListeningSensors()
+        stopLocationUpdates()
     }
 
     override fun onDestroy() {
         stopListeningSensors()
+        stopLocationUpdates()
         webView.destroy()
         super.onDestroy()
     }

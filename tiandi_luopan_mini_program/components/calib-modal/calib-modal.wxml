@@ -1,0 +1,48 @@
+<!-- components/calib-modal/calib-modal.wxml -->
+<!-- 自动校准与地磁偏角说明弹窗 -->
+<view class="calib-modal-overlay" bindtap="onClose">
+  <view class="calib-card" catchtap="preventBubble">
+    <view class="calib-header">
+      <text class="calib-title">🧭 罗盘双针与地磁偏角校准</text>
+      <text class="calib-close" bindtap="onClose">✕</text>
+    </view>
+
+    <view class="calib-status-row">
+      <text>当前地磁传感器精度：</text>
+      <text class="calib-acc-badge {{accClass}}">{{accuracyText}}</text>
+    </view>
+
+    <view class="calib-status-row" style="margin-bottom: 16rpx;">
+      <text>当前经纬度坐标：</text>
+      <text class="calib-decl-badge" style="color:#50e3c2;">{{coordsDesc}}</text>
+    </view>
+
+    <view class="calib-status-row" style="margin-bottom: 20rpx;">
+      <text>当前位置地磁偏角：</text>
+      <text class="calib-decl-badge" style="color:#f1c40f;">{{declDesc}}</text>
+    </view>
+
+    <view class="calib-figure8-box">
+      <view class="figure8-icon">🧭</view>
+      <view class="calib-figure8-text">
+        <text class="bold-text">双针系统与易学考据：\n</text>
+        • <text style="color:#2ecc71;font-weight:bold;">绿色“磁”针</text>：地磁北（地盘正针），物理磁场实测，传统立向格龙之准绳。\n
+        • <text style="color:#f1c40f;font-weight:bold;">金色“真”针</text>：地理真北（对应现代地图北向），经全球地磁模型(WMM)与GPS精确实时校正。\n
+        • <text class="bold-text">两针夹角</text>：即为您所在地的真实地磁偏角。
+      </view>
+    </view>
+
+    <view class="calib-figure8-box">
+      <view class="figure8-icon">♾️</view>
+      <view class="calib-figure8-text">
+        <text class="bold-text">传感器快速校准：\n</text>
+        若发现指针微抖，拿起手机在空中按 <text class="bold-text">“8” 字形</text> 翻转挥动 2~3 次，设备内置地磁传感器将自动完成多轴空间偏移校正并达到最高精度。
+      </view>
+    </view>
+
+    <view class="calib-actions">
+      <button class="calib-btn" bindtap="onReset">🔄 重新定位与校准</button>
+      <button class="calib-btn-sub" bindtap="onClose">我知道了</button>
+    </view>
+  </view>
+</view>

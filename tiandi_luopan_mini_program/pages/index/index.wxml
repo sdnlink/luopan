@@ -1,0 +1,137 @@
+<!-- mini_program/pages/index/index.wxml -->
+<view class="page-container">
+  <!-- 顶部状态与信息区 -->
+  <view class="header-section">
+    <view class="app-title">演象 · 时空罗盘</view>
+    <view class="subtitle">
+      <text>{{todayLine}}</text> · <text class="highlight-time">{{nowTime}}</text>
+    </view>
+    <view class="direction-mark">↑南 | ↓北 | ←东 | →西</view>
+
+    <!-- 罗盘模式切换 Tab -->
+    <view class="tab-bar">
+      <view class="tab-btn {{currentMode === 'post' ? 'active' : ''}}" bindtap="onSwitchMode" data-mode="post">
+        后天八卦罗盘
+      </view>
+      <view class="tab-btn {{currentMode === 'pre' ? 'active' : ''}}" bindtap="onSwitchMode" data-mode="pre">
+        先天八卦罗盘
+      </view>
+    </view>
+
+    <!-- 顶部朝向与磁偏角微光状态栏 -->
+    <view class="compass-bar" bindtap="toggleCalibModal" data-show="true">
+      <view class="compass-info-box">
+        <view class="calib-dot {{calibClass}}"></view>
+        <text class="compass-info-mag">磁: {{headingDescMag}}</text>
+        <text class="compass-info-divider">|</text>
+        <text class="compass-info-true">真: {{headingDescTrue}}</text>
+        <text class="compass-info-decl">({{declSummary}})</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 罗盘视口与 Canvas 2D 绘图容器 -->
+  <view class="compass-container">
+    <view class="compass-viewport">
+      <canvas 
+        type="2d" 
+        id="compassCanvas" 
+        class="compass-canvas"
+        bindtouchstart="onTouchStart"
+        bindtouchmove="onTouchMove"
+        bindtouchend="onTouchEnd"
+      ></canvas>
+    </view>
+  </view>
+
+  <!-- 底部卦象与山向详细解释面板 -->
+  <view class="info-panel">
+    <view class="info-title">当前选中：{{currentMountain.name}}山 ({{currentPalaceName}})</view>
+    
+    <view class="info-item">
+      <text class="info-label">地理方位</text>
+      <text class="info-val">{{geoDirStr}} · {{currentMountain.deg}}°</text>
+    </view>
+    
+    <view class="info-item">
+      <text class="info-label">经纬坐标</text>
+      <text class="info-val val-coords">{{coordsDisplayStr}}</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">后天八卦</text>
+      <text class="info-val">{{currentMountain.post}} {{currentMountain.postSym}}</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">先天八卦</text>
+      <text class="info-val">{{currentMountain.pre}} {{currentMountain.preSym}}</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">五行属性</text>
+      <text class="info-val" style="color: {{elemColor}}">{{currentMountain.elem}}</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">对应山向</text>
+      <text class="info-val">{{currentMountain.name}}山</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">当令节气</text>
+      <text class="info-val">{{currentMountain.solar}}</text>
+    </view>
+
+    <view class="info-item">
+      <text class="info-label">主应消息卦</text>
+      <text class="info-val">{{currentMountain.gua}}</text>
+    </view>
+
+    <!-- 罗盘图例说明 -->
+    <view class="legend">
+      <view class="legend-title">五行配色说明：</view>
+      <view class="legend-row">
+        <text style="color:#4a90e2">■ 水 (黑蓝)</text> | 
+        <text style="color:#2ecc71">■ 木 (青绿)</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#e74c3c">■ 火 (赤红)</text> | 
+        <text style="color:#f5a623">■ 土 (黄褐)</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#e0e0e0">■ 金 (白银)</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#d4af37">▣ 金色弧 = 今日当令之山</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#aaa">外圈刻度 = 24小时制（12时正南·0时正北）</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#c8b88a">最外环 = 先天六十四卦圆图（乾南坤北）</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#e74c3c">● 红色指针 = 当前实时时间（每30秒自动刷新）</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#2ecc71">▲ 绿色指针 = 地磁北（磁北·标“磁”·地盘正针）</text>
+      </view>
+      <view class="legend-row">
+        <text style="color:#f1c40f">▲ 金色指针 = 地理真北（真北·标“真”·GPS磁偏角校正）</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 自动校准与地磁偏角说明弹窗（用时注入组件：wx:if 放在页面层，
+       用户首次点开前该组件不会被注入，首次进入渲染树时先渲染为占位组件 view） -->
+  <calib-modal
+    wx:if="{{showCalibModal}}"
+    acc-class="{{calibAccClass}}"
+    accuracy-text="{{calibAccuracyText}}"
+    coords-desc="{{coordsDisplayStr}}"
+    decl-desc="{{declinationDetailStr}}"
+    bind:close="onCalibClose"
+    bind:reset="onCalibReset"
+  />
+</view>

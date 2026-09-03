@@ -1,0 +1,224 @@
+/** mini_program/pages/index/index.wxss **/
+
+.page-container {
+  min-height: 100vh;
+  background-color: #12131a;
+  color: #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx 20rpx 40rpx;
+}
+
+/* 顶部标题与副标题 */
+.header-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-title {
+  font-size: 40rpx;
+  letter-spacing: 4rpx;
+  color: #d4af37;
+  margin-bottom: 8rpx;
+  font-weight: bold;
+}
+
+.subtitle {
+  font-size: 24rpx;
+  color: #888899;
+  margin-bottom: 8rpx;
+}
+
+.highlight-time {
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.direction-mark {
+  font-size: 24rpx;
+  color: #c8b88a;
+  letter-spacing: 4rpx;
+  margin-bottom: 12rpx;
+}
+
+/* Tab 模式切换 */
+.tab-bar {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.tab-btn {
+  background: #1c1d28;
+  color: #888899;
+  border: 1px solid #333446;
+  padding: 10rpx 28rpx;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.active {
+  background: #d4af37;
+  color: #111111;
+  border-color: #d4af37;
+  font-weight: bold;
+}
+
+/* 罗盘朝向微光胶囊栏 */
+.compass-bar {
+  display: flex;
+  margin-bottom: 12rpx;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.compass-info-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  background: rgba(28, 29, 40, 0.85);
+  border: 1px solid rgba(46, 204, 113, 0.45);
+  color: #2ecc71;
+  padding: 8rpx 24rpx;
+  border-radius: 40rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.35);
+  letter-spacing: 1rpx;
+}
+
+.calib-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  display: inline-block;
+  background: #2ecc71;
+  box-shadow: 0 0 12rpx #2ecc71;
+}
+
+.calib-dot.med {
+  background: #f39c12;
+  box-shadow: 0 0 12rpx #f39c12;
+}
+
+.calib-dot.low {
+  background: #e74c3c;
+  box-shadow: 0 0 12rpx #e74c3c;
+}
+
+.compass-info-mag {
+  color: #2ecc71;
+}
+
+.compass-info-divider {
+  color: #555566;
+  margin: 0 4rpx;
+}
+
+.compass-info-true {
+  color: #f1c40f;
+}
+
+.compass-info-decl {
+  color: #888899;
+  font-size: 20rpx;
+}
+
+/* 罗盘视口与 Canvas 容器 */
+.compass-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10rpx 0 20rpx;
+  width: 100%;
+}
+
+.compass-viewport {
+  width: 680rpx;
+  height: 680rpx;
+  position: relative;
+  overflow: hidden;
+  border-radius: 50%;
+  background-color: #1a1a24;
+  box-shadow: 0 0 60rpx rgba(0, 0, 0, 0.85), 0 0 28rpx rgba(212, 175, 55, 0.35);
+}
+
+.compass-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+
+/* 底部卦象解释面板 */
+.info-panel {
+  background: #1c1d28;
+  border: 1px solid #333446;
+  border-radius: 20rpx;
+  padding: 30rpx;
+  width: 680rpx;
+  box-shadow: 0 8rpx 30rpx rgba(0, 0, 0, 0.5);
+  margin-bottom: 30rpx;
+}
+
+.info-title {
+  font-size: 32rpx;
+  color: #d4af37;
+  border-bottom: 1px solid #333446;
+  padding-bottom: 16rpx;
+  margin-bottom: 20rpx;
+  font-weight: bold;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+  font-size: 26rpx;
+}
+
+.info-label {
+  color: #888899;
+}
+
+.info-val {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.val-coords {
+  color: #d4af37;
+  font-weight: bold;
+  font-size: 24rpx;
+}
+
+/* 图例区域 */
+.legend {
+  margin-top: 24rpx;
+  padding-top: 20rpx;
+  border-top: 1px solid #2a2b3d;
+  font-size: 22rpx;
+  color: #888899;
+  line-height: 1.6;
+}
+
+.legend-title {
+  color: #cccccc;
+  font-weight: bold;
+  margin-bottom: 8rpx;
+}
+
+.legend-row {
+  margin-bottom: 4rpx;
+}
+
+/* 校准弹窗（.calib-modal-overlay / .calib-card / .calib-btn 等）相关样式
+   已随 calib-modal 组件迁移至 components/calib-modal/calib-modal.wxss，
+   随该组件的「用时注入」一并加载。
+   上方 .calib-dot 系列仍属于顶部朝向胶囊栏，故保留在本页面样式中。 */

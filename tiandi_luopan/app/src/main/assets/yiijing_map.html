@@ -298,7 +298,7 @@
         <div class="info-panel">
             <div class="info-title" id="info-heading">当前选中：子山 (坎宫)</div>
             <div class="info-item"><span class="info-label">地理方位</span><span class="info-val" id="val-dir">正北 · 0°</span></div>
-            <div class="info-item"><span class="info-label">经纬坐标</span><span class="info-val" id="val-coords" style="color:#d4af37">获取中…</span></div>
+            <div class="info-item" style="cursor:pointer" onclick="toggleCalibModal(true); if(window.AndroidCompass && window.AndroidCompass.refreshLocation) window.AndroidCompass.refreshLocation();"><span class="info-label">经纬坐标 ⟳</span><span class="info-val" id="val-coords" style="color:#d4af37">获取中…</span></div>
             <div class="info-item"><span class="info-label">后天八卦</span><span class="info-val" id="val-post">坎 ☵</span></div>
             <div class="info-item"><span class="info-label">先天八卦</span><span class="info-val" id="val-pre">坤 ☷</span></div>
             <div class="info-item"><span class="info-label">五行属性</span><span class="info-val" id="val-elem">水</span></div>
@@ -625,6 +625,20 @@
             }
         };
 
+        // Android 原生通知定位服务未开启
+        window.onNativeLocationDisabled = function() {
+            const valCoords = document.getElementById('val-coords');
+            const calibCoords = document.getElementById('calib-coords-badge');
+            if (valCoords && !currentCoordsStr) {
+                valCoords.innerText = '请开启系统位置信息(GPS)';
+                valCoords.style.color = '#e74c3c';
+            }
+            if (calibCoords && !currentCoordsStr) {
+                calibCoords.innerText = '⚠️ 系统位置服务未开启';
+                calibCoords.style.color = '#e74c3c';
+            }
+        };
+
         window.onNativeCompassAvailable = function(avail) {
             if (avail) {
                 compassEnabled = true;
@@ -729,7 +743,11 @@
                 displayStr = locationDesc.split(' · ')[0];
             }
             if (displayStr) {
-                if (valCoords) valCoords.innerText = displayStr;
+                if (valCoords) {
+                    valCoords.innerText = displayStr;
+                    valCoords.style.color = '#50e3c2';
+                    valCoords.style.transition = 'color 0.3s ease';
+                }
                 if (calibCoords) {
                     calibCoords.innerText = displayStr;
                     calibCoords.style.color = '#50e3c2';
@@ -746,6 +764,9 @@
         window.doResetCalib = function() {
             if (window.AndroidCompass && typeof window.AndroidCompass.resetCalibration === 'function') {
                 window.AndroidCompass.resetCalibration();
+            }
+            if (window.AndroidCompass && typeof window.AndroidCompass.refreshLocation === 'function') {
+                window.AndroidCompass.refreshLocation();
             }
             updateCalibStatus(1);
             const badge = document.getElementById('calib-acc-badge');

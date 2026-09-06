@@ -55,6 +55,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var currentAltitude: Double = 0.0
     private var hasAltitude: Boolean = false
     private var coordsDesc: String = ""
+    private var currentSpeedKmH: Float = 0f
+    private var lastLocationForSpeed: Location? = null
+    private var currentPitch: Float = 0f
+    private var currentRoll: Float = 0f
+    private var lastPushedPitch: Float = 0f
+    private var lastPushedRoll: Float = 0f
+    private var lastTiltUpdateTimestamp: Long = 0L
 
     private val accelerometerReading = FloatArray(3)
     private val magnetometerReading = FloatArray(3)
@@ -124,11 +131,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 val escapedDesc = locationDesc.replace("'", "\\'")
                 val escapedCoords = coordsDesc.replace("'", "\\'")
                 Log.i(TAG, "onPageFinished: pushing hasSensor=$hasSensor, initHeading=$initHeading, declination=$declFormatted, coords=$coordsDesc")
+                val speedFormatted = String.format(java.util.Locale.US, "%.1f", currentSpeedKmH)
+                val pitchStr = String.format(java.util.Locale.US, "%.1f", currentPitch)
+                val rollStr = String.format(java.util.Locale.US, "%.1f", currentRoll)
                 webView.evaluateJavascript("if(window.onNativeCompassAvailable){window.onNativeCompassAvailable($hasSensor);}", null)
                 webView.evaluateJavascript("if(window.onNativeCompassAccuracy){window.onNativeCompassAccuracy($currentAccuracy);}", null)
                 webView.evaluateJavascript("if(window.onNativeHeadingUpdate){window.onNativeHeadingUpdate($initHeading);}", null)
                 webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declFormatted, $hasDeclination, '$escapedDesc');}", null)
                 webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($currentLatitude, $currentLongitude, $currentAltitude, $hasAltitude, '$escapedCoords');}", null)
+                webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
+                webView.evaluateJavascript("if(window.onNativeTiltUpdate){window.onNativeTiltUpdate($pitchStr, $rollStr);}", null)
             }
         }
 
@@ -227,6 +239,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         @JavascriptInterface
+        fun getSpeed(): Float {
+            return currentSpeedKmH
+        }
+
+        @JavascriptInterface
+        fun getPitch(): Float {
+            return currentPitch
+        }
+
+        @JavascriptInterface
+        fun getRoll(): Float {
+            return currentRoll
+        }
+
+        @JavascriptInterface
         fun requestLocationPermission() {
             runOnUiThread {
                 checkAndRequestLocation()
@@ -278,8 +305,38 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private fun calculateSpeed(location: Location) {
+        if (location.hasSpeed()) {
+            currentSpeedKmH = Math.max(0f, location.speed * 3.6f)
+        } else {
+            val prev = lastLocationForSpeed
+            if (prev != null && location.time > prev.time) {
+                val dtSec = (location.time - prev.time) / 1000.0f
+                if (dtSec in 0.5f..10.0f) {
+                    val distMeters = location.distanceTo(prev)
+                    if (distMeters > 1.2f) {
+                        currentSpeedKmH = (distMeters / dtSec) * 3.6f
+                    } else {
+                        currentSpeedKmH = 0f
+                    }
+                }
+            }
+        }
+        lastLocationForSpeed = location
+    }
+
+    private fun pushSpeedUpdate() {
+        val speedFormatted = String.format(java.util.Locale.US, "%.1f", currentSpeedKmH)
+        webView.post {
+            webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
+        }
+    }
+
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
+            calculateSpeed(location)
+            pushSpeedUpdate()
+
             if (isBetterLocation(location, lastKnownBestLocation)) {
                 lastKnownBestLocation = location
                 updateLocationAndDeclination(location)
@@ -355,6 +412,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         val loc = mgr.getLastKnownLocation(p)
                         if (loc != null && (lastKnownBestLocation == null || isBetterLocation(loc, lastKnownBestLocation))) {
                             lastKnownBestLocation = loc
+                            if (loc.hasSpeed()) {
+                                currentSpeedKmH = Math.max(0f, loc.speed * 3.6f)
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -451,9 +511,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val declinationFormatted = String.format(java.util.Locale.US, "%.2f", currentDeclination)
             val escapedDesc = locationDesc.replace("'", "\\'")
             val escapedCoords = coordsDesc.replace("'", "\\'")
+            val speedFormatted = String.format(java.util.Locale.US, "%.1f", currentSpeedKmH)
             webView.post {
                 webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declinationFormatted, $hasDeclination, '$escapedDesc');}", null)
                 webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($currentLatitude, $currentLongitude, $currentAltitude, $hasAltitude, '$escapedCoords');}", null)
+                webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating GeomagneticField or updating location", e)
@@ -529,13 +591,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-            if (now - lastUpdateTimestamp < 16) return // ~60fps 刷新
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+            updateTiltAngles(now)
+            if (now - lastUpdateTimestamp < 16) return // ~60fps 刷新
             azimuthDegrees = getAccurateAzimuth(rotationMatrix)
         } else if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            if (now - lastUpdateTimestamp < 20) return
             System.arraycopy(event.values, 0, accelerometerReading, 0, accelerometerReading.size)
             hasAccData = true
+            if (rotationSensor == null) {
+                updateTiltAnglesFromAcc(now)
+            }
+            if (now - lastUpdateTimestamp < 20) return
             if (hasMagData && rotationSensor == null) {
                 azimuthDegrees = calculateOrientationFromAccMag()
             }
@@ -604,6 +670,39 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 val formatted = String.format(java.util.Locale.US, "%.1f", filteredDeg)
                 webView.post {
                     webView.evaluateJavascript("if(window.onNativeHeadingUpdate){window.onNativeHeadingUpdate($formatted);}", null)
+                }
+            }
+        }
+    }
+
+    private fun updateTiltAngles(now: Long) {
+        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+        currentPitch = Math.toDegrees(orientationAngles[1].toDouble()).toFloat()
+        currentRoll = Math.toDegrees(orientationAngles[2].toDouble()).toFloat()
+        pushTiltUpdate(now)
+    }
+
+    private fun updateTiltAnglesFromAcc(now: Long) {
+        val ax = accelerometerReading[0].toDouble()
+        val ay = accelerometerReading[1].toDouble()
+        val az = accelerometerReading[2].toDouble()
+        currentPitch = Math.toDegrees(Math.atan2(-ay, Math.sqrt(ax * ax + az * az))).toFloat()
+        currentRoll = Math.toDegrees(Math.atan2(ax, az)).toFloat()
+        pushTiltUpdate(now)
+    }
+
+    private fun pushTiltUpdate(now: Long) {
+        if (now - lastTiltUpdateTimestamp > 40) { // ~25fps 倾角更新
+            val pitchDiff = Math.abs(currentPitch - lastPushedPitch)
+            val rollDiff = Math.abs(currentRoll - lastPushedRoll)
+            if (pitchDiff > 0.15f || rollDiff > 0.15f || now - lastTiltUpdateTimestamp > 350) {
+                lastTiltUpdateTimestamp = now
+                lastPushedPitch = currentPitch
+                lastPushedRoll = currentRoll
+                val pitchStr = String.format(java.util.Locale.US, "%.1f", currentPitch)
+                val rollStr = String.format(java.util.Locale.US, "%.1f", currentRoll)
+                webView.post {
+                    webView.evaluateJavascript("if(window.onNativeTiltUpdate){window.onNativeTiltUpdate($pitchStr, $rollStr);}", null)
                 }
             }
         }

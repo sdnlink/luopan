@@ -77,20 +77,25 @@ Set-Location $baseDir
 if ($Target -eq "release") {
     Write-Host "Running Gradle assembleRelease..."
     & ".\gradlew.bat" assembleRelease
-    $apkPath = Join-Path $baseDir "app\build\outputs\apk\release\yanxiang.apk"
+    $apkDir = Join-Path $baseDir "app\build\outputs\apk\release"
 } else {
     Write-Host "Running Gradle assembleDebug..."
     & ".\gradlew.bat" assembleDebug
-    $apkPath = Join-Path $baseDir "app\build\outputs\apk\debug\app-debug.apk"
+    $apkDir = Join-Path $baseDir "app\build\outputs\apk\debug"
 }
 
-if (Test-Path $apkPath) {
+$foundApk = Get-ChildItem -Path $apkDir -Filter "yanxiang*.apk" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($foundApk) {
+    $apkPath = $foundApk.FullName
     $apkItem = Get-Item $apkPath
+    # 同步复制到项目根目录下，方便直接提取
+    Copy-Item $apkPath -Destination (Join-Path $baseDir $apkItem.Name) -Force
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Green
     Write-Host ">>> APK 编译成功: $($apkItem.FullName)" -ForegroundColor Green
+    Write-Host ">>> 文件名称: $($apkItem.Name)" -ForegroundColor Green
     Write-Host ">>> 文件大小: $([math]::Round($apkItem.Length / 1MB, 2)) MB ($($apkItem.Length) 字节)" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Green
 } else {
-    Write-Error "APK file not found at: $apkPath"
+    Write-Error "APK file not found in: $apkDir"
 }

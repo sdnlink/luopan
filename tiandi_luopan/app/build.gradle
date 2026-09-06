@@ -11,8 +11,8 @@ android {
         applicationId "com.example.yiijingcompass"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 102
+        versionName "1.0.2"
     }
 
     signingConfigs {
@@ -35,7 +35,9 @@ android {
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             if (variant.buildType.name == 'release') {
-                outputFileName = "yanxiang.apk"
+                outputFileName = "yanxiang-v${variant.versionName}.apk"
+            } else {
+                outputFileName = "yanxiang-v${variant.versionName}-${variant.buildType.name}.apk"
             }
         }
     }

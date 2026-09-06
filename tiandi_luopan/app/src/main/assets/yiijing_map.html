@@ -382,6 +382,70 @@
             margin-bottom: 8px;
             font-size: 13px;
         }
+        .info-item.clickable {
+            cursor: pointer;
+            border-radius: 6px;
+            padding: 4px 6px;
+            margin: -4px -6px 6px -6px;
+            transition: all 0.2s ease;
+        }
+        .info-item.clickable:hover, .info-item.clickable:active {
+            background: rgba(212, 175, 55, 0.15);
+        }
+        .clickable-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .info-hint-icon {
+            font-size: 10px;
+            color: #d4af37;
+            background: rgba(212, 175, 55, 0.18);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 50%;
+            width: 15px;
+            height: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+        .explain-box {
+            background: #14151e;
+            border: 1px solid #2d2e40;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+        .explain-title {
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .explain-tag {
+            display: inline-block;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .explain-quote {
+            background: rgba(212, 175, 55, 0.08);
+            border-left: 3px solid #d4af37;
+            padding: 8px 12px;
+            font-size: 11px;
+            color: #ffd166;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+            line-height: 1.6;
+        }
         .info-label { color: #888; }
         .info-val { font-weight: bold; color: #fff; }
         .legend {
@@ -495,6 +559,128 @@
         </div>
     </div>
 
+    <!-- 空亡诊断详细说明弹窗 -->
+    <div class="calib-modal-overlay" id="kongwang-modal" onclick="if(event.target===this)toggleKongwangModal(false)">
+        <div class="calib-card" style="max-height:85vh; overflow-y:auto; width:min(92vw, 440px);">
+            <div class="calib-header">
+                <span class="calib-title">🧭 空亡诊断 · 详细说明与断诀</span>
+                <span class="calib-close" onclick="toggleKongwangModal(false)">✕</span>
+            </div>
+            <!-- 实时状态卡片 -->
+            <div class="calib-status-row" style="background:#181926; padding:10px 12px; border-radius:8px; border:1px solid #2e3046; margin-bottom:12px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="color:#aaa; font-size:11px;">当前实测朝向：<strong id="kw-modal-heading" style="color:#f1c40f">--</strong></span>
+                    <span style="color:#aaa; font-size:11px;">偏中线度数：<strong id="kw-modal-offset" style="color:#fff">--</strong></span>
+                </div>
+                <div>
+                    <span id="kw-modal-badge" class="kw-badge pure">正针纯清</span>
+                </div>
+            </div>
+
+            <!-- 四大格局部析 -->
+            <div class="explain-box" style="border-left: 3px solid #2ecc71;">
+                <div class="explain-title" style="color:#2ecc71">
+                    <span>🟢 正针纯清</span>
+                    <span class="explain-tag" style="background:#153828; color:#2ecc71; border:1px solid #2ecc71">大吉 · 最宜立向</span>
+                </div>
+                <div>每山占 15°，其中央 <strong>9° 核心范围</strong>（距正中线 ≤ 4.5°）为正针。正针磁场纯净，阴阳各归其位，最得山川正穴生旺之气。主<strong>丁财两旺、出人端正、百福骈臻</strong>，为风水立向最高准绳。</div>
+            </div>
+
+            <div class="explain-box" style="border-left: 3px solid #f39c12;">
+                <div class="explain-title" style="color:#f39c12">
+                    <span>🟡 兼山兼向</span>
+                    <span class="explain-tag" style="background:#3d2f14; color:#f39c12; border:1px solid #f39c12">次吉 · 须起替卦</span>
+                </div>
+                <div>偏离正中线 <strong>4.5° ~ 7.0°</strong>（落在该山边缘 3° 区间），磁场偏向邻山（如卯山兼甲、卯山兼乙）。气场微杂，在沈氏玄空学中必须采用<strong>“替卦翻卦诀”</strong>排布飞星理气，富贵虽有，难免驳杂。</div>
+            </div>
+
+            <div class="explain-box" style="border-left: 3px solid #e74c3c;">
+                <div class="explain-title" style="color:#e74c3c">
+                    <span>🔴 差错小空亡</span>
+                    <span class="explain-tag" style="background:#3d1717; color:#e74c3c; border:1px solid #e74c3c">大凶 · 切莫犯之</span>
+                </div>
+                <div>压在<strong>同宫两山交界缝线上</strong>（如坎宫内壬与子、子与癸交界线，偏差 ±0.5° 内）。古称“小空亡”，阴阳差错、气场交战。犯之主<strong>口舌官非、骨肉不和、行事犹豫差错、疾病破败</strong>。</div>
+            </div>
+
+            <div class="explain-box" style="border-left: 3px solid #ff5252;">
+                <div class="explain-title" style="color:#ff5252">
+                    <span>⛔ 出卦大空亡</span>
+                    <span class="explain-tag" style="background:#5a0f0f; color:#ff5252; border:1px solid #ff5252">极凶 · 第一大忌</span>
+                </div>
+                <div>压在<strong>八卦两宫交界线上</strong>（如坎宫癸与艮宫丑交界、震宫乙与巽宫辰交界，偏差 ±0.5° 内）。两卦之气在此断绝相克，天地气机脱节。犯之主<strong>损丁破财、绝嗣癫狂、灾祸连绵</strong>，为地理勘测绝不可用之死线！</div>
+            </div>
+
+            <div class="explain-quote">
+                “正针百步始为荣，贫贱生离死别见。要向纯清穴中求，莫入火坑空亡线。”
+            </div>
+
+            <div class="calib-actions" style="margin-top:12px;">
+                <button class="calib-btn" onclick="toggleKongwangModal(false)">返回罗盘</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一百二十分金详细说明弹窗 -->
+    <div class="calib-modal-overlay" id="fenjin-modal" onclick="if(event.target===this)toggleFenjinModal(false)">
+        <div class="calib-card" style="max-height:85vh; overflow-y:auto; width:min(92vw, 440px);">
+            <div class="calib-header">
+                <span class="calib-title">💎 一百二十分金 · 详细说明与断诀</span>
+                <span class="calib-close" onclick="toggleFenjinModal(false)">✕</span>
+            </div>
+            <!-- 实时分金状态 -->
+            <div class="calib-status-row" style="background:#181926; padding:10px 12px; border-radius:8px; border:1px solid #2e3046; margin-bottom:12px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="color:#aaa; font-size:11px;">当前实测分金：<strong id="fj-modal-name" style="color:#ffd166">--</strong></span>
+                    <span style="color:#aaa; font-size:11px;">分金度数范围：<strong id="fj-modal-range" style="color:#50e3c2">--</strong></span>
+                </div>
+                <div>
+                    <span id="fj-modal-badge" style="font-weight:bold; font-size:12px; color:#2ecc71">旺相珠宝</span>
+                </div>
+            </div>
+
+            <!-- 分金渊源 -->
+            <div class="explain-box">
+                <div class="explain-title" style="color:#d4af37">
+                    <span>📜 一百二十分金由来与原理</span>
+                </div>
+                <div>罗盘 360° 分为 24 山，每山再精细均分为 5 个刻度，共计 <strong>120 分金</strong>，每个分金精准占 <strong>3.0°</strong>。对应六十甲子纳音五行与地盘正针，是杨公三元三合派在二十四山基础上进行毫厘级定针立向的核心秘诀。</div>
+            </div>
+
+            <!-- 珠宝吉线 -->
+            <div class="explain-box" style="border-left: 3px solid #2ecc71;">
+                <div class="explain-title" style="color:#2ecc71">
+                    <span>✨ 珠宝线（旺相吉线）</span>
+                    <span class="explain-tag" style="background:#153828; color:#2ecc71; border:1px solid #2ecc71">大吉 · 迎祥纳福</span>
+                </div>
+                <div>在 120 分金中，凡属于 <strong>丙子旬</strong> 与 <strong>庚子旬</strong>（即天干为丙、丁、庚、辛者）统称为“珠宝线”。金水相涵、木火通明，纳音旺相有情。主<strong>得金纳宝、丁财贵寿兼全、福寿绵长</strong>。</div>
+            </div>
+
+            <!-- 火坑凶线 -->
+            <div class="explain-box" style="border-left: 3px solid #e74c3c;">
+                <div class="explain-title" style="color:#e74c3c">
+                    <span>🔥 火坑线（孤虚凶线）</span>
+                    <span class="explain-tag" style="background:#3d1717; color:#e74c3c; border:1px solid #e74c3c">大凶 · 避之如仇</span>
+                </div>
+                <div>
+                    • <strong>甲子旬</strong>（甲、乙干支）：为“孤阳孤阴”；<br>
+                    • <strong>壬子旬</strong>（壬、癸干支）：为“虚耗阴冷”；<br>
+                    • <strong>戊子旬</strong>（戊、己干支）：为“大煞曜火坑”、“龟甲空亡”。<br>
+                    犯火坑分金者，主<strong>破家败业、人财凋零、子孙孤寡</strong>。
+                </div>
+            </div>
+
+            <div class="explain-quote">
+                “三十六个是火坑，点着火坑便应凶；<br>
+                子孙绝灭败家产，官灾疾病祸无穷。<br>
+                要向珠宝穴中求，黄金满屋世代荣。”
+            </div>
+
+            <div class="calib-actions" style="margin-top:12px;">
+                <button class="calib-btn" onclick="toggleFenjinModal(false)">返回罗盘</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="compass-viewport" id="compass-viewport">
             <div class="compass-transform-box" id="compass-transform-box">
@@ -509,8 +695,8 @@
         <div class="info-panel">
             <div class="info-title" id="info-heading">当前选中：子山 (坎宫)</div>
             <div class="info-item"><span class="info-label">立向格局</span><span class="info-val" id="val-sitface" style="color:#f1c40f">坐午向子 · 正针</span></div>
-            <div class="info-item"><span class="info-label">空亡诊断</span><span class="info-val" id="val-kongwang"><span class="kw-badge pure">正针纯清</span></span></div>
-            <div class="info-item"><span class="info-label">一百二十分金</span><span class="info-val" id="val-fenjin" style="color:#ffd166">庚子分金 (旺相珠宝)</span></div>
+            <div class="info-item clickable" onclick="toggleKongwangModal(true)" title="点击查看空亡诊断详细说明与吉凶断诀"><span class="info-label clickable-hint">空亡诊断<span class="info-hint-icon">?</span></span><span class="info-val" id="val-kongwang"><span class="kw-badge pure">正针纯清</span></span></div>
+            <div class="info-item clickable" onclick="toggleFenjinModal(true)" title="点击查看一百二十分金详细说明与珠宝断诀"><span class="info-label clickable-hint">一百二十分金<span class="info-hint-icon">?</span></span><span class="info-val" id="val-fenjin" style="color:#ffd166">庚子分金 (旺相珠宝)</span></div>
             <div class="info-item"><span class="info-label">电子水准倾角</span><span class="info-val" id="val-level" style="color:#2ecc71">0.0° · 水平良好 ✓</span></div>
             <div class="info-item"><span class="info-label">四柱天干地支</span><span class="info-val" id="val-ganzhi" style="color:#50e3c2">推算中…</span></div>
             <div class="info-item"><span class="info-label">真太阳时 ☀️</span><span class="info-val" id="val-solar-time" style="color:#e74c3c">计算中…</span></div>
@@ -1505,6 +1691,59 @@
             const modal = document.getElementById('calib-modal');
             if (modal) modal.style.display = show ? 'flex' : 'none';
             if (show) updateDeclinationDisplay();
+        };
+
+        window.toggleKongwangModal = function(show) {
+            const modal = document.getElementById('kongwang-modal');
+            if (!modal) return;
+            if (show) {
+                const effectiveHeading = isHeadingLocked ? lockedHeading : currentHeading;
+                const h = (effectiveHeading !== null && !isNaN(effectiveHeading)) ? ((effectiveHeading % 360) + 360) % 360 : 0;
+                const diag = getSitAndFaceDiagnosis(h);
+                const hName = geoDirName(h);
+
+                const elH = document.getElementById('kw-modal-heading');
+                const elOff = document.getElementById('kw-modal-offset');
+                const elB = document.getElementById('kw-modal-badge');
+
+                if (elH) elH.innerText = `${hName} ${h.toFixed(1)}° (${diag.faceMt}山)`;
+                if (elOff) {
+                    const absDev = Math.abs(diag.dev);
+                    elOff.innerText = absDev < 0.3 ? '居中正线 (±0.0°)' : `偏${diag.dev > 0 ? '右' : '左'} ${absDev.toFixed(1)}°`;
+                }
+                if (elB) {
+                    elB.className = `kw-badge ${diag.badgeClass}`;
+                    elB.innerText = diag.statusText;
+                }
+            }
+            modal.style.display = show ? 'flex' : 'none';
+        };
+
+        window.toggleFenjinModal = function(show) {
+            const modal = document.getElementById('fenjin-modal');
+            if (!modal) return;
+            if (show) {
+                const effectiveHeading = isHeadingLocked ? lockedHeading : currentHeading;
+                const h = (effectiveHeading !== null && !isNaN(effectiveHeading)) ? ((effectiveHeading % 360) + 360) % 360 : 0;
+                const fj = getFenjinAnalysis(h);
+
+                let relAz = (h - 352.5 + 720) % 360;
+                let fenjinIdx = Math.floor(relAz / 3) % 120;
+                let startDeg = (352.5 + fenjinIdx * 3) % 360;
+                let endDeg = (startDeg + 3) % 360;
+
+                const elName = document.getElementById('fj-modal-name');
+                const elRange = document.getElementById('fj-modal-range');
+                const elBadge = document.getElementById('fj-modal-badge');
+
+                if (elName) elName.innerText = `${fj.name}分金 (第${fenjinIdx + 1}分金)`;
+                if (elRange) elRange.innerText = `${startDeg.toFixed(1)}° ~ ${endDeg.toFixed(1)}° (当前${h.toFixed(1)}°)`;
+                if (elBadge) {
+                    elBadge.innerText = fj.type;
+                    elBadge.style.color = fj.badgeColor;
+                }
+            }
+            modal.style.display = show ? 'flex' : 'none';
         };
 
         window.doResetCalib = function() {

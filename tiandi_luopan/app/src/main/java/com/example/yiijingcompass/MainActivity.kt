@@ -301,6 +301,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 startLocationUpdates()
             } else {
                 Log.w(TAG, "Location permissions denied by user")
+                webView.post {
+                    webView.evaluateJavascript("if(window.onNativeLocationDisabled){window.onNativeLocationDisabled();}", null)
+                }
             }
         }
     }

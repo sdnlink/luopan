@@ -2,7 +2,9 @@
  * geomagnetic.js
  * 纯 JS 离线全球地磁模型（与 Android 官方 GeomagneticField.java 100% 算法完全对齐）
  * 基于 NOAA / NGA World Magnetic Model (WMM 2020-2025)
- * 无需联网，输入经纬度、海拔及时间，离线精确计算地磁偏角（Declination）
+ * 无需联网，输入经纬度、海拔及时间，离线解算：
+ *   磁偏角 Declination / 磁倾角 Inclination / 磁场总强度 FieldStrength
+ *   水平强度 HorizontalStrength / 北向 X / 东向 Y / 垂直 Z
  */
 
 const G_COEFF = [
@@ -117,18 +119,25 @@ class LegendreTable {
   }
 }
 
+function normalizeTimeMillis(timeMillis) {
+  if (typeof timeMillis === 'object' && timeMillis !== null && timeMillis.getTime) {
+    return timeMillis.getTime();
+  }
+  return Number(timeMillis);
+}
+
 /**
- * 完整计算任意坐标点地磁偏角（度）
+ * 完整解算任意坐标点的地磁七要素
  * @param {number} gdLatitudeDeg 纬度 (-90 ~ 90)
  * @param {number} gdLongitudeDeg 经度 (-180 ~ 180)
  * @param {number} altitudeMeters 海拔 (m)
  * @param {Date|number} timeMillis 评估时间点
- * @returns {number} 偏角度数（负数=西偏，正数=东偏）
+ * @returns {{x:number, y:number, z:number, declination:number, inclination:number,
+ *            horizontalStrength:number, fieldStrength:number}}
+ *          分量单位为 nT；角度单位为度（磁偏角负=西偏，正=东偏）
  */
-function computeDeclination(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters = 0, timeMillis = Date.now()) {
-  if (typeof timeMillis === 'object' && timeMillis.getTime) {
-    timeMillis = timeMillis.getTime();
-  }
+function computeGeomagneticField(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters = 0, timeMillis = Date.now()) {
+  timeMillis = normalizeTimeMillis(timeMillis);
 
   gdLatitudeDeg = Math.min(90.0 - 1e-5, Math.max(-90.0 + 1e-5, Number(gdLatitudeDeg)));
   gdLongitudeDeg = Number(gdLongitudeDeg);
@@ -201,12 +210,42 @@ function computeDeclination(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters = 0, t
     }
   }
 
+  // 地心坐标 → 大地坐标：绕 Y 轴旋转 latDiff 角
+  // 严格对齐 AOSP GeomagneticField 构造器：
+  //   mX =  gcX*cos(latDiff) + gcZ*sin(latDiff)
+  //   mY =  gcY
+  //   mZ = -gcX*sin(latDiff) + gcZ*cos(latDiff)
   const latDiffRad = gdLatRad - mGcLatitudeRad;
-  const mX = gcX * Math.cos(latDiffRad) + gcZ * Math.sin(latDiffRad);
-  const mY = gcY;
+  const x = gcX * Math.cos(latDiffRad) + gcZ * Math.sin(latDiffRad);
+  const y = gcY;
+  const z = -gcX * Math.sin(latDiffRad) + gcZ * Math.cos(latDiffRad);
 
-  const declination = Math.atan2(mY, mX) * 180.0 / Math.PI;
-  return Math.round(declination * 10) / 10;
+  const horizontalStrength = Math.sqrt(x * x + y * y);
+  const fieldStrength = Math.sqrt(x * x + y * y + z * z);
+
+  return {
+    x, y, z,                                                       // nT：北向 / 东向 / 垂直向下
+    declination: Math.atan2(y, x) * 180.0 / Math.PI,               // 磁偏角（负=西偏）
+    inclination: Math.atan2(z, horizontalStrength) * 180.0 / Math.PI, // 磁倾角
+    horizontalStrength,
+    fieldStrength
+  };
+}
+
+/**
+ * 计算地磁偏角（度，负数=西偏，正数=东偏），保留一位小数
+ */
+function computeDeclination(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters = 0, timeMillis = Date.now()) {
+  const f = computeGeomagneticField(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters, timeMillis);
+  return Math.round(f.declination * 10) / 10;
+}
+
+/**
+ * 计算磁场总强度（μT）
+ */
+function computeFieldStrength(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters = 0, timeMillis = Date.now()) {
+  const f = computeGeomagneticField(gdLatitudeDeg, gdLongitudeDeg, altitudeMeters, timeMillis);
+  return Math.round((f.fieldStrength / 1000) * 10) / 10; // nT → μT
 }
 
 /**
@@ -232,6 +271,8 @@ function formatLocationAndDeclination(latitude, longitude, altitudeMeters, decli
 }
 
 module.exports = {
+  computeGeomagneticField,
   computeDeclination,
+  computeFieldStrength,
   formatLocationAndDeclination
 };

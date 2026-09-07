@@ -2,7 +2,6 @@
 <view class="page-container">
   <!-- 顶部标题与综合状态栏（时间 · 速度 · 方向） -->
   <view class="header-section">
-    <view class="app-title">演象 · 时空罗盘</view>
     <view class="subtitle">{{todayLine}}</view>
     <view class="status-line">
       <text class="status-time">{{nowTime}}</text>
@@ -52,10 +51,16 @@
   <!-- 罗盘视口：Canvas 2D + 十字天心瞄准线 -->
   <view class="compass-container">
     <view class="compass-viewport">
+      <!--
+        画布在弹出任何弹窗时临时隐藏：<canvas type="2d"> 在部分机型/基础库下会作为
+        原生层组件渲染在所有 WebView 内容之上，忽略 z-index，导致弹窗被画布遮挡。
+        使用 hidden 属性而非 wx:if，避免画布节点被卸载后 this.canvas 失效。
+      -->
       <canvas
         type="2d"
         id="compassCanvas"
         class="compass-canvas"
+        hidden="{{showCalibModal || showLayerModal || showKongwangModal || showFenjinModal}}"
         bindtouchstart="onTouchStart"
         bindtouchmove="onTouchMove"
         bindtouchend="onTouchEnd"
@@ -169,6 +174,7 @@
       <view class="legend-row"><text style="color:#ffd166">💎 外数第三环 = 一百二十分金 (金色为旺相珠宝线)</text></view>
       <view class="legend-row"><text style="color:#aaa">时间圈 = 24小时制（12时正南·0时正北）</text></view>
       <view class="legend-row"><text style="color:#c8b88a">最外环 = 先天六十四卦圆图（乾南坤北）</text></view>
+      <view class="legend-row"><text style="color:#888899">手势：单指点击选山 · 双指捏合缩放 (1.0~4.5x) · 放大后单指拖拽平移 · 双击放大/还原</text></view>
       <view class="legend-row"><text style="color:#e74c3c">● 红色指针 = 当前北京时间</text></view>
       <view class="legend-row"><text style="color:#f1c40f">☀ 金色虚线针 = 真太阳时（经度 + 日行差修正）</text></view>
       <view class="legend-row"><text style="color:#2ecc71">▲ 绿色指针 = 地磁北（磁北·标“磁”·地盘正针）</text></view>

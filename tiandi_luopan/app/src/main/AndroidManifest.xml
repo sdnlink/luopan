@@ -9,11 +9,13 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- 传感器高采样率权限（Android 12+ 确保罗盘旋转丝滑，系统默认授予无弹窗） -->
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <!-- 设备方向与地磁传感器特性声明 -->
     <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.stepdetector" android:required="false" />
 
     <application
         android:allowBackup="true"

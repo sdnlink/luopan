@@ -14,6 +14,8 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.WindowInsets
@@ -43,6 +45,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var magnetometer: Sensor? = null
     private var gyroscope: Sensor? = null
+    private var stepDetectorSensor: Sensor? = null
     @Suppress("DEPRECATION")
     private var orientationSensor: Sensor? = null
 
@@ -57,6 +60,33 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var coordsDesc: String = ""
     private var currentSpeedKmH: Float = 0f
     private var lastLocationForSpeed: Location? = null
+    private var lastLocationForSpeedTime: Long = 0L
+    private var lastPushedSpeedKmH: Float = -1f
+
+    // 速度看门狗与衰减心跳（解决停止无 GPS 回调时的速度卡滞）
+    private val speedWatchdogHandler = Handler(Looper.getMainLooper())
+    private var isWatchdogRunning = false
+    private val speedWatchdogRunnable = object : Runnable {
+        override fun run() {
+            checkSpeedWatchdog()
+            if (isWatchdogRunning) {
+                speedWatchdogHandler.postDelayed(this, 500L)
+            }
+        }
+    }
+
+    // IMU 零速修正 (ZUPT) 与步态航位测速 (PDR) 状态
+    private var accMean = 9.8f
+    private var accVar = 0f
+    private var stationaryStartTime = 0L
+    @Volatile private var isDeviceStationary = false
+
+    private var lastStepTime = 0L
+    private var pdrEstimatedSpeedKmH = 0f
+    private var isWaveRising = false
+    private var waveValley = 9.8f
+    private var wavePeak = 9.8f
+
     private var currentPitch: Float = 0f
     private var currentRoll: Float = 0f
     private var lastPushedPitch: Float = 0f
@@ -87,7 +117,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         webView.isVerticalScrollBarEnabled = false
         webView.isHorizontalScrollBarEnabled = false
 
-        // 传感器初始化（优先旋转矢量，其次加速度+地磁，备用旧版方向传感器）
+        // 传感器初始化（优先旋转矢量，其次加速度+地磁，备用旧版方向传感器与步态检测器）
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -95,8 +125,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         @Suppress("DEPRECATION")
         orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+        stepDetectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
-        Log.i(TAG, "Sensors initialized: rotation=$rotationSensor, acc=$accelerometer, mag=$magnetometer, ori=$orientationSensor")
+        Log.i(TAG, "Sensors initialized: rotation=$rotationSensor, acc=$accelerometer, mag=$magnetometer, gyro=$gyroscope, step=$stepDetectorSensor")
 
         // WebView 配置
         val settings: WebSettings = webView.settings
@@ -309,8 +340,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun calculateSpeed(location: Location) {
+        val now = System.currentTimeMillis()
+        if (isDeviceStationary) {
+            // IMU 判定手机处于绝对静止状态，压制 GPS 噪点与漂移
+            currentSpeedKmH = 0f
+            lastLocationForSpeed = location
+            return
+        }
+
         if (location.hasSpeed()) {
-            currentSpeedKmH = Math.max(0f, location.speed * 3.6f)
+            val sp = location.speed * 3.6f
+            currentSpeedKmH = if (sp < 0.6f) 0f else sp
+            lastLocationForSpeedTime = now
         } else {
             val prev = lastLocationForSpeed
             if (prev != null && location.time > prev.time) {
@@ -319,8 +360,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     val distMeters = location.distanceTo(prev)
                     if (distMeters > 1.2f) {
                         currentSpeedKmH = (distMeters / dtSec) * 3.6f
+                        lastLocationForSpeedTime = now
                     } else {
                         currentSpeedKmH = 0f
+                        lastLocationForSpeedTime = now
                     }
                 }
             }
@@ -329,9 +372,147 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun pushSpeedUpdate() {
+        if (Math.abs(currentSpeedKmH - lastPushedSpeedKmH) < 0.05f) return
+        lastPushedSpeedKmH = currentSpeedKmH
         val speedFormatted = String.format(java.util.Locale.US, "%.1f", currentSpeedKmH)
         webView.post {
             webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
+        }
+    }
+
+    // ==========================================
+    // 速度看门狗与无 GPS 步态测速 / IMU 零速修正 (ZUPT)
+    // ==========================================
+    private fun startSpeedWatchdog() {
+        if (isWatchdogRunning) return
+        isWatchdogRunning = true
+        speedWatchdogHandler.post(speedWatchdogRunnable)
+        Log.i(TAG, "Speed watchdog started")
+    }
+
+    private fun stopSpeedWatchdog() {
+        if (!isWatchdogRunning) return
+        isWatchdogRunning = false
+        speedWatchdogHandler.removeCallbacks(speedWatchdogRunnable)
+        Log.i(TAG, "Speed watchdog stopped")
+    }
+
+    private fun checkSpeedWatchdog() {
+        val now = System.currentTimeMillis()
+        val timeSinceGps = now - lastLocationForSpeedTime
+        val timeSinceStep = now - lastStepTime
+
+        if (isDeviceStationary) {
+            if (currentSpeedKmH > 0f) {
+                currentSpeedKmH = 0f
+                pushSpeedUpdate()
+            }
+            return
+        }
+
+        // 超过 1.6 秒没有步伐动作，步态速度归零
+        if (timeSinceStep > 1600L && pdrEstimatedSpeedKmH > 0f) {
+            pdrEstimatedSpeedKmH = 0f
+        }
+
+        // GPS 超时超过 2.5 秒未更新
+        if (timeSinceGps > 2500L) {
+            if (timeSinceStep < 1600L && pdrEstimatedSpeedKmH > 0f) {
+                // 室内或无 GPS 步行接管中：更新为步态推算速度
+                if (Math.abs(currentSpeedKmH - pdrEstimatedSpeedKmH) > 0.1f) {
+                    currentSpeedKmH = pdrEstimatedSpeedKmH
+                    pushSpeedUpdate()
+                }
+            } else {
+                // 既无有效 GPS，又无步伐动作 -> 判定为停止，衰减并彻底归零
+                if (currentSpeedKmH > 0f) {
+                    if (currentSpeedKmH > 2.0f && timeSinceGps < 4000L) {
+                        currentSpeedKmH *= 0.5f
+                        if (currentSpeedKmH < 0.6f) currentSpeedKmH = 0f
+                    } else {
+                        currentSpeedKmH = 0f
+                    }
+                    pushSpeedUpdate()
+                }
+            }
+        }
+    }
+
+    private fun processAccelerationForZuptAndPdr(totalAcc: Float, now: Long) {
+        // 1. ZUPT 零速检测：计算加速度滑动均值与方差 (EWMA)
+        val delta = totalAcc - accMean
+        accMean += 0.05f * delta
+        accVar = 0.95f * accVar + 0.05f * (delta * delta)
+
+        // 静止特征：旋转角速度 < 0.08 rad/s，加速度方差极小 (<0.035)，总重力接近 9.8 m/s²
+        val isQuiet = gyroAngularSpeed < 0.08f && accVar < 0.035f && Math.abs(accMean - 9.8f) < 1.2f
+        if (isQuiet) {
+            if (stationaryStartTime == 0L) {
+                stationaryStartTime = now
+            } else if (now - stationaryStartTime > 600L) {
+                // 持续 600ms 绝对静止，触发零速修正
+                isDeviceStationary = true
+                pdrEstimatedSpeedKmH = 0f
+                if (currentSpeedKmH > 0f) {
+                    currentSpeedKmH = 0f
+                    pushSpeedUpdate()
+                }
+            }
+        } else {
+            stationaryStartTime = 0L
+            isDeviceStationary = false
+        }
+
+        // 2. PDR 步态检测：垂直加速度波峰波谷识别
+        if (totalAcc > wavePeak) wavePeak = totalAcc
+        if (totalAcc < waveValley) waveValley = totalAcc
+
+        if (isWaveRising && totalAcc < wavePeak - 0.35f) {
+            // 波峰转折向下
+            val peakValleyDiff = wavePeak - waveValley
+            if (peakValleyDiff in 1.1f..7.5f && wavePeak > 10.3f && waveValley < 9.3f) {
+                val stepInterval = now - lastStepTime
+                if (stepInterval in 320L..1250L) {
+                    handleValidStep(now, stepInterval)
+                } else if (stepInterval > 1250L) {
+                    lastStepTime = now
+                }
+            }
+            isWaveRising = false
+            waveValley = totalAcc
+        } else if (!isWaveRising && totalAcc > waveValley + 0.35f) {
+            // 波谷转折向上
+            isWaveRising = true
+            wavePeak = totalAcc
+        }
+    }
+
+    private fun onStepDetected(now: Long) {
+        val stepInterval = now - lastStepTime
+        if (stepInterval in 320L..1250L) {
+            handleValidStep(now, stepInterval)
+        } else if (stepInterval > 1250L) {
+            lastStepTime = now
+        }
+    }
+
+    private fun handleValidStep(now: Long, stepInterval: Long) {
+        lastStepTime = now
+        val dtSec = stepInterval / 1000f
+        val stepLength = 0.70f // 平均步长估算 (米)
+        val instantSpeed = (stepLength / dtSec) * 3.6f
+        val clamped = Math.min(8.5f, Math.max(1.8f, instantSpeed))
+        pdrEstimatedSpeedKmH = if (pdrEstimatedSpeedKmH <= 0.1f) {
+            clamped
+        } else {
+            0.5f * clamped + 0.5f * pdrEstimatedSpeedKmH
+        }
+
+        // 若当前无 GPS 速度（超过 2.5 秒未收到有效 GPS 速度刷新）
+        val timeSinceGps = now - lastLocationForSpeedTime
+        if (timeSinceGps > 2500L) {
+            currentSpeedKmH = pdrEstimatedSpeedKmH
+            pushSpeedUpdate()
         }
     }
 
@@ -417,6 +598,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                             lastKnownBestLocation = loc
                             if (loc.hasSpeed()) {
                                 currentSpeedKmH = Math.max(0f, loc.speed * 3.6f)
+                                lastLocationForSpeedTime = System.currentTimeMillis()
                             }
                         }
                     }
@@ -545,6 +727,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             registered = true
             Log.i(TAG, "Registered rotationSensor")
         }
+        // 始终监听加速度计，以支撑姿态解算、IMU零速修正(ZUPT)与步态航位测速(PDR)
+        if (accelerometer != null) {
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+            registered = true
+            Log.i(TAG, "Registered accelerometer for ZUPT & PDR")
+        }
         // 注册物理陀螺仪以实现角速度惯性锁与抗突发磁干扰
         if (gyroscope != null) {
             sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_GAME)
@@ -554,14 +742,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (magnetometer != null) {
             sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL)
         }
-        if (rotationSensor == null && accelerometer != null && magnetometer != null) {
-            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
-            registered = true
-            Log.i(TAG, "Registered accelerometer & magnetometer")
-        } else if (rotationSensor == null && orientationSensor != null) {
+        if (rotationSensor == null && orientationSensor != null) {
             sensorManager.registerListener(this, orientationSensor, SensorManager.SENSOR_DELAY_GAME)
             registered = true
             Log.i(TAG, "Registered fallback orientationSensor")
+        }
+        // 尝试注册硬件计步传感器作为步态测速的补充（若硬件支持）
+        if (stepDetectorSensor != null) {
+            try {
+                sensorManager.registerListener(this, stepDetectorSensor, SensorManager.SENSOR_DELAY_NORMAL)
+                Log.i(TAG, "Registered stepDetectorSensor")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to register stepDetectorSensor: ${e.message}")
+            }
         }
         if (registered) {
             isSensorListening = true
@@ -574,6 +767,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         isSensorListening = false
         hasSmoothHeading = false
         gyroAngularSpeed = 0f
+        isDeviceStationary = false
+        pdrEstimatedSpeedKmH = 0f
         Log.i(TAG, "Stopped sensor listening")
     }
 
@@ -582,6 +777,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val now = System.currentTimeMillis()
 
         var azimuthDegrees: Float? = null
+
+        if (event.sensor.type == Sensor.TYPE_STEP_DETECTOR) {
+            onStepDetected(now)
+            return
+        }
 
         if (event.sensor.type == Sensor.TYPE_GYROSCOPE) {
             // 陀螺仪测量机身真实旋转角速度，完全不受铁磁干扰！
@@ -604,6 +804,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (rotationSensor == null) {
                 updateTiltAnglesFromAcc(now)
             }
+
+            // 提取三轴加速度模长并送入 ZUPT 零速与 PDR 步态分析器
+            val ax = event.values[0]
+            val ay = event.values[1]
+            val az = event.values[2]
+            val totalAcc = Math.sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
+            processAccelerationForZuptAndPdr(totalAcc, now)
+
             if (now - lastUpdateTimestamp < 20) return
             if (hasMagData && rotationSensor == null) {
                 azimuthDegrees = calculateOrientationFromAccMag()
@@ -759,6 +967,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         webView.onResume()
         enterFullScreen()
         startListeningSensors()
+        startSpeedWatchdog()
         if (hasLocationPermission()) {
             startLocationUpdates()
         }
@@ -767,11 +976,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onPause() {
         super.onPause()
         webView.onPause()
+        stopSpeedWatchdog()
         stopListeningSensors()
         stopLocationUpdates()
     }
 
     override fun onDestroy() {
+        stopSpeedWatchdog()
         stopListeningSensors()
         stopLocationUpdates()
         webView.destroy()

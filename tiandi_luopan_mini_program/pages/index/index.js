@@ -1,6 +1,7 @@
 /**
  * pages/index/index.js
  * 演象 · 时空罗盘 微信小程序主逻辑
+ * 与 Android 版 yiijing_map.html 完全对齐
  */
 
 const {
@@ -11,53 +12,144 @@ const {
   GUA64_STEP,
   GUA64_HALF,
   ELEM_COLORS,
-  ELEM_BG,
   ELEM_BG_DARK
 } = require('../../utils/compass-data');
 
-const { getTodayMountainInfo, currentSolarTerm } = require('../../utils/solar-terms');
+const { getTodayMountainInfo } = require('../../utils/solar-terms');
 const { computeDeclination, formatLocationAndDeclination } = require('../../utils/geomagnetic');
+const { calculateTrueSolarTime, calculateFourPillars } = require('../../utils/astronomy');
+const {
+  JIAZI_60, geoDirName, getSitAndFaceDiagnosis, getFenjinAnalysis
+} = require('../../utils/fengshui');
+
+const DEFAULT_LAYERS = {
+  bubbleLevel: true,  // 太极双轴电子水准仪气泡
+  palaces: true,      // 八卦八宫环
+  mountains: true,    // 二十四山
+  fenjin: true,       // 一百二十分金
+  solarRing: true,    // 二十四节气与消息卦
+  timeDial: true,     // 24 小时时间圈与真太阳时针
+  hex64: true         // 先天六十四卦圆图
+};
 
 Page({
   data: {
-    currentMode: 'post', // 'post'=后天八卦, 'pre'=先天八卦
-    currentMountain: MOUNTAINS_DATA[13], // 默认子山 (13)
+    // 模式与选中
+    currentMode: 'post',
+    currentMountain: MOUNTAINS_DATA[13],
     currentPalaceName: '坎宫',
     geoDirStr: '正北',
     elemColor: ELEM_COLORS['水'],
+    modeLabel: '后天',
+
+    // 顶部综合状态栏
+    todayLine: '',
+    nowTime: '00:00',
+    nowSpeed: '0 KM/H',
+    nowDir: '正北 0°',
+
+    // 双北指针
     headingDescMag: '正北 0° · 子山',
     headingDescTrue: '正北 0°',
     declSummary: '无偏',
-    declinationDetailStr: '正在获取GPS定位…',
+
+    // 风水立向
+    sitFacePattern: '坐午向子 · 正针',
+    kongwangText: '正针纯清',
+    kongwangClass: 'pure',
+    fenjinText: '庚子分金 (旺相珠宝 (吉))',
+    fenjinColor: '#2ecc71',
+    levelText: '0.0° · 水平良好 ✓',
+    levelColor: '#2ecc71',
+
+    // 天文历法
+    ganzhiStr: '推算中…',
+    solarTimeStr: '计算中…',
+    solarTimeDelta: '',
+
+    // 罗盘转动模式与锁定
+    compassMode: 'rotateDisk', // 'rotateDisk'=盘随向转, 'fixedDisk'=固定盘面
+    isHeadingLocked: false,
+
+    // 强磁预警
+    showMagAlert: false,
+    magAlertText: '',
+
+    // 定位与地磁
     coordsDisplayStr: '正在获取GPS定位…',
-    todayLine: '',
-    nowTime: '00:00',
+    declinationDetailStr: '正在获取GPS定位…',
+
+    // 弹窗
     showCalibModal: false,
+    showLayerModal: false,
+    showKongwangModal: false,
+    showFenjinModal: false,
     calibAccuracyText: '✓ 极高 (已自动校准)',
     calibAccClass: '',
-    calibClass: ''
+    calibClass: '',
+    magBadgeText: '✓ 正常 (地磁均匀)',
+    magBadgeClass: '',
+
+    // 空亡 / 分金详解弹窗内容
+    kwHeadingText: '--',
+    kwOffsetText: '--',
+    kwBadgeText: '正针纯清',
+    kwBadgeClass: 'pure',
+    fjNameText: '--',
+    fjRangeText: '--',
+    fjBadgeText: '旺相珠宝',
+    fjBadgeColor: '#2ecc71',
+
+    // 圈层图层
+    layerConfig: Object.assign({}, DEFAULT_LAYERS)
   },
 
-  // 内部绘图与传感器状态
+  // ==================== 内部状态（不参与视图渲染） ====================
   canvas: null,
   ctx: null,
+  dialCanvas: null,
+  dialCtx: null,
+  useOffscreen: false,
   dpr: 1,
   canvasW: 450,
   canvasH: 450,
+
   currentHeading: 0,
   targetHeading: 0,
   isAnimating: false,
+  lockedHeading: 0,
+  lastAccuracyLevel: '',
+  lastTiltMag: -999,
   currentDeclination: 0,
   hasDeclination: false,
   currentLatitude: 0,
   currentLongitude: 0,
   currentAltitude: 0,
   hasAltitude: false,
-  currentIndex: -1, // 今日当令之山索引
-  hoveredIndex: 13, // 当前选中山向索引
-  clockTimer: null,
-  isCompassRunning: false,
 
+  currentPitch: 0,
+  currentRoll: 0,
+  currentSpeed: 0,
+
+  currentIndex: -1,
+  hoveredIndex: 13,
+  isTouching: false,
+
+  layerConfig: Object.assign({}, DEFAULT_LAYERS),
+  isDialDirty: true,
+  isDrawScheduled: false,
+
+  cachedTrueSolarTime: null,
+  cachedFourPillars: null,
+  lastFengshuiHeading: -999,
+  lastCompassInfoHeading: -999,
+
+  clockTimer: null,
+  locationTimer: null,
+  isCompassRunning: false,
+  isMotionRunning: false,
+
+  // ==================== 生命周期 ====================
   onLoad() {
     this.initTodayInfo();
     this.startClockTimer();
@@ -71,24 +163,27 @@ Page({
   onShow() {
     if (!this.isCompassRunning && this.canvas) {
       this.startCompassListener();
+      this.startMotionListener();
     }
   },
 
   onHide() {
     this.stopCompassListener();
+    this.stopMotionListener();
   },
 
   onUnload() {
     this.stopCompassListener();
-    if (this.clockTimer) {
-      clearInterval(this.clockTimer);
-      this.clockTimer = null;
+    this.stopMotionListener();
+    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
+    if (this.locationTimer) { clearInterval(this.locationTimer); this.locationTimer = null; }
+    if (typeof wx.stopLocationUpdate === 'function') {
+      wx.stopLocationUpdate();
+      if (typeof wx.offLocationChange === 'function') wx.offLocationChange();
     }
   },
 
-  /**
-   * 初始化今日节气与当令之山
-   */
+  // ==================== 初始化 ====================
   initTodayInfo() {
     const today = getTodayMountainInfo();
     if (today) {
@@ -100,154 +195,277 @@ Page({
       });
       this.updateMountainDetails(today.mountainIndex);
     } else {
-      this.setData({
-        todayLine: '—'
-      });
+      this.setData({ todayLine: '—' });
     }
-    this.updateClock();
   },
 
-  /**
-   * 启动时钟定时器
-   */
   startClockTimer() {
-    this.updateClock();
+    this.refreshAstronomicalData();
+    this.updateHeaderStatus();
+    // 与 Android 一致：每秒刷新天文数据与状态栏
     this.clockTimer = setInterval(() => {
-      this.updateClock();
+      this.refreshAstronomicalData();
+      this.updateHeaderStatus();
     }, 1000);
   },
 
-  updateClock() {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const nowTime = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    this.setData({ nowTime });
+  /**
+   * 天文算力解耦：四柱与真太阳时每秒运算一次并缓存，
+   * 避免落入 60Hz 罗盘旋转流重复执行三角函数
+   */
+  refreshAstronomicalData() {
+    try {
+      this.cachedFourPillars = calculateFourPillars(new Date(), this.currentLongitude);
+      this.cachedTrueSolarTime = calculateTrueSolarTime(this.currentLongitude, new Date());
+      this.setData({
+        ganzhiStr: this.cachedFourPillars.fullStr,
+        solarTimeStr: this.cachedTrueSolarTime.timeStr,
+        solarTimeDelta: this.cachedTrueSolarTime.deltaDesc
+      });
+    } catch (e) {
+      console.warn('refreshAstronomicalData error:', e);
+    }
   },
 
-  /**
-   * 初始化微信 GPS 定位与地磁偏角计算
-   */
   initLocation() {
+    const applyLocation = (lat, lon, alt, speed) => {
+      this.currentLatitude = lat;
+      this.currentLongitude = lon;
+      if (alt !== undefined && alt !== null) {
+        this.currentAltitude = alt;
+        this.hasAltitude = !!(alt && alt !== 0);
+      }
+      if (speed !== undefined && speed !== null && !isNaN(speed)) {
+        this.currentSpeed = Math.max(0, speed);
+      }
+
+      const decl = computeDeclination(lat, lon, this.currentAltitude, new Date());
+      this.currentDeclination = decl;
+      this.hasDeclination = true;
+
+      const info = formatLocationAndDeclination(lat, lon, this.currentAltitude, decl);
+      this.setData({
+        coordsDisplayStr: info.coordsDesc,
+        declinationDetailStr: `${Math.abs(decl).toFixed(1)}° (${info.dirStr})`,
+        declSummary: info.declText
+      });
+
+      this.refreshAstronomicalData();
+      this.updateCompassInfo(true);
+      this.updateHeaderStatus();
+      if (this.ctx) this.scheduleCompassDraw();
+    };
+
+    const onFail = (err) => {
+      console.warn('获取用户位置失败或未授权:', err);
+      this.setData({
+        coordsDisplayStr: '请开启系统位置信息(GPS)',
+        declinationDetailStr: '0° (无偏角 · 默认值)',
+        declSummary: '无偏'
+      });
+    };
+
     wx.getLocation({
       type: 'wgs84',
       altitude: true,
       success: (res) => {
-        const { latitude, longitude, altitude } = res;
-        this.currentLatitude = latitude;
-        this.currentLongitude = longitude;
-        this.currentAltitude = altitude || 0;
-        this.hasAltitude = !!(altitude && altitude !== 0);
-
-        // 离线高精度计算地磁偏角
-        const decl = computeDeclination(latitude, longitude, this.currentAltitude, new Date());
-        this.currentDeclination = decl;
-        this.hasDeclination = true;
-
-        const info = formatLocationAndDeclination(latitude, longitude, this.currentAltitude, decl);
-        this.setData({
-          coordsDisplayStr: info.coordsDesc,
-          declinationDetailStr: `${Math.abs(decl).toFixed(1)}° (${info.dirStr})`,
-          declSummary: info.declText
-        });
-
-        this.updateCompassInfo();
-        if (this.ctx) this.drawCompass();
+        // wx.getLocation 返回速度为 m/s，转换为 KM/H
+        const kmh = (typeof res.speed === 'number' && res.speed >= 0) ? res.speed * 3.6 : 0;
+        applyLocation(res.latitude, res.longitude, res.altitude, kmh);
+        this.startLocationWatch(applyLocation, onFail);
       },
-      fail: (err) => {
-        console.warn('获取用户位置失败或未授权:', err);
-        this.setData({
-          coordsDisplayStr: '暂未授权定位 (默认使用磁北)',
-          declinationDetailStr: '0° (无偏角 · 默认值)',
-          declSummary: '无偏'
-        });
-      }
+      fail: onFail
     });
   },
 
   /**
-   * 初始化 Canvas 2D 绘图上下文
+   * 持续定位监听（实时刷新坐标与速度）；不支持时退化为定时轮询
    */
-  initCanvas() {
-    const query = wx.createSelectorQuery().in(this);
-    query.select('#compassCanvas')
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (!res || !res[0] || !res[0].node) {
-          console.error('Canvas node not found!');
-          return;
-        }
-        const canvas = res[0].node;
-        const ctx = canvas.getContext('2d');
-        const sys = wx.getSystemInfoSync();
-        const dpr = Math.min(sys.pixelRatio || 2, 3);
-
-        const width = res[0].width;
-        const height = res[0].height;
-
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.scale(dpr, dpr);
-
-        this.canvas = canvas;
-        this.ctx = ctx;
-        this.dpr = dpr;
-        this.canvasW = width;
-        this.canvasH = height;
-
-        this.drawCompass();
-        this.startCompassListener();
-      });
+  startLocationWatch(applyLocation, onFail) {
+    if (typeof wx.startLocationUpdate !== 'function' || typeof wx.onLocationChange !== 'function') {
+      this.locationTimer = setInterval(() => {
+        wx.getLocation({
+          type: 'wgs84', altitude: true,
+          success: (r) => applyLocation(r.latitude, r.longitude, r.altitude,
+            (typeof r.speed === 'number' && r.speed >= 0) ? r.speed * 3.6 : 0),
+          fail: () => {}
+        });
+      }, 10000);
+      return;
+    }
+    wx.startLocationUpdate({
+      success: () => {
+        wx.onLocationChange((res) => {
+          const kmh = (typeof res.speed === 'number' && res.speed >= 0) ? res.speed * 3.6 : 0;
+          applyLocation(res.latitude, res.longitude, res.altitude, kmh);
+        });
+      },
+      fail: () => {
+        this.locationTimer = setInterval(() => {
+          wx.getLocation({
+            type: 'wgs84', altitude: true,
+            success: (r) => applyLocation(r.latitude, r.longitude, r.altitude,
+              (typeof r.speed === 'number' && r.speed >= 0) ? r.speed * 3.6 : 0),
+            fail: () => {}
+          });
+        }, 10000);
+      }
+    });
   },
 
-  /**
-   * 启动指南针高频传感器监听
-   */
+  initCanvas() {
+    const query = wx.createSelectorQuery().in(this);
+    query.select('#compassCanvas').fields({ node: true, size: true }).exec((res) => {
+      if (!res || !res[0] || !res[0].node) {
+        console.error('Canvas node not found!');
+        return;
+      }
+      const canvas = res[0].node;
+      const ctx = canvas.getContext('2d');
+      const sys = wx.getSystemInfoSync();
+      const dpr = Math.min(sys.pixelRatio || 2, 3);
+      const width = res[0].width;
+      const height = res[0].height;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx.scale(dpr, dpr);
+
+      this.canvas = canvas;
+      this.ctx = ctx;
+      this.dpr = dpr;
+      this.canvasW = width;
+      this.canvasH = height;
+
+      // 离屏缓冲画布：用于预渲染静态盘面（八宫/24山/120分金/节气/消息卦/时间刻度/64卦）
+      const dq = wx.createSelectorQuery().in(this);
+      dq.select('#dialCanvas').fields({ node: true, size: true }).exec((dres) => {
+        if (dres && dres[0] && dres[0].node) {
+          const dc = dres[0].node;
+          dc.width = width * dpr;
+          dc.height = height * dpr;
+          const dctx = dc.getContext('2d');
+          dctx.scale(dpr, dpr);
+          this.dialCanvas = dc;
+          this.dialCtx = dctx;
+          this.useOffscreen = true;
+        } else {
+          this.useOffscreen = false;
+        }
+        this.isDialDirty = true;
+        this.drawCompass();
+        this.startCompassListener();
+        this.startMotionListener();
+      });
+    });
+  },
+
+  // ==================== 传感器 ====================
   startCompassListener() {
     this.isCompassRunning = true;
     wx.startCompass({
       interval: 'game',
       success: () => {
         wx.onCompassChange((res) => {
+          if (this.data.isHeadingLocked) return; // 立向已锁定
           if (res.direction !== undefined && !isNaN(res.direction)) {
             this.targetHeading = ((res.direction % 360) + 360) % 360;
             if (!this.isAnimating) {
               this.isAnimating = true;
               this.animateCompassStep();
             }
-            if (res.accuracy) {
-              this.updateAccuracy(res.accuracy);
-            }
+          }
+          if (res.accuracy !== undefined) {
+            this.updateAccuracy(res.accuracy);
           }
         });
       },
-      fail: (err) => {
-        console.warn('wx.startCompass failed:', err);
-      }
+      fail: (err) => { console.warn('wx.startCompass failed:', err); }
     });
   },
 
   stopCompassListener() {
     this.isCompassRunning = false;
-    if (typeof wx.stopCompass === 'function') {
-      wx.stopCompass();
-    }
-    // 必须同时解绑回调：wx.stopCompass 只停硬件，不会移除 onCompassChange 监听，
-    // 否则每次 onShow/onHide 都会叠加一个监听器与一条动画帧循环。
-    if (typeof wx.offCompassChange === 'function') {
-      wx.offCompassChange();
-    }
+    if (typeof wx.stopCompass === 'function') wx.stopCompass();
+    // 必须同时解绑回调，否则 onShow/onHide 反复切换会叠加监听器与动画帧循环
+    if (typeof wx.offCompassChange === 'function') wx.offCompassChange();
   },
 
-  /**
-   * 指南针平滑阻尼物理动画帧
-   */
+  startMotionListener() {
+    if (this.isMotionRunning) return;
+    this.isMotionRunning = true;
+    if (typeof wx.startDeviceMotionListening !== 'function') return;
+    wx.startDeviceMotionListening({
+      interval: 'game',
+      success: () => {
+        wx.onDeviceMotionChange((res) => {
+          if (res.beta !== undefined && res.gamma !== undefined) {
+            this.currentPitch = res.beta;
+            this.currentRoll = res.gamma;
+            this.updateTiltDisplay();
+            if (this.layerConfig.bubbleLevel) this.scheduleCompassDraw();
+          }
+        });
+      },
+      fail: (err) => { console.warn('wx.startDeviceMotionListening failed:', err); }
+    });
+  },
+
+  stopMotionListener() {
+    if (!this.isMotionRunning) return;
+    this.isMotionRunning = false;
+    if (typeof wx.stopDeviceMotionListening === 'function') wx.stopDeviceMotionListening();
+    if (typeof wx.offDeviceMotionChange === 'function') wx.offDeviceMotionChange();
+  },
+
+  updateAccuracy(acc) {
+    // 微信各端 acc 可能为字符串(android)或数值(iOS)，统一归一到等级
+    let level = 'high';
+    if (typeof acc === 'string') {
+      level = acc;
+    } else if (typeof acc === 'number') {
+      if (acc <= 0) level = 'unreliable';
+      else if (acc < 15) level = 'low';
+      else if (acc < 45) level = 'medium';
+      else level = 'high';
+    }
+
+    let text = '✓ 极高 (已自动校准)';
+    let accClass = '';
+    let dotClass = '';
+    if (level === 'medium') {
+      text = '⚠️ 精度一般 (建议空中画8字)';
+      accClass = 'med'; dotClass = 'med';
+    } else if (level === 'low' || level === 'unreliable') {
+      text = '⚠️ 需校准 (请空中画8字)';
+      accClass = 'low'; dotClass = 'low';
+    }
+
+    // 该回调随罗盘高频触发，仅在等级变化时触碰 setData
+    if (level === this.lastAccuracyLevel) return;
+    this.lastAccuracyLevel = level;
+
+    // 小程序无原始磁通量接口，以传感器精度等级等效判定强磁干扰
+    const distorted = (level === 'low' || level === 'unreliable');
+    const patch = {
+      calibAccuracyText: text,
+      calibAccClass: accClass,
+      calibClass: dotClass,
+      showMagAlert: distorted,
+      magAlertText: distorted ? '⚠️ 监测到金属/强磁干扰 · 建议远离铁器或移步室内' : '',
+      magBadgeText: distorted ? '⚠️ 强磁干扰' : '✓ 正常 (地磁均匀)',
+      magBadgeClass: distorted ? 'low' : ''
+    };
+    this.setData(patch);
+  },
+
   animateCompassStep() {
     let diff = ((this.targetHeading - this.currentHeading + 540) % 360) - 180;
-    if (Math.abs(diff) < 0.05) {
+    if (Math.abs(diff) < 0.08) {
       this.currentHeading = this.targetHeading;
       this.isAnimating = false;
     } else {
-      this.currentHeading = (this.currentHeading + diff * 0.25 + 360) % 360;
+      this.currentHeading = (this.currentHeading + diff * 0.55 + 360) % 360;
       if (this.canvas && typeof this.canvas.requestAnimationFrame === 'function') {
         this.canvas.requestAnimationFrame(() => this.animateCompassStep());
       } else {
@@ -255,50 +473,53 @@ Page({
       }
     }
     this.updateCompassInfo();
-    this.drawCompass();
+    this.updateHeaderStatus();
+    this.scheduleCompassDraw();
   },
 
-  updateAccuracy(acc) {
-    let text = '✓ 极高 (已自动校准)';
-    let accClass = '';
-    let dotClass = '';
-    if (acc === 'medium') {
-      text = '⚠️ 精度一般 (建议空中画8字)';
-      accClass = 'med';
-      dotClass = 'med';
-    } else if (acc === 'low' || acc === 'unreliable') {
-      text = '⚠️ 需校准 (请空中画8字)';
-      accClass = 'low';
-      dotClass = 'low';
+  updateTiltDisplay() {
+    const tiltMag = Math.sqrt(this.currentPitch * this.currentPitch + this.currentRoll * this.currentRoll);
+    // 姿态回调同样高频，0.1° 死区，避免每帧 setData
+    if (Math.abs(tiltMag - this.lastTiltMag) < 0.1) return;
+    this.lastTiltMag = tiltMag;
+
+    if (tiltMag < 2.5) {
+      this.setData({ levelText: `${tiltMag.toFixed(1)}° · 水平良好 ✓`, levelColor: '#2ecc71' });
+    } else if (tiltMag < 7.0) {
+      this.setData({ levelText: `${tiltMag.toFixed(1)}° · 轻微倾斜`, levelColor: '#f39c12' });
+    } else {
+      this.setData({ levelText: `${tiltMag.toFixed(1)}° · ⚠️ 请放平手机`, levelColor: '#e74c3c' });
     }
-    this.setData({
-      calibAccuracyText: text,
-      calibAccClass: accClass,
-      calibClass: dotClass
-    });
   },
 
-  /**
-   * 刷新顶部磁北与真北朝向栏文本
-   */
-  updateCompassInfo() {
-    const heading = this.currentHeading;
+  // ==================== 状态刷新 ====================
+  getEffectiveHeading() {
+    return this.data.isHeadingLocked ? this.lockedHeading : this.currentHeading;
+  },
+
+  updateCompassInfo(force) {
+    const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+    if (!force && Math.abs(effectiveHeading - this.lastCompassInfoHeading) < 0.2) return;
+    this.lastCompassInfoHeading = effectiveHeading;
+
+    const heading = effectiveHeading;
     const trueHeading = ((heading + this.currentDeclination) % 360 + 360) % 360;
+    const dirNameMag = geoDirName(heading);
+    const dirNameTrue = geoDirName(trueHeading);
 
-    const dirs = ['正北', '东北', '正东', '东南', '正南', '西南', '正西', '西北'];
-    const dirNameMag = dirs[Math.round(heading / 45) % 8];
-    const dirNameTrue = dirs[Math.round(trueHeading / 45) % 8];
-
-    // 真实方位转罗盘角度：罗盘0°=正南，真实0°=正北
+    // 真实方位→罗盘角度：罗盘0°=正南，真实0°=正北
     const compassDeg = (heading + 180) % 360;
-    let nearest = MOUNTAINS_DATA[13], minDiff = 360;
+    let nearest = MOUNTAINS_DATA[13], minDiff = 360, nearestIdx = 13;
     for (let i = 0; i < 24; i++) {
       let diff = Math.abs(MOUNTAINS_DATA[i].deg - compassDeg);
       diff = Math.min(diff, 360 - diff);
-      if (diff < minDiff) {
-        minDiff = diff;
-        nearest = MOUNTAINS_DATA[i];
-      }
+      if (diff < minDiff) { minDiff = diff; nearest = MOUNTAINS_DATA[i]; nearestIdx = i; }
+    }
+
+    // 盘随向转模式下，选中山向自动跟随当前朝向
+    if (this.data.compassMode === 'rotateDisk' && !this.isTouching && this.hoveredIndex !== nearestIdx) {
+      this.hoveredIndex = nearestIdx;
+      this.updateMountainDetails(nearestIdx);
     }
 
     const declAbs = Math.abs(this.currentDeclination).toFixed(1);
@@ -309,658 +530,831 @@ Page({
       headingDescTrue: `${dirNameTrue} ${trueHeading.toFixed(0)}°`,
       declSummary: declText
     });
+    this.updateAllFengshuiStatus(false);
   },
 
   /**
-   * 模式切换：后天八卦 / 先天八卦
+   * 坐向格局、空亡诊断与分金全景刷新（0.2° 死区防抖，杜绝高频 setData）
    */
+  updateAllFengshuiStatus(force) {
+    const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+    if (effectiveHeading === null || isNaN(effectiveHeading)) return;
+    if (!force && Math.abs(effectiveHeading - this.lastFengshuiHeading) < 0.2) return;
+    this.lastFengshuiHeading = effectiveHeading;
+
+    const diag = getSitAndFaceDiagnosis(effectiveHeading);
+    const fj = getFenjinAnalysis(effectiveHeading);
+
+    this.setData({
+      sitFacePattern: diag.sitFacePattern,
+      kongwangText: diag.statusText,
+      kongwangClass: diag.badgeClass,
+      fenjinText: fj.displayStr,
+      fenjinColor: fj.badgeColor
+    });
+  },
+
+  updateHeaderStatus() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const speedStr = this.currentSpeed > 0
+      ? (this.currentSpeed >= 10 ? this.currentSpeed.toFixed(0) : this.currentSpeed.toFixed(1))
+      : '0';
+    const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+    const h = ((effectiveHeading % 360) + 360) % 360;
+
+    this.setData({
+      nowTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      nowSpeed: `${speedStr} KM/H`,
+      nowDir: `${geoDirName(h)} ${Math.round(h)}°`
+    });
+    this.updateAllFengshuiStatus(false);
+  },
+
+  // ==================== 交互 ====================
   onSwitchMode(e) {
     const mode = e.currentTarget.dataset.mode;
-    if (mode && mode !== this.data.currentMode) {
-      this.setData({ currentMode: mode });
-      this.updateMountainDetails(this.hoveredIndex);
-      this.drawCompass();
-    }
+    if (!mode || mode === this.data.currentMode) return;
+    this.setData({
+      currentMode: mode,
+      modeLabel: mode === 'post' ? '后天' : '先天'
+    });
+    this.isDialDirty = true;
+    this.updateMountainDetails(this.hoveredIndex);
+    this.scheduleCompassDraw();
   },
 
-  /**
-   * 选中山向详情更新
-   */
+  toggleCompassMode() {
+    const next = this.data.compassMode === 'rotateDisk' ? 'fixedDisk' : 'rotateDisk';
+    this.setData({ compassMode: next });
+    this.updateCompassInfo(true);
+    this.scheduleCompassDraw();
+  },
+
+  toggleHeadingLock() {
+    const locked = !this.data.isHeadingLocked;
+    if (locked) this.lockedHeading = this.currentHeading;
+    this.setData({ isHeadingLocked: locked });
+    this.updateCompassInfo(true);
+    this.scheduleCompassDraw();
+  },
+
   updateMountainDetails(idx) {
     const m = MOUNTAINS_DATA[idx];
     const palaces = this.data.currentMode === 'post' ? PALACES_POST : PALACES_PRE;
-    // 寻找山向所属宫位
     let palName = '';
-    palaces.forEach(p => {
-      let diff = ((m.deg - p.baseDeg + 540) % 360) - 180;
-      if (Math.abs(diff) <= 23) {
-        palName = p.name;
-      }
+    palaces.forEach((p) => {
+      const diff = ((m.deg - p.baseDeg + 540) % 360) - 180;
+      if (Math.abs(diff) <= 23) palName = p.name;
     });
-
-    const geoDeg = (m.deg + 180) % 360;
-    const dirs = ['正北', '东北', '正东', '东南', '正南', '西南', '正西', '西北'];
-    const geoDirStr = dirs[Math.round(geoDeg / 45) % 8];
 
     this.setData({
       currentMountain: m,
       currentPalaceName: palName || (this.data.currentMode === 'post' ? m.post + '宫' : m.pre + '宫'),
-      geoDirStr,
+      geoDirStr: geoDirName((m.deg + 180) % 360),
       elemColor: ELEM_COLORS[m.elem] || '#ffffff'
     });
   },
 
-  /**
-   * 触摸交互拾取山向
-   */
   handleTouch(e) {
     if (!e.touches || !e.touches[0]) return;
     const touch = e.touches[0];
-    const x = touch.x;
-    const y = touch.y;
     const CX = this.canvasW / 2;
     const CY = this.canvasH / 2;
-
-    const dx = x - CX;
-    const dy = y - CY;
+    const dx = touch.x - CX;
+    const dy = touch.y - CY;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= 20 || dist > CX) return;
 
-    // 半径范围判定：排除天池太极中心区，其余整个圆形视口均可拾取
-    if (dist > 20 && dist <= CX) {
-      // 计算角度：相对于顶部 (0°=正南)
-      let rad = Math.atan2(dy, dx);
-      let deg = (rad * 180 / Math.PI + 90 + 360) % 360;
+    // 盘面角度（0°=正南/画布顶部，顺时针）
+    let ang = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+    // 抵消盘随向转带来的盘面旋转
+    if (this.data.compassMode === 'rotateDisk') {
+      const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+      const diskRotDeg = (180 - effectiveHeading + 360) % 360;
+      ang = (ang - diskRotDeg + 720) % 360;
+    }
 
-      let bestIdx = 0;
-      let minDiff = 360;
-      for (let i = 0; i < 24; i++) {
-        let diff = Math.abs(MOUNTAINS_DATA[i].deg - deg);
-        diff = Math.min(diff, 360 - diff);
-        if (diff < minDiff) {
-          minDiff = diff;
-          bestIdx = i;
-        }
-      }
+    let bestIdx = 0, minDiff = 360;
+    for (let i = 0; i < 24; i++) {
+      let diff = Math.abs(MOUNTAINS_DATA[i].deg - ang);
+      diff = Math.min(diff, 360 - diff);
+      if (diff < minDiff) { minDiff = diff; bestIdx = i; }
+    }
 
-      if (bestIdx !== this.hoveredIndex) {
-        this.hoveredIndex = bestIdx;
-        this.updateMountainDetails(bestIdx);
-        this.drawCompass();
-      }
+    if (bestIdx !== this.hoveredIndex) {
+      this.hoveredIndex = bestIdx;
+      this.updateMountainDetails(bestIdx);
+      this.scheduleCompassDraw();
     }
   },
 
-  onTouchStart(e) {
-    this.handleTouch(e);
-  },
+  onTouchStart(e) { this.isTouching = true; this.handleTouch(e); },
+  onTouchMove(e) { this.handleTouch(e); },
+  onTouchEnd() { this.isTouching = false; },
 
-  onTouchMove(e) {
-    this.handleTouch(e);
-  },
-
-  onTouchEnd() {
-    // touch end
-  },
-
-  /**
-   * 打开校准弹窗（来自顶部朝向胶囊栏）
-   * 弹窗本体为用时注入组件，此时才会首次进入渲染树并触发注入
-   */
+  // ---------- 弹窗 ----------
   toggleCalibModal(e) {
     const show = e.currentTarget.dataset.show === 'true' || e.currentTarget.dataset.show === true;
     this.setData({ showCalibModal: show });
   },
-
-  /**
-   * 用时注入组件 calib-modal 抛出的关闭事件
-   */
-  onCalibClose() {
-    this.setData({ showCalibModal: false });
-  },
-
-  /**
-   * 用时注入组件 calib-modal 抛出的「重新定位与校准」事件
-   */
+  onCalibClose() { this.setData({ showCalibModal: false }); },
   onCalibReset() {
     this.initLocation();
-    wx.showToast({
-      title: '已重置，请画8字',
-      icon: 'none',
-      duration: 1500
-    });
+    wx.showToast({ title: '已重置，请画8字', icon: 'none', duration: 1500 });
   },
 
+  toggleLayerModal(e) {
+    const show = e.currentTarget.dataset.show === 'true' || e.currentTarget.dataset.show === true;
+    this.setData({ showLayerModal: show });
+  },
+
+  onLayerToggle(e) {
+    const key = e.currentTarget.dataset.layer;
+    if (!key || this.layerConfig[key] === undefined) return;
+    this.layerConfig[key] = !this.layerConfig[key];
+    this.isDialDirty = true;
+    this.setData({ layerConfig: Object.assign({}, this.layerConfig) });
+    this.scheduleCompassDraw();
+  },
+
+  applyLayerPreset(e) {
+    const preset = e.currentTarget.dataset.preset;
+    if (preset === 'all') {
+      this.layerConfig = Object.assign({}, DEFAULT_LAYERS);
+    } else if (preset === 'sanyuan') {
+      this.layerConfig = Object.assign({}, DEFAULT_LAYERS, { timeDial: false });
+    } else if (preset === 'simple') {
+      this.layerConfig = Object.assign({}, DEFAULT_LAYERS, { palaces: false, solarRing: false, timeDial: false, hex64: false });
+    }
+    this.isDialDirty = true;
+    this.setData({ layerConfig: Object.assign({}, this.layerConfig) });
+    this.scheduleCompassDraw();
+  },
+
+  toggleKongwangModal(e) {
+    const show = e.currentTarget.dataset.show === 'true' || e.currentTarget.dataset.show === true;
+    if (show) {
+      const h = ((this.getEffectiveHeading() % 360) + 360) % 360;
+      const diag = getSitAndFaceDiagnosis(h);
+      const absDev = Math.abs(diag.dev);
+      this.setData({
+        kwHeadingText: `${geoDirName(h)} ${h.toFixed(1)}° (${diag.faceMt}山)`,
+        kwOffsetText: absDev < 0.3 ? '居中正线 (±0.0°)' : `偏${diag.dev > 0 ? '右' : '左'} ${absDev.toFixed(1)}°`,
+        kwBadgeText: diag.statusText,
+        kwBadgeClass: diag.badgeClass
+      });
+    }
+    this.setData({ showKongwangModal: show });
+  },
+
+  toggleFenjinModal(e) {
+    const show = e.currentTarget.dataset.show === 'true' || e.currentTarget.dataset.show === true;
+    if (show) {
+      const h = ((this.getEffectiveHeading() % 360) + 360) % 360;
+      const fj = getFenjinAnalysis(h);
+      this.setData({
+        fjNameText: `${fj.name}分金 (第${fj.fenjinIdx + 1}分金)`,
+        fjRangeText: `${fj.startDeg.toFixed(1)}° ~ ${fj.endDeg.toFixed(1)}° (当前${h.toFixed(1)}°)`,
+        fjBadgeText: fj.type,
+        fjBadgeColor: fj.badgeColor
+      });
+    }
+    this.setData({ showFenjinModal: show });
+  },
+
+  preventBubble() {},
+
+  // ==================== 绘图 ====================
   deg2rad(d) {
-    // 0°=正南(画布顶部)、顺时针
+    // 0°=正南(画布顶部)、顺时针；canvas 0°=正右，故减 90° 对齐
     return (d - 90) * Math.PI / 180;
   },
 
   /**
    * 绘制六爻卦图（初爻在下）
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number[]} lines 六爻数组，1=阳爻、0=阴爻，lines[0] 为初爻
-   * @param {number} x 卦图中心横坐标
-   * @param {number} y 卦图中心纵坐标
-   * @param {number} size 卦图宽度（爻长）
    */
-  drawHexagram(ctx, lines, x, y, size) {
-    const h = size * 0.12;    // 爻厚
-    const w = size;           // 爻长
-    const gap = size * 0.08;  // 爻间距
-    let py = y + ((lines.length - 1) * (h + gap)) / 2; // 自下而上排布
+  drawHexagram(c, lines, x, y, size) {
+    const h = size * 0.12;
+    const w = size;
+    const gap = size * 0.08;
+    let py = y + ((lines.length - 1) * (h + gap)) / 2;
     for (let i = 0; i < lines.length; i++) {
-      ctx.fillStyle = lines[i] === 1 ? '#e74c3c' : '#4a90e2';
+      c.fillStyle = lines[i] === 1 ? '#e74c3c' : '#4a90e2';
       if (lines[i] === 1) {
-        ctx.fillRect(x - w / 2, py - h / 2, w, h);
+        c.fillRect(x - w / 2, py - h / 2, w, h);
       } else {
         const segW = w * 0.42;
-        ctx.fillRect(x - w / 2, py - h / 2, segW, h);
-        ctx.fillRect(x + w / 2 - segW, py - h / 2, segW, h);
+        c.fillRect(x - w / 2, py - h / 2, segW, h);
+        c.fillRect(x + w / 2 - segW, py - h / 2, segW, h);
       }
       py -= h + gap;
     }
   },
 
   /**
-   * 完整罗盘 Canvas 2D 高保真渲染
+   * 统一计算环径与字号（设计尺寸 900，与 Android 版 1:1）
    */
+  computeLayout() {
+    const W = this.canvasW;
+    const H = this.canvasH;
+    const s = W / 900;
+    const R = {
+      s,
+      taiji: 42 * s,
+      preGuaRing: 86 * s,
+      postGuaRing: 138 * s,
+      mountainRing: 198 * s,
+      fenjinRing: 242 * s,
+      solarRing: 295 * s,
+      hexRing: 355 * s,
+      timeIn: 363 * s,   // hexRing + 8
+      timeOut: 396 * s,
+      gua64In: 402 * s,  // timeOuter + 6
+      gua64Out: 442 * s
+    };
+    const FS = {
+      palaceSym: Math.max(9, Math.round(17 * s * 1.4)),
+      palace: Math.max(8, Math.round(12 * s * 1.6)),
+      mountain: Math.max(11, Math.round(12 * s * 1.6)),
+      fenjin: Math.max(7, Math.round(8 * s * 1.8)),
+      solar: Math.max(9, Math.round(11 * s * 1.6)),
+      hexName: Math.max(7, Math.round(10 * s * 1.6)),
+      timeMinor: Math.max(7, Math.round(9 * s * 1.6)),
+      timeMajor: Math.max(8, Math.round(11 * s * 1.6)),
+      gua64: Math.max(4, Math.round(7 * s * 1.6)),
+      label: Math.max(7, Math.round(8 * s * 1.6))
+    };
+    return { W, H, CX: W / 2, CY: H / 2, R, FS };
+  },
+
+  scheduleCompassDraw() {
+    if (this.isDrawScheduled) return;
+    this.isDrawScheduled = true;
+    const run = () => { this.isDrawScheduled = false; this.drawCompass(); };
+    if (this.canvas && typeof this.canvas.requestAnimationFrame === 'function') {
+      this.canvas.requestAnimationFrame(run);
+    } else {
+      setTimeout(run, 16);
+    }
+  },
+
   drawCompass() {
     const ctx = this.ctx;
     if (!ctx) return;
+    const { W, H, CX, CY, R, FS } = this.computeLayout();
 
-    const W = this.canvasW;
-    const H = this.canvasH;
-    const CX = W / 2;
-    const CY = H / 2;
-
-    // 清屏并铺底色
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#14151f';
     ctx.fillRect(0, 0, W, H);
 
-    // ============ 环径布局 ============
-    // 以 900 为设计尺寸（与 Android 版 yiijing_map.html 完全 1:1），scale 为适配系数。
-    // 注意：半径必须 = 设计值 × scale，绝不可再乘 2，否则整圈会被圆形视口裁掉。
-    const scale = W / 900;
-    const R = {
-      s: scale,
-      taiji: 42 * scale,
-      preGuaRing: 90 * scale,
-      postGuaRing: 150 * scale,
-      mountainRing: 215 * scale,
-      solarRing: 280 * scale,
-      hexRing: 350 * scale,
-      timeIn: 358 * scale,
-      timeOut: 392 * scale,
-      gua64In: 398 * scale,
-      gua64Out: 440 * scale,
-      outerBorder: 444 * scale
-    };
-    // 字号：Android 设计字号等比缩放，并设定可读性下限
-    const FS = {
-      palaceSym: Math.max(9, Math.round(18 * scale * 1.4)),
-      palace: Math.max(8, Math.round(13 * scale * 1.6)),
-      mountain: Math.max(11, Math.round(12 * scale * 1.6)),
-      solar: Math.max(9, Math.round(11 * scale * 1.6)),
-      hexName: Math.max(7, Math.round(10 * scale * 1.6)),
-      timeMinor: Math.max(7, Math.round(9 * scale * 1.6)),
-      timeMajor: Math.max(8, Math.round(12 * scale * 1.6)),
-      gua64: Math.max(4, Math.round(7 * scale * 1.6)),
-      label: Math.max(7, Math.round(8 * scale * 1.6))
-    };
-    const HEX_W_MT = Math.max(9, Math.round(20 * scale * 1.5)); // 消息卦六爻宽度
-    const HEX_W_64 = Math.max(7, Math.round(10 * scale * 1.9)); // 六十四卦六爻宽度
+    // 静态盘面离屏预渲染（脏标记驱动）
+    if (this.useOffscreen && this.dialCtx) {
+      if (this.isDialDirty) {
+        this.dialCtx.clearRect(0, 0, W, H);
+        this.renderStaticDial(this.dialCtx, CX, CY, R, FS);
+        this.isDialDirty = false;
+      }
+    }
 
-    // 1. 底盘黑金深空圆盘
-    ctx.beginPath();
-    ctx.arc(CX, CY, R.outerBorder, 0, Math.PI * 2);
-    ctx.fillStyle = '#14151e';
-    ctx.fill();
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+    let diskRotDeg = 0;
+    if (this.data.compassMode === 'rotateDisk' && effectiveHeading !== null) {
+      diskRotDeg = (180 - effectiveHeading + 360) % 360;
+    }
 
-    // 2. 先天六十四卦圆图
-    this.draw64GuaRing(ctx, CX, CY, R, FS, HEX_W_64);
-
-    // 3. 二十四小时制时间刻度环
-    this.drawTimeRing(ctx, CX, CY, R, FS);
-
-    // 4. 十二消息卦 + 六爻外环
-    this.drawMessageGuaRing(ctx, CX, CY, R, FS, HEX_W_MT);
-
-    // 5. 二十四节气环
-    this.drawSolarRing(ctx, CX, CY, R, FS);
-
-    // 6. 二十四山环
-    this.drawMountainRing(ctx, CX, CY, R, FS);
-
-    // 7. 八宫环与八卦符号内环
-    this.drawPalaceRing(ctx, CX, CY, R, FS);
-    this.drawPalaceSymbolRing(ctx, CX, CY, R, FS);
-
-    // 8. 今日当令之山金弧
-    this.drawTodayHighlight(ctx, CX, CY, R);
-
-    // 9. 天池太极图
-    this.drawTaiji(ctx, CX, CY, R.taiji);
-
-    // 10. 实时时钟红针
-    this.drawClockPointer(ctx, CX, CY, R);
-
-    // 11. 【地磁北（绿）与地理真北（金）双指针系统】
-    this.drawDualCompassNeedles(ctx, CX, CY, R, FS);
-  },
-
-  drawTaiji(ctx, CX, CY, r) {
     ctx.save();
-    ctx.translate(CX, CY);
+    if (diskRotDeg !== 0) {
+      ctx.translate(CX, CY);
+      ctx.rotate(diskRotDeg * Math.PI / 180);
+      ctx.translate(-CX, -CY);
+    }
 
-    // 底圆（黑鱼半圆）
-    ctx.beginPath();
-    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.fillStyle = '#111118';
-    ctx.fill();
+    // 1. 静态盘面（离屏单次 blit，或直接绘制）
+    if (this.useOffscreen && this.dialCanvas) {
+      try {
+        ctx.drawImage(this.dialCanvas, 0, 0, W, H);
+      } catch (err) {
+        this.useOffscreen = false;
+        this.renderStaticDial(ctx, CX, CY, R, FS);
+      }
+    } else {
+      this.renderStaticDial(ctx, CX, CY, R, FS);
+    }
 
-    // 底圆（白鱼半圆）
-    ctx.beginPath();
-    ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2);
-    ctx.fillStyle = '#e8e8ea';
-    ctx.fill();
-
-    // 白鱼中圆
-    ctx.beginPath();
-    ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#e8e8ea';
-    ctx.fill();
-
-    // 黑鱼中圆
-    ctx.beginPath();
-    ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2);
-    ctx.fillStyle = '#111118';
-    ctx.fill();
-
-    // 黑鱼眼（白鱼内部小黑眼）
-    ctx.beginPath();
-    ctx.arc(0, -r / 2, r / 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#111118';
-    ctx.fill();
-
-    // 白鱼眼（黑鱼内部小白眼）
-    ctx.beginPath();
-    ctx.arc(0, r / 2, r / 6, 0, Math.PI * 2);
-    ctx.fillStyle = '#e8e8ea';
-    ctx.fill();
-
-    // 金色外边框
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    ctx.restore();
-  },
-
-  /**
-   * 先天六十四卦圆图（乾南坤北，每卦 5.625°，含六爻卦图）
-   */
-  draw64GuaRing(ctx, CX, CY, R, FS, hexW) {
-    const rIn = R.gua64In;
-    const rOut = R.gua64Out;
-    const midR = (rIn + rOut) / 2;
-    const hexOff = 8 * R.s;    // 局部 +y 指向圆心，正值 = 向内
-    const nameOff = 14 * R.s;  // 负值 = 向外
-
-    // 环底
-    ctx.beginPath();
-    ctx.arc(CX, CY, rOut, 0, Math.PI * 2);
-    ctx.arc(CX, CY, rIn, 0, Math.PI * 2, true);
-    ctx.closePath();
-    ctx.fillStyle = '#0e0f16';
-    ctx.fill();
-    ctx.strokeStyle = '#2d3042';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    for (let i = 0; i < 64; i++) {
-      const g = HEXAGRAMS_64[i];
-      const deg = i * GUA64_STEP;
-      const sRad = this.deg2rad(deg - GUA64_HALF);
-      const eRad = this.deg2rad(deg + GUA64_HALF);
-      const isYang = (i === 0 || i >= 33); // 阳仪：乾 + 复至夬
-
-      ctx.beginPath();
-      ctx.arc(CX, CY, rOut, sRad, eRad);
-      ctx.arc(CX, CY, rIn, eRad, sRad, true);
-      ctx.closePath();
-      ctx.fillStyle = isYang ? '#161822' : '#101118';
-      ctx.fill();
-      ctx.strokeStyle = '#2a2c3c';
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-
-      const midRad = this.deg2rad(deg);
+    // 2. 当前选中山向高光
+    if (this.hoveredIndex >= 0 && this.layerConfig.mountains) {
+      const m = MOUNTAINS_DATA[this.hoveredIndex];
+      const sRad = this.deg2rad(m.deg - 7.5);
+      const eRad = this.deg2rad(m.deg + 7.5);
       ctx.save();
-      ctx.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
-      ctx.rotate(midRad + Math.PI / 2);
-      // 六爻卦图（内侧）
-      this.drawHexagram(ctx, g.l, 0, hexOff, hexW);
-      // 卦名（外侧）
-      ctx.fillStyle = isYang ? '#c8b88a' : '#8a8a9a';
-      ctx.font = `${FS.gua64}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(g.n, 0, -nameOff);
-      ctx.restore();
-    }
-
-    // 八宫分界线（每 8 卦一宫，占 45°）
-    for (let k = 1; k <= 8; k++) {
-      const rad = this.deg2rad(k * 45 - GUA64_HALF);
-      ctx.beginPath();
-      ctx.moveTo(CX + Math.cos(rad) * rIn, CY + Math.sin(rad) * rIn);
-      ctx.lineTo(CX + Math.cos(rad) * rOut, CY + Math.sin(rad) * rOut);
-      ctx.strokeStyle = '#4a4d5e';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    }
-  },
-
-  /**
-   * 二十四小时制时间刻度环（12 时正南 · 0 时正北）
-   */
-  drawTimeRing(ctx, CX, CY, R, FS) {
-    const rIn = R.timeIn;
-    const rOut = R.timeOut;
-
-    // 环底
-    ctx.beginPath();
-    ctx.arc(CX, CY, rOut, 0, Math.PI * 2);
-    ctx.arc(CX, CY, rIn, 0, Math.PI * 2, true);
-    ctx.closePath();
-    ctx.fillStyle = '#111219';
-    ctx.fill();
-    ctx.strokeStyle = '#2d3042';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // 当前小时扇区高亮
-    const now = new Date();
-    const nowDeg = (((now.getHours() - 12 + 24) % 24) * 15) + now.getMinutes() * 0.25;
-    const hourDeg = (Math.floor(nowDeg / 15) % 24) * 15;
-    ctx.beginPath();
-    ctx.arc(CX, CY, rOut, this.deg2rad(hourDeg - 7.5), this.deg2rad(hourDeg + 7.5));
-    ctx.arc(CX, CY, rIn, this.deg2rad(hourDeg + 7.5), this.deg2rad(hourDeg - 7.5), true);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(231, 76, 60, 0.18)';
-    ctx.fill();
-
-    for (let h = 0; h < 24; h++) {
-      const deg = ((h - 12 + 24) % 24) * 15;
-      const rad = this.deg2rad(deg);
-      const major = (h % 3 === 0);
-      const tickEnd = major ? rOut - 8 * R.s : rOut - 16 * R.s;
-
-      ctx.beginPath();
-      ctx.moveTo(CX + Math.cos(rad) * rIn, CY + Math.sin(rad) * rIn);
-      ctx.lineTo(CX + Math.cos(rad) * tickEnd, CY + Math.sin(rad) * tickEnd);
-      ctx.strokeStyle = major ? '#d4af37' : '#5a5d6e';
-      ctx.lineWidth = major ? 2 : 1;
-      ctx.stroke();
-
-      const lx = CX + Math.cos(rad) * (rOut - 26 * R.s);
-      const ly = CY + Math.sin(rad) * (rOut - 26 * R.s);
-      ctx.fillStyle = major ? '#d4af37' : '#9a9daa';
-      ctx.font = major ? `bold ${FS.timeMajor}px sans-serif` : `${FS.timeMinor}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(h.toString(), lx, ly);
-    }
-  },
-
-  /**
-   * 十二消息卦 + 六爻外环（二十四山各配一卦）
-   */
-  drawMessageGuaRing(ctx, CX, CY, R, FS, hexW) {
-    const SEG = 7.5;
-    const midR = (R.solarRing + R.hexRing) / 2;
-    const nameOff = -18 * R.s; // 卦名向外
-    const hexOff = 13 * R.s;   // 六爻向内
-
-    for (let i = 0; i < 24; i++) {
-      const m = MOUNTAINS_DATA[i];
-      const isSel = (i === this.hoveredIndex);
-      const sRad = this.deg2rad(m.deg - SEG);
-      const eRad = this.deg2rad(m.deg + SEG);
-
-      ctx.beginPath();
-      ctx.arc(CX, CY, R.hexRing, sRad, eRad);
-      ctx.arc(CX, CY, R.solarRing, eRad, sRad, true);
-      ctx.closePath();
-      ctx.fillStyle = isSel ? '#2c3e50' : '#171821';
-      ctx.fill();
-      ctx.strokeStyle = '#383a4c';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      const midRad = this.deg2rad(m.deg);
-      ctx.save();
-      ctx.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
-      ctx.rotate(midRad + Math.PI / 2);
-      ctx.fillStyle = isSel ? '#5dade2' : '#7f8c8d';
-      ctx.font = `${FS.hexName}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(m.gua, 0, nameOff);
-      this.drawHexagram(ctx, m.lines, 0, hexOff, hexW);
-      ctx.restore();
-    }
-  },
-
-  /**
-   * 二十四节气环
-   */
-  drawSolarRing(ctx, CX, CY, R, FS) {
-    const SEG = 7.5;
-    const midR = (R.mountainRing + R.solarRing) / 2;
-
-    for (let i = 0; i < 24; i++) {
-      const m = MOUNTAINS_DATA[i];
-      const isSel = (i === this.hoveredIndex);
-      const sRad = this.deg2rad(m.deg - SEG);
-      const eRad = this.deg2rad(m.deg + SEG);
-
-      ctx.beginPath();
-      ctx.arc(CX, CY, R.solarRing, sRad, eRad);
-      ctx.arc(CX, CY, R.mountainRing, eRad, sRad, true);
-      ctx.closePath();
-      ctx.fillStyle = isSel ? '#d35400' : '#1f202b';
-      ctx.fill();
-      ctx.strokeStyle = '#383a4c';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      const midRad = this.deg2rad(m.deg);
-      ctx.save();
-      ctx.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
-      ctx.rotate(midRad + Math.PI / 2);
-      ctx.fillStyle = isSel ? '#ffd166' : '#9ca3af';
-      ctx.font = `${FS.solar}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(m.solar, 0, 0);
-      ctx.restore();
-    }
-  },
-
-  /**
-   * 二十四山环
-   */
-  drawMountainRing(ctx, CX, CY, R, FS) {
-    const SEG = 7.5;
-    const midR = (R.postGuaRing + R.mountainRing) / 2;
-
-    for (let i = 0; i < 24; i++) {
-      const m = MOUNTAINS_DATA[i];
-      const isSel = (i === this.hoveredIndex);
-      const sRad = this.deg2rad(m.deg - SEG);
-      const eRad = this.deg2rad(m.deg + SEG);
-
       ctx.beginPath();
       ctx.arc(CX, CY, R.mountainRing, sRad, eRad);
       ctx.arc(CX, CY, R.postGuaRing, eRad, sRad, true);
       ctx.closePath();
-      ctx.fillStyle = isSel ? '#e67e22' : '#232533';
+      ctx.fillStyle = 'rgba(230, 126, 34, 0.85)';
       ctx.fill();
-      ctx.strokeStyle = '#383a4c';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#f39c12';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
 
       const midRad = this.deg2rad(m.deg);
-      ctx.save();
-      ctx.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
+      ctx.translate(CX + Math.cos(midRad) * ((R.postGuaRing + R.mountainRing) / 2),
+        CY + Math.sin(midRad) * ((R.postGuaRing + R.mountainRing) / 2));
       ctx.rotate(midRad + Math.PI / 2);
-      ctx.fillStyle = isSel ? '#ffffff' : '#d1d5db';
+      ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${FS.mountain}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(m.name, 0, 0);
       ctx.restore();
     }
+
+    // 3. 实时北京时间红针 + 真太阳时金针
+    if (this.layerConfig.timeDial) {
+      this.drawTimeNeedles(ctx, CX, CY, R, FS);
+    }
+
+    // 4. 天池太极图
+    this.drawTaiji(ctx, CX, CY, R.taiji);
+
+    ctx.restore(); // 闭合盘面旋转
+
+    // 5. 电子双轴水准仪气泡（屏幕固定参考系）
+    if (this.layerConfig.bubbleLevel) {
+      this.drawBubbleLevel(ctx, CX, CY, R, FS);
+    }
+
+    // 6. 磁北 / 真北双指针系统（屏幕固定参考系）
+    this.drawDualCompassNeedles(ctx, CX, CY, R, FS, effectiveHeading);
   },
 
   /**
-   * 八宫环（五行扇区填色 + 宫名）
+   * 离屏预渲染静态盘面：八宫、二十四山、一百二十分金、节气、消息卦、时间刻度、六十四卦
    */
-  drawPalaceRing(ctx, CX, CY, R, FS) {
-    const palaces = this.data.currentMode === 'post' ? PALACES_POST : PALACES_PRE;
-    const midR = (R.preGuaRing + R.postGuaRing) / 2;
+  renderStaticDial(c, CX, CY, R, FS) {
+    const L = this.layerConfig;
+    const HALF_SEG = 7.5;
 
-    palaces.forEach((p) => {
-      const sRad = this.deg2rad(p.baseDeg - 22.5);
-      const eRad = this.deg2rad(p.baseDeg + 22.5);
+    // ---- 1. 八卦八宫环与符号内环 ----
+    if (L.palaces) {
+      const palaces = this.data.currentMode === 'post' ? PALACES_POST : PALACES_PRE;
+      for (let i = 0; i < 8; i++) {
+        const p = palaces[i];
+        const sRad = this.deg2rad(p.baseDeg - 22.5);
+        const eRad = this.deg2rad(p.baseDeg + 22.5);
+        c.beginPath();
+        c.arc(CX, CY, R.postGuaRing, sRad, eRad);
+        c.arc(CX, CY, R.preGuaRing, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = ELEM_BG_DARK[p.elem] || '#232533';
+        c.fill();
+        c.strokeStyle = '#2d3042';
+        c.lineWidth = 1.5;
+        c.stroke();
 
-      ctx.beginPath();
-      ctx.arc(CX, CY, R.postGuaRing, sRad, eRad);
-      ctx.arc(CX, CY, R.preGuaRing, eRad, sRad, true);
-      ctx.closePath();
-      ctx.fillStyle = ELEM_BG_DARK[p.elem] || '#232533';
-      ctx.fill();
-      ctx.strokeStyle = '#2d3042';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+        const midRad = this.deg2rad(p.baseDeg);
+        const tx = CX + Math.cos(midRad) * ((R.preGuaRing + R.postGuaRing) / 2);
+        const ty = CY + Math.sin(midRad) * ((R.preGuaRing + R.postGuaRing) / 2);
+        c.save();
+        c.translate(tx, ty);
+        c.rotate(midRad + Math.PI / 2);
+        c.fillStyle = '#ffffff';
+        c.font = `bold ${FS.palace}px sans-serif`;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(`${p.name} ${p.symbol}`, 0, 0);
+        c.restore();
+      }
+      // 八卦符号内环
+      c.save();
+      c.fillStyle = '#d4af37';
+      c.font = `${FS.palaceSym}px sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let i = 0; i < 8; i++) {
+        const p = palaces[i];
+        const midRad = this.deg2rad(p.baseDeg);
+        const tr = (R.taiji + R.preGuaRing) / 2;
+        c.fillText(p.symbol, CX + Math.cos(midRad) * tr, CY + Math.sin(midRad) * tr);
+      }
+      c.restore();
+    }
 
-      const midRad = this.deg2rad(p.baseDeg);
-      ctx.save();
-      ctx.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
-      ctx.rotate(midRad + Math.PI / 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${FS.palace}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(`${p.name} ${p.symbol}`, 0, 0);
-      ctx.restore();
-    });
+    // ---- 2. 二十四山环 ----
+    if (L.mountains) {
+      c.save();
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let i = 0; i < 24; i++) {
+        const m = MOUNTAINS_DATA[i];
+        const sRad = this.deg2rad(m.deg - HALF_SEG);
+        const eRad = this.deg2rad(m.deg + HALF_SEG);
+        c.beginPath();
+        c.arc(CX, CY, R.mountainRing, sRad, eRad);
+        c.arc(CX, CY, R.postGuaRing, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = '#232533';
+        c.fill();
+        c.strokeStyle = '#383a4c'; c.lineWidth = 1; c.stroke();
+
+        const midRad = this.deg2rad(m.deg);
+        const tr = (R.postGuaRing + R.mountainRing) / 2;
+        c.save();
+        c.translate(CX + Math.cos(midRad) * tr, CY + Math.sin(midRad) * tr);
+        c.rotate(midRad + Math.PI / 2);
+        c.fillStyle = '#d1d5db';
+        c.font = `bold ${FS.mountain}px sans-serif`;
+        c.fillText(m.name, 0, 0);
+        c.restore();
+      }
+      c.restore();
+    }
+
+    // ---- 3. 一百二十分金环（每山 5 分金，每位 3°，共 120 位）----
+    if (L.fenjin) {
+      const ringW = R.fenjinRing - R.mountainRing;
+      c.save();
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let k = 0; k < 120; k++) {
+        const fDeg = 172.5 + k * 3;
+        const sRad = this.deg2rad(fDeg);
+        const eRad = this.deg2rad(fDeg + 3);
+        const midRad = this.deg2rad(fDeg + 1.5);
+        const name = JIAZI_60[k % 60];
+        const stem = name[0];
+        const isWangXiang = (stem === '丙' || stem === '丁' || stem === '庚' || stem === '辛');
+        const isHuoKeng = (stem === '戊' || stem === '己');
+
+        c.beginPath();
+        c.arc(CX, CY, R.fenjinRing, sRad, eRad);
+        c.arc(CX, CY, R.mountainRing, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = isWangXiang ? 'rgba(212, 175, 55, 0.25)' : (isHuoKeng ? 'rgba(192, 57, 43, 0.18)' : '#161823');
+        c.fill();
+        c.strokeStyle = isWangXiang ? 'rgba(212, 175, 55, 0.6)' : '#2a2c3d';
+        c.lineWidth = 0.6;
+        c.stroke();
+
+        const tr = (R.mountainRing + R.fenjinRing) / 2;
+        c.save();
+        c.translate(CX + Math.cos(midRad) * tr, CY + Math.sin(midRad) * tr);
+        // 120 分金每格仅占 3°，切向排布必然重叠，故采用径向排布保证可读
+        c.rotate(midRad);
+        if (isWangXiang) {
+          c.fillStyle = '#ffd166';
+          c.font = `bold ${FS.fenjin}px sans-serif`;
+          c.fillText(name, 0, 0);
+          c.beginPath();
+          c.arc(-(ringW / 2) + 3, 0, 1.6, 0, Math.PI * 2);
+          c.fillStyle = '#f1c40f';
+          c.fill();
+        } else if (isHuoKeng) {
+          c.fillStyle = '#e74c3c';
+          c.font = `${FS.fenjin}px sans-serif`;
+          c.fillText(name, 0, 0);
+        } else {
+          c.fillStyle = '#5a5d6e';
+          c.font = `${FS.fenjin}px sans-serif`;
+          c.fillText(name, 0, 0);
+        }
+        c.restore();
+      }
+      c.restore();
+    }
+
+    // ---- 4. 二十四节气环与十二消息卦外环 ----
+    if (L.solarRing) {
+      c.save();
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let i = 0; i < 24; i++) {
+        const m = MOUNTAINS_DATA[i];
+        const sRad = this.deg2rad(m.deg - HALF_SEG);
+        const eRad = this.deg2rad(m.deg + HALF_SEG);
+        c.beginPath();
+        c.arc(CX, CY, R.solarRing, sRad, eRad);
+        c.arc(CX, CY, R.fenjinRing, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = '#1f202b';
+        c.fill();
+        c.strokeStyle = '#383a4c'; c.stroke();
+
+        const midRad = this.deg2rad(m.deg);
+        const tr = (R.fenjinRing + R.solarRing) / 2;
+        c.save();
+        c.translate(CX + Math.cos(midRad) * tr, CY + Math.sin(midRad) * tr);
+        c.rotate(midRad + Math.PI / 2);
+        c.fillStyle = '#9ca3af';
+        c.font = `${FS.solar}px sans-serif`;
+        c.fillText(m.solar, 0, 0);
+        c.restore();
+      }
+
+      const hexMid = (R.solarRing + R.hexRing) / 2;
+      const nameOff = -18 * R.s; // 卦名向外
+      const hexOff = 13 * R.s;   // 六爻向内
+      const hexW = Math.max(9, Math.round(20 * R.s * 1.5));
+      for (let i = 0; i < 24; i++) {
+        const m = MOUNTAINS_DATA[i];
+        const sRad = this.deg2rad(m.deg - HALF_SEG);
+        const eRad = this.deg2rad(m.deg + HALF_SEG);
+        c.beginPath();
+        c.arc(CX, CY, R.hexRing, sRad, eRad);
+        c.arc(CX, CY, R.solarRing, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = '#171821';
+        c.fill();
+        c.strokeStyle = '#383a4c'; c.stroke();
+
+        const midRad = this.deg2rad(m.deg);
+        c.save();
+        c.translate(CX + Math.cos(midRad) * hexMid, CY + Math.sin(midRad) * hexMid);
+        c.rotate(midRad + Math.PI / 2);
+        c.fillStyle = '#7f8c8d';
+        c.font = `${FS.hexName}px sans-serif`;
+        c.fillText(m.gua, 0, nameOff);
+        this.drawHexagram(c, m.lines, 0, hexOff, hexW);
+        c.restore();
+      }
+      c.restore();
+    }
+
+    // ---- 5. 24 小时制时间刻度环 ----
+    if (L.timeDial) {
+      c.beginPath();
+      c.arc(CX, CY, R.timeOut, 0, Math.PI * 2);
+      c.arc(CX, CY, R.timeIn, 0, Math.PI * 2, true);
+      c.closePath();
+      c.fillStyle = '#111219';
+      c.fill();
+      c.strokeStyle = '#2d3042'; c.lineWidth = 1; c.stroke();
+
+      for (let h = 0; h < 24; h++) {
+        const deg = ((h - 12 + 24) % 24) * 15;
+        const rad = this.deg2rad(deg);
+        const major = (h % 3 === 0);
+        const tickEnd = major ? R.timeOut - 8 * R.s : R.timeOut - 16 * R.s;
+        c.beginPath();
+        c.moveTo(CX + Math.cos(rad) * R.timeIn, CY + Math.sin(rad) * R.timeIn);
+        c.lineTo(CX + Math.cos(rad) * tickEnd, CY + Math.sin(rad) * tickEnd);
+        c.strokeStyle = major ? '#d4af37' : '#5a5d6e';
+        c.lineWidth = major ? 2 : 1;
+        c.stroke();
+
+        const lr = R.timeOut - 24 * R.s;
+        c.fillStyle = major ? '#d4af37' : '#9a9daa';
+        c.font = major ? `bold ${FS.timeMajor}px sans-serif` : `${FS.timeMinor}px sans-serif`;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(h.toString(), CX + Math.cos(rad) * lr, CY + Math.sin(rad) * lr);
+      }
+    }
+
+    // ---- 6. 先天六十四卦圆图 ----
+    if (L.hex64) {
+      c.beginPath();
+      c.arc(CX, CY, R.gua64Out, 0, Math.PI * 2);
+      c.arc(CX, CY, R.gua64In, 0, Math.PI * 2, true);
+      c.closePath();
+      c.fillStyle = '#0e0f16';
+      c.fill();
+      c.strokeStyle = '#2d3042'; c.lineWidth = 1; c.stroke();
+
+      const midR = (R.gua64In + R.gua64Out) / 2;
+      const hexOff = 8 * R.s;    // 局部 +y 指向圆心
+      const nameOff = 14 * R.s;
+      const hexW = Math.max(7, Math.round(10 * R.s * 1.9));
+      for (let i = 0; i < 64; i++) {
+        const g = HEXAGRAMS_64[i];
+        const deg = i * GUA64_STEP;
+        const sRad = this.deg2rad(deg - GUA64_HALF);
+        const eRad = this.deg2rad(deg + GUA64_HALF);
+        const isYang = (i === 0 || i >= 33);
+        c.beginPath();
+        c.arc(CX, CY, R.gua64Out, sRad, eRad);
+        c.arc(CX, CY, R.gua64In, eRad, sRad, true);
+        c.closePath();
+        c.fillStyle = isYang ? '#161822' : '#101118';
+        c.fill();
+        c.strokeStyle = '#2a2c3c'; c.lineWidth = 0.5; c.stroke();
+
+        const midRad = this.deg2rad(deg);
+        c.save();
+        c.translate(CX + Math.cos(midRad) * midR, CY + Math.sin(midRad) * midR);
+        c.rotate(midRad + Math.PI / 2);
+        this.drawHexagram(c, g.l, 0, hexOff, hexW);
+        c.fillStyle = isYang ? '#c8b88a' : '#8a8a9a';
+        c.font = `${FS.gua64}px sans-serif`;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(g.n, 0, -nameOff);
+        c.restore();
+      }
+      // 八宫分界线
+      for (let k = 1; k <= 8; k++) {
+        const rad = this.deg2rad(k * 45 - GUA64_HALF);
+        c.beginPath();
+        c.moveTo(CX + Math.cos(rad) * R.gua64In, CY + Math.sin(rad) * R.gua64In);
+        c.lineTo(CX + Math.cos(rad) * R.gua64Out, CY + Math.sin(rad) * R.gua64Out);
+        c.strokeStyle = '#4a4d5e'; c.lineWidth = 1.2; c.stroke();
+      }
+    }
+
+    // ---- 7. 今日当令之山金色弧 ----
+    if (this.currentIndex >= 0 && L.mountains) {
+      const m = MOUNTAINS_DATA[this.currentIndex];
+      const sRad = this.deg2rad(m.deg - HALF_SEG);
+      const eRad = this.deg2rad(m.deg + HALF_SEG);
+      c.beginPath();
+      c.arc(CX, CY, R.hexRing + 5 * R.s, sRad, eRad);
+      c.arc(CX, CY, R.hexRing + 2 * R.s, eRad, sRad, true);
+      c.closePath();
+      c.fillStyle = 'rgba(212, 175, 55, 0.35)';
+      c.fill();
+      c.strokeStyle = '#d4af37'; c.lineWidth = 2.5; c.stroke();
+    }
   },
 
-  /**
-   * 八卦符号内环（太极与八宫之间的金色卦符）
-   */
-  drawPalaceSymbolRing(ctx, CX, CY, R, FS) {
-    const palaces = this.data.currentMode === 'post' ? PALACES_POST : PALACES_PRE;
-    const midR = (R.taiji + R.preGuaRing) / 2;
-
-    ctx.save();
-    ctx.fillStyle = '#d4af37';
-    ctx.font = `${FS.palaceSym}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    palaces.forEach((p) => {
-      const rad = this.deg2rad(p.baseDeg);
-      ctx.fillText(p.symbol, CX + Math.cos(rad) * midR, CY + Math.sin(rad) * midR);
-    });
-    ctx.restore();
-  },
-
-  /**
-   * 今日当令之山金色弧标记
-   */
-  drawTodayHighlight(ctx, CX, CY, R) {
-    if (this.currentIndex < 0 || this.currentIndex >= 24) return;
-    const m = MOUNTAINS_DATA[this.currentIndex];
-    const sRad = this.deg2rad(m.deg - 7.5);
-    const eRad = this.deg2rad(m.deg + 7.5);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(CX, CY, R.hexRing + 5 * R.s, sRad, eRad);
-    ctx.arc(CX, CY, R.hexRing + 2 * R.s, eRad, sRad, true);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(212, 175, 55, 0.35)';
-    ctx.fill();
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-    ctx.restore();
-  },
-
-  /**
-   * 实时时钟红针（12 时正南 · 0 时正北）
-   */
-  drawClockPointer(ctx, CX, CY, R) {
+  drawTimeNeedles(ctx, CX, CY, R, FS) {
     const now = new Date();
-    const nowDeg = (((now.getHours() - 12 + 24) % 24) * 15)
-      + now.getMinutes() * 0.25
-      + now.getSeconds() * (0.25 / 60);
-    const rad = this.deg2rad(nowDeg);
-
     const pStart = R.taiji + 4 * R.s;
     const pEnd = R.timeOut - 6 * R.s;
 
-    ctx.save();
+    // A. 当前实时北京时间红针
+    const nowDeg = (((now.getHours() - 12 + 24) % 24) * 15) + now.getMinutes() * 0.25;
+    const nowRad = this.deg2rad(nowDeg);
+    const nowHour = Math.floor(nowDeg / 15) % 24;
+    const hourDeg = nowHour * 15;
     ctx.beginPath();
-    ctx.moveTo(CX + Math.cos(rad) * pStart, CY + Math.sin(rad) * pStart);
-    ctx.lineTo(CX + Math.cos(rad) * pEnd, CY + Math.sin(rad) * pEnd);
+    ctx.arc(CX, CY, R.timeOut, this.deg2rad(hourDeg - 7.5), this.deg2rad(hourDeg + 7.5));
+    ctx.arc(CX, CY, R.timeIn, this.deg2rad(hourDeg + 7.5), this.deg2rad(hourDeg - 7.5), true);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(231, 76, 60, 0.18)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(nowRad) * pStart, CY + Math.sin(nowRad) * pStart);
+    ctx.lineTo(CX + Math.cos(nowRad) * pEnd, CY + Math.sin(nowRad) * pEnd);
     ctx.strokeStyle = 'rgba(231, 76, 60, 0.85)';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // 末端指示圆点
     ctx.beginPath();
-    ctx.arc(CX + Math.cos(rad) * pEnd, CY + Math.sin(rad) * pEnd, 5, 0, Math.PI * 2);
+    ctx.arc(CX + Math.cos(nowRad) * pEnd, CY + Math.sin(nowRad) * pEnd, 5.5, 0, Math.PI * 2);
     ctx.fillStyle = '#e74c3c';
     ctx.fill();
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.2;
     ctx.stroke();
 
+    // B. 真太阳时金针（读取每秒缓存，避免每帧重复 Spencer 三角函数运算）
+    const solarTime = this.cachedTrueSolarTime || calculateTrueSolarTime(this.currentLongitude, now);
+    const solarRad = this.deg2rad(solarTime.solarDeg);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(solarRad) * (pStart + 8 * R.s), CY + Math.sin(solarRad) * (pStart + 8 * R.s));
+    ctx.lineTo(CX + Math.cos(solarRad) * (R.timeOut - 4 * R.s), CY + Math.sin(solarRad) * (R.timeOut - 4 * R.s));
+    ctx.strokeStyle = 'rgba(241, 196, 15, 0.9)';
+    ctx.lineWidth = 1.6;
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 2]);
+    ctx.stroke();
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+
+    ctx.beginPath();
+    ctx.arc(CX + Math.cos(solarRad) * (R.timeOut - 4 * R.s), CY + Math.sin(solarRad) * (R.timeOut - 4 * R.s),
+      4, 0, Math.PI * 2);
+    ctx.fillStyle = '#f1c40f';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+
     // 中心轴点
     ctx.beginPath();
     ctx.arc(CX, CY, 4, 0, Math.PI * 2);
     ctx.fillStyle = '#e74c3c';
     ctx.fill();
+  },
+
+  drawTaiji(ctx, CX, CY, r) {
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#f5f5ef';
+    ctx.fill();
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, r, Math.PI / 2, Math.PI * 1.5, true); // 右半为阴
+    ctx.closePath();
+    ctx.fillStyle = '#141414';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, -r / 2, r / 2, 0, Math.PI * 2); // 阳鱼头在上
+    ctx.fillStyle = '#f5f5ef';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, r / 2, r / 2, 0, Math.PI * 2); // 阴鱼头在下
+    ctx.fillStyle = '#141414';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, -r / 2, r / 6, 0, Math.PI * 2); // 阳中含阴
+    ctx.fillStyle = '#141414';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, r / 2, r / 6, 0, Math.PI * 2); // 阴中含阳
+    ctx.fillStyle = '#f5f5ef';
+    ctx.fill();
     ctx.restore();
   },
 
   /**
-   * 核心双指针系统渲染：地磁北（绿）与地理真北（金）
+   * 电子双轴太极水准仪气泡（屏幕固定参考系，位于太极天心处）
    */
-  drawDualCompassNeedles(ctx, CX, CY, R, FS) {
-    const heading = this.currentHeading;
-    if (heading === null || heading === undefined) return;
+  drawBubbleLevel(ctx, CX, CY, R, FS) {
+    const rTaiji = R.taiji;
+    ctx.save();
 
-    // 1. 地磁北屏幕角（物理地磁实际指向，0°=北）
-    const magNorthDeg = (360 - (heading % 360)) % 360;
+    // 基准十字微刻线
+    ctx.beginPath();
+    ctx.moveTo(CX - rTaiji * 0.65, CY); ctx.lineTo(CX + rTaiji * 0.65, CY);
+    ctx.moveTo(CX, CY - rTaiji * 0.65); ctx.lineTo(CX, CY + rTaiji * 0.65);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // 2.5° 精密平水合格圈
+    ctx.beginPath();
+    ctx.arc(CX, CY, rTaiji * 0.38, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(46, 204, 113, 0.55)';
+    ctx.lineWidth = 1.2;
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([2, 2]);
+    ctx.stroke();
+
+    // 7.0° 倾角警戒圈
+    ctx.beginPath();
+    ctx.arc(CX, CY, rTaiji * 0.72, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(241, 196, 15, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+
+    // 物理倾角映射气泡位移
+    const maxTilt = 12;
+    const maxOffset = rTaiji * 0.65;
+    const bx = CX + Math.max(-1, Math.min(1, this.currentRoll / maxTilt)) * maxOffset;
+    const by = CY - Math.max(-1, Math.min(1, this.currentPitch / maxTilt)) * maxOffset;
+    const tiltMag = Math.sqrt(this.currentPitch * this.currentPitch + this.currentRoll * this.currentRoll);
+
+    const isPerfect = tiltMag < 2.5;
+    const isModerate = tiltMag >= 2.5 && tiltMag < 7.0;
+    const bubbleColor = isPerfect ? '#2ecc71' : (isModerate ? '#f39c12' : '#ff5252');
+
+    ctx.beginPath();
+    ctx.arc(bx, by, 7.5, 0, Math.PI * 2);
+    ctx.fillStyle = isPerfect ? 'rgba(46, 204, 113, 0.35)' : (isModerate ? 'rgba(243, 156, 18, 0.35)' : 'rgba(255, 82, 82, 0.35)');
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(bx, by, 5.5, 0, Math.PI * 2);
+    ctx.fillStyle = bubbleColor;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(bx - 1.5, by - 1.5, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    ctx.fillStyle = bubbleColor;
+    ctx.font = `bold ${FS.label}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isPerfect ? '✓水平' : `${tiltMag.toFixed(1)}°`, CX, CY + rTaiji - 7);
+
+    ctx.restore();
+  },
+
+  /**
+   * 磁北（绿·磁）与地理真北（金·真）双指针系统
+   */
+  drawDualCompassNeedles(ctx, CX, CY, R, FS, effectiveHeading) {
+    if (effectiveHeading === null || effectiveHeading === undefined) return;
+
+    const magNorthDeg = (360 - (effectiveHeading % 360)) % 360;
     const magRad = this.deg2rad(magNorthDeg);
 
-    // 2. 地理真北屏幕角（经度磁偏角校正后地理正北）
-    const trueHeading = ((heading + this.currentDeclination) % 360 + 360) % 360;
+    const trueHeading = ((effectiveHeading + this.currentDeclination) % 360 + 360) % 360;
     const trueNorthDeg = (360 - trueHeading) % 360;
     const trueRad = this.deg2rad(trueNorthDeg);
 
-    // 3. 当存在明显地磁偏角（>=0.2°）时，在两针之间绘制半透明微金虚线弧与数值
+    // 地磁偏角虚线弧与度数
     const declDiff = Math.abs(this.currentDeclination);
     if (declDiff >= 0.2) {
       const arcR = 92 * R.s;
@@ -973,13 +1367,10 @@ Page({
       ctx.arc(CX, CY, arcR, magRad, magRad + diffA, diffA < 0);
       ctx.strokeStyle = 'rgba(241, 196, 15, 0.45)';
       ctx.lineWidth = 1.5;
-      if (typeof ctx.setLineDash === 'function') {
-        ctx.setLineDash([2, 3]);
-      }
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([2, 3]);
       ctx.stroke();
       ctx.restore();
 
-      // 标注偏角度数（如 7.3°）
       const midA = magRad + diffA / 2;
       const textR = arcR + 10 * R.s;
       ctx.fillStyle = '#ffd166';
@@ -993,8 +1384,7 @@ Page({
     const arrowAngle = 0.42;
     const labelBack = arrowLen * 0.62;
 
-    // ---------- 指针南端配重对称尾翼 ----------
-    // 磁北南端尾针（青墨色）
+    // 磁北南端尾翼
     const magSouthRad = magRad + Math.PI;
     ctx.beginPath();
     ctx.moveTo(CX + Math.cos(magSouthRad) * (R.taiji + 6 * R.s), CY + Math.sin(magSouthRad) * (R.taiji + 6 * R.s));
@@ -1004,7 +1394,7 @@ Page({
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // 真北南端尾针（暗金棕色）
+    // 真北南端尾翼
     const trueSouthRad = trueRad + Math.PI;
     ctx.beginPath();
     ctx.moveTo(CX + Math.cos(trueSouthRad) * (R.taiji + 6 * R.s), CY + Math.sin(trueSouthRad) * (R.taiji + 6 * R.s));
@@ -1014,7 +1404,7 @@ Page({
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // ---------- 绘制【磁北针】（苍翠青绿，标“磁”） ----------
+    // 磁北针（标“磁”）
     {
       const pStart = R.taiji + 6 * R.s;
       const pEnd = R.postGuaRing - 6 * R.s;
@@ -1036,7 +1426,6 @@ Page({
       ctx.fillStyle = '#2ecc71';
       ctx.fill();
 
-      // 箭头内“磁”字
       ctx.fillStyle = '#ffffff';
       ctx.font = `bold ${FS.label}px sans-serif`;
       ctx.textAlign = 'center';
@@ -1044,10 +1433,10 @@ Page({
       ctx.fillText('磁', ax - Math.cos(magRad) * labelBack, ay - Math.sin(magRad) * labelBack);
     }
 
-    // ---------- 绘制【真北针】（曜目金光，标“真”） ----------
+    // 真北针（标“真”）
     {
       const pStart = R.taiji + 6 * R.s;
-      const pEnd = R.postGuaRing - 14 * R.s; // 微缩以防重叠遮挡
+      const pEnd = R.postGuaRing - 14 * R.s;
       ctx.beginPath();
       ctx.moveTo(CX + Math.cos(trueRad) * pStart, CY + Math.sin(trueRad) * pStart);
       ctx.lineTo(CX + Math.cos(trueRad) * pEnd, CY + Math.sin(trueRad) * pEnd);
@@ -1066,7 +1455,6 @@ Page({
       ctx.fillStyle = '#f1c40f';
       ctx.fill();
 
-      // 箭头内“真”字
       ctx.fillStyle = '#2c1e02';
       ctx.font = `bold ${FS.label}px sans-serif`;
       ctx.textAlign = 'center';

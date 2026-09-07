@@ -12,6 +12,11 @@
       <text class="calib-acc-badge {{accClass}}">{{accuracyText}}</text>
     </view>
 
+    <view class="calib-status-row" style="margin-bottom: 8rpx;">
+      <text>环境磁场干扰状态：</text>
+      <text class="calib-acc-badge {{magClass}}">{{magText}}</text>
+    </view>
+
     <view class="calib-status-row" style="margin-bottom: 16rpx;">
       <text>当前经纬度坐标：</text>
       <text class="calib-decl-badge" style="color:#50e3c2;">{{coordsDesc}}</text>
@@ -25,9 +30,10 @@
     <view class="calib-figure8-box">
       <view class="figure8-icon">🧭</view>
       <view class="calib-figure8-text">
-        <text class="bold-text">双针系统与易学考据：\n</text>
-        • <text style="color:#2ecc71;font-weight:bold;">绿色“磁”针</text>：地磁北（地盘正针），物理磁场实测，传统立向格龙之准绳。\n
-        • <text style="color:#f1c40f;font-weight:bold;">金色“真”针</text>：地理真北（对应现代地图北向），经全球地磁模型(WMM)与GPS精确实时校正。\n
+        <text class="bold-text">双针系统与易学考据：
+</text>
+        • <text style="color:#2ecc71;font-weight:bold;">绿色“磁”针</text>：地磁北（地盘正针），物理磁场实测，传统立向格龙之准绳。
+        • <text style="color:#f1c40f;font-weight:bold;">金色“真”针</text>：地理真北（对应现代地图北向），经全球地磁模型(WMM)与GPS精确实时校正。
         • <text class="bold-text">两针夹角</text>：即为您所在地的真实地磁偏角。
       </view>
     </view>

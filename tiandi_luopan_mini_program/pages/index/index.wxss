@@ -1,4 +1,4 @@
-/** mini_program/pages/index/index.wxss **/
+/* pages/index/index.wxss */
 
 .page-container {
   min-height: 100vh;
@@ -27,21 +27,33 @@
 }
 
 .subtitle {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #888899;
-  margin-bottom: 8rpx;
+  margin-bottom: 6rpx;
+  text-align: center;
 }
 
-.highlight-time {
-  color: #e74c3c;
-  font-weight: bold;
+/* 综合状态栏：时间 · 速度 · 方向 */
+.status-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 26rpx;
+  margin-bottom: 8rpx;
+  letter-spacing: 1rpx;
 }
+.status-time { color: #e74c3c; font-weight: bold; }
+.status-speed { color: #50e3c2; font-weight: bold; }
+.status-dir { color: #d4af37; font-weight: bold; }
+.status-sep { color: #555566; font-weight: normal; }
 
 .direction-mark {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #c8b88a;
-  letter-spacing: 4rpx;
+  letter-spacing: 2rpx;
   margin-bottom: 12rpx;
+  text-align: center;
 }
 
 /* Tab 模式切换 */
@@ -49,15 +61,16 @@
   display: flex;
   gap: 16rpx;
   margin-bottom: 12rpx;
+  justify-content: center;
 }
 
 .tab-btn {
   background: #1c1d28;
   color: #888899;
   border: 1px solid #333446;
-  padding: 10rpx 28rpx;
+  padding: 10rpx 24rpx;
   border-radius: 12rpx;
-  font-size: 26rpx;
+  font-size: 24rpx;
   transition: all 0.2s ease;
 }
 
@@ -66,6 +79,16 @@
   color: #111111;
   border-color: #d4af37;
   font-weight: bold;
+}
+
+.tab-btn.fn { font-weight: bold; }
+.tab-btn.fn-gold { color: #f1c40f; border-color: #534321; }
+.tab-btn.fn-cyan { color: #50e3c2; border-color: #1f4f45; }
+.tab-btn.fn-locked {
+  background: #e67e22 !important;
+  color: #ffffff !important;
+  border-color: #d35400 !important;
+  box-shadow: 0 0 10rpx rgba(230, 126, 34, 0.7);
 }
 
 /* 罗盘朝向微光胶囊栏 */
@@ -80,16 +103,15 @@
 .compass-info-box {
   display: inline-flex;
   align-items: center;
-  gap: 12rpx;
+  gap: 10rpx;
   background: rgba(28, 29, 40, 0.85);
   border: 1px solid rgba(46, 204, 113, 0.45);
   color: #2ecc71;
-  padding: 8rpx 24rpx;
+  padding: 8rpx 20rpx;
   border-radius: 40rpx;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 600;
   box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.35);
-  letter-spacing: 1rpx;
 }
 
 .calib-dot {
@@ -100,33 +122,26 @@
   background: #2ecc71;
   box-shadow: 0 0 12rpx #2ecc71;
 }
+.calib-dot.med { background: #f39c12; box-shadow: 0 0 12rpx #f39c12; }
+.calib-dot.low { background: #e74c3c; box-shadow: 0 0 12rpx #e74c3c; }
 
-.calib-dot.med {
-  background: #f39c12;
-  box-shadow: 0 0 12rpx #f39c12;
-}
+.compass-info-mag { color: #2ecc71; }
+.compass-info-divider { color: #555566; }
+.compass-info-true { color: #f1c40f; }
+.compass-info-decl { color: #888899; font-size: 20rpx; }
 
-.calib-dot.low {
-  background: #e74c3c;
-  box-shadow: 0 0 12rpx #e74c3c;
-}
-
-.compass-info-mag {
-  color: #2ecc71;
-}
-
-.compass-info-divider {
-  color: #555566;
-  margin: 0 4rpx;
-}
-
-.compass-info-true {
-  color: #f1c40f;
-}
-
-.compass-info-decl {
-  color: #888899;
-  font-size: 20rpx;
+/* 强磁干扰悬浮告警条 */
+.mag-alert-banner {
+  width: 100%;
+  background: #3d1717;
+  border: 1px solid #e74c3c;
+  color: #ff6b6b;
+  font-size: 22rpx;
+  font-weight: bold;
+  text-align: center;
+  padding: 10rpx 16rpx;
+  border-radius: 12rpx;
+  margin-bottom: 12rpx;
 }
 
 /* 罗盘视口与 Canvas 容器 */
@@ -155,6 +170,76 @@
   border-radius: 50%;
 }
 
+/* 离屏缓冲画布（移出可视区，仅作静态盘面预渲染缓冲） */
+.offscreen-canvas {
+  position: fixed;
+  left: -3000rpx;
+  top: 0;
+  width: 680rpx;
+  height: 680rpx;
+}
+
+/* 十字天心瞄准线（坐向同论） */
+.crosshair-vertical {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2rpx;
+  background: linear-gradient(to bottom,
+    rgba(231, 76, 60, 0.9) 0%, rgba(231, 76, 60, 0.2) 50%, rgba(231, 76, 60, 0.9) 100%);
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.crosshair-horizontal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2rpx;
+  background: linear-gradient(to right,
+    rgba(231, 76, 60, 0.9) 0%, rgba(231, 76, 60, 0.2) 50%, rgba(231, 76, 60, 0.9) 100%);
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.crosshair-front-pointer {
+  position: absolute;
+  top: 6rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ff5252;
+  font-size: 20rpx;
+  font-weight: bold;
+  background: rgba(22, 23, 32, 0.88);
+  border: 1px solid rgba(231, 76, 60, 0.85);
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  pointer-events: none;
+  z-index: 6;
+  line-height: 1.3;
+}
+
+.crosshair-back-pointer {
+  position: absolute;
+  bottom: 6rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #50e3c2;
+  font-size: 20rpx;
+  font-weight: bold;
+  background: rgba(22, 23, 32, 0.88);
+  border: 1px solid rgba(80, 227, 194, 0.85);
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+  pointer-events: none;
+  z-index: 6;
+  line-height: 1.3;
+}
+
 /* 底部卦象解释面板 */
 .info-panel {
   background: #1c1d28;
@@ -167,11 +252,11 @@
 }
 
 .info-title {
-  font-size: 32rpx;
+  font-size: 30rpx;
   color: #d4af37;
   border-bottom: 1px solid #333446;
   padding-bottom: 16rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
   font-weight: bold;
 }
 
@@ -179,46 +264,212 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14rpx;
-  font-size: 26rpx;
-}
-
-.info-label {
-  color: #888899;
-}
-
-.info-val {
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.val-coords {
-  color: #d4af37;
-  font-weight: bold;
+  margin-bottom: 12rpx;
   font-size: 24rpx;
 }
+
+.info-item-clickable {
+  border-radius: 8rpx;
+  padding: 8rpx 10rpx;
+  margin: -8rpx -10rpx 12rpx -10rpx;
+  background: rgba(212, 175, 55, 0.08);
+}
+
+.info-hint-icon {
+  font-size: 18rpx;
+  color: #d4af37;
+  background: rgba(212, 175, 55, 0.18);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 50%;
+  width: 26rpx;
+  height: 26rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8rpx;
+  font-weight: bold;
+}
+
+.info-label { color: #888899; }
+.info-val { color: #ffffff; font-weight: 500; }
+.sub-desc { font-size: 20rpx; color: #888899; font-weight: normal; }
+
+/* 空亡诊断徽标 */
+.kw-badge {
+  display: inline-block;
+  padding: 2rpx 14rpx;
+  border-radius: 20rpx;
+  font-size: 20rpx;
+  font-weight: bold;
+}
+.kw-badge.pure { background: #153828; color: #2ecc71; border: 1px solid #2ecc71; }
+.kw-badge.jian { background: #3d2f14; color: #f39c12; border: 1px solid #f39c12; }
+.kw-badge.small_kw { background: #3d1717; color: #e74c3c; border: 1px solid #e74c3c; }
+.kw-badge.big_kw { background: #5a0f0f; color: #ff5252; border: 1px solid #ff5252; }
 
 /* 图例区域 */
 .legend {
   margin-top: 24rpx;
   padding-top: 20rpx;
   border-top: 1px solid #2a2b3d;
-  font-size: 22rpx;
+  font-size: 20rpx;
   color: #888899;
   line-height: 1.6;
 }
+.legend-title { color: #cccccc; font-weight: bold; margin-bottom: 8rpx; }
+.legend-row { margin-bottom: 4rpx; }
 
-.legend-title {
+/* ==================== 通用弹窗 ==================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32rpx;
+}
+
+.modal-card {
+  background: #1e1f2b;
+  border: 1px solid #3c3e54;
+  border-radius: 28rpx;
+  width: 92vw;
+  max-width: 640rpx;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 32rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.8);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.modal-title {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #d4af37;
+}
+
+.modal-close {
+  font-size: 32rpx;
+  color: #888888;
+  padding: 8rpx;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.modal-btn {
+  flex: 1;
+  background: #d4af37;
+  color: #111111;
+  font-weight: bold;
+  border-radius: 16rpx;
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  line-height: 1.4;
+}
+
+/* 图层配置弹窗 */
+.layer-preset-bar {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.layer-preset-btn {
+  flex: 1;
+  background: #252636;
+  border: 1px solid #3d3e55;
+  color: #bbbbbb;
+  font-size: 20rpx;
+  padding: 10rpx 4rpx;
+  border-radius: 10rpx;
+  text-align: center;
+}
+.layer-preset-btn:active { background: #d4af37; color: #121216; font-weight: bold; }
+
+.layer-item-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 14rpx 16rpx;
+  background: #181924;
+  border: 1px solid #2a2c3e;
+  border-radius: 12rpx;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #dddddd;
+}
+
+.layer-check { color: #d4af37; font-size: 28rpx; }
+
+/* 详解弹窗实时状态卡片 */
+.status-card {
+  background: #181926;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  border: 1px solid #2e3046;
+  margin-bottom: 20rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.status-card-col { display: flex; flex-direction: column; gap: 6rpx; }
+.status-card-label { color: #aaaaaa; font-size: 20rpx; }
+.status-card-strong { font-weight: bold; }
+
+/* 详解卡片 */
+.explain-box {
+  background: #14151e;
+  border: 1px solid #2d2e40;
+  border-radius: 14rpx;
+  padding: 18rpx;
+  margin-bottom: 16rpx;
+  font-size: 22rpx;
+  line-height: 1.7;
   color: #cccccc;
+}
+
+.explain-title {
+  font-size: 24rpx;
   font-weight: bold;
   margin-bottom: 8rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
 }
 
-.legend-row {
-  margin-bottom: 4rpx;
+.explain-tag {
+  display: inline-block;
+  font-size: 18rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 12rpx;
+  font-weight: bold;
 }
 
-/* 校准弹窗（.calib-modal-overlay / .calib-card / .calib-btn 等）相关样式
-   已随 calib-modal 组件迁移至 components/calib-modal/calib-modal.wxss，
-   随该组件的「用时注入」一并加载。
-   上方 .calib-dot 系列仍属于顶部朝向胶囊栏，故保留在本页面样式中。 */
+.explain-quote {
+  background: rgba(212, 175, 55, 0.08);
+  border-left: 3px solid #d4af37;
+  padding: 14rpx 20rpx;
+  font-size: 20rpx;
+  color: #ffd166;
+  margin: 16rpx 0;
+  border-radius: 0 10rpx 10rpx 0;
+  line-height: 1.7;
+}
+
+.bold { font-weight: bold; color: #ffffff; }

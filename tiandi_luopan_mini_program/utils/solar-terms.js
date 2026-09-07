@@ -113,6 +113,9 @@ function getTodayMountainInfo() {
 
 module.exports = {
   SOLAR_TERM_NAMES,
+  SOLAR_LON,
+  termJD,
+  jdToBeijingDate,
   currentSolarTerm,
   getTodayMountainInfo
 };

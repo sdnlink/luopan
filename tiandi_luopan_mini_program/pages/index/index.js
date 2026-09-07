@@ -135,6 +135,21 @@ Page({
   hoveredIndex: 13,
   isTouching: false,
 
+  // 缩放与拖拽平移系统（对齐 Android MIN_SCALE/MAX_SCALE）
+  viewScale: 1.0,
+  viewTX: 0,
+  viewTY: 0,
+  MIN_SCALE: 1.0,
+  MAX_SCALE: 4.5,
+  touchStartDist: 0,
+  touchStartScale: 1.0,
+  touchStartX: 0,
+  touchStartY: 0,
+  touchStartTX: 0,
+  touchStartTY: 0,
+  isDragging: false,
+  lastTapTime: 0,
+
   layerConfig: Object.assign({}, DEFAULT_LAYERS),
   isDialDirty: true,
   isDrawScheduled: false,
@@ -616,13 +631,51 @@ Page({
     });
   },
 
-  handleTouch(e) {
-    if (!e.touches || !e.touches[0]) return;
-    const touch = e.touches[0];
+  /**
+   * 视图缩放 / 平移变换应用与边界收敛
+   */
+  applyViewTransform() {
+    const maxTranslate = (this.viewScale - 1) * (this.canvasW / 2);
+    this.viewTX = Math.max(-maxTranslate, Math.min(maxTranslate, this.viewTX));
+    this.viewTY = Math.max(-maxTranslate, Math.min(maxTranslate, this.viewTY));
+    if (this.viewScale <= 1.001) {
+      this.viewTX = 0;
+      this.viewTY = 0;
+    }
+  },
+
+  setZoom(newScale) {
+    this.viewScale = Math.max(this.MIN_SCALE, Math.min(this.MAX_SCALE, newScale));
+    this.applyViewTransform();
+    this.scheduleCompassDraw();
+  },
+
+  resetView() {
+    this.viewScale = 1.0;
+    this.viewTX = 0;
+    this.viewTY = 0;
+    this.scheduleCompassDraw();
+  },
+
+  /**
+   * 屏幕坐标 → 画布坐标（抵消当前缩放与平移）
+   */
+  toCanvasPoint(sx, sy) {
     const CX = this.canvasW / 2;
     const CY = this.canvasH / 2;
-    const dx = touch.x - CX;
-    const dy = touch.y - CY;
+    return {
+      x: (sx - CX - this.viewTX) / this.viewScale + CX,
+      y: (sy - CY - this.viewTY) / this.viewScale + CY
+    };
+  },
+
+  handleTouch(e) {
+    if (!e.touches || !e.touches[0]) return;
+    const p = this.toCanvasPoint(e.touches[0].x, e.touches[0].y);
+    const CX = this.canvasW / 2;
+    const CY = this.canvasH / 2;
+    const dx = p.x - CX;
+    const dy = p.y - CY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist <= 20 || dist > CX) return;
 
@@ -649,9 +702,78 @@ Page({
     }
   },
 
-  onTouchStart(e) { this.isTouching = true; this.handleTouch(e); },
-  onTouchMove(e) { this.handleTouch(e); },
-  onTouchEnd() { this.isTouching = false; },
+  // 触控交互：单指点击选中 / 单指拖拽平移 / 双指捏合缩放 / 双击切换缩放
+  onTouchStart(e) {
+    if (!e.touches) return;
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      this.touchStartX = t.x;
+      this.touchStartY = t.y;
+      this.touchStartTX = this.viewTX;
+      this.touchStartTY = this.viewTY;
+      this.isDragging = false;
+      this.isTouching = true;
+      this.handleTouch(e);
+    } else if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const ddx = t2.x - t1.x;
+      const ddy = t2.y - t1.y;
+      this.isTouching = true;
+      this.isDragging = false;
+      this.touchStartDist = Math.sqrt(ddx * ddx + ddy * ddy);
+      this.touchStartScale = this.viewScale;
+      this.touchStartTX = this.viewTX;
+      this.touchStartTY = this.viewTY;
+    }
+  },
+
+  onTouchMove(e) {
+    if (!this.isTouching || !e.touches) return;
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const dx = t.x - this.touchStartX;
+      const dy = t.y - this.touchStartY;
+      if (Math.sqrt(dx * dx + dy * dy) > 8) this.isDragging = true;
+
+      if (this.viewScale > 1.05 && this.isDragging) {
+        this.viewTX = this.touchStartTX + dx;
+        this.viewTY = this.touchStartTY + dy;
+        this.applyViewTransform();
+        this.scheduleCompassDraw();
+      } else {
+        this.handleTouch(e);
+      }
+    } else if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const ddx = t2.x - t1.x;
+      const ddy = t2.y - t1.y;
+      const curDist = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (this.touchStartDist > 0) {
+        this.viewScale = Math.max(this.MIN_SCALE, Math.min(this.MAX_SCALE,
+          this.touchStartScale * (curDist / this.touchStartDist)));
+        this.applyViewTransform();
+        this.scheduleCompassDraw();
+      }
+    }
+  },
+
+  onTouchEnd(e) {
+    if (!e.touches || e.touches.length === 0) {
+      this.isTouching = false;
+      if (!this.isDragging) {
+        const now = Date.now();
+        if (now - this.lastTapTime < 300) {
+          // 双击切换缩放
+          this.setZoom(this.viewScale > 1.2 ? 1.0 : 2.2);
+          this.lastTapTime = 0;
+        } else {
+          this.lastTapTime = now;
+        }
+      }
+    }
+  },
 
   // ---------- 弹窗 ----------
   toggleCalibModal(e) {
@@ -808,19 +930,29 @@ Page({
     ctx.fillStyle = '#14151f';
     ctx.fillRect(0, 0, W, H);
 
-    // 静态盘面离屏预渲染（脏标记驱动）
-    if (this.useOffscreen && this.dialCtx) {
-      if (this.isDialDirty) {
-        this.dialCtx.clearRect(0, 0, W, H);
-        this.renderStaticDial(this.dialCtx, CX, CY, R, FS);
-        this.isDialDirty = false;
-      }
+    // 仅在未缩放、未平移时启用离屏位图缓存；
+    // 缩放/平移状态下改为直接矢量重绘，保证放大后文字与线条依然锐利
+    const useCache = this.useOffscreen && !!this.dialCtx
+      && this.viewScale <= 1.001 && this.viewTX === 0 && this.viewTY === 0;
+
+    if (useCache && this.isDialDirty) {
+      this.dialCtx.clearRect(0, 0, W, H);
+      this.renderStaticDial(this.dialCtx, CX, CY, R, FS);
+      this.isDialDirty = false;
     }
 
     const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
     let diskRotDeg = 0;
     if (this.data.compassMode === 'rotateDisk' && effectiveHeading !== null) {
       diskRotDeg = (180 - effectiveHeading + 360) % 360;
+    }
+
+    // ---------- 视图缩放与平移包裹 ----------
+    ctx.save();
+    if (this.viewScale > 1.001 || this.viewTX !== 0 || this.viewTY !== 0) {
+      ctx.translate(CX + this.viewTX, CY + this.viewTY);
+      ctx.scale(this.viewScale, this.viewScale);
+      ctx.translate(-CX, -CY);
     }
 
     ctx.save();
@@ -830,8 +962,8 @@ Page({
       ctx.translate(-CX, -CY);
     }
 
-    // 1. 静态盘面（离屏单次 blit，或直接绘制）
-    if (this.useOffscreen && this.dialCanvas) {
+    // 1. 静态盘面（离屏单次 blit，或直接矢量绘制）
+    if (useCache && this.dialCanvas) {
       try {
         ctx.drawImage(this.dialCanvas, 0, 0, W, H);
       } catch (err) {
@@ -887,6 +1019,8 @@ Page({
 
     // 6. 磁北 / 真北双指针系统（屏幕固定参考系）
     this.drawDualCompassNeedles(ctx, CX, CY, R, FS, effectiveHeading);
+
+    ctx.restore(); // 闭合视图缩放/平移
   },
 
   /**

@@ -178,8 +178,8 @@
             margin: 0 auto;
         }
         .compass-viewport {
-            width: min(94vw, 500px);
-            height: min(94vw, 500px);
+            width: min(96vw, 520px);
+            height: min(96vw, 520px);
             position: relative;
             overflow: hidden;
             border-radius: 50%;
@@ -763,7 +763,7 @@
         };
 
         // ========== 高清渲染（适配高分屏） ==========
-        const DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+        const DPR = Math.min(window.devicePixelRatio || 1, 3.0);
         const W = 900, H = 900;             // 逻辑尺寸
         canvas.width = W * DPR;
         canvas.height = H * DPR;
@@ -1862,7 +1862,7 @@
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
                     offCtx.fillStyle="#fff";
-                    offCtx.font="bold 12px sans-serif";
+                    offCtx.font="bold 16px sans-serif";
                     offCtx.textAlign="center";offCtx.textBaseline="middle";
                     offCtx.fillText(`${p.name} ${p.symbol}`,0,0);
                     offCtx.restore();
@@ -1876,7 +1876,7 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.fillStyle="#d4af37";
-                    offCtx.font="17px sans-serif";
+                    offCtx.font="bold 22px sans-serif";
                     offCtx.textAlign="center";offCtx.textBaseline="middle";
                     offCtx.fillText(p.symbol,0,0);
                     offCtx.restore();
@@ -1903,8 +1903,8 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
-                    offCtx.fillStyle = "#d1d5db";
-                    offCtx.font="bold 12px sans-serif";
+                    offCtx.fillStyle = "#f3f4f6";
+                    offCtx.font="bold 18px sans-serif";
                     offCtx.textAlign="center";offCtx.textBaseline="middle";
                     offCtx.fillText(m.name,0,0);
                     offCtx.restore();
@@ -1939,26 +1939,30 @@
                     offCtx.translate(tx, ty);
                     offCtx.rotate(midRad + Math.PI / 2);
 
+                    // 120分金扇形切向空间极紧凑(约11.5px)，采用径向纵排(天干在上、地支在下)避免水平挤压并放大字号
                     if (isWangXiang) {
-                        offCtx.fillStyle = '#ffd166';
-                        offCtx.font = 'bold 8px sans-serif';
+                        offCtx.fillStyle = '#ffe082';
+                        offCtx.font = 'bold 9.5px sans-serif';
                         offCtx.textAlign = 'center'; offCtx.textBaseline = 'middle';
-                        offCtx.fillText(name, 0, 0);
+                        offCtx.fillText(name[0], 0, -6);
+                        offCtx.fillText(name[1], 0, 6);
 
                         offCtx.beginPath();
-                        offCtx.arc(0, (R.fenjinRing - R.mountainRing) / 2 - 3, 1.6, 0, Math.PI * 2);
+                        offCtx.arc(0, -14, 1.8, 0, Math.PI * 2);
                         offCtx.fillStyle = '#f1c40f';
                         offCtx.fill();
                     } else if (isHuoKeng) {
-                        offCtx.fillStyle = '#e74c3c';
-                        offCtx.font = '6.5px sans-serif';
+                        offCtx.fillStyle = '#ef5350';
+                        offCtx.font = '8.5px sans-serif';
                         offCtx.textAlign = 'center'; offCtx.textBaseline = 'middle';
-                        offCtx.fillText(name, 0, 0);
+                        offCtx.fillText(name[0], 0, -6);
+                        offCtx.fillText(name[1], 0, 6);
                     } else {
-                        offCtx.fillStyle = '#5a5d6e';
-                        offCtx.font = '6.5px sans-serif';
+                        offCtx.fillStyle = '#787b8d';
+                        offCtx.font = '8px sans-serif';
                         offCtx.textAlign = 'center'; offCtx.textBaseline = 'middle';
-                        offCtx.fillText(name, 0, 0);
+                        offCtx.fillText(name[0], 0, -6);
+                        offCtx.fillText(name[1], 0, 6);
                     }
                     offCtx.restore();
                 }
@@ -1984,8 +1988,8 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
-                    offCtx.fillStyle = "#9ca3af";
-                    offCtx.font="11px sans-serif";
+                    offCtx.fillStyle = "#e5e7eb";
+                    offCtx.font="bold 15px sans-serif";
                     offCtx.textAlign="center";offCtx.textBaseline="middle";
                     offCtx.fillText(m.solar,0,0);
                     offCtx.restore();
@@ -2008,11 +2012,11 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
-                    offCtx.fillStyle = "#7f8c8d";
-                    offCtx.font="10px sans-serif";
+                    offCtx.fillStyle = "#a1a1aa";
+                    offCtx.font="bold 13px sans-serif";
                     offCtx.textAlign="center";offCtx.textBaseline="middle";
                     offCtx.fillText(m.gua,0,0);
-                    drawHexagram(m.lines,0,30,20,offCtx);
+                    drawHexagram(m.lines,0,32,22,offCtx);
                     offCtx.restore();
                 }
             }
@@ -2044,8 +2048,8 @@
 
                     const lx = CX + Math.cos(rad)*(tOut - 24);
                     const ly = CY + Math.sin(rad)*(tOut - 24);
-                    offCtx.fillStyle = major ? '#d4af37' : '#9a9daa';
-                    offCtx.font = major ? 'bold 11px sans-serif' : '9px sans-serif';
+                    offCtx.fillStyle = major ? '#d4af37' : '#b0b3c0';
+                    offCtx.font = major ? 'bold 13.5px sans-serif' : 'bold 11px sans-serif';
                     offCtx.textAlign = 'center';
                     offCtx.textBaseline = 'middle';
                     offCtx.fillText(h.toString(), lx, ly);
@@ -2086,9 +2090,9 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
-                    drawHexagram(g.l, 0, 6, 10, offCtx);
-                    offCtx.fillStyle = isYang ? '#c8b88a' : '#8a8a9a';
-                    offCtx.font = '7px sans-serif';
+                    drawHexagram(g.l, 0, 7, 12, offCtx);
+                    offCtx.fillStyle = isYang ? '#e6d7ab' : '#a8a8bb';
+                    offCtx.font = 'bold 9.5px sans-serif';
                     offCtx.textAlign = 'center';
                     offCtx.textBaseline = 'middle';
                     offCtx.fillText(g.n, 0, -11);
@@ -2172,7 +2176,7 @@
                 ctx.translate(tx,ty);
                 ctx.rotate(midRad + Math.PI/2);
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "bold 12px sans-serif";
+                ctx.font = "bold 18px sans-serif";
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText(m.name, 0, 0);
@@ -2305,7 +2309,7 @@
 
                 // 倾角数字标注
                 ctx.fillStyle = bubbleColor;
-                ctx.font = 'bold 8px sans-serif';
+                ctx.font = 'bold 10px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(isPerfect ? '✓水平' : `${tiltMag.toFixed(1)}°`, CX, CY + rTaiji - 7);
@@ -2342,9 +2346,9 @@
                     ctx.restore();
 
                     const midA = magRad + diffA / 2;
-                    const textR = arcR + 10;
+                    const textR = arcR + 11;
                     ctx.fillStyle = '#ffd166';
-                    ctx.font = 'bold 8px sans-serif';
+                    ctx.font = 'bold 10.5px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(`${declDiff.toFixed(1)}°`, CX + Math.cos(midA) * textR, CY + Math.sin(midA) * textR);
@@ -2377,13 +2381,13 @@
                     ctx.moveTo(CX + Math.cos(magRad) * pStart, CY + Math.sin(magRad) * pStart);
                     ctx.lineTo(CX + Math.cos(magRad) * pEnd, CY + Math.sin(magRad) * pEnd);
                     ctx.strokeStyle = 'rgba(46, 204, 113, 0.95)';
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 3.2;
                     ctx.lineCap = 'round';
                     ctx.stroke();
 
                     const ax = CX + Math.cos(magRad) * pEnd;
                     const ay = CY + Math.sin(magRad) * pEnd;
-                    const arrowLen = 14;
+                    const arrowLen = 16;
                     const arrowAngle = 0.42;
                     ctx.beginPath();
                     ctx.moveTo(ax, ay);
@@ -2393,10 +2397,10 @@
                     ctx.fillStyle = '#2ecc71';
                     ctx.fill();
 
-                    const tx = ax - Math.cos(magRad) * 6;
-                    const ty = ay - Math.sin(magRad) * 6;
+                    const tx = ax - Math.cos(magRad) * 7.5;
+                    const ty = ay - Math.sin(magRad) * 7.5;
                     ctx.fillStyle = '#fff';
-                    ctx.font = 'bold 8px sans-serif';
+                    ctx.font = 'bold 10px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('磁', tx, ty);
@@ -2410,13 +2414,13 @@
                     ctx.moveTo(CX + Math.cos(trueRad) * pStart, CY + Math.sin(trueRad) * pStart);
                     ctx.lineTo(CX + Math.cos(trueRad) * pEnd, CY + Math.sin(trueRad) * pEnd);
                     ctx.strokeStyle = 'rgba(241, 196, 15, 0.95)';
-                    ctx.lineWidth = 2.5;
+                    ctx.lineWidth = 2.8;
                     ctx.lineCap = 'round';
                     ctx.stroke();
 
                     const ax = CX + Math.cos(trueRad) * pEnd;
                     const ay = CY + Math.sin(trueRad) * pEnd;
-                    const arrowLen = 13;
+                    const arrowLen = 15;
                     const arrowAngle = 0.42;
                     ctx.beginPath();
                     ctx.moveTo(ax, ay);
@@ -2426,10 +2430,10 @@
                     ctx.fillStyle = '#f1c40f';
                     ctx.fill();
 
-                    const tx = ax - Math.cos(trueRad) * 6;
-                    const ty = ay - Math.sin(trueRad) * 6;
+                    const tx = ax - Math.cos(trueRad) * 7;
+                    const ty = ay - Math.sin(trueRad) * 7;
                     ctx.fillStyle = '#2c1e02';
-                    ctx.font = 'bold 8px sans-serif';
+                    ctx.font = 'bold 10px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('真', tx, ty);

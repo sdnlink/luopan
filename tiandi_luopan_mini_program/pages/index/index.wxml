@@ -129,6 +129,11 @@
     </view>
 
     <view class="info-item">
+      <text class="info-label">地磁强度 / 磁倾角</text>
+      <text class="info-val" style="color:#9b59b6">{{magStrengthStr}} · {{magInclStr}}</text>
+    </view>
+
+    <view class="info-item">
       <text class="info-label">后天八卦</text>
       <text class="info-val">{{currentMountain.post}} {{currentMountain.postSym}}</text>
     </view>

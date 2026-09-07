@@ -32,6 +32,16 @@ Component({
     declDesc: {
       type: String,
       value: '正在获取GPS定位…'
+    },
+    // 环境磁场干扰状态文案
+    magText: {
+      type: String,
+      value: '✓ 正常 (地磁均匀)'
+    },
+    // 环境磁场干扰状态样式后缀：'' | 'low'
+    magClass: {
+      type: String,
+      value: ''
     }
   },
 

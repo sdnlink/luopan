@@ -16,7 +16,10 @@ const {
 } = require('../../utils/compass-data');
 
 const { getTodayMountainInfo } = require('../../utils/solar-terms');
-const { computeDeclination, formatLocationAndDeclination } = require('../../utils/geomagnetic');
+const {
+  computeGeomagneticField,
+  formatLocationAndDeclination
+} = require('../../utils/geomagnetic');
 const { calculateTrueSolarTime, calculateFourPillars } = require('../../utils/astronomy');
 const {
   JIAZI_60, geoDirName, getSitAndFaceDiagnosis, getFenjinAnalysis
@@ -78,6 +81,8 @@ Page({
     // 定位与地磁
     coordsDisplayStr: '正在获取GPS定位…',
     declinationDetailStr: '正在获取GPS定位…',
+    magStrengthStr: '—',
+    magInclStr: '—',
 
     // 弹窗
     showCalibModal: false,
@@ -120,6 +125,12 @@ Page({
   lockedHeading: 0,
   lastAccuracyLevel: '',
   lastTiltMag: -999,
+
+  // 陀螺仪角速度融合与抗磁突变（对齐 Android onSensorChanged 的自适应滤波）
+  gyroAngularSpeed: 0,
+  isMagDistorted: false,
+  lastCompassSample: -999,
+  magJoltCount: 0,
   currentDeclination: 0,
   hasDeclination: false,
   currentLatitude: 0,
@@ -163,6 +174,7 @@ Page({
   locationTimer: null,
   isCompassRunning: false,
   isMotionRunning: false,
+  isGyroRunning: false,
 
   // ==================== 生命周期 ====================
   onLoad() {
@@ -179,17 +191,20 @@ Page({
     if (!this.isCompassRunning && this.canvas) {
       this.startCompassListener();
       this.startMotionListener();
+      this.startGyroListener();
     }
   },
 
   onHide() {
     this.stopCompassListener();
     this.stopMotionListener();
+    this.stopGyroListener();
   },
 
   onUnload() {
     this.stopCompassListener();
     this.stopMotionListener();
+    this.stopGyroListener();
     if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
     if (this.locationTimer) { clearInterval(this.locationTimer); this.locationTimer = null; }
     if (typeof wx.stopLocationUpdate === 'function') {
@@ -254,15 +269,18 @@ Page({
         this.currentSpeed = Math.max(0, speed);
       }
 
-      const decl = computeDeclination(lat, lon, this.currentAltitude, new Date());
-      this.currentDeclination = decl;
+      // WMM 一次性解算地磁七要素，取偏角、总强度与磁倾角
+      const field = computeGeomagneticField(lat, lon, this.currentAltitude, new Date());
+      this.currentDeclination = Math.round(field.declination * 10) / 10;
       this.hasDeclination = true;
 
-      const info = formatLocationAndDeclination(lat, lon, this.currentAltitude, decl);
+      const info = formatLocationAndDeclination(lat, lon, this.currentAltitude, this.currentDeclination);
       this.setData({
         coordsDisplayStr: info.coordsDesc,
-        declinationDetailStr: `${Math.abs(decl).toFixed(1)}° (${info.dirStr})`,
-        declSummary: info.declText
+        declinationDetailStr: `${Math.abs(this.currentDeclination).toFixed(1)}° (${info.dirStr})`,
+        declSummary: info.declText,
+        magStrengthStr: `${(field.fieldStrength / 1000).toFixed(1)} μT`,
+        magInclStr: `${field.inclination.toFixed(1)}°`
       });
 
       this.refreshAstronomicalData();
@@ -371,6 +389,7 @@ Page({
         this.drawCompass();
         this.startCompassListener();
         this.startMotionListener();
+        this.startGyroListener();
       });
     });
   },
@@ -383,15 +402,18 @@ Page({
       success: () => {
         wx.onCompassChange((res) => {
           if (this.data.isHeadingLocked) return; // 立向已锁定
+          let joltDistorted = false;
           if (res.direction !== undefined && !isNaN(res.direction)) {
-            this.targetHeading = ((res.direction % 360) + 360) % 360;
+            const dir = ((res.direction % 360) + 360) % 360;
+            joltDistorted = this.checkMagneticDisturbance(dir);
+            this.targetHeading = dir;
             if (!this.isAnimating) {
               this.isAnimating = true;
               this.animateCompassStep();
             }
           }
           if (res.accuracy !== undefined) {
-            this.updateAccuracy(res.accuracy);
+            this.updateAccuracy(res.accuracy, joltDistorted);
           }
         });
       },
@@ -433,7 +455,71 @@ Page({
     if (typeof wx.offDeviceMotionChange === 'function') wx.offDeviceMotionChange();
   },
 
-  updateAccuracy(acc) {
+  /**
+   * 物理陀螺仪：测量机身真实旋转角速度（rad/s），完全不受铁磁干扰
+   */
+  startGyroListener() {
+    if (this.isGyroRunning) return;
+    if (typeof wx.startGyroscope !== 'function') return;
+    this.isGyroRunning = true;
+    wx.startGyroscope({
+      interval: 'game',
+      success: () => {
+        wx.onGyroscopeChange((res) => {
+          const x = res.x || 0;
+          const y = res.y || 0;
+          const z = res.z || 0;
+          this.gyroAngularSpeed = Math.sqrt(x * x + y * y + z * z);
+        });
+      },
+      fail: (err) => { console.warn('wx.startGyroscope failed:', err); }
+    });
+  },
+
+  stopGyroListener() {
+    if (!this.isGyroRunning) return;
+    this.isGyroRunning = false;
+    this.gyroAngularSpeed = 0;
+    if (typeof wx.stopGyroscope === 'function') wx.stopGyroscope();
+    if (typeof wx.offGyroscopeChange === 'function') wx.offGyroscopeChange();
+  },
+
+  /**
+   * 自适应滤波系数（对齐 Android onSensorChanged）：
+   * 陀螺仪显示机身静止但磁场异常/突跳时，大幅降低跟随权重以压制突发磁吸偏；
+   * 真正转动手机时放行高动态跟随，即转即随。
+   */
+  getAdaptiveAlpha() {
+    const isStatic = this.gyroAngularSpeed < 0.08;
+    if (isStatic && this.isMagDistorted) return 0.05; // 靠近铁窗且静止：极大压制磁突变
+    if (isStatic) return 0.20;                        // 原地微停：极致沉稳平滑
+    if (this.gyroAngularSpeed > 0.4) return 0.55;     // 快速转身：极速跟随
+    return 0.40;                                      // 常规旋转
+  },
+
+  /**
+   * 强磁干扰判定。
+   * 小程序不开放原始磁通量(μT)接口，故采用双路等效判据：
+   *   1) 系统上报的传感器精度为 low / unreliable；
+   *   2) 陀螺仪判定机身静止，但朝向仍出现大幅突跳（典型磁吸偏特征）。
+   */
+  checkMagneticDisturbance(heading) {
+    let jolt = false;
+    if (this.lastCompassSample >= 0) {
+      let d = Math.abs(heading - this.lastCompassSample);
+      if (d > 180) d = 360 - d;
+      // 静止状态下单次采样跳变超过 2.5° 视为磁扰动
+      jolt = (this.gyroAngularSpeed < 0.08 && d > 2.5);
+    }
+    this.lastCompassSample = heading;
+
+    if (jolt) this.magJoltCount = Math.min(10, this.magJoltCount + 1);
+    else if (this.magJoltCount > 0) this.magJoltCount -= 1;
+
+    return this.magJoltCount >= 3;
+  },
+
+  updateAccuracy(acc, joltDistorted) {
     // 微信各端 acc 可能为字符串(android)或数值(iOS)，统一归一到等级
     let level = 'high';
     if (typeof acc === 'string') {
@@ -456,18 +542,20 @@ Page({
       accClass = 'low'; dotClass = 'low';
     }
 
-    // 该回调随罗盘高频触发，仅在等级变化时触碰 setData
-    if (level === this.lastAccuracyLevel) return;
-    this.lastAccuracyLevel = level;
+    // 双路等效判定强磁干扰：传感器精度等级 + 静止状态下的朝向突跳
+    const distorted = (level === 'low' || level === 'unreliable') || !!joltDistorted;
 
-    // 小程序无原始磁通量接口，以传感器精度等级等效判定强磁干扰
-    const distorted = (level === 'low' || level === 'unreliable');
+    // 该回调随罗盘高频触发，仅在状态真正变化时触碰 setData
+    if (level === this.lastAccuracyLevel && distorted === this.isMagDistorted) return;
+    this.lastAccuracyLevel = level;
+    this.isMagDistorted = distorted;
+
     const patch = {
       calibAccuracyText: text,
       calibAccClass: accClass,
       calibClass: dotClass,
       showMagAlert: distorted,
-      magAlertText: distorted ? '⚠️ 监测到金属/强磁干扰 · 建议远离铁器或移步室内' : '',
+      magAlertText: distorted ? '⚠️ 监测到金属/强磁干扰 · 陀螺仪惯性锁已激活 · 建议远离铁器或移步室内' : '',
       magBadgeText: distorted ? '⚠️ 强磁干扰' : '✓ 正常 (地磁均匀)',
       magBadgeClass: distorted ? 'low' : ''
     };
@@ -480,7 +568,8 @@ Page({
       this.currentHeading = this.targetHeading;
       this.isAnimating = false;
     } else {
-      this.currentHeading = (this.currentHeading + diff * 0.55 + 360) % 360;
+      // 陀螺仪角速度自适应跟随权重（静止时沉稳、转身时迅捷、磁异常时压制突跳）
+      this.currentHeading = (this.currentHeading + diff * this.getAdaptiveAlpha() + 360) % 360;
       if (this.canvas && typeof this.canvas.requestAnimationFrame === 'function') {
         this.canvas.requestAnimationFrame(() => this.animateCompassStep());
       } else {

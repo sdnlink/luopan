@@ -249,14 +249,14 @@
 .\setup_and_build.ps1 -Target debug
 
 # 3. 产物路径 (携带版本号)
-# app/build/outputs/apk/release/yanxiang-v1.2.1.apk (约 4.9 MB)
-# 根目录下亦会同步生成 yanxiang-v1.2.1.apk
+# app/build/outputs/apk/release/yanxiang-v1.2.2.apk (约 4.9 MB)
+# 根目录下亦会同步生成 yanxiang-v1.2.2.apk
 ```
 
 ### 快捷安装到手机 (ADB)
 ```powershell
 # 推送并自动安装至已连接的 Android 设备
-.\.tools\android-sdk\platform-tools\adb.exe install -r app/build/outputs/apk/release/yanxiang-v1.2.1.apk
+.\.tools\android-sdk\platform-tools\adb.exe install -r app/build/outputs/apk/release/yanxiang-v1.2.2.apk
 ```
 
 ---

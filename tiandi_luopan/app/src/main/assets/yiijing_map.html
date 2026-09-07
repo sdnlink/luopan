@@ -1273,8 +1273,7 @@
                     btn.classList.remove('locked');
                 }
             }
-            updateCompassInfo();
-            updateAllFengshuiStatus();
+            scheduleThrottledDomUpdate(true);
             drawCompass();
         };
 
@@ -1326,27 +1325,39 @@
         };
 
         // ========== Android 原生双轴水准仪倾角回调 ==========
+        let lastTiltDomTime = 0;
+        let lastTiltStatusText = '';
+
         window.onNativeTiltUpdate = function(pitch, roll) {
             if (pitch !== undefined && !isNaN(pitch) && roll !== undefined && !isNaN(roll)) {
                 currentPitch = pitch;
                 currentRoll = roll;
-                updateTiltDisplay();
+                updateTiltDisplay(false);
                 if (layerConfig.bubbleLevel) {
                     scheduleCompassDraw();
                 }
             }
         };
 
-        function updateTiltDisplay() {
+        function updateTiltDisplay(force = false) {
+            const now = performance.now();
+            if (!force && now - lastTiltDomTime < 100) return;
+            lastTiltDomTime = now;
+
             const valLevel = document.getElementById('val-level');
             if (!valLevel) return;
             const tiltMag = Math.hypot(currentPitch, currentRoll);
+            let html = '';
             if (tiltMag < 2.5) {
-                valLevel.innerHTML = `<span style="color:#2ecc71">${tiltMag.toFixed(1)}° · 水平良好 ✓</span>`;
+                html = `<span style="color:#2ecc71">${tiltMag.toFixed(1)}° · 水平良好 ✓</span>`;
             } else if (tiltMag < 7.0) {
-                valLevel.innerHTML = `<span style="color:#f39c12">${tiltMag.toFixed(1)}° · 轻微倾斜</span>`;
+                html = `<span style="color:#f39c12">${tiltMag.toFixed(1)}° · 轻微倾斜</span>`;
             } else {
-                valLevel.innerHTML = `<span style="color:#e74c3c">${tiltMag.toFixed(1)}° · ⚠️ 请放平手机</span>`;
+                html = `<span style="color:#e74c3c">${tiltMag.toFixed(1)}° · ⚠️ 请放平手机</span>`;
+            }
+            if (html !== lastTiltStatusText) {
+                lastTiltStatusText = html;
+                valLevel.innerHTML = html;
             }
         }
 
@@ -1378,8 +1389,8 @@
             const effectiveHeading = isHeadingLocked ? lockedHeading : currentHeading;
             if (effectiveHeading === null || isNaN(effectiveHeading)) return;
 
-            // 只有当朝向变化超过0.2°或强制刷新时才触碰DOM，消除回流耗时
-            if (!force && Math.abs(effectiveHeading - lastFengshuiHeading) < 0.2) {
+            // 只有当朝向变化超过0.5°或强制刷新时才触碰DOM，消除回流耗时
+            if (!force && Math.abs(effectiveHeading - lastFengshuiHeading) < 0.5) {
                 return;
             }
             lastFengshuiHeading = effectiveHeading;
@@ -1397,7 +1408,7 @@
             if (valFj) valFj.innerHTML = `<span style="color:${fj.badgeColor};font-weight:bold">${fj.displayStr}</span>`;
         }
 
-        function updateHeaderStatus(){
+        function updateHeaderStatus(force = false){
             const timeEl = document.getElementById('now-time');
             const speedEl = document.getElementById('now-speed');
             const dirEl = document.getElementById('now-dir');
@@ -1424,19 +1435,40 @@
                 dirEl.innerText = `${dName} ${Math.round(h)}°`;
             }
 
-            updateAllFengshuiStatus(false);
+            updateAllFengshuiStatus(force);
+        }
+
+        // ========== 状态文本节流调度器（动静分离核心） ==========
+        let lastDomStatusTime = 0;
+        let lastDomStatusHeading = -999;
+
+        function scheduleThrottledDomUpdate(force = false) {
+            const effectiveHeading = isHeadingLocked ? lockedHeading : (currentHeading !== null ? currentHeading : 0);
+            const now = performance.now();
+            const headingDiff = Math.abs(effectiveHeading - lastDomStatusHeading);
+
+            // 节流机制：转动过程中，除非强制刷新，否则至少间隔 120ms 或角度变化大于 1.0° 才刷新 DOM 文本
+            // 消除 60fps 每一帧触发的 Style Recalculation 与 Layout Reflow，释放主线程给 GPU Canvas
+            if (!force && (now - lastDomStatusTime < 120 && headingDiff < 1.0)) {
+                return;
+            }
+            lastDomStatusTime = now;
+            lastDomStatusHeading = effectiveHeading;
+
+            updateCompassInfo(true);
+            updateHeaderStatus(true);
         }
 
         function updateNowTime(){
             refreshAstronomicalData();
-            updateHeaderStatus();
+            scheduleThrottledDomUpdate(true);
             scheduleCompassDraw();
         }
 
         window.onNativeSpeedUpdate = function(speed) {
             if (speed !== undefined && !isNaN(speed)) {
                 currentSpeed = Math.max(0, parseFloat(speed) || 0);
-                updateHeaderStatus();
+                updateHeaderStatus(true);
             }
         };
         // ========== 指南针（设备方向传感器） ==========
@@ -1460,8 +1492,8 @@
                     ? '🎯 十字天心瞄准 · 正前实测立向 (红线所指为当前山向)'
                     : '↑南 | ↓北 | ←东 | →西 (固定盘面模式)';
             }
-            updateCompassInfo();
-            drawCompass();
+            scheduleThrottledDomUpdate(true);
+            scheduleCompassDraw();
         };
 
         window.onNativeMagneticFieldUpdate = function(isDistorted, strength) {
@@ -1488,7 +1520,7 @@
                     badge.style.color = '#2ecc71';
                 }
             }
-            updateCompassInfo();
+            scheduleThrottledDomUpdate(true);
         };
 
         function animateCompassStep() {
@@ -1500,21 +1532,21 @@
                 currentHeading = (currentHeading + diff * 0.55 + 360) % 360;
                 requestAnimationFrame(animateCompassStep);
             }
-            updateCompassInfo();
-            updateHeaderStatus();
             scheduleCompassDraw();
+            scheduleThrottledDomUpdate();
         }
 
-        // Android 原生方向回调
+        // Android 原生方向回调（满帧丝滑驱动通道）
         window.onNativeHeadingUpdate = function(heading) {
             if (isHeadingLocked) return; // 立向已锁定时保持锁定朝向
             if (heading !== undefined && !isNaN(heading)) {
                 compassEnabled = true;
-                targetHeading = ((heading % 360) + 360) % 360;
-                if (!isAnimatingCompass) {
-                    isAnimatingCompass = true;
-                    requestAnimationFrame(animateCompassStep);
-                }
+                const norm = ((heading % 360) + 360) % 360;
+                targetHeading = norm;
+                currentHeading = norm; // 原生在 Kotlin 已完成陀螺仪角速度自适应滤波，直接同步，零滞后、零二次滤波冲突！
+                isAnimatingCompass = false; // 取消冗余的二次补间循环
+                scheduleCompassDraw();      // 毫秒级触发 GPU 极速 Canvas 重绘（满帧 60fps）
+                scheduleThrottledDomUpdate(); // 智能节流更新 DOM 文本，消除主线程卡顿
             }
         };
 
@@ -1526,8 +1558,8 @@
                 locationDesc = desc || '';
                 updateDeclinationDisplay();
                 updateLocationDisplay();
-                updateCompassInfo();
-                drawCompass();
+                scheduleThrottledDomUpdate(true);
+                scheduleCompassDraw();
             }
         };
 
@@ -1599,7 +1631,7 @@
             const el = document.getElementById('compass-info');
             if(!el) return;
             const effectiveHeading = isHeadingLocked ? lockedHeading : (currentHeading !== null ? currentHeading : 0);
-            if (!force && Math.abs(effectiveHeading - lastCompassInfoHeading) < 0.2) {
+            if (!force && Math.abs(effectiveHeading - lastCompassInfoHeading) < 0.5) {
                 return;
             }
             lastCompassInfoHeading = effectiveHeading;

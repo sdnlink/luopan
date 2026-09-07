@@ -951,10 +951,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun pushTiltUpdate(now: Long) {
-        if (now - lastTiltUpdateTimestamp > 40) { // ~25fps 倾角更新
+        if (now - lastTiltUpdateTimestamp > 50) { // ~20fps 倾角更新，足够平滑且大幅降低主线程 IPC 挤占
             val pitchDiff = Math.abs(currentPitch - lastPushedPitch)
             val rollDiff = Math.abs(currentRoll - lastPushedRoll)
-            if (pitchDiff > 0.15f || rollDiff > 0.15f || now - lastTiltUpdateTimestamp > 350) {
+            if (pitchDiff > 0.2f || rollDiff > 0.2f || now - lastTiltUpdateTimestamp > 400) {
                 lastTiltUpdateTimestamp = now
                 lastPushedPitch = currentPitch
                 lastPushedRoll = currentRoll

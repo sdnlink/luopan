@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var hasAltitude: Boolean = false
     private var coordsDesc: String = ""
     private var currentSpeedKmH: Float = 0f
-    private var lastLocationForSpeed: Location? = null
+    private var lastGpsLocationForSpeed: Location? = null
     private var lastLocationForSpeedTime: Long = 0L
     private var lastPushedSpeedKmH: Float = -1f
 
@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     @Volatile private var isDeviceStationary = false
 
     private var lastStepTime = 0L
+    private var consecutiveSteps = 0
     private var pdrEstimatedSpeedKmH = 0f
     private var isWaveRising = false
     private var waveValley = 9.8f
@@ -341,34 +342,56 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun calculateSpeed(location: Location) {
         val now = System.currentTimeMillis()
+
+        // 1. 如果 IMU 判定手机处于手持静止或水平不动状态，彻底封死速度跳变
         if (isDeviceStationary) {
-            // IMU 判定手机处于绝对静止状态，压制 GPS 噪点与漂移
             currentSpeedKmH = 0f
-            lastLocationForSpeed = location
+            if (location.provider == LocationManager.GPS_PROVIDER) {
+                lastGpsLocationForSpeed = location
+            }
             return
         }
 
+        // 2. 绝对严禁使用 NETWORK_PROVIDER 或 PASSIVE_PROVIDER 测速！
+        // 网络基站/Wi-Fi 探针定位精度通常在几十到上百米，且会频繁在基站间跳动，
+        // 一旦参与差分计算，原地不动也会被算出高达 20~100+ KM/H 的巨大虚假速度！
+        if (location.provider != LocationManager.GPS_PROVIDER) {
+            return
+        }
+
+        // 3. 处理真实 GPS 硬件速度
         if (location.hasSpeed()) {
             val sp = location.speed * 3.6f
-            currentSpeedKmH = if (sp < 0.6f) 0f else sp
+            // 速度静止死区过滤（行业通用标准）：
+            // 原地不动时卫星信号多径效应与载波相噪常有 0.2~0.5 m/s (约 0.7~1.8 KM/H) 的底噪波动；
+            // 小于 1.8 KM/H 强制归零，彻底消除静止时的微幅跳字！
+            currentSpeedKmH = if (sp < 1.8f) 0f else sp
             lastLocationForSpeedTime = now
         } else {
-            val prev = lastLocationForSpeed
+            // 4. GPS 坐标差分计算备用分支
+            val prev = lastGpsLocationForSpeed
             if (prev != null && location.time > prev.time) {
                 val dtSec = (location.time - prev.time) / 1000.0f
-                if (dtSec in 0.5f..10.0f) {
+                if (dtSec in 0.5f..5.0f) {
                     val distMeters = location.distanceTo(prev)
-                    if (distMeters > 1.2f) {
-                        currentSpeedKmH = (distMeters / dtSec) * 3.6f
-                        lastLocationForSpeedTime = now
+                    // GPS 原地漂移常在 1~3 米。仅当位移显著超越定位精度容差，且计算速度 >= 2.0 KM/H 时才认可为真实位移
+                    val minDriftThreshold = if (location.hasAccuracy() && prev.hasAccuracy()) {
+                        Math.max(3.5f, (location.accuracy + prev.accuracy) * 0.35f)
+                    } else {
+                        3.5f
+                    }
+
+                    if (distMeters > minDriftThreshold) {
+                        val calcSpeed = (distMeters / dtSec) * 3.6f
+                        currentSpeedKmH = if (calcSpeed < 2.0f) 0f else calcSpeed
                     } else {
                         currentSpeedKmH = 0f
-                        lastLocationForSpeedTime = now
                     }
+                    lastLocationForSpeedTime = now
                 }
             }
         }
-        lastLocationForSpeed = location
+        lastGpsLocationForSpeed = location
     }
 
     private fun pushSpeedUpdate() {
@@ -403,6 +426,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val timeSinceStep = now - lastStepTime
 
         if (isDeviceStationary) {
+            consecutiveSteps = 0
+            pdrEstimatedSpeedKmH = 0f
             if (currentSpeedKmH > 0f) {
                 currentSpeedKmH = 0f
                 pushSpeedUpdate()
@@ -410,28 +435,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             return
         }
 
-        // 超过 1.6 秒没有步伐动作，步态速度归零
-        if (timeSinceStep > 1600L && pdrEstimatedSpeedKmH > 0f) {
+        // 超过 1.5 秒没有新的连续步伐动作，步态速度立即归零
+        if (timeSinceStep > 1500L) {
+            consecutiveSteps = 0
             pdrEstimatedSpeedKmH = 0f
         }
 
-        // GPS 超时超过 2.5 秒未更新
-        if (timeSinceGps > 2500L) {
-            if (timeSinceStep < 1600L && pdrEstimatedSpeedKmH > 0f) {
-                // 室内或无 GPS 步行接管中：更新为步态推算速度
+        // GPS 超时超过 2.0 秒未更新有效速度
+        if (timeSinceGps > 2000L) {
+            if (consecutiveSteps >= 2 && pdrEstimatedSpeedKmH > 0f) {
+                // 仅在确认连续迈步行走时才接管输出步速
                 if (Math.abs(currentSpeedKmH - pdrEstimatedSpeedKmH) > 0.1f) {
                     currentSpeedKmH = pdrEstimatedSpeedKmH
                     pushSpeedUpdate()
                 }
             } else {
-                // 既无有效 GPS，又无步伐动作 -> 判定为停止，衰减并彻底归零
+                // 既无有效 GPS，又无连续步行步伐 -> 彻底归零
                 if (currentSpeedKmH > 0f) {
-                    if (currentSpeedKmH > 2.0f && timeSinceGps < 4000L) {
-                        currentSpeedKmH *= 0.5f
-                        if (currentSpeedKmH < 0.6f) currentSpeedKmH = 0f
-                    } else {
-                        currentSpeedKmH = 0f
-                    }
+                    currentSpeedKmH = 0f
                     pushSpeedUpdate()
                 }
             }
@@ -444,14 +465,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         accMean += 0.05f * delta
         accVar = 0.95f * accVar + 0.05f * (delta * delta)
 
-        // 静止特征：旋转角速度 < 0.08 rad/s，加速度方差极小 (<0.035)，总重力接近 9.8 m/s²
-        val isQuiet = gyroAngularSpeed < 0.08f && accVar < 0.035f && Math.abs(accMean - 9.8f) < 1.2f
-        if (isQuiet) {
+        // 手持静止特征：
+        // 正常人手持手机站立/端持罗盘不动时，手部生理微震颤方差在 0.03~0.15 之间，角速度 < 0.16 rad/s；
+        // 真正迈步走路时，加速度方差骤升至 1.5 ~ 6.0 以上，二者有超过 10 倍的安全界限！
+        // 阈值设定为 0.20 m²/s⁴ 和 0.16 rad/s，既能完美覆盖“手持完全静止”，又不会在行走时误判
+        val isQuietInHand = gyroAngularSpeed < 0.16f && accVar < 0.20f && Math.abs(accMean - 9.8f) < 1.6f
+        if (isQuietInHand) {
             if (stationaryStartTime == 0L) {
                 stationaryStartTime = now
-            } else if (now - stationaryStartTime > 600L) {
-                // 持续 600ms 绝对静止，触发零速修正
+            } else if (now - stationaryStartTime > 400L) {
+                // 持续 400ms 保持手持静止，立即判定为完全静止
                 isDeviceStationary = true
+                consecutiveSteps = 0
                 pdrEstimatedSpeedKmH = 0f
                 if (currentSpeedKmH > 0f) {
                     currentSpeedKmH = 0f
@@ -463,24 +488,39 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             isDeviceStationary = false
         }
 
-        // 2. PDR 步态检测：垂直加速度波峰波谷识别
+        // 2. PDR 步态检测：垂直加速度波峰波谷识别（防手抖误触发）
         if (totalAcc > wavePeak) wavePeak = totalAcc
         if (totalAcc < waveValley) waveValley = totalAcc
 
-        if (isWaveRising && totalAcc < wavePeak - 0.35f) {
+        // 闲置时峰谷值向 9.8 平滑衰减
+        if (now - lastStepTime > 1500L) {
+            wavePeak = Math.max(9.8f, wavePeak - 0.03f)
+            waveValley = Math.min(9.8f, waveValley + 0.03f)
+        }
+
+        if (isWaveRising && totalAcc < wavePeak - 0.45f) {
             // 波峰转折向下
             val peakValleyDiff = wavePeak - waveValley
-            if (peakValleyDiff in 1.1f..7.5f && wavePeak > 10.3f && waveValley < 9.3f) {
+            // 严格步态区间：必须具有明确的迈步下踏冲击力（峰谷差 >= 2.0 m/s²，且峰值 >= 11.0）
+            if (peakValleyDiff in 2.0f..8.0f && wavePeak > 11.0f && waveValley < 8.8f) {
                 val stepInterval = now - lastStepTime
-                if (stepInterval in 320L..1250L) {
-                    handleValidStep(now, stepInterval)
-                } else if (stepInterval > 1250L) {
+                if (stepInterval in 320L..1200L) {
+                    consecutiveSteps++
+                    // 必须至少连续迈出 2 步以上才认可为正在走路，彻底排除手部偶发晃动的单次误判！
+                    if (consecutiveSteps >= 2) {
+                        handleValidStep(now, stepInterval)
+                    } else {
+                        lastStepTime = now
+                    }
+                } else if (stepInterval > 1200L) {
+                    // 第一步起步：先不输出速度，记录起始时间点
+                    consecutiveSteps = 1
                     lastStepTime = now
                 }
             }
             isWaveRising = false
             waveValley = totalAcc
-        } else if (!isWaveRising && totalAcc > waveValley + 0.35f) {
+        } else if (!isWaveRising && totalAcc > waveValley + 0.45f) {
             // 波谷转折向上
             isWaveRising = true
             wavePeak = totalAcc
@@ -489,9 +529,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private fun onStepDetected(now: Long) {
         val stepInterval = now - lastStepTime
-        if (stepInterval in 320L..1250L) {
-            handleValidStep(now, stepInterval)
-        } else if (stepInterval > 1250L) {
+        if (stepInterval in 320L..1200L) {
+            consecutiveSteps++
+            if (consecutiveSteps >= 2) {
+                handleValidStep(now, stepInterval)
+            } else {
+                lastStepTime = now
+            }
+        } else if (stepInterval > 1200L) {
+            consecutiveSteps = 1
             lastStepTime = now
         }
     }
@@ -508,9 +554,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             0.5f * clamped + 0.5f * pdrEstimatedSpeedKmH
         }
 
-        // 若当前无 GPS 速度（超过 2.5 秒未收到有效 GPS 速度刷新）
+        // 若当前无 GPS 速度（超过 2.0 秒未收到有效 GPS 速度刷新）且确认连续步行中
         val timeSinceGps = now - lastLocationForSpeedTime
-        if (timeSinceGps > 2500L) {
+        if (timeSinceGps > 2000L && consecutiveSteps >= 2 && !isDeviceStationary) {
             currentSpeedKmH = pdrEstimatedSpeedKmH
             pushSpeedUpdate()
         }
@@ -596,8 +642,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         val loc = mgr.getLastKnownLocation(p)
                         if (loc != null && (lastKnownBestLocation == null || isBetterLocation(loc, lastKnownBestLocation))) {
                             lastKnownBestLocation = loc
-                            if (loc.hasSpeed()) {
-                                currentSpeedKmH = Math.max(0f, loc.speed * 3.6f)
+                            if (p == LocationManager.GPS_PROVIDER && loc.hasSpeed()) {
+                                val sp = loc.speed * 3.6f
+                                currentSpeedKmH = if (sp < 1.8f) 0f else sp
                                 lastLocationForSpeedTime = System.currentTimeMillis()
                             }
                         }
@@ -768,6 +815,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         hasSmoothHeading = false
         gyroAngularSpeed = 0f
         isDeviceStationary = false
+        consecutiveSteps = 0
         pdrEstimatedSpeedKmH = 0f
         Log.i(TAG, "Stopped sensor listening")
     }

@@ -11,8 +11,8 @@ android {
         applicationId "com.example.yiijingcompass"
         minSdk 26
         targetSdk 34
-        versionCode 102
-        versionName "1.0.2"
+        versionCode 120
+        versionName "1.2.0"
     }
 
     signingConfigs {

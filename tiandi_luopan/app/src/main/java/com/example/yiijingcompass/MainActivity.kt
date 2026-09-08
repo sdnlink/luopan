@@ -343,38 +343,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private fun calculateSpeed(location: Location) {
         val now = System.currentTimeMillis()
 
-        // 1. 如果 IMU 判定手机处于手持静止或水平不动状态，彻底封死速度跳变
-        if (isDeviceStationary) {
-            currentSpeedKmH = 0f
-            if (location.provider == LocationManager.GPS_PROVIDER) {
-                lastGpsLocationForSpeed = location
-            }
+        // 1. 过滤非法或无可靠速度的定位源
+        // 绝对严禁无条件使用纯网络基站（NETWORK_PROVIDER）做坐标差分，基站跳动会产生巨大虚假漂移速度！
+        val isGps = location.provider == LocationManager.GPS_PROVIDER
+        val hasReliableSpeed = location.hasSpeed() && (!location.hasAccuracy() || location.accuracy <= 30f)
+        if (!isGps && !hasReliableSpeed) {
             return
         }
 
-        // 2. 绝对严禁使用 NETWORK_PROVIDER 或 PASSIVE_PROVIDER 测速！
-        // 网络基站/Wi-Fi 探针定位精度通常在几十到上百米，且会频繁在基站间跳动，
-        // 一旦参与差分计算，原地不动也会被算出高达 20~100+ KM/H 的巨大虚假速度！
-        if (location.provider != LocationManager.GPS_PROVIDER) {
-            return
-        }
-
-        // 3. 处理真实 GPS 硬件速度
+        // 2. 处理真实硬件速度（多普勒频移解算）
         if (location.hasSpeed()) {
             val sp = location.speed * 3.6f
-            // 速度静止死区过滤（行业通用标准）：
-            // 原地不动时卫星信号多径效应与载波相噪常有 0.2~0.5 m/s (约 0.7~1.8 KM/H) 的底噪波动；
-            // 小于 1.8 KM/H 强制归零，彻底消除静止时的微幅跳字！
-            currentSpeedKmH = if (sp < 1.8f) 0f else sp
+            // 速度静止死区与原地低速漂移过滤：
+            // - 小于 1.8 KM/H 属于卫星相噪与多径底噪，强制归零；
+            // - 若速度在 1.8 ~ 3.0 KM/H 之间，且 IMU 检测到手机处于绝对静止状态（无震动无手抖），说明人原地站立，过滤偶发漂移；
+            // - 速度 >= 3.0 KM/H 或处于车载高速行驶时，手机即使静止也是真实航速，必须绝对认可！
+            if (sp < 1.8f) {
+                currentSpeedKmH = 0f
+            } else if (sp < 3.0f && isDeviceStationary) {
+                currentSpeedKmH = 0f
+            } else {
+                currentSpeedKmH = sp
+            }
             lastLocationForSpeedTime = now
-        } else {
-            // 4. GPS 坐标差分计算备用分支
+        } else if (isGps) {
+            // 3. GPS 坐标差分计算备用分支（仅在真正是 GPS 且硬件无 direct speed 时备用）
             val prev = lastGpsLocationForSpeed
             if (prev != null && location.time > prev.time) {
                 val dtSec = (location.time - prev.time) / 1000.0f
                 if (dtSec in 0.5f..5.0f) {
                     val distMeters = location.distanceTo(prev)
-                    // GPS 原地漂移常在 1~3 米。仅当位移显著超越定位精度容差，且计算速度 >= 2.0 KM/H 时才认可为真实位移
                     val minDriftThreshold = if (location.hasAccuracy() && prev.hasAccuracy()) {
                         Math.max(3.5f, (location.accuracy + prev.accuracy) * 0.35f)
                     } else {
@@ -383,7 +381,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
                     if (distMeters > minDriftThreshold) {
                         val calcSpeed = (distMeters / dtSec) * 3.6f
-                        currentSpeedKmH = if (calcSpeed < 2.0f) 0f else calcSpeed
+                        if (calcSpeed < 2.0f || (calcSpeed < 3.0f && isDeviceStationary)) {
+                            currentSpeedKmH = 0f
+                        } else {
+                            currentSpeedKmH = calcSpeed
+                        }
                     } else {
                         currentSpeedKmH = 0f
                     }
@@ -391,7 +393,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             }
         }
-        lastGpsLocationForSpeed = location
+        if (isGps) {
+            lastGpsLocationForSpeed = location
+        }
     }
 
     private fun pushSpeedUpdate() {
@@ -428,11 +432,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         if (isDeviceStationary) {
             consecutiveSteps = 0
             pdrEstimatedSpeedKmH = 0f
-            if (currentSpeedKmH > 0f) {
-                currentSpeedKmH = 0f
-                pushSpeedUpdate()
+            // 核心修复：仅当 GPS 超时（室内/无信号）或当前速度处于微弱漂移区(<3.0)时才归零，
+            // 严禁在车载高速巡航（GPS 正常更新且速度较高）时将速度误归零！
+            if (timeSinceGps > 2500L || currentSpeedKmH < 3.0f) {
+                if (currentSpeedKmH > 0f) {
+                    currentSpeedKmH = 0f
+                    pushSpeedUpdate()
+                }
+                return
             }
-            return
         }
 
         // 超过 1.5 秒没有新的连续步伐动作，步态速度立即归零
@@ -441,8 +449,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             pdrEstimatedSpeedKmH = 0f
         }
 
-        // GPS 超时超过 2.0 秒未更新有效速度
-        if (timeSinceGps > 2000L) {
+        // GPS 超时超过 2.5 秒未更新有效速度
+        if (timeSinceGps > 2500L) {
             if (consecutiveSteps >= 2 && pdrEstimatedSpeedKmH > 0f) {
                 // 仅在确认连续迈步行走时才接管输出步速
                 if (Math.abs(currentSpeedKmH - pdrEstimatedSpeedKmH) > 0.1f) {
@@ -474,13 +482,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (stationaryStartTime == 0L) {
                 stationaryStartTime = now
             } else if (now - stationaryStartTime > 400L) {
-                // 持续 400ms 保持手持静止，立即判定为完全静止
+                // 持续 400ms 保持机身静止
                 isDeviceStationary = true
                 consecutiveSteps = 0
                 pdrEstimatedSpeedKmH = 0f
-                if (currentSpeedKmH > 0f) {
-                    currentSpeedKmH = 0f
-                    pushSpeedUpdate()
+                // 核心修复：仅在 GPS 超时（室内无信号）或当前速度处于微漂移区时才置零，
+                // 车载高速行驶时手机处于惯性系，机身静止不可用于否定对地航速！
+                val timeSinceGps = now - lastLocationForSpeedTime
+                if (timeSinceGps > 2500L || currentSpeedKmH < 3.0f) {
+                    if (currentSpeedKmH > 0f) {
+                        currentSpeedKmH = 0f
+                        pushSpeedUpdate()
+                    }
                 }
             }
         } else {
@@ -554,9 +567,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             0.5f * clamped + 0.5f * pdrEstimatedSpeedKmH
         }
 
-        // 若当前无 GPS 速度（超过 2.0 秒未收到有效 GPS 速度刷新）且确认连续步行中
+        // 若当前无 GPS 速度（超过 2.5 秒未收到有效 GPS 速度刷新）且确认连续步行中
         val timeSinceGps = now - lastLocationForSpeedTime
-        if (timeSinceGps > 2000L && consecutiveSteps >= 2 && !isDeviceStationary) {
+        if (timeSinceGps > 2500L && consecutiveSteps >= 2 && !isDeviceStationary) {
             currentSpeedKmH = pdrEstimatedSpeedKmH
             pushSpeedUpdate()
         }

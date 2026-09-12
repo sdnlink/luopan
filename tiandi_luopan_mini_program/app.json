@@ -15,7 +15,9 @@
     }
   },
   "requiredPrivateInfos": [
-    "getLocation"
+    "getLocation",
+    "onLocationChange",
+    "startLocationUpdate"
   ],
   "sitemapLocation": "sitemap.json",
   "style": "v2",

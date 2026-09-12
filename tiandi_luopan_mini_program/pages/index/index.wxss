@@ -163,15 +163,6 @@
   border-radius: 50%;
 }
 
-/* 离屏缓冲画布（移出可视区，仅作静态盘面预渲染缓冲，尺寸须与主画布一致） */
-.offscreen-canvas {
-  position: fixed;
-  left: -3000rpx;
-  top: 0;
-  width: 700rpx;
-  height: 700rpx;
-}
-
 /* 十字天心瞄准线（坐向同论） */
 .crosshair-vertical {
   position: absolute;

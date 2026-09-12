@@ -83,6 +83,8 @@ Page({
     declinationDetailStr: '正在获取GPS定位…',
     magStrengthStr: '—',
     magInclStr: '—',
+    // 临时诊断行：用于真机定位抖动来源（无需真机调试即可读数）
+    debugLine: '等待数据…',
 
     // 弹窗
     showCalibModal: false,
@@ -112,6 +114,7 @@ Page({
   // ==================== 内部状态（不参与视图渲染） ====================
   canvas: null,
   ctx: null,
+  // 官方离屏画布（wx.createOffscreenCanvas），用于缓存静态盘面位图
   dialCanvas: null,
   dialCtx: null,
   useOffscreen: false,
@@ -120,14 +123,18 @@ Page({
   canvasH: 450,
 
   currentHeading: 0,
-  targetHeading: 0,
   isAnimating: false,
   lockedHeading: 0,
 
-  // 传感器级圆周低通状态（对齐 Android 的 smoothSin / smoothCos）
+  // 圆周低通状态（对齐 Android 的 smoothSin / smoothCos）
   smoothSin: 0,
   smoothCos: 0,
   hasSmoothHeading: false,
+  // 原始罗盘读数（滤波的唯一输入，不做二次追赶）
+  rawHeading: 0,
+  hasRawHeading: false,
+  // 陀螺仪角速度平滑值：避免手部微颤跨越静止阈值导致滤波系数来回跳变
+  gyroSmooth: 0,
   lastDomUpdateAt: 0,
   lastTiltUpdateAt: 0,
   lastDrawnHeading: -999,
@@ -313,27 +320,39 @@ Page({
         // wx.getLocation 返回速度为 m/s，转换为 KM/H
         const kmh = (typeof res.speed === 'number' && res.speed >= 0) ? res.speed * 3.6 : 0;
         applyLocation(res.latitude, res.longitude, res.altitude, kmh);
-        this.startLocationWatch(applyLocation, onFail);
+        this.startLocationWatch(applyLocation);
       },
       fail: onFail
     });
   },
 
   /**
-   * 持续定位监听（实时刷新坐标与速度）；不支持时退化为定时轮询
+   * 持续定位监听（实时刷新坐标与速度）
+   *
+   * wx.startLocationUpdate / wx.onLocationChange 为需申请开通的受限接口，
+   * 已在小程序后台「开发」→「开发管理」→「接口设置」完成开通，并在 app.json 的
+   * requiredPrivateInfos 中声明。若因类目或权限未生效而 start 失败，
+   * 则自动降级为 wx.getLocation 定时轮询，保证功能不中断。
    */
-  startLocationWatch(applyLocation, onFail) {
-    if (typeof wx.startLocationUpdate !== 'function' || typeof wx.onLocationChange !== 'function') {
+  startLocationWatch(applyLocation) {
+    const fallbackPoll = () => {
+      if (this.locationTimer) return;
       this.locationTimer = setInterval(() => {
         wx.getLocation({
-          type: 'wgs84', altitude: true,
+          type: 'wgs84',
+          altitude: true,
           success: (r) => applyLocation(r.latitude, r.longitude, r.altitude,
             (typeof r.speed === 'number' && r.speed >= 0) ? r.speed * 3.6 : 0),
           fail: () => {}
         });
-      }, 10000);
+      }, 5000);
+    };
+
+    if (typeof wx.startLocationUpdate !== 'function' || typeof wx.onLocationChange !== 'function') {
+      fallbackPoll();
       return;
     }
+
     wx.startLocationUpdate({
       success: () => {
         wx.onLocationChange((res) => {
@@ -342,14 +361,7 @@ Page({
         });
       },
       fail: () => {
-        this.locationTimer = setInterval(() => {
-          wx.getLocation({
-            type: 'wgs84', altitude: true,
-            success: (r) => applyLocation(r.latitude, r.longitude, r.altitude,
-              (typeof r.speed === 'number' && r.speed >= 0) ? r.speed * 3.6 : 0),
-            fail: () => {}
-          });
-        }, 10000);
+        fallbackPoll();
       }
     });
   },
@@ -365,8 +377,13 @@ Page({
       const ctx = canvas.getContext('2d');
       const sys = wx.getSystemInfoSync();
       const dpr = Math.min(sys.pixelRatio || 2, 3);
-      const width = res[0].width;
-      const height = res[0].height;
+      let width = res[0].width;
+      let height = res[0].height;
+      // 极少数机型查询时布局尚未完成会返回 0，导致画布尺寸为 0 而整屏空白
+      if (!width || !height) {
+        const vw = sys.windowWidth || 375;
+        width = height = Math.round(vw * 700 / 750);
+      }
 
       canvas.width = width * dpr;
       canvas.height = height * dpr;
@@ -378,28 +395,59 @@ Page({
       this.canvasW = width;
       this.canvasH = height;
 
-      // 离屏缓冲画布：用于预渲染静态盘面（八宫/24山/120分金/节气/消息卦/时间刻度/64卦）
-      const dq = wx.createSelectorQuery().in(this);
-      dq.select('#dialCanvas').fields({ node: true, size: true }).exec((dres) => {
-        if (dres && dres[0] && dres[0].node) {
-          const dc = dres[0].node;
-          dc.width = width * dpr;
-          dc.height = height * dpr;
-          const dctx = dc.getContext('2d');
-          dctx.scale(dpr, dpr);
-          this.dialCanvas = dc;
-          this.dialCtx = dctx;
-          this.useOffscreen = true;
-        } else {
-          this.useOffscreen = false;
-        }
-        this.isDialDirty = true;
-        this.drawCompass();
-        this.startCompassListener();
-        this.startMotionListener();
-        this.startGyroListener();
-      });
+      // 静态盘面位图缓存：盘面含 350+ 图元，逐帧矢量重绘在中低端机上会掉帧，
+      // 表现为罗盘抖动。缓存后旋转时只需一次 drawImage。不可用时自动降级为直绘。
+      this.setupOffscreenCanvas();
+
+      this.isDialDirty = true;
+      this.drawCompass();
+      this.startCompassListener();
+      this.startMotionListener();
+      this.startGyroListener();
     });
+  },
+
+  /**
+   * 建立官方离屏画布并做可用性自检。
+   *
+   * 背景：曾使用「移出视口的 DOM canvas」作离屏缓冲，真机上移出视口的 canvas
+   * 不会被合成渲染，drawImage 到主画布得到全透明图 —— 且不抛异常，曾导致罗盘
+   * 整屏空白。故改用官方 wx.createOffscreenCanvas，并实测一次像素确认 blit
+   * 真正生效，不能只依赖 try/catch。
+   */
+  setupOffscreenCanvas() {
+    this.useOffscreen = false;
+    this.dialCanvas = null;
+    this.dialCtx = null;
+    try {
+      if (typeof wx.createOffscreenCanvas !== 'function') return;
+      const w = Math.max(1, Math.round(this.canvasW * this.dpr));
+      const h = Math.max(1, Math.round(this.canvasH * this.dpr));
+      const oc = wx.createOffscreenCanvas({ type: '2d', width: w, height: h });
+      if (!oc) return;
+      const octx = oc.getContext('2d');
+      if (!octx) return;
+      octx.scale(this.dpr, this.dpr);
+
+      // 自检：填满红色 -> blit 到主画布 -> 读回像素确认不透明且为红色
+      octx.clearRect(0, 0, this.canvasW, this.canvasH);
+      octx.fillStyle = '#ff0000';
+      octx.fillRect(0, 0, this.canvasW, this.canvasH);
+      this.ctx.clearRect(0, 0, this.canvasW, this.canvasH);
+      this.ctx.drawImage(oc, 0, 0, this.canvasW, this.canvasH);
+      const px = this.ctx.getImageData(1, 1, 1, 1);
+      if (!px || !px.data || px.data.length < 4 || px.data[3] < 250) {
+        console.warn('[compass] 离屏画布自检未通过，降级为逐帧矢量绘制');
+        return;
+      }
+
+      this.dialCanvas = oc;
+      this.dialCtx = octx;
+      this.useOffscreen = true;
+    } catch (e) {
+      console.warn('[compass] 离屏画布不可用，降级为逐帧矢量绘制', e);
+      this.useOffscreen = false;
+    }
   },
 
   // ==================== 传感器 ====================
@@ -415,23 +463,37 @@ Page({
             const dir = ((res.direction % 360) + 360) % 360;
             joltDistorted = this.checkMagneticDisturbance(dir);
 
-            // 传感器级圆周低通滤波（对齐 Android smoothSin / smoothCos）。
-            // 若直接把原始 direction 交给盘面，地磁底噪会原样透出导致强烈抖动，
-            // 必须先在采样率上做低通，且用 sin/cos 分解以正确处理 0°/360° 跨越。
-            const rad = dir * Math.PI / 180;
-            const sinV = Math.sin(rad);
-            const cosV = Math.cos(rad);
-            const alpha = this.getAdaptiveAlpha();
-            if (!this.hasSmoothHeading) {
-              this.smoothSin = sinV;
-              this.smoothCos = cosV;
-              this.hasSmoothHeading = true;
-            } else {
-              this.smoothSin += alpha * (sinV - this.smoothSin);
-              this.smoothCos += alpha * (cosV - this.smoothCos);
+            // 诊断：统计相邻采样的平均跳变幅度，用于判断这台机器的地磁底噪强度
+            if (this._dPrev !== undefined) {
+              let dd = Math.abs(dir - this._dPrev);
+              if (dd > 180) dd = 360 - dd;
+              this._dSum = (this._dSum || 0) + dd;
+              this._dN = (this._dN || 0) + 1;
             }
-            this.targetHeading = (Math.atan2(this.smoothSin, this.smoothCos) * 180 / Math.PI + 360) % 360;
+            this._dPrev = dir;
+            const tNow = Date.now();
+            if (tNow - (this._dAt || 0) > 2000) {
+              const avgStep = this._dN ? (this._dSum / this._dN) : 0;
+              console.log(
+                `[compass] 原始读数平均跳变 ${avgStep.toFixed(2)}°` +
+                ` · 采样 ${this._dN} 次/2s · 陀螺 ${this.gyroAngularSpeed.toFixed(3)} rad/s` +
+                ` · 静止=${this.gyroAngularSpeed < 0.15} · 磁扰=${this.isMagDistorted}`
+              );
+              // 同时显示到屏幕上，避免必须开真机调试才能看到
+              this.setData({
+                debugLine: `跳变 ${avgStep.toFixed(2)}° · ${this._dN}次/2s · 陀螺 ${this.gyroAngularSpeed.toFixed(3)}` +
+                  ` · 静止 ${this.gyroAngularSpeed < 0.15 ? '是' : '否'} · 磁扰 ${this.isMagDistorted ? '是' : '否'}`
+              });
+              this._dSum = 0;
+              this._dN = 0;
+              this._dAt = tNow;
+            }
 
+            // 只记录原始读数，滤波统一在渲染帧里做。
+            // 滤波若放在这里，会与 animateCompassStep 的第二级追赶级联，
+            // 产生滞后并在追赶时来回摆动。
+            this.rawHeading = dir;
+            this.hasRawHeading = true;
             if (!this.isAnimating) {
               this.isAnimating = true;
               this.animateCompassStep();
@@ -494,7 +556,11 @@ Page({
           const x = res.x || 0;
           const y = res.y || 0;
           const z = res.z || 0;
-          this.gyroAngularSpeed = Math.sqrt(x * x + y * y + z * z);
+          const speed = Math.sqrt(x * x + y * y + z * z);
+          // 平滑后再用于静止判定，否则手持微颤会让滤波系数反复跳变，
+          // 表现为滤波时快时慢的来回摆动
+          this.gyroSmooth += 0.2 * (speed - this.gyroSmooth);
+          this.gyroAngularSpeed = this.gyroSmooth;
         });
       },
       fail: (err) => { console.warn('wx.startGyroscope failed:', err); }
@@ -515,11 +581,15 @@ Page({
    * 真正转动手机时放行高动态跟随，即转即随。
    */
   getAdaptiveAlpha() {
-    const isStatic = this.gyroAngularSpeed < 0.08;
-    if (isStatic && this.isMagDistorted) return 0.03; // 靠近铁窗且静止：极大压制磁突变
-    if (isStatic) return 0.10;                        // 原地微停：极致沉稳平滑
-    if (this.gyroAngularSpeed > 0.4) return 0.40;     // 快速转身：极速跟随
-    return 0.25;                                      // 常规旋转
+    // gyroAngularSpeed 已做过平滑，不会在阈值附近抖动导致系数跳变。
+    // 静止阈值放宽到 0.15：MEMS 陀螺存在零偏与噪声，卡在 0.08 会让
+    // 静止状态被误判为运动，从而使用弱滤波把抖动直接放出去。
+    const isStatic = this.gyroAngularSpeed < 0.15;
+    // 静止时进一步加重滤波：实测 0.06 仍不足以压住地磁底噪引起的来回摆
+    if (isStatic && this.isMagDistorted) return 0.015; // 靠近铁窗且静止：极强压制
+    if (isStatic) return 0.025;                        // 原地微停：极致沉稳
+    if (this.gyroAngularSpeed > 0.4) return 0.30;      // 快速转身：极速跟随
+    return 0.18;                                       // 常规旋转
   },
 
   /**
@@ -588,13 +658,44 @@ Page({
   },
 
   animateCompassStep() {
-    let diff = ((this.targetHeading - this.currentHeading + 540) % 360) - 180;
-    if (Math.abs(diff) < 0.05) {
-      // 死区内停止动画。切勿在此处把 currentHeading 硬吸附到 targetHeading，
-      // 否则会把低通后残留的微小抖动一次性“跳”出来。
+    if (!this.hasRawHeading) {
+      this.isAnimating = false;
+      return;
+    }
+
+    const rad = this.rawHeading * Math.PI / 180;
+    const absDiff = Math.abs(((this.rawHeading - this.currentHeading + 540) % 360) - 180);
+    const isStatic = this.gyroAngularSpeed < 0.15;
+
+    // 静止死区（关键）：手机放着不动时，地磁原始读数会在小范围内来回跳。
+    // 死区内完全不推进滤波、不重绘 —— 对齐 Android 推送朝向前的 0.15° 死区，
+    // 让底噪根本到不了显示层。否则在默认的「盘随向转」模式下，
+    // 整块盘面随残余抖动旋转，肉眼就是明显的来回转。
+    const deadband = isStatic ? 1.0 : 0.2;
+
+    let changed = false;
+
+    if (!this.hasSmoothHeading) {
+      // 首次读数直接对齐，避免盘面从 0° 缓慢转过去
+      this.smoothSin = Math.sin(rad);
+      this.smoothCos = Math.cos(rad);
+      this.hasSmoothHeading = true;
+      this.currentHeading = this.rawHeading;
+      changed = true;
+    } else if (absDiff >= deadband) {
+      // 单级圆周低通：以原始读数为目标，sin/cos 分解处理 0°/360° 跨越。
+      // 不叠加第二级追赶，避免滞后与来回摆动。
+      const alpha = this.getAdaptiveAlpha();
+      this.smoothSin += alpha * (Math.sin(rad) - this.smoothSin);
+      this.smoothCos += alpha * (Math.cos(rad) - this.smoothCos);
+      this.currentHeading = (Math.atan2(this.smoothSin, this.smoothCos) * 180 / Math.PI + 360) % 360;
+      changed = true;
+    }
+
+    // 已进入死区则停止循环，下一采样到达时由 onCompassChange 再次唤醒
+    if (absDiff < deadband) {
       this.isAnimating = false;
     } else {
-      this.currentHeading = (this.currentHeading + diff * 0.22 + 360) % 360;
       if (this.canvas && typeof this.canvas.requestAnimationFrame === 'function') {
         this.canvas.requestAnimationFrame(() => this.animateCompassStep());
       } else {
@@ -602,10 +703,12 @@ Page({
       }
     }
 
+    if (!changed) return;
+
     this.updateCompassInfo();
 
-    // 重绘死区：朝向变化不足 0.05° 时不重绘，避免无意义的重排与掉帧
-    if (Math.abs(this.currentHeading - this.lastDrawnHeading) > 0.05 || Math.abs(diff) < 0.05) {
+    // 输出死区：变化不足 0.15° 不重绘
+    if (Math.abs(this.currentHeading - this.lastDrawnHeading) > 0.15) {
       this.lastDrawnHeading = this.currentHeading;
       this.scheduleCompassDraw();
     }
@@ -638,8 +741,8 @@ Page({
     const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
     const now = Date.now();
     if (!force && Math.abs(effectiveHeading - this.lastCompassInfoHeading) < 0.2) return;
-    // 文本节点最快 10Hz：setData 需要跨线程桥接，按帧调用会拖垮渲染造成抖动
-    if (!force && now - this.lastDomUpdateAt < 100) return;
+    // 文本节点最快 5Hz：setData 需要跨线程桥接，与画布重绘争用会造成抖动
+    if (!force && now - this.lastDomUpdateAt < 200) return;
     this.lastCompassInfoHeading = effectiveHeading;
     this.lastDomUpdateAt = now;
 
@@ -1009,23 +1112,39 @@ Page({
     const s = W / 900;
     const R = {
       s,
+      // 与 Android yiijing_map.html 的 R 定义逐项一致
       taiji: 42 * s,
-      preGuaRing: 86 * s,
-      postGuaRing: 138 * s,
-      mountainRing: 198 * s,
-      fenjinRing: 242 * s,
-      solarRing: 295 * s,
-      hexRing: 355 * s,
-      timeIn: 363 * s,   // hexRing + 8
-      timeOut: 396 * s,
-      gua64In: 402 * s,  // timeOuter + 6
-      gua64Out: 442 * s
+      preGuaRing: 85 * s,
+      postGuaRing: 136 * s,
+      mountainRing: 195 * s,
+      fenjinRing: 240 * s,
+      solarRing: 292 * s,
+      hexRing: 348 * s,
+      timeIn: 356 * s,   // hexRing + 8
+      timeOut: 390 * s,
+      gua64In: 396 * s,  // timeOuter + 6
+      gua64Out: 436 * s
     };
     const FS = {
       palaceSym: Math.max(9, Math.round(17 * s * 1.4)),
       palace: Math.max(8, Math.round(12 * s * 1.6)),
       mountain: Math.max(11, Math.round(12 * s * 1.6)),
-      fenjin: Math.max(7, Math.round(8 * s * 1.8)),
+      // 分金采用「竖排」：两字沿半径方向堆叠、字身与 Android 同样的切向基准。
+      // 约束因此变为——单字宽度 <= 弧长，两字总高 <= 环宽。
+      // 相比横排（两字并排挤 3° 弧长），可用字号大得多且几乎不重叠。
+      // 竖排后单字只占一格宽度，字号可收一档：以「不超出 3° 弧长」为上限，
+      // 保证相邻分金严格不重叠、环带留白透气；旺相分金略大以便一眼区分。
+      fenjinWang: (() => {
+        const arc = (2 * Math.PI * ((R.mountainRing + R.fenjinRing) / 2)) / 120;
+        const rw = R.fenjinRing - R.mountainRing;
+        const base = Math.max(4, Math.min(9, Math.min(arc * 0.95, rw / 2.6)));
+        return Math.round(Math.min(base * 1.25, rw / 2.4));
+      })(),
+      fenjin: (() => {
+        const arc = (2 * Math.PI * ((R.mountainRing + R.fenjinRing) / 2)) / 120;
+        const rw = R.fenjinRing - R.mountainRing;
+        return Math.round(Math.max(4, Math.min(9, Math.min(arc * 0.95, rw / 2.6))));
+      })(),
       solar: Math.max(9, Math.round(11 * s * 1.6)),
       hexName: Math.max(7, Math.round(10 * s * 1.6)),
       timeMinor: Math.max(7, Math.round(9 * s * 1.6)),
@@ -1056,11 +1175,11 @@ Page({
     ctx.fillStyle = '#14151f';
     ctx.fillRect(0, 0, W, H);
 
-    // 仅在未缩放、未平移时启用离屏位图缓存；
-    // 缩放/平移状态下改为直接矢量重绘，保证放大后文字与线条依然锐利
-    const useCache = this.useOffscreen && !!this.dialCtx
-      && this.viewScale <= 1.001 && this.viewTX === 0 && this.viewTY === 0;
+    const _t0 = Date.now();
 
+    // 未缩放/未平移时启用静态盘面位图缓存；缩放状态下矢量直绘以保证放大后锐利
+    const useCache = this.useOffscreen
+      && this.viewScale <= 1.001 && this.viewTX === 0 && this.viewTY === 0;
     if (useCache && this.isDialDirty) {
       this.dialCtx.clearRect(0, 0, W, H);
       this.renderStaticDial(this.dialCtx, CX, CY, R, FS);
@@ -1088,14 +1207,9 @@ Page({
       ctx.translate(-CX, -CY);
     }
 
-    // 1. 静态盘面（离屏单次 blit，或直接矢量绘制）
-    if (useCache && this.dialCanvas) {
-      try {
-        ctx.drawImage(this.dialCanvas, 0, 0, W, H);
-      } catch (err) {
-        this.useOffscreen = false;
-        this.renderStaticDial(ctx, CX, CY, R, FS);
-      }
+    // 1. 静态盘面：八宫 / 二十四山 / 一百二十分金 / 节气 / 消息卦 / 时间刻度 / 六十四卦
+    if (useCache) {
+      ctx.drawImage(this.dialCanvas, 0, 0, W, H);
     } else {
       this.renderStaticDial(ctx, CX, CY, R, FS);
     }
@@ -1147,6 +1261,19 @@ Page({
     this.drawDualCompassNeedles(ctx, CX, CY, R, FS, effectiveHeading);
 
     ctx.restore(); // 闭合视图缩放/平移
+
+    // 绘制耗时统计：每 2 秒输出一次，便于真机判断是否为掉帧导致的抖动
+    this._costSum = (this._costSum || 0) + (Date.now() - _t0);
+    this._costCnt = (this._costCnt || 0) + 1;
+    if (_t0 - (this._costLoggedAt || 0) > 2000) {
+      console.log(
+        `[compass] 平均绘制耗时 ${(this._costSum / this._costCnt).toFixed(1)}ms` +
+        ` · 离屏缓存=${this.useOffscreen ? '开' : '关'}`
+      );
+      this._costSum = 0;
+      this._costCnt = 0;
+      this._costLoggedAt = _t0;
+    }
   },
 
   /**
@@ -1256,24 +1383,35 @@ Page({
         const tr = (R.mountainRing + R.fenjinRing) / 2;
         c.save();
         c.translate(CX + Math.cos(midRad) * tr, CY + Math.sin(midRad) * tr);
-        // 120 分金每格仅占 3°，切向排布必然重叠，故采用径向排布保证可读
-        c.rotate(midRad);
+        // 竖排：两字沿半径方向堆叠（局部 +y 指向圆心，故 -y 为外侧、+y 为内侧）。
+        // 相比横排（两字并排挤 3° 弧长），单字宽度只需 <= 弧长、两字总高用环宽，
+        // 120 个全量标注也能保持清晰不糊。
+        c.rotate(midRad + Math.PI / 2);
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
         if (isWangXiang) {
+          const fs = FS.fenjinWang;
           c.fillStyle = '#ffd166';
-          c.font = `bold ${FS.fenjin}px sans-serif`;
-          c.fillText(name, 0, 0);
+          c.font = `bold ${fs}px sans-serif`;
+          c.fillText(name[0], 0, -fs / 2); // 外侧
+          c.fillText(name[1], 0, fs / 2);  // 内侧
+          // 珠宝线金点（位于环带内侧边缘）
           c.beginPath();
-          c.arc(-(ringW / 2) + 3, 0, 1.6, 0, Math.PI * 2);
+          c.arc(0, ringW / 2 - 2, 1.6, 0, Math.PI * 2);
           c.fillStyle = '#f1c40f';
           c.fill();
         } else if (isHuoKeng) {
+          const fs = FS.fenjin;
           c.fillStyle = '#e74c3c';
-          c.font = `${FS.fenjin}px sans-serif`;
-          c.fillText(name, 0, 0);
+          c.font = `${fs}px sans-serif`;
+          c.fillText(name[0], 0, -fs / 2);
+          c.fillText(name[1], 0, fs / 2);
         } else {
+          const fs = FS.fenjin;
           c.fillStyle = '#5a5d6e';
-          c.font = `${FS.fenjin}px sans-serif`;
-          c.fillText(name, 0, 0);
+          c.font = `${fs}px sans-serif`;
+          c.fillText(name[0], 0, -fs / 2);
+          c.fillText(name[1], 0, fs / 2);
         }
         c.restore();
       }

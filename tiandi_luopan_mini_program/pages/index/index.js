@@ -123,6 +123,14 @@ Page({
   targetHeading: 0,
   isAnimating: false,
   lockedHeading: 0,
+
+  // 传感器级圆周低通状态（对齐 Android 的 smoothSin / smoothCos）
+  smoothSin: 0,
+  smoothCos: 0,
+  hasSmoothHeading: false,
+  lastDomUpdateAt: 0,
+  lastTiltUpdateAt: 0,
+  lastDrawnHeading: -999,
   lastAccuracyLevel: '',
   lastTiltMag: -999,
 
@@ -406,7 +414,24 @@ Page({
           if (res.direction !== undefined && !isNaN(res.direction)) {
             const dir = ((res.direction % 360) + 360) % 360;
             joltDistorted = this.checkMagneticDisturbance(dir);
-            this.targetHeading = dir;
+
+            // 传感器级圆周低通滤波（对齐 Android smoothSin / smoothCos）。
+            // 若直接把原始 direction 交给盘面，地磁底噪会原样透出导致强烈抖动，
+            // 必须先在采样率上做低通，且用 sin/cos 分解以正确处理 0°/360° 跨越。
+            const rad = dir * Math.PI / 180;
+            const sinV = Math.sin(rad);
+            const cosV = Math.cos(rad);
+            const alpha = this.getAdaptiveAlpha();
+            if (!this.hasSmoothHeading) {
+              this.smoothSin = sinV;
+              this.smoothCos = cosV;
+              this.hasSmoothHeading = true;
+            } else {
+              this.smoothSin += alpha * (sinV - this.smoothSin);
+              this.smoothCos += alpha * (cosV - this.smoothCos);
+            }
+            this.targetHeading = (Math.atan2(this.smoothSin, this.smoothCos) * 180 / Math.PI + 360) % 360;
+
             if (!this.isAnimating) {
               this.isAnimating = true;
               this.animateCompassStep();
@@ -491,10 +516,10 @@ Page({
    */
   getAdaptiveAlpha() {
     const isStatic = this.gyroAngularSpeed < 0.08;
-    if (isStatic && this.isMagDistorted) return 0.05; // 靠近铁窗且静止：极大压制磁突变
-    if (isStatic) return 0.20;                        // 原地微停：极致沉稳平滑
-    if (this.gyroAngularSpeed > 0.4) return 0.55;     // 快速转身：极速跟随
-    return 0.40;                                      // 常规旋转
+    if (isStatic && this.isMagDistorted) return 0.03; // 靠近铁窗且静止：极大压制磁突变
+    if (isStatic) return 0.10;                        // 原地微停：极致沉稳平滑
+    if (this.gyroAngularSpeed > 0.4) return 0.40;     // 快速转身：极速跟随
+    return 0.25;                                      // 常规旋转
   },
 
   /**
@@ -564,28 +589,36 @@ Page({
 
   animateCompassStep() {
     let diff = ((this.targetHeading - this.currentHeading + 540) % 360) - 180;
-    if (Math.abs(diff) < 0.08) {
-      this.currentHeading = this.targetHeading;
+    if (Math.abs(diff) < 0.05) {
+      // 死区内停止动画。切勿在此处把 currentHeading 硬吸附到 targetHeading，
+      // 否则会把低通后残留的微小抖动一次性“跳”出来。
       this.isAnimating = false;
     } else {
-      // 陀螺仪角速度自适应跟随权重（静止时沉稳、转身时迅捷、磁异常时压制突跳）
-      this.currentHeading = (this.currentHeading + diff * this.getAdaptiveAlpha() + 360) % 360;
+      this.currentHeading = (this.currentHeading + diff * 0.22 + 360) % 360;
       if (this.canvas && typeof this.canvas.requestAnimationFrame === 'function') {
         this.canvas.requestAnimationFrame(() => this.animateCompassStep());
       } else {
         setTimeout(() => this.animateCompassStep(), 16);
       }
     }
+
     this.updateCompassInfo();
-    this.updateHeaderStatus();
-    this.scheduleCompassDraw();
+
+    // 重绘死区：朝向变化不足 0.05° 时不重绘，避免无意义的重排与掉帧
+    if (Math.abs(this.currentHeading - this.lastDrawnHeading) > 0.05 || Math.abs(diff) < 0.05) {
+      this.lastDrawnHeading = this.currentHeading;
+      this.scheduleCompassDraw();
+    }
   },
 
   updateTiltDisplay() {
     const tiltMag = Math.sqrt(this.currentPitch * this.currentPitch + this.currentRoll * this.currentRoll);
-    // 姿态回调同样高频，0.1° 死区，避免每帧 setData
-    if (Math.abs(tiltMag - this.lastTiltMag) < 0.1) return;
+    // 姿态回调同样高频：0.15° 死区 + 150ms 节流，避免按帧 setData
+    const now = Date.now();
+    if (Math.abs(tiltMag - this.lastTiltMag) < 0.15) return;
+    if (now - this.lastTiltUpdateAt < 150) return;
     this.lastTiltMag = tiltMag;
+    this.lastTiltUpdateAt = now;
 
     if (tiltMag < 2.5) {
       this.setData({ levelText: `${tiltMag.toFixed(1)}° · 水平良好 ✓`, levelColor: '#2ecc71' });
@@ -603,8 +636,12 @@ Page({
 
   updateCompassInfo(force) {
     const effectiveHeading = this.data.isHeadingLocked ? (this.lockedHeading || 0) : this.currentHeading;
+    const now = Date.now();
     if (!force && Math.abs(effectiveHeading - this.lastCompassInfoHeading) < 0.2) return;
+    // 文本节点最快 10Hz：setData 需要跨线程桥接，按帧调用会拖垮渲染造成抖动
+    if (!force && now - this.lastDomUpdateAt < 100) return;
     this.lastCompassInfoHeading = effectiveHeading;
+    this.lastDomUpdateAt = now;
 
     const heading = effectiveHeading;
     const trueHeading = ((heading + this.currentDeclination) % 360 + 360) % 360;

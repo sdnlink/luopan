@@ -16,3 +16,12 @@ app/build/
 *.jks
 *.keystore
 
+# iOS 构建产物（ipa 由 build_ios.ps1 生成，可随时重建，不入库）
+dist-ios/
+*.ipa
+ios/**/build/
+ios/**/DerivedData/
+# Xcode 用户态数据（断点、窗口布局、本地 scheme 等，因人而异）
+ios/**/*.xcodeproj/xcuserdata/
+ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
+

@@ -1,0 +1,196 @@
+import UIKit
+import WebKit
+
+class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, CompassMotionManagerDelegate {
+    
+    private var webView: WKWebView!
+    private let motionManager = CompassMotionManager.shared
+    
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
+    }
+    
+    override var prefersStatusBarHidden: Bool {
+        return false
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+        
+        // 保持屏幕常亮
+        UIApplication.shared.isIdleTimerDisabled = true
+        
+        setupWebView()
+        loadCompassWeb()
+        
+        motionManager.delegate = self
+        motionManager.start()
+    }
+    
+    deinit {
+        UIApplication.shared.isIdleTimerDisabled = false
+        motionManager.stop()
+    }
+    
+    private func setupWebView() {
+        let config = WKWebViewConfiguration()
+        let userContentController = WKUserContentController()
+        userContentController.add(self, name: "iOSCompass")
+        config.userContentController = userContentController
+        
+        // 偏好设置
+        config.preferences.javaScriptCanOpenWindowsAutomatically = false
+        if #available(iOS 14.0, *) {
+            let webpagePrefs = WKWebpagePreferences()
+            webpagePrefs.allowsContentJavaScript = true
+            config.defaultWebpagePreferences = webpagePrefs
+        }
+        
+        webView = WKWebView(frame: .zero, configuration: config)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.navigationDelegate = self
+        webView.isOpaque = false
+        webView.backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+        webView.scrollView.backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+        
+        // 禁用弹性滚动以获得原生 App 质感
+        webView.scrollView.bounces = false
+        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
+        if #available(iOS 11.0, *) {
+            webView.scrollView.contentInsetAdjustmentBehavior = .never
+        }
+        
+        view.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: view.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
+    
+    private func loadCompassWeb() {
+        // 1. 尝试从本地 App Bundle www 目录加载
+        if let htmlPath = Bundle.main.path(forResource: "index", ofType: "html", inDirectory: "www") {
+            let fileURL = URL(fileURLWithPath: htmlPath)
+            let dirURL = fileURL.deletingLastPathComponent()
+            webView.loadFileURL(fileURL, allowingReadAccessTo: dirURL)
+            return
+        }
+        
+        // 2. 尝试从根 Bundle 加载
+        if let htmlURL = Bundle.main.url(forResource: "index", withExtension: "html") {
+            webView.loadFileURL(htmlURL, allowingReadAccessTo: htmlURL.deletingLastPathComponent())
+            return
+        }
+        
+        print("Warning: index.html not found in main bundle!")
+    }
+    
+    // MARK: - WKScriptMessageHandler
+    
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "iOSCompass", let body = message.body as? [String: Any] else { return }
+        let action = body["action"] as? String ?? ""
+        
+        switch action {
+        case "startCompass":
+            motionManager.start()
+        case "stopCompass":
+            motionManager.stop()
+        case "resetCalibration":
+            motionManager.stop()
+            motionManager.start()
+            webView.evaluateJavaScript("if(window.onNativeCompassAccuracy){window.onNativeCompassAccuracy(1);}", completionHandler: nil)
+        case "refreshLocation":
+            motionManager.refreshLocation()
+        case "requestLocationPermission":
+            motionManager.requestLocationPermission()
+        default:
+            break
+        }
+    }
+    
+    // MARK: - WKNavigationDelegate
+    
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // 页面就绪后推入初始状态
+        let initHeading = motionManager.currentHeading
+        let decl = String(format: "%.2f", motionManager.currentDeclination)
+        let hasDecl = motionManager.hasDeclination ? "true" : "false"
+        let speed = String(format: "%.1f", motionManager.currentSpeedKmH)
+        let pitch = String(format: "%.1f", motionManager.currentPitch)
+        let roll = String(format: "%.1f", motionManager.currentRoll)
+        
+        let js = """
+        if(window.onNativeCompassAvailable){ window.onNativeCompassAvailable(true); }
+        if(window.onNativeHeadingUpdate){ window.onNativeHeadingUpdate(\(initHeading)); }
+        if(window.onNativeSpeedUpdate){ window.onNativeSpeedUpdate(\(speed)); }
+        if(window.onNativeTiltUpdate){ window.onNativeTiltUpdate(\(pitch), \(roll)); }
+        if(window.onNativeDeclinationUpdate){ window.onNativeDeclinationUpdate(\(decl), \(hasDecl), ''); }
+        """
+        webView.evaluateJavaScript(js, completionHandler: nil)
+    }
+    
+    // MARK: - CompassMotionManagerDelegate
+    
+    func didUpdateHeading(magneticHeading: Double, trueHeading: Double, accuracy: Double) {
+        let formatted = String(format: "%.1f", magneticHeading)
+        let js = "if(window.onNativeHeadingUpdate){ window.onNativeHeadingUpdate(\(formatted)); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func didUpdateTilt(pitch: Double, roll: Double) {
+        let pitchStr = String(format: "%.1f", pitch)
+        let rollStr = String(format: "%.1f", roll)
+        let js = "if(window.onNativeTiltUpdate){ window.onNativeTiltUpdate(\(pitchStr), \(rollStr)); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func didUpdateLocation(latitude: Double, longitude: Double, altitude: Double, speedKmH: Double, accuracy: Double) {
+        let latStr = String(format: "%.5f°%@", abs(latitude), latitude >= 0 ? "N" : "S")
+        let lonStr = String(format: "%.5f°%@", abs(longitude), longitude >= 0 ? "E" : "W")
+        let altStr = altitude > 0 ? String(format: " · 海拔 %.0fm", altitude) : ""
+        let accStr = accuracy > 0 ? String(format: " (±%.0fm)", accuracy) : ""
+        let coordsDesc = "\(latStr), \(lonStr)\(altStr)\(accStr)"
+        
+        let decl = motionManager.currentDeclination
+        let dirStr = decl < 0 ? "西偏" : (decl > 0 ? "东偏" : "无偏")
+        let locationDesc = "\(latStr), \(lonStr) · 磁偏角 \(String(format: "%.1f", abs(decl)))°(\(dirStr))"
+        let declFormatted = String(format: "%.2f", decl)
+        let speedFormatted = String(format: "%.1f", speedKmH)
+        
+        let escapedCoords = coordsDesc.replacingOccurrences(of: "'", with: "\\'")
+        let escapedDesc = locationDesc.replacingOccurrences(of: "'", with: "\\'")
+        
+        let js = """
+        if(window.onNativeLocationUpdate){ window.onNativeLocationUpdate(\(latitude), \(longitude), \(altitude), true, '\(escapedCoords)'); }
+        if(window.onNativeDeclinationUpdate){ window.onNativeDeclinationUpdate(\(declFormatted), true, '\(escapedDesc)'); }
+        if(window.onNativeSpeedUpdate){ window.onNativeSpeedUpdate(\(speedFormatted)); }
+        """
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func didUpdateMagneticField(isDistorted: Bool, strengthUT: Double) {
+        let strengthFormatted = String(format: "%.0f", strengthUT)
+        let js = "if(window.onNativeMagneticFieldUpdate){ window.onNativeMagneticFieldUpdate(\(isDistorted), \(strengthFormatted)); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func didChangeAccuracy(accuracy: Int) {
+        let js = "if(window.onNativeCompassAccuracy){ window.onNativeCompassAccuracy(\(accuracy)); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+}

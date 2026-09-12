@@ -261,7 +261,49 @@
 
 ---
 
-## 5. 许可证与致谢
+## 5. iPhone (iOS) 版本编译与安装指南
+
+本仓库现已全面提供适用于 **iPhone (iOS 14.0+)** 的移植版本与标准安装包：
+
+### 5.1 产物与工程路径
+* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.2.3.ipa` (约 1.83 MB)
+* **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj` (Swift 5.x + WebKit + CoreLocation + CoreMotion)
+* **Web / PWA 资源**：`ios/TiandiLuopan/www/`
+
+### 5.2 Windows 下一键重新打包
+在 Windows 终端执行：
+```powershell
+.\build_ios.ps1
+```
+脚本将自动提取全套高清 iOS AppIcon 资产、编译 Web 适配核心并生成最新的 `.ipa` 文件。
+
+### 5.3 iPhone 安装方案
+
+#### 方式 1：通过签名工具直接安装 IPA（无需 Mac）
+* 使用 **爱思助手 (3uTools)**、**Sideloadly** 或 **AltStore**：
+  1. 将 iPhone 通过数据线连接电脑；
+  2. 打开 Sideloadly / 爱思助手，将 `dist-ios/YanXiangCompass-v1.2.3.ipa` 拖入；
+  3. 输入您的免费 Apple ID 进行一键签名安装；
+  4. 首次打开在 iPhone「设置 -> 通用 -> VPN与设备管理」信任开发者证书即可。
+* 若设备已越狱或拥有 **TrollStore**，可直接将 IPA 发送至手机无视证书永久安装。
+
+#### 方式 2：使用 Mac 与 Xcode 编译运行
+* 将本仓库克隆至 Mac，用 Xcode 打开 `ios/TiandiLuopan.xcodeproj`；
+* 连接 iPhone 真机，在 `Signing & Capabilities` 选择个人开发团队即可一键部署到真机。
+
+#### 方式 3：GitHub Actions 云端全自动打包
+* 仓库已内置 `.github/workflows/build-ios.yml`，推送到 GitHub 后会自动在云端 macOS Runner 上调用 `xcodebuild` 编译并输出最新真机 IPA 供下载。
+
+#### 方式 4：局域网免签即用 PWA 模式
+运行内置服务器：
+```powershell
+python tools/serve_ios_web.py
+```
+iPhone 连接同一 Wi-Fi，用 Safari 打开控制台输出的局域网网址，点击底部分享按钮 -> **「添加到主屏幕」**，即可免签名作为独立全屏 App 运行，享受 60FPS 流畅罗盘。
+
+---
+
+## 6. 许可证与致谢
 
 * 本应用专为易学实战勘察、建筑环境规划与天文爱好者量身打造；
 * 融合传统杨公风水、玄空飞星理气与现代大地测量学体系。

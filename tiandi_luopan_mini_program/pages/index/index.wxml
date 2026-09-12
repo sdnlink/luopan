@@ -73,9 +73,6 @@
     </view>
   </view>
 
-  <!-- 离屏缓冲画布：预渲染静态盘面，位于视口外不可见 -->
-  <canvas type="2d" id="dialCanvas" class="offscreen-canvas"></canvas>
-
   <!-- 底部卦象与风水立向详情面板 -->
   <view class="info-panel">
     <view class="info-title">[{{modeLabel}}] {{currentMountain.name}}山 ({{currentPalaceName}})</view>
@@ -131,6 +128,12 @@
     <view class="info-item">
       <text class="info-label">地磁强度 / 磁倾角</text>
       <text class="info-val" style="color:#9b59b6">{{magStrengthStr}} · {{magInclStr}}</text>
+    </view>
+
+    <!-- 临时诊断行：定位抖动用，稳定后删除 -->
+    <view class="info-item">
+      <text class="info-label">诊断</text>
+      <text class="info-val" style="color:#e67e22;font-size:20rpx">{{debugLine}}</text>
     </view>
 
     <view class="info-item">

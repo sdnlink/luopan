@@ -134,7 +134,12 @@ tiandi_luopan_mini_program/
 
 与 Android 版一致的三项优化：
 
-1. **离屏预渲染**：八宫 / 24 山 / 120 分金 / 节气 / 消息卦 / 时间刻度 / 64 卦等 350+ 静态图元一次性渲染进离屏缓冲画布，旋转时仅执行一次 `drawImage` 硬件位图贴图；脏标记驱动，仅在模式或图层变化时重绘。（若 `drawImage` 传入 canvas 节点失败，自动降级为逐帧直绘）
+1. **重绘合并与死区**：静态盘面（八宫 / 24 山 / 120 分金 / 节气 / 消息卦 / 时间刻度 / 64 卦，共 350+ 图元）采用 `requestAnimationFrame` 合并重绘，配合 0.05° 重绘死区，避免同一帧内多次绘制与无意义的重排。
+
+   > 曾尝试用「移出视口的 DOM canvas」作离屏位图缓冲以进一步提速，但该方案在真机上会失效：
+   > 移出视口的 canvas 不会被合成渲染，`drawImage` 到主画布得到的是全透明图且不抛异常，
+   > 表现为真机罗盘完全空白（模拟器往往正常）。故改为直接矢量绘制。
+   > 后续若需进一步优化，应使用官方 `wx.createOffscreenCanvas` 而非 DOM canvas。
 2. **天文算力解耦**：四柱干支与真太阳时从 60Hz 旋转流剥离，1 秒定时运算并缓存，消除高频三角函数开销。
 3. **死区防抖**：朝向信息卡片与风水状态设定 0.2° 变动死区，避免高频 `setData` 造成的视图层抖动。
 
@@ -172,7 +177,31 @@ tiandi_luopan_mini_program/
 | 罗盘 | `wx.startCompass` / `wx.onCompassChange` | 地磁北朝向与传感器精度 |
 | 设备姿态 | `wx.startDeviceMotionListening` | 电子水准仪横滚角 / 俯仰角 |
 
-`app.json` 中已声明 `permission.scope.userLocation` 与 `requiredPrivateInfos: ["getLocation"]`。
+`app.json` 中已声明 `permission.scope.userLocation` 与
+`requiredPrivateInfos: ["getLocation", "onLocationChange", "startLocationUpdate"]`。
+
+### 关于持续定位接口
+
+`wx.startLocationUpdate` / `wx.onLocationChange` 属于需申请开通的受限接口。本项目**保留**
+这两个接口的调用（用于实时刷新坐标与移动速度），前提是已在小程序后台完成开通：
+
+1. 后台「开发」→「开发管理」→「接口设置」中自助开通 `wx.startLocationUpdate`；
+2. `app.json` 的 `requiredPrivateInfos` 中已声明
+   `"getLocation"`、`"onLocationChange"`、`"startLocationUpdate"` 三项。
+
+> 注意：官方会在**代码审核环节**检测该接口是否已完成开通，未开通将拦截提审；
+> 且 `requiredPrivateInfos` 只是「声明」、不等于「开通」，两者必须分别完成。
+
+若因类目或权限未生效导致 `startLocationUpdate` 失败，代码会自动降级为
+`wx.getLocation` 5 秒定时轮询（见 `startLocationWatch` 中的 `fallbackPoll`），功能不中断。
+
+### 提审前检查清单
+
+1. 确认后台「开发」→「开发管理」→「接口设置」中 `wx.startLocationUpdate` 处于**已开通**状态；
+2. 小程序后台「设置」→「服务内容声明」→**用户隐私保护指引**中勾选「位置信息」，
+   用途说明与 `app.json` 中 `scope.userLocation.desc` 保持一致；
+3. 确认小程序**类目**与实际功能相符（罗盘类通常归入「工具」类目）；
+4. 在真机上确认首次进入时位置授权弹窗正常弹出，拒绝授权后不崩溃、有明确提示。
 
 ---
 

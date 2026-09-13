@@ -108,7 +108,10 @@ Page({
     fjBadgeColor: '#2ecc71',
 
     // 圈层图层
-    layerConfig: Object.assign({}, DEFAULT_LAYERS)
+    layerConfig: Object.assign({}, DEFAULT_LAYERS),
+
+    // 自定义导航栏顶部留白，onLoad 时按实际状态栏高度注入
+    statusBarHeight: 20
   },
 
   // ==================== 内部状态（不参与视图渲染） ====================
@@ -121,6 +124,10 @@ Page({
   dpr: 1,
   canvasW: 450,
   canvasH: 450,
+
+  // 分享图缓存：朋友圈分享要求同步返回 imageUrl，故提前导出一张备用
+  shareImagePath: null,
+  shareImageTimer: null,
 
   currentHeading: 0,
   isAnimating: false,
@@ -193,13 +200,17 @@ Page({
 
   // ==================== 生命周期 ====================
   onLoad() {
+    this.initStatusBarHeight();
     this.initTodayInfo();
     this.startClockTimer();
     this.initLocation();
+    this.enableShareMenu();
   },
 
   onReady() {
     this.initCanvas();
+    // 画布就绪后延迟导出分享图，供朋友圈分享同步返回
+    this.scheduleShareImage();
   },
 
   onShow() {
@@ -222,13 +233,132 @@ Page({
     this.stopGyroListener();
     if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
     if (this.locationTimer) { clearInterval(this.locationTimer); this.locationTimer = null; }
+    if (this.shareImageTimer) { clearTimeout(this.shareImageTimer); this.shareImageTimer = null; }
     if (typeof wx.stopLocationUpdate === 'function') {
       wx.stopLocationUpdate();
       if (typeof wx.offLocationChange === 'function') wx.offLocationChange();
     }
   },
 
+  // ==================== 分享（好友 / 朋友圈） ====================
+
+  /**
+   * 开启右上角菜单的「发送给朋友」与「分享到朋友圈」按钮。
+   *
+   * 注意两点：
+   * 1. 只有定义了 onShareTimeline，右上角菜单才会出现「分享到朋友圈」；
+   * 2. 显示「分享到朋友圈」时必须同时显示「发送给朋友」，反之则允许只显示前者。
+   */
+  enableShareMenu() {
+    if (typeof wx.showShareMenu !== 'function') return;
+    wx.showShareMenu({
+      withShareTicket: true,
+      menus: ['shareAppMessage', 'shareTimeline']
+    });
+  },
+
+  /**
+   * 延迟导出分享图，等待首帧罗盘绘制完成
+   */
+  scheduleShareImage() {
+    if (this.shareImageTimer) clearTimeout(this.shareImageTimer);
+    this.shareImageTimer = setTimeout(() => {
+      this.shareImageTimer = null;
+      this.updateShareImage();
+    }, 2000);
+  },
+
+  /**
+   * 导出当前罗盘画面为分享图并缓存
+   * @returns {Promise<string>} 临时文件路径；失败时返回空串
+   */
+  updateShareImage() {
+    return new Promise((resolve) => {
+      if (!this.canvas || typeof wx.canvasToTempFilePath !== 'function') {
+        resolve('');
+        return;
+      }
+      // 画布在弹窗打开时会被 hidden 临时隐藏，此时导出会得到空白图，跳过本次
+      if (this.data.showCalibModal || this.data.showLayerModal
+        || this.data.showKongwangModal || this.data.showFenjinModal) {
+        resolve('');
+        return;
+      }
+      wx.canvasToTempFilePath({
+        canvas: this.canvas,
+        success: (res) => {
+          this.shareImagePath = res.tempFilePath || '';
+          resolve(this.shareImagePath);
+        },
+        fail: (err) => {
+          console.warn('生成分享图失败:', err);
+          resolve('');
+        }
+      });
+    });
+  },
+
+  /** 分享标题：能取到今日当令之山时带上，否则回退固定描述 */
+  getShareTitle() {
+    const line = this.data && this.data.todayLine;
+    const matched = typeof line === 'string' ? /主应\s*([^\s·]+?)山/.exec(line) : null;
+    return matched
+      ? `演象·时空罗盘 · 今日主应 ${matched[1]}山`
+      : '演象·时空罗盘 · 磁北真北双针校准 · 一百二十分金';
+  },
+
+  /**
+   * 分享给好友 / 群聊
+   *
+   * promise 用于异步导出「当前罗盘画面」作封面（基础库 2.12.0+）；
+   * 低版本忽略该字段，自动回退为默认截图，不影响分享。
+   */
+  onShareAppMessage() {
+    return {
+      title: this.getShareTitle(),
+      path: '/pages/index/index',
+      promise: this.updateShareImage().then((imageUrl) => (imageUrl ? { imageUrl } : {}))
+    };
+  },
+
+  /**
+   * 分享到朋友圈（基础库 2.11.3+，目前仅 Android 支持）
+   *
+   * 该回调必须同步返回，无法等待 canvas 导出，故使用预生成的缓存图；
+   * 同时触发一次异步刷新，使下次分享用上最新画面。
+   * 分享图为正方形画布，正好符合朋友圈 1:1 的展示比例。
+   */
+  onShareTimeline() {
+    const content = {
+      title: this.getShareTitle(),
+      query: ''
+    };
+    if (this.shareImagePath) {
+      content.imageUrl = this.shareImagePath;
+    }
+    if (this.canvas) this.updateShareImage();
+    return content;
+  },
+
   // ==================== 初始化 ====================
+
+  /**
+   * 获取状态栏高度，供自定义导航栏顶部留白。
+   * wx.getSystemInfoSync 已废弃，优先使用 wx.getWindowInfo（基础库 2.20.1+）。
+   */
+  initStatusBarHeight() {
+    let h = 20;
+    try {
+      const info = (typeof wx.getWindowInfo === 'function')
+        ? wx.getWindowInfo()
+        : wx.getSystemInfoSync();
+      if (info && typeof info.statusBarHeight === 'number') h = info.statusBarHeight;
+    } catch (e) {
+      console.warn('获取状态栏高度失败，使用默认值 20:', e);
+    }
+    this.setData({ statusBarHeight: h });
+  },
+
   initTodayInfo() {
     const today = getTodayMountainInfo();
     if (today) {

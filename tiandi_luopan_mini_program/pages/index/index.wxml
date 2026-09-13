@@ -1,5 +1,14 @@
 <!-- pages/index/index.wxml -->
 <view class="page-container">
+  <!--
+    自定义顶部导航栏：navigationStyle 设为 custom 后系统导航栏被移除，
+    标题需自行绘制。padding-top 由 JS 按实际状态栏高度注入，避免被系统状态栏遮挡；
+    右侧胶囊按钮由微信原生渲染，无法隐藏，故标题居中即可与其共存。
+  -->
+  <view class="custom-nav" style="padding-top: {{statusBarHeight}}px;">
+    <text class="nav-title">演象 · 时空罗盘</text>
+  </view>
+
   <!-- 顶部标题与综合状态栏（时间 · 速度 · 方向） -->
   <view class="header-section">
     <view class="subtitle">{{todayLine}}</view>
@@ -29,6 +38,9 @@
         {{isHeadingLocked ? '🔒 锁定' : '🔓 实时'}}
       </view>
       <view class="tab-btn fn fn-cyan" bindtap="toggleLayerModal" data-show="true">⚙️ 图层</view>
+      <!-- 好友/群聊分享：微信仅提供 open-type="share" 按钮入口；
+           分享到朋友圈无对应 open-type，仍需从右上角菜单发起 -->
+      <button class="tab-btn fn fn-share" open-type="share" hover-class="none">📤 分享</button>
     </view>
 
     <!-- 磁北 / 真北朝向胶囊栏 -->

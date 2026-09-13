@@ -7,7 +7,29 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx 12rpx 40rpx;
+  /* 顶部内边距交由 .custom-nav 的 padding-top 处理，避免与状态栏留白叠加；
+     底部叠加安全区，避免全面屏机型的 Home Indicator 遮挡内容 */
+  padding: 0 12rpx calc(40rpx + env(safe-area-inset-bottom));
+}
+
+/* 自定义顶部导航栏（navigationStyle: custom 时由页面自行渲染） */
+.custom-nav {
+  width: 100%;
+  height: 88rpx;           /* 原系统导航栏内容区高度（44px） */
+  box-sizing: content-box; /* 状态栏高度作为 padding 叠加在上方，不计入该高度 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 8rpx;
+}
+
+.nav-title {
+  font-size: 34rpx;
+  font-weight: bold;
+  color: #d4af37;
+  letter-spacing: 2rpx;
+  text-align: center;
 }
 
 /* 顶部标题与副标题 */
@@ -81,6 +103,28 @@
   color: #ffffff !important;
   border-color: #d35400 !important;
   box-shadow: 0 0 10rpx rgba(230, 126, 34, 0.7);
+}
+
+/* 分享按钮：button 组件有大量默认样式，需逐项重置以与相邻 .tab-btn 视觉对齐 */
+.tab-btn.fn-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 10rpx 24rpx;
+  line-height: 1.2;
+  font-size: 24rpx;
+  font-weight: bold;
+  color: #7fb3ff;
+  background: #1c1d28;
+  border: 1px solid #2a3f5f;
+  border-radius: 12rpx;
+  overflow: visible;
+}
+
+/* 去掉 button 默认的 ::after 边框 */
+.tab-btn.fn-share::after {
+  border: none;
 }
 
 /* 罗盘朝向微光胶囊栏 */

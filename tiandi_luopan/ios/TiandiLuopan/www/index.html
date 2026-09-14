@@ -75,23 +75,26 @@
         }
         .tab-bar {
             display: flex;
-            gap: 8px;
+            gap: 5px;
             margin-bottom: 6px;
             justify-content: center;
             width: 100%;
-            max-width: 500px;
+            max-width: 520px;
+            flex-wrap: wrap;
         }
         .tab-btn {
-            flex: 1;
+            flex: 1 1 auto;
+            min-width: 58px;
             background: #1c1d28;
             border: 1px solid #333446;
             color: #888;
-            padding: 6px 10px;
+            padding: 5px 6px;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.2s;
             text-align: center;
+            white-space: nowrap;
         }
         .tab-btn:hover { border-color: #d4af37; color: #d4af37; }
         .tab-btn.active {
@@ -469,6 +472,182 @@
             border-top: 1px dashed #333446;
             padding-top: 10px;
         }
+
+        /* 实时方位风水速查卡片 */
+        .fs-live-card {
+            background: linear-gradient(135deg, rgba(28, 30, 42, 0.95), rgba(18, 19, 28, 0.98));
+            border: 1px solid #5a4622;
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin: 8px 0;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 0 10px rgba(212, 175, 55, 0.05);
+            transition: all 0.2s ease;
+        }
+        .fs-live-card:hover {
+            border-color: #d4af37;
+            background: linear-gradient(135deg, rgba(35, 38, 54, 0.95), rgba(24, 25, 36, 0.98));
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), inset 0 0 12px rgba(212, 175, 55, 0.12);
+        }
+        .fs-live-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+            padding-bottom: 6px;
+            margin-bottom: 7px;
+        }
+        .fs-live-badge {
+            font-size: 13px;
+            font-weight: bold;
+            color: #f1c40f;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .fs-live-role {
+            font-size: 11px;
+            color: #50e3c2;
+            background: rgba(80, 227, 194, 0.12);
+            border: 1px solid rgba(80, 227, 194, 0.3);
+            border-radius: 10px;
+            padding: 1px 7px;
+        }
+        .fs-live-btn {
+            font-size: 11px;
+            color: #d4af37;
+            font-weight: bold;
+        }
+        .fs-live-body {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .fs-live-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            font-size: 11.5px;
+            line-height: 1.45;
+        }
+        .fs-pill {
+            flex-shrink: 0;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 1px 5px;
+            border-radius: 4px;
+            margin-top: 1px;
+        }
+        .fs-pill.warn {
+            background: #3d1717;
+            color: #ff7675;
+            border: 1px solid #8e2b2b;
+        }
+        .fs-pill.layout {
+            background: #14352b;
+            color: #50e3c2;
+            border: 1px solid #1f6b55;
+        }
+        .fs-live-text {
+            color: #ddd;
+        }
+
+        /* 八方风水详解大弹窗 */
+        .fs-tabs-scroll {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
+        }
+        .fs-tab-item {
+            flex: 0 0 auto;
+            background: #181926;
+            border: 1px solid #2e3046;
+            color: #aaa;
+            padding: 6px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-align: center;
+            white-space: nowrap;
+        }
+        .fs-tab-item.active {
+            background: #d4af37;
+            color: #111;
+            border-color: #d4af37;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+        }
+        .fs-detail-card {
+            background: #14151e;
+            border: 1px solid #2d2e40;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .fs-detail-card.warn-card {
+            border-left: 3.5px solid #ff7675;
+            background: linear-gradient(90deg, rgba(61, 23, 23, 0.4) 0%, rgba(20, 21, 30, 0.6) 100%);
+        }
+        .fs-detail-card.layout-card {
+            border-left: 3.5px solid #50e3c2;
+            background: linear-gradient(90deg, rgba(20, 53, 43, 0.4) 0%, rgba(20, 21, 30, 0.6) 100%);
+        }
+        .fs-detail-card.remedy-card {
+            border-left: 3.5px solid #f1c40f;
+            background: linear-gradient(90deg, rgba(74, 59, 29, 0.4) 0%, rgba(20, 21, 30, 0.6) 100%);
+        }
+        .fs-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .fs-card-title {
+            font-size: 13px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .fs-card-title.warn-title { color: #ff7675; }
+        .fs-card-title.layout-title { color: #50e3c2; }
+        .fs-card-title.remedy-title { color: #f1c40f; }
+        .fs-tag-badge {
+            font-size: 10.5px;
+            padding: 1px 6px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .fs-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .fs-meta-item {
+            background: #181926;
+            border: 1px solid #2a2c3d;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 11.5px;
+        }
+        .fs-meta-lbl {
+            color: #888;
+            margin-bottom: 2px;
+            font-size: 10.5px;
+        }
+        .fs-meta-val {
+            color: #fff;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -603,6 +782,7 @@
             <button class="tab-btn" id="tab-rot-mode" onclick="toggleCompassMode()" style="color:#f1c40f; border-color:#534321; font-weight:bold;">🔄 随向转</button>
             <button class="tab-btn" id="btn-lock-heading" onclick="toggleHeadingLock()" style="color:#eee;">🔓 实时</button>
             <button class="tab-btn" id="btn-layer-settings" onclick="toggleLayerModal(true)" style="color:#50e3c2;">⚙️ 图层</button>
+            <button class="tab-btn" id="btn-fengshui-guide" onclick="toggleFengshuiModal(true)" style="color:#f39c12; border-color:#8e5a1b; font-weight:bold;">🏡 风水详解</button>
         </div>
         <div class="compass-bar" id="compass-bar" onclick="toggleCalibModal(true)">
             <div class="compass-info-box">
@@ -676,6 +856,7 @@
             </div>
             <div class="layer-item-row"><label><input type="checkbox" id="layer-bubble" checked onchange="toggleLayer('bubbleLevel', this.checked)"> <span>🎯 太极双轴电子水准仪气泡</span></label></div>
             <div class="layer-item-row"><label><input type="checkbox" id="layer-palaces" checked onchange="toggleLayer('palaces', this.checked)"> <span>☵ 八卦八宫环 (先天/后天)</span></label></div>
+            <div class="layer-item-row"><label><input type="checkbox" id="layer-fengshui" checked onchange="toggleLayer('fengshui', this.checked)"> <span>🏡 八宫风水职能与宜忌环 (盘面指示)</span></label></div>
             <div class="layer-item-row"><label><input type="checkbox" id="layer-mountains" checked onchange="toggleLayer('mountains', this.checked)"> <span>🧭 二十四山与五行纳音底色</span></label></div>
             <div class="layer-item-row"><label><input type="checkbox" id="layer-fenjin" checked onchange="toggleLayer('fenjin', this.checked)"> <span>💎 一百二十分金与旺相珠宝珠</span></label></div>
             <div class="layer-item-row"><label><input type="checkbox" id="layer-solar" checked onchange="toggleLayer('solarRing', this.checked)"> <span>☀️ 当令二十四节气与消息卦</span></label></div>
@@ -809,6 +990,26 @@
         </div>
     </div>
 
+    <!-- 居家风水八方详勘与空间布局全鉴弹窗 -->
+    <div class="calib-modal-overlay" id="fengshui-modal" onclick="if(event.target===this)toggleFengshuiModal(false)">
+        <div class="calib-card" style="max-height:88vh; overflow-y:auto; width:min(94vw, 480px);">
+            <div class="calib-header">
+                <span class="calib-title">🏡 居家风水八方详勘与空间布局全鉴</span>
+                <span class="calib-close" onclick="toggleFengshuiModal(false)">✕</span>
+            </div>
+
+            <!-- 八方快速切换标签栏 -->
+            <div class="fs-tabs-scroll" id="fs-tabs-container"></div>
+
+            <!-- 当前选定方位详情容器 -->
+            <div id="fs-modal-content"></div>
+
+            <div class="calib-actions" style="margin-top:14px;">
+                <button class="calib-btn" onclick="toggleFengshuiModal(false)">返回罗盘盘面</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="compass-viewport" id="compass-viewport">
             <div class="compass-transform-box" id="compass-transform-box">
@@ -825,6 +1026,25 @@
             <div class="info-item"><span class="info-label">立向格局</span><span class="info-val" id="val-sitface" style="color:#f1c40f">坐午向子 · 正针</span></div>
             <div class="info-item clickable" onclick="toggleKongwangModal(true)" title="点击查看空亡诊断详细说明与吉凶断诀"><span class="info-label clickable-hint">空亡诊断<span class="info-hint-icon">?</span></span><span class="info-val" id="val-kongwang"><span class="kw-badge pure">正针纯清</span></span></div>
             <div class="info-item clickable" onclick="toggleFenjinModal(true)" title="点击查看一百二十分金详细说明与珠宝断诀"><span class="info-label clickable-hint">一百二十分金<span class="info-hint-icon">?</span></span><span class="info-val" id="val-fenjin" style="color:#ffd166">庚子分金 (旺相珠宝)</span></div>
+            <div class="info-item clickable" onclick="toggleFengshuiModal(true)" title="点击查看当前方位风水深度详解与居家八方布局全书"><span class="info-label clickable-hint">风水方位详解<span class="info-hint-icon">?</span></span><span class="info-val" id="val-fengshui-summary" style="color:#f39c12">坎水 · 宜书房静卧 · 忌污厕缺角</span></div>
+            <!-- 实时方位风水与居家布置速查看板 -->
+            <div class="fs-live-card" onclick="toggleFengshuiModal(true)" title="点击打开居家风水八方全鉴">
+                <div class="fs-live-header">
+                    <span class="fs-live-badge" id="fs-live-palace">坎宫 · 正北 (五行水)</span>
+                    <span class="fs-live-role" id="fs-live-role">中男 · 事业官运位</span>
+                    <span class="fs-live-btn">八方详解 ❯</span>
+                </div>
+                <div class="fs-live-body">
+                    <div class="fs-live-row">
+                        <span class="fs-pill warn">⚠️ 注意问题</span>
+                        <span class="fs-live-text" id="fs-live-warn">忌卫生间污秽、忌阴暗潮湿、防腰肾受寒与事业阻滞</span>
+                    </div>
+                    <div class="fs-live-row">
+                        <span class="fs-pill layout">🏡 居家布置</span>
+                        <span class="fs-live-text" id="fs-live-layout">宜设静雅书房或主卧，保持干燥干爽，置流水摆件/金属风铃催旺官禄</span>
+                    </div>
+                </div>
+            </div>
             <div class="info-item"><span class="info-label">电子水准倾角</span><span class="info-val" id="val-level" style="color:#2ecc71">0.0° · 水平良好 ✓</span></div>
             <div class="info-item"><span class="info-label">四柱天干地支</span><span class="info-val" id="val-ganzhi" style="color:#50e3c2">推算中…</span></div>
             <div class="info-item"><span class="info-label">真太阳时 ☀️</span><span class="info-val" id="val-solar-time" style="color:#e74c3c">计算中…</span></div>
@@ -887,7 +1107,8 @@
             fenjin: true,                 // 一百二十分金环
             solarRing: true,              // 二十四节气
             timeDial: true,               // 24小时时间圈
-            hex64: true                   // 64卦圆图
+            hex64: true,                  // 64卦圆图
+            fengshui: true                // 🏡 八宫风水职能与宜忌环 (盘面指示)
         };
 
         // ========== 高清渲染（适配高分屏） ==========
@@ -919,10 +1140,10 @@
 
         // ========== 常量配置 ==========
         const ELEM_COLORS = {
-            '水': '#1b3b5a',
-            '木': '#1a4a3a',
-            '火': '#5c2424',
-            '土': '#534321',
+            '水': '#1b2a47',
+            '木': '#1a382b',
+            '火': '#4a1e1e',
+            '土': '#42331c',
             '金': '#404552'
         };
         // 环半径（优化半径分配：gua64Outer向内微收8px消除视口边界遮挡，内部圈层留足大字号空间）
@@ -989,27 +1210,293 @@
 
         // 后天八卦八宫（0°=南，顺时针；每宫45°，各辖3山）
         const PALACES_POST = [
-            {name:'离宫', label:'正南', symbol:'☲', elem:'火', baseDeg:0},
-            {name:'坤宫', label:'西南', symbol:'☷', elem:'土', baseDeg:45},
-            {name:'兑宫', label:'正西', symbol:'☱', elem:'金', baseDeg:90},
-            {name:'乾宫', label:'西北', symbol:'☰', elem:'金', baseDeg:135},
-            {name:'坎宫', label:'正北', symbol:'☵', elem:'水', baseDeg:180},
-            {name:'艮宫', label:'东北', symbol:'☶', elem:'土', baseDeg:225},
-            {name:'震宫', label:'正东', symbol:'☳', elem:'木', baseDeg:270},
-            {name:'巽宫', label:'东南', symbol:'☴', elem:'木', baseDeg:315}
+            {name:'离宫', label:'正南', symbol:'☲', elem:'火', baseDeg:0, key:'离', fengshuiRole:'名望·中女', fengshuiYi:'采光明堂', fengshuiJi:'水浸昏暗'},
+            {name:'坤宫', label:'西南', symbol:'☷', elem:'土', baseDeg:45, key:'坤', fengshuiRole:'田宅·女主', fengshuiYi:'主卧田宅', fengshuiJi:'脏污下水'},
+            {name:'兑宫', label:'正西', symbol:'☱', elem:'金', baseDeg:90, key:'兑', fengshuiRole:'财源·少女', fengshuiYi:'会客聚气', fengshuiJi:'火克开裂'},
+            {name:'乾宫', label:'西北', symbol:'☰', elem:'金', baseDeg:135, key:'乾', fengshuiRole:'天门·男主', fengshuiYi:'主房尊位', fengshuiJi:'火烧天门'},
+            {name:'坎宫', label:'正北', symbol:'☵', elem:'水', baseDeg:180, key:'坎', fengshuiRole:'坎水·中男', fengshuiYi:'书房静卧', fengshuiJi:'污厕缺角'},
+            {name:'艮宫', label:'东北', symbol:'☶', elem:'土', baseDeg:225, key:'艮', fengshuiRole:'靠山·少男', fengshuiYi:'儿房静稳', fengshuiJi:'鬼门卫浴'},
+            {name:'震宫', label:'正东', symbol:'☳', elem:'木', baseDeg:270, key:'震', fengshuiRole:'生机·长男', fengshuiYi:'客厅生机', fengshuiJi:'重金冲煞'},
+            {name:'巽宫', label:'东南', symbol:'☴', elem:'木', baseDeg:315, key:'巽', fengshuiRole:'文昌·名利', fengshuiYi:'文昌书房', fengshuiJi:'落厕阴湿'}
         ];
         // 先天八卦八宫（伏羲方位：乾南、坤北、离东、坎西、震东北、巽西南、艮西北、兑东南）
         const PALACES_PRE = [
-            {name:'乾宫', label:'正南', symbol:'☰', elem:'金', baseDeg:0},
-            {name:'巽宫', label:'西南', symbol:'☴', elem:'木', baseDeg:45},
-            {name:'坎宫', label:'正西', symbol:'☵', elem:'水', baseDeg:90},
-            {name:'艮宫', label:'西北', symbol:'☶', elem:'土', baseDeg:135},
-            {name:'坤宫', label:'正北', symbol:'☷', elem:'土', baseDeg:180},
-            {name:'震宫', label:'东北', symbol:'☳', elem:'木', baseDeg:225},
-            {name:'离宫', label:'正东', symbol:'☲', elem:'火', baseDeg:270},
-            {name:'兑宫', label:'东南', symbol:'☱', elem:'金', baseDeg:315}
+            {name:'乾宫', label:'正南', symbol:'☰', elem:'金', baseDeg:0, key:'乾', fengshuiRole:'天象·至尊', fengshuiYi:'崇高明朗', fengshuiJi:'晦暗压顶'},
+            {name:'巽宫', label:'西南', symbol:'☴', elem:'木', baseDeg:45, key:'巽', fengshuiRole:'清风·温和', fengshuiYi:'通透整洁', fengshuiJi:'杂物堆积'},
+            {name:'坎宫', label:'正西', symbol:'☵', elem:'水', baseDeg:90, key:'坎', fengshuiRole:'润下·深邃', fengshuiYi:'水木清华', fengshuiJi:'污秽滞留'},
+            {name:'艮宫', label:'西北', symbol:'☶', elem:'土', baseDeg:135, key:'艮', fengshuiRole:'笃实·止息', fengshuiYi:'厚重安宁', fengshuiJi:'动摇破耗'},
+            {name:'坤宫', label:'正北', symbol:'☷', elem:'土', baseDeg:180, key:'坤', fengshuiRole:'坤厚·藏纳', fengshuiYi:'方正敦厚', fengshuiJi:'虚浮空洞'},
+            {name:'震宫', label:'东北', symbol:'☳', elem:'木', baseDeg:225, key:'震', fengshuiRole:'雷动·启行', fengshuiYi:'朝气生机', fengshuiJi:'闭塞死寂'},
+            {name:'离宫', label:'正东', symbol:'☲', elem:'火', baseDeg:270, key:'离', fengshuiRole:'明丽·显耀', fengshuiYi:'光彩夺目', fengshuiJi:'阴湿掩蔽'},
+            {name:'兑宫', label:'东南', symbol:'☱', elem:'金', baseDeg:315, key:'兑', fengshuiRole:'和悦·通达', fengshuiYi:'欢聚喜庆', fengshuiJi:'尖利冲撞'}
         ];
         function getPalaces(){ return currentMode === 'post' ? PALACES_POST : PALACES_PRE; }
+
+        // ========== 居家风水八方深度详解与空间布局知识库 ==========
+        const FENGSHUI_PALACES_DATA = {
+            '坎': {
+                name: '坎宫 · 正北',
+                key: '坎',
+                dir: '正北 (337.5° ~ 22.5°)',
+                elem: '水 (一白贪狼星)',
+                symbol: '☵',
+                role: '中男 (次子) · 事业官运位',
+                body: '肾脏、泌尿生殖系统、耳疾、腰椎、血液循环',
+                fortune: '事业前程、官运发展、智慧谋略、深层财源',
+                discYi: '书房·静卧',
+                discJi: '污厕·缺角',
+                warnTitle: '坎位（正北）核心大忌与注意问题',
+                warnings: [
+                    '【切忌设卫生间或排污管道】坎为正水，最忌污秽腐水侵犯。若此处为厕所，易致男丁肾虚腰痛、前列腺与泌尿结石、女性妇科缠绵，且事业遭小人算计陷害。',
+                    '【切忌正北方严重缺角】北方缺角称为“坎水失陷”，家中次子运势阻滞，男主人体能耐力衰竭，行事缺乏毅力，无贵人相助。',
+                    '【切忌厨房炉灶火克水】北方安设灶台，构成“水火交战”、“水火未济”，主家人心肾不交、夜梦惊悸、夫妻经常发生口角反目。',
+                    '【忌常年阴湿昏暗与杂物堆塞】北方常年背阳，若再堆积潮湿杂物，极易积聚阴邪霉气，令居住者意志低沉、抑郁迟钝。'
+                ],
+                layoutTitle: '坎位（正北）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】最适宜设为清静书房、主人私密起居室、密室保险柜或藏风聚气之储蓄间。',
+                    '【采光与温控】需特别注重通风与采光，安装暖色柔和照明（暖白/米黄灯光），以温阳之气平衡北方阴水。',
+                    '【家具床位摆放】书桌或睡床宜朝向正东或东南（水生木顺生之局），床头靠北实墙，忌头冲北方门窗。',
+                    '【色彩风格搭配】宜采用素雅白、浅金（金生水）、米白或静谧浅蓝；忌大面积采用深黑（过阴）或大红（水火相克）。'
+                ],
+                remedyTitle: '坎位（正北）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角补气】在正北缺角处摆放【泰山石敢当】或一尊【纯铜玄武龙龟】，取“金生水旺、玄武镇后”之意补足地气。',
+                    '【卫浴落坎方化煞】卫生间内摆放一盆耐阴水养大叶绿植（如万年青、黄金葛）吸收湿气，并悬挂【天然开口黄铜葫芦】收浊化煞。',
+                    '【生旺事业官运】摆放黑曜石七星阵、白水晶球或纯铜金属风铃，生发事业贵人运。'
+                ]
+            },
+            '艮': {
+                name: '艮宫 · 东北',
+                key: '艮',
+                dir: '东北 (22.5° ~ 67.5°)',
+                elem: '土 (八白左辅星)',
+                symbol: '☶',
+                role: '少男 (幼子) · 子嗣靠山位',
+                body: '脾胃、消化道、手脚关节、脊椎颈椎、鼻面呼吸',
+                fortune: '子嗣人丁、学业考运、家庭靠山与基业根基',
+                discYi: '儿房·静稳',
+                discJi: '鬼门·卫浴',
+                warnTitle: '艮位（东北）核心大忌与注意问题',
+                warnings: [
+                    '【东北为“表鬼门”，切忌设卫生间】东北是阴阳交接转换之枢纽，气场极敏感脆弱。若为厕所污水侵袭，主幼子多病难抚养、全家脾胃肠道慢性病，更损男丁子嗣运。',
+                    '【绝对忌讳东北方严重缺角】艮为子孙山、靠山。东北缺角是风水大忌，主丁口不旺、晚辈后劲不足、晚年孤苦、投资频遭深套、事业无后盾靠山。',
+                    '【忌大门直冲与动土破坏】东北方忌做大开大合的大型落地门直接受冷风贯冲，气流激荡则家无宁日。',
+                    '【忌脏乱杂物房与垃圾桶堆积】污垢秽气滞留会导致青少年厌学叛逆、思维迟钝不前、骨骼发育不良。'
+                ],
+                layoutTitle: '艮位（东北）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】最适宜设为儿童房、男孩卧室、幽雅禅茶室或文雅读书室。',
+                    '【空间气场要求】宜方正饱满、平整稳重、干燥温和，给人脚踏实地、山一般沉稳安定的心理支撑。',
+                    '【色彩与材质】宜采用米黄色、土黄色、暖咖色或稳重原木色，增强艮土厚重承载之德；忌大面积青绿色（木克土）。',
+                    '【陈设规范】避免摆放高耸杂乱或带尖角的家具，保持平稳大方，墙体不可有开裂脱落。'
+                ],
+                remedyTitle: '艮位（东北）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角补齐】在东北角摆放稳重的【泰山石敢当】或一尊【黄色玉石聚宝盆】、【陶瓷方樽】，以土生土补足地气。',
+                    '【卫浴落东北化煞】墙面采用黄色系瓷砖，摆放干燥多肉植物，放置一盒天然粗海盐净化磁场，门上悬挂天然桃木平安兽。',
+                    '【催旺子嗣学业】摆放一尊白瓷文昌塔或黄水晶金蟾，保佑学童聪明睿智、金榜题名。'
+                ]
+            },
+            '震': {
+                name: '震宫 · 正东',
+                key: '震',
+                dir: '正东 (67.5° ~ 112.5°)',
+                elem: '木 (三碧禄存星)',
+                symbol: '☳',
+                role: '长男 (长子) · 生机开拓位',
+                body: '肝胆系统、双足腿脚、神经经络、发肤指甲',
+                fortune: '朝气生机、创业开拓力、进取意志、事业立项',
+                discYi: '客厅·生机',
+                discJi: '重金·冲煞',
+                warnTitle: '震位（正东）核心大忌与注意问题',
+                warnings: [
+                    '【忌受重金属利器刑克冲煞】正东五行属木，金克木。若东面放置大型金属机械、刀剑架、重铁构件，极易伤损长男筋骨腿脚、肝胆受创、易招意外血光。',
+                    '【忌常年昏暗闭塞与杂物堵压】东方为朝阳旭日之地，万物生发。若被杂物堆死、闭塞无光，主长子缺乏阳刚进取心、性格孤僻内向、事业毫无突破。',
+                    '【忌正东方缺角】正东缺角象征“震木无根”，长子在家中无立足之地，甚至损折长男性命健康，全家缺乏开拓生机。',
+                    '【忌设大面积火炉烈火耗木】东方见大炉灶，木被烈火狂焚泄气，居住者常感心烦气躁、肝火过旺、失眠多梦。'
+                ],
+                layoutTitle: '震位（正东）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】极宜设为采光大客厅、入户迎宾玄关、向阳阳台或朝气蓬勃的青年卧室。',
+                    '【紫气东来采光】早晨务必拉开窗帘引纳旭日紫气，保持明朗清爽，注入生机勃勃的天地元气。',
+                    '【绿植生旺首选】最适宜摆放枝叶繁茂的阔叶常绿植物（发财树、琴叶榕、龟背竹），以水润木、木助生机。',
+                    '【色彩装潢搭配】适宜采用清新青碧、翠绿、原木暖色或点缀水蓝；忌大面积冰冷纯白或银灰金属色（金伤木）。'
+                ],
+                remedyTitle: '震位（正东）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角化解】在正东方摆放一条【纯铜或青玉生肖龙】（辰龙归木局），或种植大型发财树，墙上悬挂《旭日东升》山水画。',
+                    '【受金属煞冲化解】在窗台安放水养富贵竹或水培植物，形成“金生水、水生木”之贪生忘克良局。',
+                    '【催旺长子运】摆放木雕如意或天然绿东陵玉印章，生发威权与事业果决魄力。'
+                ]
+            },
+            '巽': {
+                name: '巽宫 · 东南',
+                key: '巽',
+                dir: '东南 (112.5° ~ 157.5°)',
+                elem: '木 (四绿文曲星)',
+                symbol: '☴',
+                role: '长女 (长媳) · 第一文昌位',
+                body: '胆经、呼吸神经系统、大腿骨盆、手足血管',
+                fortune: '名扬四海、科甲功名、商贾财富（“巽为利市三倍”）、贵人声誉',
+                discYi: '文昌·书房',
+                discJi: '落厕·阴湿',
+                warnTitle: '巽位（东南）核心大忌与注意问题',
+                warnings: [
+                    '【大忌一：切忌“文昌落厕”】东南方为住宅天生第一文昌吉位，若卫生间设于此，称为“污秽文昌”，主学童考运屡战屡败、思维混乱，长女多妇科抑郁，投资受骗破耗。',
+                    '【忌东南方严重缺角】东南缺角主家中长女体质赢弱、长媳操劳孤苦无依，全家“利市三倍”之生财通路被截断，赚钱艰难积蓄空虚。',
+                    '【忌烈火油烟直接焚烧】若厨房落于东南，木气被火焚灼，家人易患急躁热病、呼吸系统炎症与脱发。',
+                    '【忌阴暗潮湿堆积废料】杂乱肮脏会严重败坏全家声誉口碑与社会人际关系。'
+                ],
+                layoutTitle: '巽位（东南）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】全屋最为珍贵的“第一主书房位”、“学霸考研角”、“大门财气进气口”或“企业财务室”。',
+                    '【文昌大吉布局】将书桌或电脑办公桌设在东南角，坐吉向吉，主思路敏捷、文采飞扬、考运亨通。',
+                    '【水木清华配饰】水养四支富贵竹（合四绿文曲星之数），或设流水小型喷泉景观，水木相涵，催旺文昌与财富流转。',
+                    '【色彩格调建议】宜用典雅浅绿、竹青、水墨浅蓝；搭配天然实木家具，营造书香门第、清新儒雅之气。'
+                ],
+                remedyTitle: '巽位（东南）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角化解】在东南方位摆放高耸【富贵开运竹】、【木雕如意】或一座【天然绿幽灵/绿东陵玉文昌塔】。',
+                    '【文昌落厕化解】卫生间必须保持高强度排风干燥，内放四支水养富贵竹吸秽，门外悬挂半截式棉麻门帘并安放铜葫芦。',
+                    '【催旺名望仕途】桌面摆放天然黑曜石毛笔架或文昌紫晶洞，助功成名就、金榜题名。'
+                ]
+            },
+            '离': {
+                name: '离宫 · 正南',
+                key: '离',
+                dir: '正南 (157.5° ~ 202.5°)',
+                elem: '火 (九紫右弼星)',
+                symbol: '☲',
+                role: '中女 (二女儿) · 前程光明位',
+                body: '心脏、心脑血管、眼睛视力、小肠、血液流通',
+                fortune: '名气美誉、前程锦绣、礼仪才艺、显耀荣光、九运当令吉星',
+                discYi: '采光明堂',
+                discJi: '水浸昏暗',
+                warnTitle: '离位（正南）核心大忌与注意问题',
+                warnings: [
+                    '【忌大水池、大鱼缸或卫生间冲克】南方为正火之地（朱雀神位），最忌水克火。水浸离宫极易诱发中女心脑血管急症、眼部近视白内障、家中女性感情受挫。',
+                    '【忌高墙遮挡阳光导致阴沉无光】南方为光明与正气之源。若南方紧闭无窗、常年昏暗，主全家前程晦暗、名声遭诽谤、难以出人头地。',
+                    '【忌正南方严重缺角】南方缺角主家中女性性急易躁、心脏供血不良、名誉受损、前途迷茫无依。',
+                    '【忌尖角煞冲射朱雀明堂】若窗外正对电线杆、烟囱或尖角煞，易招火灾、烫伤或官非口舌。'
+                ],
+                layoutTitle: '离位（正南）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】最适宜设为主客厅大落地窗明堂、景观大阳台、艺术创作沙龙或亮丽主卧。',
+                    '【朱雀展翅格局】正南方讲究开阔通透、平整洁净，宛如“朱雀展翅翱翔”，纳尽天地至阳吉气。',
+                    '【光照与艺术陈设】保持光线充沛明朗，可悬挂红色名家画作、中国结、紫水晶洞或暖调艺术吊灯。',
+                    '【色彩搭配建议】宜用暖色系、中国红、朱砂红、香槟紫或浅原木色（木生火旺）；忌大面积冷黑、深蓝。'
+                ],
+                remedyTitle: '离位（正南）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角化解】在正南方挂一幅《万山红遍》或《鸿运当头》红日画卷，摆放【红玛瑙聚宝盆】或一盏常明暖光灯补足火气。',
+                    '【受水煞冲克化解】摆放大型阔叶绿植（木生火、水生木），以木通关水火相克之局，化煞生财。',
+                    '【催旺九运喜庆大吉】九运当令（2024-2043九紫离火），摆设九枝红玫瑰或红色紫晶洞，大催人丁贵气与喜庆良缘。'
+                ]
+            },
+            '坤': {
+                name: '坤宫 · 西南',
+                key: '坤',
+                dir: '西南 (202.5° ~ 247.5°)',
+                elem: '土 (二黑巨门星)',
+                symbol: '☷',
+                role: '母亲 (女主人) · 家庭田宅位',
+                body: '脾胃消化、腹部脏器、妇科子宫、皮肤组织',
+                fortune: '包容厚德、家庭和睦、婚姻美满、田宅不动产积蓄',
+                discYi: '主卧田宅',
+                discJi: '脏污下水',
+                warnTitle: '坤位（西南）核心大忌与注意问题',
+                warnings: [
+                    '【西南为“里鬼门”，切忌垃圾堆放与排污恶臭】西南属纯阴之坤土，最忌阴浊污秽侵扰。若为厕所或排污口，女主人常年胃痛、妇科痼疾缠身、精神抑郁、夫妻反目成仇。',
+                    '【绝忌西南方严重缺角】西南代表母亲与女主人立身之根本。缺西南角则母运衰竭、女主人体弱多病无地位，严重者导致婚姻破裂、家庭财富外泄不聚。',
+                    '【忌金属利器过多泄耗坤土】坤为厚土，摆放过多锋利刀剑或大件金属制品，会泄土太过，导致家运不稳。',
+                    '【忌地面凹陷不平】坤位要求平稳扎实，凹陷或悬空会动摇全家基业根基。'
+                ],
+                layoutTitle: '坤位（西南）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】最适宜设为温馨夫妻主卧、衣帽间、家庭和睦起居厅或储蓄贵重物品之室。',
+                    '【厚德载物气场】宜方正厚重、稳固平整、温润祥和，营造极具安全感与包容力的家庭港湾。',
+                    '【软装与质感】选用米黄、浅杏色、暖咖色、温润大地色调，搭配高档陶瓷摆件、紫砂茶器或石雕艺术。',
+                    '【家庭和美布局】床位宜平稳靠实墙，不宜悬空或受门冲，卧室柔光温馨，滋养女主人身心健康。'
+                ],
+                remedyTitle: '坤位（西南）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角补齐】在西南角安放厚重【泰山石敢当】或一尊【黄色大号陶瓷聚宝盆】、【生肖羊形雕件】（未羊合坤土），补足坤土厚德。',
+                    '【二黑病符化煞】若见病符气场，悬挂一对【开光天然纯铜葫芦】或铜六帝钱吸纳病气、保佑健康平安。',
+                    '【增进夫妻和睦】摆放一盏天然喜马拉雅盐灯或黄水晶树，温暖地气，增进家庭和睦幸福。'
+                ]
+            },
+            '兑': {
+                name: '兑宫 · 正西',
+                key: '兑',
+                dir: '正西 (247.5° ~ 292.5°)',
+                elem: '金 (七赤破军星)',
+                symbol: '☱',
+                role: '少女 (幼女) · 金钱财库位',
+                body: '呼吸道、肺部系统、口腔牙齿、咽喉气管、声带',
+                fortune: '口才演说、交际公关、晚年清福、金钱财库藏聚',
+                discYi: '会客聚气',
+                discJi: '火克开裂',
+                warnTitle: '兑位（正西）核心大忌与注意问题',
+                warnings: [
+                    '【忌厨房炉灶设在正西（“火烧兑金”）】西方五行属金，烈火焚金，极易引起家人咽喉发炎、咳嗽哮喘、肺部结节，小女儿易招惹是非官司口舌。',
+                    '【忌墙面开裂、缺口或破败受损】兑卦古象为“泽、毁折”，若西面墙皮剥落、窗框破损，主招盗贼光顾、破财漏财、口舌争吵不断。',
+                    '【忌正西方严重缺角】西面缺角主家中幼女弱不禁风、性格尖酸孤僻，全家口才表达不利、难以留住钱财。',
+                    '【忌受外部锐角尖角煞冲射】外部有尖塔、尖角直冲正西，主口角官非与口腔咽喉病变。'
+                ],
+                layoutTitle: '兑位（正西）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】宜设为多功能影音娱乐室、轻奢会客茶吧、私密琴房或年轻女儿卧室。',
+                    '【明朗素雅风格】宜保持素净、干爽、明快，装潢宜采用现代简约轻奢风格。',
+                    '【材质与色彩】适宜白色、银灰、象牙白、金黄色（土生金）；搭配精工金属工艺品、铜制貔貅或机械八音盒。',
+                    '【聚气纳财要领】西方为日落之所，宜敛气藏金，窗帘质感宜厚实雅致，夜间拉上可稳固全家财库。'
+                ],
+                remedyTitle: '兑位（正西）缺角与形煞化解锦囊',
+                remedies: [
+                    '【缺角补足】在正西角摆设【纯铜金鸡】（酉金归位）或【纯铜招财金蟾】、【纯铜聚宝盆】，镇宅固金库。',
+                    '【火烧兑金化煞】若厨房不幸在正西，在灶台旁放置黄色天然陶瓷陶罐（以土通关火生土、土生金），挂纯铜葫芦保护呼吸系统。',
+                    '【化口舌为生财】摆放白水晶球或纯铜貔貅，收敛杂气，将口舌是非转化为出众的谈判公关与生财口才。'
+                ]
+            },
+            '乾': {
+                name: '乾宫 · 西北',
+                key: '乾',
+                dir: '西北 (292.5° ~ 337.5°)',
+                elem: '金 (六白武曲星)',
+                symbol: '☰',
+                role: '父亲 (男主人) · 天门第一尊位',
+                body: '头部脑神经、脑血管、脊椎骨骼、大肠经',
+                fortune: '一家之主至尊权柄、事业巅峰、贵人八方提携、福寿威严',
+                discYi: '主房尊位',
+                discJi: '火烧天门',
+                warnTitle: '乾位（西北）核心大忌与注意问题（至关重要！）',
+                warnings: [
+                    '【风水第一大凶——“火烧天门”！】西北为八卦首脑“天门”，至刚至阳之金。若将厨房炉灶设在西北方，即为“烈火烧天门”！烈火克天金，男主人事业屡屡受挫、痛失贵人、脾气暴烈引发家庭决裂；健康上极易诱发脑溢血、严重脑血管病、高血压脑梗或突发中风！此为阳宅第一大忌！',
+                    '【绝对不可缺角——“天塌一角”！】西北方缺角如同天门倾塌，男主人在家中丧失尊严与地位，事业无靠山无贵人，求职创业碰壁连连，后代男丁难成大器。',
+                    '【切忌卫生间设在西北天门】厕所落西北称为“水污天门”，严重败坏男主人社会声望，使其屡招官讼诽谤与财务泥潭，神思昏聩。',
+                    '【忌杂乱昏暗与红色大面积涂抹】西北宜威严纯粹，忌花里胡哨与艳红色调（火克金）。'
+                ],
+                layoutTitle: '乾位（西北）居家空间布置法则',
+                layoutGuide: [
+                    '【功能用房首选】全屋至高尊位！最宜设为男主人专属主书房、尊贵主卧、政商高端接待室或企业董事长办公室。',
+                    '【庄严肃穆气场】必须稳重厚实、庄严肃穆、方正饱满，展现坐镇天门、运筹帷幄之大气象。',
+                    '【家具床位摆位】书桌老板椅务必背后靠坚固实墙，面前明堂开阔坦荡，象征“坐镇天门，统驭全局”。',
+                    '【色彩尊贵格调】宜采用尊贵香槟金、米白、象牙白、稳重大地暖褐；绝对避免大面积烈焰鲜红与花哨涂鸦。'
+                ],
+                remedyTitle: '乾位（西北）缺角与形煞化解锦囊（实战必备）',
+                remedies: [
+                    '【“火烧天门”化解绝招】若厨房已在西北无法移位，务必用“土”通关（火生土、土生金）。厨房改用米黄色耐火砖，灶台下安放【黄色天然陶土罐】或【黄玉聚宝盆】泄火生金，厨房门悬挂【纯铜开光五帝钱】。',
+                    '【西北缺角补足】在西北角安放重型【泰山石敢当】（稳如泰山）或纯铜制作的【乾坤鼎】、【纯铜龙龟】、【金属落地大钟】，稳固天门至尊地位！',
+                    '【引聚八方大贵人】书桌后方摆放纯铜六帝钱摆件或一尊开光纯铜金蟾，强力引聚八方显要贵人提携！'
+                ]
+            }
+        };
+
+        function getFengshuiOrientationInfo(palaceKey) {
+            if (!palaceKey) return FENGSHUI_PALACES_DATA['坎'];
+            const pureKey = palaceKey.replace('宫', '').trim();
+            return FENGSHUI_PALACES_DATA[pureKey] || FENGSHUI_PALACES_DATA['坎'];
+        }
 
         // ========== 先天六十四卦圆图（乾南0°起，顺时针；每卦5.625°，坤在正北180°） ==========
         const HEXAGRAMS_64 = [
@@ -1331,7 +1818,9 @@
 
             return {
                 faceMt: faceMt.name,
+                facePalace: faceMt.palace,
                 sitMt: sitMt.name,
+                sitPalace: sitMt.palace,
                 sitFacePattern,
                 statusType,
                 statusText,
@@ -1421,16 +1910,17 @@
             if (pSim) pSim.classList.toggle('active', preset === 'simple');
 
             if (preset === 'all') {
-                layerConfig = { bubbleLevel: true, palaces: true, mountains: true, fenjin: true, solarRing: true, timeDial: true, hex64: true };
+                layerConfig = { bubbleLevel: true, palaces: true, fengshui: true, mountains: true, fenjin: true, solarRing: true, timeDial: true, hex64: true };
             } else if (preset === 'sanyuan') {
-                layerConfig = { bubbleLevel: true, palaces: true, mountains: true, fenjin: true, solarRing: true, timeDial: false, hex64: true };
+                layerConfig = { bubbleLevel: true, palaces: true, fengshui: true, mountains: true, fenjin: true, solarRing: true, timeDial: false, hex64: true };
             } else if (preset === 'simple') {
-                layerConfig = { bubbleLevel: true, palaces: false, mountains: true, fenjin: true, solarRing: false, timeDial: false, hex64: false };
+                layerConfig = { bubbleLevel: true, palaces: false, fengshui: false, mountains: true, fenjin: true, solarRing: false, timeDial: false, hex64: false };
             }
 
             const chkMap = {
                 bubbleLevel: 'layer-bubble',
                 palaces: 'layer-palaces',
+                fengshui: 'layer-fengshui',
                 mountains: 'layer-mountains',
                 fenjin: 'layer-fenjin',
                 solarRing: 'layer-solar',
@@ -1527,6 +2017,38 @@
 
             const valFj = document.getElementById('val-fenjin');
             if (valFj) valFj.innerHTML = `<span style="color:${fj.badgeColor};font-weight:bold">${fj.displayStr}</span>`;
+
+            // 实时更新当前朝向与坐向的风水大忌与居家布局速查卡
+            const fsFace = getFengshuiOrientationInfo(diag.facePalace);
+            const fsSit = getFengshuiOrientationInfo(diag.sitPalace);
+            updateFengshuiHud(fsFace, fsSit, diag);
+        }
+
+        function updateFengshuiHud(fsFace, fsSit, diag, customMountain) {
+            if (!fsFace) return;
+            const elSummary = document.getElementById('val-fengshui-summary');
+            if (elSummary) {
+                elSummary.innerText = `${fsFace.name.split('·')[0].trim()} · 宜${fsFace.discYi} · 忌${fsFace.discJi}`;
+            }
+
+            const elPalace = document.getElementById('fs-live-palace');
+            const elRole = document.getElementById('fs-live-role');
+            const elWarn = document.getElementById('fs-live-warn');
+            const elLayout = document.getElementById('fs-live-layout');
+
+            if (elPalace) {
+                const mtPrefix = customMountain ? `${customMountain}山 · ` : '';
+                elPalace.innerText = `${mtPrefix}${fsFace.name} (${fsFace.elem.split(' ')[0]})`;
+            }
+            if (elRole) {
+                elRole.innerText = fsFace.role;
+            }
+            if (elWarn && fsFace.warnings && fsFace.warnings[0]) {
+                elWarn.innerText = fsFace.warnings[0].replace(/^【[^】]+】/, '');
+            }
+            if (elLayout && fsFace.layoutGuide && fsFace.layoutGuide[0]) {
+                elLayout.innerText = fsFace.layoutGuide[0].replace(/^【[^】]+】/, '');
+            }
         }
 
         function updateHeaderStatus(force = false){
@@ -1906,6 +2428,112 @@
             modal.style.display = show ? 'flex' : 'none';
         };
 
+        // ========== 居家风水八方详勘与空间布局全鉴弹窗控制器 ==========
+        let currentFsPalaceKey = '坎';
+
+        window.toggleFengshuiModal = function(show, targetPalace) {
+            const modal = document.getElementById('fengshui-modal');
+            if (!modal) return;
+            if (show) {
+                if (targetPalace && FENGSHUI_PALACES_DATA[targetPalace]) {
+                    currentFsPalaceKey = targetPalace;
+                } else {
+                    const effectiveHeading = isHeadingLocked ? lockedHeading : (currentHeading !== null ? currentHeading : 0);
+                    const diag = getSitAndFaceDiagnosis(effectiveHeading);
+                    if (diag && diag.facePalace && FENGSHUI_PALACES_DATA[diag.facePalace]) {
+                        currentFsPalaceKey = diag.facePalace;
+                    }
+                }
+                renderFengshuiTabs();
+                renderFengshuiDetail(currentFsPalaceKey);
+            }
+            modal.style.display = show ? 'flex' : 'none';
+        };
+
+        window.switchFengshuiTab = function(palaceKey) {
+            if (FENGSHUI_PALACES_DATA[palaceKey]) {
+                currentFsPalaceKey = palaceKey;
+                renderFengshuiTabs();
+                renderFengshuiDetail(palaceKey);
+            }
+        };
+
+        function renderFengshuiTabs() {
+            const container = document.getElementById('fs-tabs-container');
+            if (!container) return;
+            const order = ['坎', '艮', '震', '巽', '离', '坤', '兑', '乾'];
+            let html = '';
+            for (let k of order) {
+                const p = FENGSHUI_PALACES_DATA[k];
+                const isActive = (k === currentFsPalaceKey);
+                const shortLabel = `${p.symbol} ${k} · ${p.dir.split(' ')[0]}`;
+                html += `<button class="fs-tab-item ${isActive ? 'active' : ''}" onclick="switchFengshuiTab('${k}')">${shortLabel}</button>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function renderFengshuiDetail(palaceKey) {
+            const container = document.getElementById('fs-modal-content');
+            if (!container) return;
+            const p = FENGSHUI_PALACES_DATA[palaceKey];
+            if (!p) return;
+
+            let warningsHtml = p.warnings.map(w => `<div style="margin-bottom:6px;">• ${w}</div>`).join('');
+            let layoutHtml = p.layoutGuide.map(l => `<div style="margin-bottom:6px;">• ${l}</div>`).join('');
+            let remediesHtml = p.remedies.map(r => `<div style="margin-bottom:6px;">• ${r}</div>`).join('');
+
+            container.innerHTML = `
+                <div class="fs-meta-grid">
+                    <div class="fs-meta-item">
+                        <div class="fs-meta-lbl">方位与五行星宿</div>
+                        <div class="fs-meta-val" style="color:#f1c40f">${p.name} (${p.elem})</div>
+                    </div>
+                    <div class="fs-meta-item">
+                        <div class="fs-meta-lbl">六亲代表与气场</div>
+                        <div class="fs-meta-val" style="color:#50e3c2">${p.role}</div>
+                    </div>
+                    <div class="fs-meta-item">
+                        <div class="fs-meta-lbl">身体脏腑健康应候</div>
+                        <div class="fs-meta-val" style="color:#e0e0e0">${p.body}</div>
+                    </div>
+                    <div class="fs-meta-item">
+                        <div class="fs-meta-lbl">主宰家运与事业</div>
+                        <div class="fs-meta-val" style="color:#ffd166">${p.fortune}</div>
+                    </div>
+                </div>
+
+                <div class="fs-detail-card warn-card">
+                    <div class="fs-card-header">
+                        <span class="fs-card-title warn-title">⚠️ ${p.warnTitle}</span>
+                        <span class="fs-tag-badge" style="background:#3d1717; color:#ff7675; border:1px solid #8e2b2b">核心大忌</span>
+                    </div>
+                    <div style="color:#e8dcdc; font-size:12px; line-height:1.65;">
+                        ${warningsHtml}
+                    </div>
+                </div>
+
+                <div class="fs-detail-card layout-card">
+                    <div class="fs-card-header">
+                        <span class="fs-card-title layout-title">🏡 ${p.layoutTitle}</span>
+                        <span class="fs-tag-badge" style="background:#14352b; color:#50e3c2; border:1px solid #1f6b55">宜居布局</span>
+                    </div>
+                    <div style="color:#dce8e4; font-size:12px; line-height:1.65;">
+                        ${layoutHtml}
+                    </div>
+                </div>
+
+                <div class="fs-detail-card remedy-card">
+                    <div class="fs-card-header">
+                        <span class="fs-card-title remedy-title">🛡️ ${p.remedyTitle}</span>
+                        <span class="fs-tag-badge" style="background:#3d2f14; color:#f1c40f; border:1px solid #7c5d1e">化解锦囊</span>
+                    </div>
+                    <div style="color:#e8e4dc; font-size:12px; line-height:1.65;">
+                        ${remediesHtml}
+                    </div>
+                </div>
+            `;
+        }
+
         window.doResetCalib = function() {
             if (window.AndroidCompass && typeof window.AndroidCompass.resetCalibration === 'function') {
                 window.AndroidCompass.resetCalibration();
@@ -2021,10 +2649,25 @@
                     offCtx.save();
                     offCtx.translate(tx,ty);
                     offCtx.rotate(midRad + Math.PI/2);
-                    offCtx.fillStyle="#fff";
-                    offCtx.font="bold 16px sans-serif";
-                    offCtx.textAlign="center";offCtx.textBaseline="middle";
-                    offCtx.fillText(`${p.name} ${p.symbol}`,0,0);
+                    if (layerConfig.fengshui && p.fengshuiYi) {
+                        offCtx.fillStyle="#ffffff";
+                        offCtx.font="bold 13px sans-serif";
+                        offCtx.textAlign="center"; offCtx.textBaseline="middle";
+                        offCtx.fillText(`${p.name} ${p.symbol}`, 0, -14);
+
+                        offCtx.fillStyle="#50e3c2";
+                        offCtx.font="bold 9.5px sans-serif";
+                        offCtx.fillText(`宜:${p.fengshuiYi}`, 0, 0);
+
+                        offCtx.fillStyle="#ff7675";
+                        offCtx.font="bold 9.5px sans-serif";
+                        offCtx.fillText(`忌:${p.fengshuiJi}`, 0, 13);
+                    } else {
+                        offCtx.fillStyle="#fff";
+                        offCtx.font="bold 16px sans-serif";
+                        offCtx.textAlign="center"; offCtx.textBaseline="middle";
+                        offCtx.fillText(`${p.name} ${p.symbol}`,0,0);
+                    }
                     offCtx.restore();
                 }
                 // 八卦符号内环
@@ -2620,6 +3263,12 @@
             document.getElementById('val-mountain').innerText = `${m.name}山`;
             document.getElementById('val-solar').innerText = m.solar;
             document.getElementById('val-gua').innerText = m.gua;
+
+            // 同步联动该山所属八宫风水宜忌
+            const fsInfo = getFengshuiOrientationInfo(m.post);
+            if (fsInfo) {
+                updateFengshuiHud(fsInfo, null, null, m.name);
+            }
         }
 
         // 获取屏幕坐标对应的24山索引（支持任意缩放和平移状态）

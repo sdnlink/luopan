@@ -38,14 +38,14 @@ jobs:
           mkdir -p build/Payload
           cp -r build/TiandiLuopan.xcarchive/Products/Applications/TiandiLuopan.app build/Payload/
           cd build
-          zip -r YanXiangCompass-v1.2.3.ipa Payload
+          zip -r YanXiangCompass-v1.2.4.ipa Payload
           cd ..
           mkdir -p dist-ios
-          cp build/YanXiangCompass-v1.2.3.ipa dist-ios/
+          cp build/YanXiangCompass-v1.2.4.ipa dist-ios/
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: YanXiangCompass-iOS-IPA
-          path: dist-ios/YanXiangCompass-v1.2.3.ipa
+          path: dist-ios/YanXiangCompass-v1.2.4.ipa
           retention-days: 14

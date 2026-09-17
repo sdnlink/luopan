@@ -379,6 +379,7 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24rpx;
+  flex-shrink: 0;
 }
 
 .modal-title {
@@ -397,6 +398,7 @@
   display: flex;
   gap: 20rpx;
   margin-top: 24rpx;
+  flex-shrink: 0;
 }
 
 .modal-btn {
@@ -498,6 +500,205 @@
   margin: 16rpx 0;
   border-radius: 0 10rpx 10rpx 0;
   line-height: 1.7;
+}
+
+/* ==================== 居家风水：实时方位速查卡片 ==================== */
+.fs-live-card {
+  width: 100%;
+  margin: 12rpx 0;
+  padding: 18rpx 20rpx;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, rgba(28, 30, 42, 0.95), rgba(18, 19, 28, 0.98));
+  border: 1px solid #5a4622;
+  border-radius: 16rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.4), inset 0 0 14rpx rgba(212, 175, 55, 0.05);
+}
+
+.fs-live-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-bottom: 12rpx;
+}
+
+.fs-live-badge {
+  font-size: 23rpx;
+  font-weight: bold;
+  color: #d4af37;
+}
+
+.fs-live-role {
+  flex: 1;
+  font-size: 20rpx;
+  color: #50e3c2;
+}
+
+.fs-live-btn {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #f39c12;
+}
+
+.fs-live-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.fs-live-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+}
+
+.fs-pill {
+  flex-shrink: 0;
+  font-size: 19rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  line-height: 1.5;
+  border: 1px solid;
+}
+
+.fs-pill.warn {
+  background: #3d1717;
+  color: #ff7675;
+  border-color: #8e2b2b;
+}
+
+.fs-pill.layout {
+  background: #14352b;
+  color: #50e3c2;
+  border-color: #1f6b55;
+}
+
+.fs-live-text {
+  flex: 1;
+  font-size: 21rpx;
+  color: #bbbbbb;
+  line-height: 1.5;
+}
+
+/* ==================== 居家风水八方详勘弹窗 ==================== */
+.fs-modal-card {
+  width: 92vw;
+  height: 88vh;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  /* 外层卡片自身不滚动，避免与内部详情 scroll-view 形成嵌套滚动冲突；
+     给定确定高度后，内部 flex:1 的详情区才能正确计算滚动高度 */
+  overflow: hidden;
+}
+
+.fs-tabs-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 16rpx;
+  flex-shrink: 0;
+  /* 独立背景 + 抬升层级，确保不与下方详情内容重叠 */
+  background: #1e1f2b;
+  position: relative;
+  z-index: 2;
+}
+
+.fs-tabs-inner {
+  display: inline-flex;
+  gap: 10rpx;
+  padding: 2rpx 0;
+}
+
+.fs-tab-item {
+  flex-shrink: 0;
+  padding: 10rpx 18rpx;
+  font-size: 22rpx;
+  color: #888899;
+  background: #1c1d28;
+  border: 1px solid #333446;
+  border-radius: 12rpx;
+}
+
+.fs-tab-item.active {
+  background: #d4af37;
+  color: #111111;
+  border-color: #d4af37;
+  font-weight: bold;
+}
+
+.fs-detail-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+/* 概览四宫格：用 flex 换行而非 grid，兼容性更稳妥 */
+.fs-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.fs-meta-item {
+  width: calc(50% - 6rpx);
+  box-sizing: border-box;
+  background: #14151e;
+  border: 1px solid #2d2e40;
+  border-radius: 10rpx;
+  padding: 12rpx;
+}
+
+.fs-meta-lbl {
+  display: block;
+  font-size: 19rpx;
+  color: #888899;
+  margin-bottom: 4rpx;
+}
+
+.fs-meta-val {
+  display: block;
+  font-size: 21rpx;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.fs-detail-card {
+  border-radius: 12rpx;
+  padding: 16rpx;
+  margin-bottom: 14rpx;
+  background: #14151e;
+  border: 1px solid #2d2e40;
+}
+
+.fs-detail-card.warn-card { border-left: 4rpx solid #e74c3c; }
+.fs-detail-card.layout-card { border-left: 4rpx solid #2ecc71; }
+.fs-detail-card.remedy-card { border-left: 4rpx solid #f1c40f; }
+
+.fs-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.fs-card-title {
+  flex: 1;
+  font-size: 23rpx;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.fs-card-title.warn-title { color: #ff7675; }
+.fs-card-title.layout-title { color: #50e3c2; }
+.fs-card-title.remedy-title { color: #f1c40f; }
+
+.fs-list-item {
+  font-size: 21rpx;
+  color: #cccccc;
+  line-height: 1.65;
+  margin-bottom: 8rpx;
 }
 
 .bold { font-weight: bold; color: #ffffff; }

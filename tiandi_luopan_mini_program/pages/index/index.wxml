@@ -72,7 +72,7 @@
         type="2d"
         id="compassCanvas"
         class="compass-canvas"
-        hidden="{{showCalibModal || showLayerModal || showKongwangModal || showFenjinModal}}"
+        hidden="{{showCalibModal || showLayerModal || showKongwangModal || showFenjinModal || showFengshuiModal}}"
         bindtouchstart="onTouchStart"
         bindtouchmove="onTouchMove"
         bindtouchend="onTouchEnd"
@@ -102,6 +102,31 @@
     <view class="info-item info-item-clickable" bindtap="toggleFenjinModal" data-show="true">
       <text class="info-label">一百二十分金<text class="info-hint-icon">?</text></text>
       <text class="info-val" style="color:{{fenjinColor}}">{{fenjinText}}</text>
+    </view>
+
+    <!-- 风水方位详解入口：点击打开居家风水八方全鉴 -->
+    <view class="info-item info-item-clickable" bindtap="toggleFengshuiModal" data-show="true">
+      <text class="info-label">风水方位详解<text class="info-hint-icon">?</text></text>
+      <text class="info-val" style="color:#f39c12">{{fengshuiSummary}}</text>
+    </view>
+
+    <!-- 实时方位风水与居家布置速查看板 -->
+    <view class="fs-live-card" bindtap="toggleFengshuiModal" data-show="true">
+      <view class="fs-live-header">
+        <text class="fs-live-badge">{{fsLivePalace}}</text>
+        <text class="fs-live-role">{{fsLiveRole}}</text>
+        <text class="fs-live-btn">八方详解 ❯</text>
+      </view>
+      <view class="fs-live-body">
+        <view class="fs-live-row">
+          <text class="fs-pill warn">⚠️ 注意问题</text>
+          <text class="fs-live-text">{{fsLiveWarn}}</text>
+        </view>
+        <view class="fs-live-row">
+          <text class="fs-pill layout">🏡 居家布置</text>
+          <text class="fs-live-text">{{fsLiveLayout}}</text>
+        </view>
+      </view>
     </view>
 
     <view class="info-item">
@@ -258,6 +283,10 @@
       <text class="layer-check">{{layerConfig.hex64 ? '☑' : '☐'}}</text>
       <text>䷀ 先天六十四卦圆图全爻</text>
     </view>
+    <view class="layer-item-row" bindtap="onLayerToggle" data-layer="fengshui">
+      <text class="layer-check">{{layerConfig.fengshui ? '☑' : '☐'}}</text>
+      <text>🏡 八宫风水职能与宜忌环 (盘面指示)</text>
+    </view>
 
     <view class="modal-actions">
       <button class="modal-btn" bindtap="toggleLayerModal" data-show="false">完成并应用</button>
@@ -369,6 +398,84 @@
 
     <view class="modal-actions">
       <button class="modal-btn" bindtap="toggleFenjinModal" data-show="false">返回罗盘</button>
+    </view>
+  </view>
+</view>
+
+<!-- ==================== 居家风水八方详勘与空间布局全鉴弹窗 ==================== -->
+<view class="modal-overlay" wx:if="{{showFengshuiModal}}" bindtap="toggleFengshuiModal" data-show="false">
+  <view class="modal-card fs-modal-card" catchtap="preventBubble">
+    <view class="modal-header">
+      <text class="modal-title">🏡 居家风水八方详勘与空间布局全鉴</text>
+      <text class="modal-close" bindtap="toggleFengshuiModal" data-show="false">✕</text>
+    </view>
+
+    <!-- 八方快速切换标签栏 -->
+    <scroll-view class="fs-tabs-scroll" scroll-x enable-flex>
+      <view class="fs-tabs-inner">
+        <view
+          wx:for="{{fsTabs}}"
+          wx:key="key"
+          class="fs-tab-item {{item.active ? 'active' : ''}}"
+          bindtap="switchFengshuiTab"
+          data-key="{{item.key}}"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <scroll-view class="fs-detail-scroll" scroll-y wx:if="{{fsDetail}}">
+      <view class="fs-meta-grid">
+        <view class="fs-meta-item">
+          <text class="fs-meta-lbl">方位与五行星宿</text>
+          <text class="fs-meta-val" style="color:#f1c40f">{{fsDetail.name}} ({{fsDetail.elem}})</text>
+        </view>
+        <view class="fs-meta-item">
+          <text class="fs-meta-lbl">六亲代表与气场</text>
+          <text class="fs-meta-val" style="color:#50e3c2">{{fsDetail.role}}</text>
+        </view>
+        <view class="fs-meta-item">
+          <text class="fs-meta-lbl">身体脏腑健康应候</text>
+          <text class="fs-meta-val" style="color:#e0e0e0">{{fsDetail.body}}</text>
+        </view>
+        <view class="fs-meta-item">
+          <text class="fs-meta-lbl">主宰家运与事业</text>
+          <text class="fs-meta-val" style="color:#ffd166">{{fsDetail.fortune}}</text>
+        </view>
+      </view>
+
+      <view class="fs-detail-card warn-card">
+        <view class="fs-card-header">
+          <text class="fs-card-title warn-title">⚠️ {{fsDetail.warnTitle}}</text>
+          <text class="explain-tag" style="background:#3d1717; color:#ff7675; border:1px solid #8e2b2b">核心大忌</text>
+        </view>
+        <view class="fs-list">
+          <view class="fs-list-item" wx:for="{{fsDetail.warnings}}" wx:key="*this">• {{item}}</view>
+        </view>
+      </view>
+
+      <view class="fs-detail-card layout-card">
+        <view class="fs-card-header">
+          <text class="fs-card-title layout-title">🏡 {{fsDetail.layoutTitle}}</text>
+          <text class="explain-tag" style="background:#14352b; color:#50e3c2; border:1px solid #1f6b55">宜居布局</text>
+        </view>
+        <view class="fs-list">
+          <view class="fs-list-item" wx:for="{{fsDetail.layoutGuide}}" wx:key="*this">• {{item}}</view>
+        </view>
+      </view>
+
+      <view class="fs-detail-card remedy-card">
+        <view class="fs-card-header">
+          <text class="fs-card-title remedy-title">🛡️ {{fsDetail.remedyTitle}}</text>
+          <text class="explain-tag" style="background:#3d2f14; color:#f1c40f; border:1px solid #7c5d1e">化解锦囊</text>
+        </view>
+        <view class="fs-list">
+          <view class="fs-list-item" wx:for="{{fsDetail.remedies}}" wx:key="*this">• {{item}}</view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="modal-actions">
+      <button class="modal-btn" bindtap="toggleFengshuiModal" data-show="false">返回罗盘盘面</button>
     </view>
   </view>
 </view>

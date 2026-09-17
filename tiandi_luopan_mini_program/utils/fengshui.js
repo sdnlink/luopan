@@ -114,6 +114,9 @@ function getSitAndFaceDiagnosis(heading) {
   return {
     faceMt: faceMt.name,
     sitMt: sitMt.name,
+    // 向方 / 坐方所属八宫 key（如 '坎'），供居家风水详解取用
+    facePalace: faceMt.palace,
+    sitPalace: sitMt.palace,
     sitFacePattern,
     statusType,
     statusText,

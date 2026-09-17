@@ -40,27 +40,28 @@ const MOUNTAINS_DATA = [
 ];
 
 // 后天八卦八宫（0°=南，顺时针；每宫45°，各辖3山）
+// key 用于索引居家风水详解库；fengshuiYi/Ji 为盘面宜忌指示环的显示文本
 const PALACES_POST = [
-  { name: '离宫', label: '正南', symbol: '☲', elem: '火', baseDeg: 0 },
-  { name: '坤宫', label: '西南', symbol: '☷', elem: '土', baseDeg: 45 },
-  { name: '兑宫', label: '正西', symbol: '☱', elem: '金', baseDeg: 90 },
-  { name: '乾宫', label: '西北', symbol: '☰', elem: '金', baseDeg: 135 },
-  { name: '坎宫', label: '正北', symbol: '☵', elem: '水', baseDeg: 180 },
-  { name: '艮宫', label: '东北', symbol: '☶', elem: '土', baseDeg: 225 },
-  { name: '震宫', label: '正东', symbol: '☳', elem: '木', baseDeg: 270 },
-  { name: '巽宫', label: '东南', symbol: '☴', elem: '木', baseDeg: 315 }
+  { name: '离宫', label: '正南', symbol: '☲', elem: '火', baseDeg: 0, key: '离', fengshuiRole: '名望·中女', fengshuiYi: '采光明堂', fengshuiJi: '水浸昏暗' },
+  { name: '坤宫', label: '西南', symbol: '☷', elem: '土', baseDeg: 45, key: '坤', fengshuiRole: '田宅·女主', fengshuiYi: '主卧田宅', fengshuiJi: '脏污下水' },
+  { name: '兑宫', label: '正西', symbol: '☱', elem: '金', baseDeg: 90, key: '兑', fengshuiRole: '财源·少女', fengshuiYi: '会客聚气', fengshuiJi: '火克开裂' },
+  { name: '乾宫', label: '西北', symbol: '☰', elem: '金', baseDeg: 135, key: '乾', fengshuiRole: '天门·男主', fengshuiYi: '主房尊位', fengshuiJi: '火烧天门' },
+  { name: '坎宫', label: '正北', symbol: '☵', elem: '水', baseDeg: 180, key: '坎', fengshuiRole: '坎水·中男', fengshuiYi: '书房静卧', fengshuiJi: '污厕缺角' },
+  { name: '艮宫', label: '东北', symbol: '☶', elem: '土', baseDeg: 225, key: '艮', fengshuiRole: '靠山·少男', fengshuiYi: '儿房静稳', fengshuiJi: '鬼门卫浴' },
+  { name: '震宫', label: '正东', symbol: '☳', elem: '木', baseDeg: 270, key: '震', fengshuiRole: '生机·长男', fengshuiYi: '客厅生机', fengshuiJi: '重金冲煞' },
+  { name: '巽宫', label: '东南', symbol: '☴', elem: '木', baseDeg: 315, key: '巽', fengshuiRole: '文昌·名利', fengshuiYi: '文昌书房', fengshuiJi: '落厕阴湿' }
 ];
 
 // 先天八卦八宫（伏羲方位：乾南、坤北、离东、坎西、震东北、巽西南、艮西北、兑东南）
 const PALACES_PRE = [
-  { name: '乾宫', label: '正南', symbol: '☰', elem: '金', baseDeg: 0 },
-  { name: '巽宫', label: '西南', symbol: '☴', elem: '木', baseDeg: 45 },
-  { name: '坎宫', label: '正西', symbol: '☵', elem: '水', baseDeg: 90 },
-  { name: '艮宫', label: '西北', symbol: '☶', elem: '土', baseDeg: 135 },
-  { name: '坤宫', label: '正北', symbol: '☷', elem: '土', baseDeg: 180 },
-  { name: '震宫', label: '东北', symbol: '☳', elem: '木', baseDeg: 225 },
-  { name: '离宫', label: '正东', symbol: '☲', elem: '火', baseDeg: 270 },
-  { name: '兑宫', label: '东南', symbol: '☱', elem: '金', baseDeg: 315 }
+  { name: '乾宫', label: '正南', symbol: '☰', elem: '金', baseDeg: 0, key: '乾', fengshuiRole: '天象·至尊', fengshuiYi: '崇高明朗', fengshuiJi: '晦暗压顶' },
+  { name: '巽宫', label: '西南', symbol: '☴', elem: '木', baseDeg: 45, key: '巽', fengshuiRole: '清风·温和', fengshuiYi: '通透整洁', fengshuiJi: '杂物堆积' },
+  { name: '坎宫', label: '正西', symbol: '☵', elem: '水', baseDeg: 90, key: '坎', fengshuiRole: '润下·深邃', fengshuiYi: '水木清华', fengshuiJi: '污秽滞留' },
+  { name: '艮宫', label: '西北', symbol: '☶', elem: '土', baseDeg: 135, key: '艮', fengshuiRole: '笃实·止息', fengshuiYi: '厚重安宁', fengshuiJi: '动摇破耗' },
+  { name: '坤宫', label: '正北', symbol: '☷', elem: '土', baseDeg: 180, key: '坤', fengshuiRole: '坤厚·藏纳', fengshuiYi: '方正敦厚', fengshuiJi: '虚浮空洞' },
+  { name: '震宫', label: '东北', symbol: '☳', elem: '木', baseDeg: 225, key: '震', fengshuiRole: '雷动·启行', fengshuiYi: '朝气生机', fengshuiJi: '闭塞死寂' },
+  { name: '离宫', label: '正东', symbol: '☲', elem: '火', baseDeg: 270, key: '离', fengshuiRole: '明丽·显耀', fengshuiYi: '光彩夺目', fengshuiJi: '阴湿掩蔽' },
+  { name: '兑宫', label: '东南', symbol: '☱', elem: '金', baseDeg: 315, key: '兑', fengshuiRole: '和悦·通达', fengshuiYi: '欢聚喜庆', fengshuiJi: '尖利冲撞' }
 ];
 
 // 先天六十四卦圆图（乾南0°起，顺时针；每卦5.625°，坤在正北180°）

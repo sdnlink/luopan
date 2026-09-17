@@ -24,6 +24,11 @@ const { calculateTrueSolarTime, calculateFourPillars } = require('../../utils/as
 const {
   JIAZI_60, geoDirName, getSitAndFaceDiagnosis, getFenjinAnalysis
 } = require('../../utils/fengshui');
+const {
+  FENGSHUI_PALACES_DATA,
+  FS_PALACE_ORDER,
+  getFengshuiOrientationInfo
+} = require('../../utils/fengshui-palace');
 
 const DEFAULT_LAYERS = {
   bubbleLevel: true,  // 太极双轴电子水准仪气泡
@@ -32,7 +37,8 @@ const DEFAULT_LAYERS = {
   fenjin: true,       // 一百二十分金
   solarRing: true,    // 二十四节气与消息卦
   timeDial: true,     // 24 小时时间圈与真太阳时针
-  hex64: true         // 先天六十四卦圆图
+  hex64: true,        // 先天六十四卦圆图
+  fengshui: true      // 八宫风水职能与宜忌环（盘面指示）
 };
 
 Page({
@@ -109,6 +115,16 @@ Page({
 
     // 圈层图层
     layerConfig: Object.assign({}, DEFAULT_LAYERS),
+
+    // 居家风水八方详勘
+    showFengshuiModal: false,
+    fsTabs: [],
+    fsDetail: null,
+    fengshuiSummary: '坎水 · 宜书房静卧 · 忌污厕缺角',
+    fsLivePalace: '坎宫 · 正北 (水)',
+    fsLiveRole: '中男 (次子) · 事业官运位',
+    fsLiveWarn: '—',
+    fsLiveLayout: '—',
 
     // 自定义导航栏顶部留白，onLoad 时按实际状态栏高度注入
     statusBarHeight: 20
@@ -280,7 +296,8 @@ Page({
       }
       // 画布在弹窗打开时会被 hidden 临时隐藏，此时导出会得到空白图，跳过本次
       if (this.data.showCalibModal || this.data.showLayerModal
-        || this.data.showKongwangModal || this.data.showFenjinModal) {
+        || this.data.showKongwangModal || this.data.showFenjinModal
+        || this.data.showFengshuiModal) {
         resolve('');
         return;
       }
@@ -926,6 +943,64 @@ Page({
       fenjinText: fj.displayStr,
       fenjinColor: fj.badgeColor
     });
+
+    // 风水方位详解随坐向实时联动，默认宫位跟随当前向方
+    this.currentFsPalaceKey = diag.facePalace;
+    this.updateFengshuiHud(diag.facePalace);
+  },
+
+  /**
+   * 刷新「风水方位详解」入口摘要与实时方位速查卡
+   * @param {string} palaceKey 宫位 key（形如 '坎' 或 '坎宫'）
+   * @param {string} [customMountain] 选中山名，作为速查卡标题前缀
+   */
+  updateFengshuiHud(palaceKey, customMountain) {
+    const p = getFengshuiOrientationInfo(palaceKey);
+    if (!p) return;
+    // 去掉文案开头的【xxx】标记，仅保留要点主体
+    const stripLeading = (s) => String(s || '').replace(/^【[^】]+】/, '');
+    this.setData({
+      fengshuiSummary: `${p.name.split('·')[0].trim()} · 宜${p.discYi} · 忌${p.discJi}`,
+      fsLivePalace: `${customMountain ? `${customMountain}山 · ` : ''}${p.name} (${p.elem.split(' ')[0]})`,
+      fsLiveRole: p.role,
+      fsLiveWarn: stripLeading(p.warnings && p.warnings[0]),
+      fsLiveLayout: stripLeading(p.layoutGuide && p.layoutGuide[0])
+    });
+  },
+
+  /**
+   * 打开 / 关闭居家风水八方详勘弹窗
+   * 未显式指定宫位时，回落到当前向方所属八宫
+   */
+  toggleFengshuiModal(e) {
+    const show = e.currentTarget.dataset.show === 'true' || e.currentTarget.dataset.show === true;
+    if (show) {
+      const key = e.currentTarget.dataset.palace || this.currentFsPalaceKey || '坎';
+      this.renderFengshuiModal(key);
+    }
+    this.setData({ showFengshuiModal: show });
+  },
+
+  /** 切换八方详解的当前宫位 */
+  switchFengshuiTab(e) {
+    const key = e.currentTarget.dataset.key;
+    if (!key || !FENGSHUI_PALACES_DATA[key]) return;
+    this.renderFengshuiModal(key);
+  },
+
+  /** 渲染八方标签栏与当前宫位详情 */
+  renderFengshuiModal(palaceKey) {
+    const detail = getFengshuiOrientationInfo(palaceKey);
+    this.currentFsPalaceKey = detail.key;
+    const tabs = FS_PALACE_ORDER.map((k) => {
+      const item = FENGSHUI_PALACES_DATA[k];
+      return {
+        key: item.key,
+        label: `${item.symbol} ${item.key} · ${item.dir.split(' ')[0]}`,
+        active: item.key === detail.key
+      };
+    });
+    this.setData({ fsTabs: tabs, fsDetail: detail });
   },
 
   updateHeaderStatus() {
@@ -988,6 +1063,12 @@ Page({
       geoDirStr: geoDirName((m.deg + 180) % 360),
       elemColor: ELEM_COLORS[m.elem] || '#ffffff'
     });
+
+    // 同步联动该山所属八宫的风水宜忌（对齐 Android 端 updateFengshuiHud 联动）
+    if (palName) {
+      this.currentFsPalaceKey = palName.replace('宫', '');
+      this.updateFengshuiHud(palName, m.name);
+    }
   },
 
   /**
@@ -1258,6 +1339,11 @@ Page({
     const FS = {
       palaceSym: Math.max(9, Math.round(17 * s * 1.4)),
       palace: Math.max(8, Math.round(12 * s * 1.6)),
+      // 八宫风水宜忌指示：三行沿径向堆叠（宫名/宜/忌）。
+      // 系数取 1.25 而非其他环的 1.6——三行总跨度须控制在环宽 80% 以内，
+      // 否则会溢出到相邻的二十四山环。
+      fsPalaceName: Math.max(5, Math.round(13 * s * 1.25)),
+      fsPalaceSub: Math.max(4, Math.round(9.5 * s * 1.25)),
       mountain: Math.max(11, Math.round(12 * s * 1.6)),
       // 分金采用「竖排」：两字沿半径方向堆叠、字身与 Android 同样的切向基准。
       // 约束因此变为——单字宽度 <= 弧长，两字总高 <= 环宽。
@@ -1436,10 +1522,25 @@ Page({
         c.save();
         c.translate(tx, ty);
         c.rotate(midRad + Math.PI / 2);
-        c.fillStyle = '#ffffff';
-        c.font = `bold ${FS.palace}px sans-serif`;
         c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillText(`${p.name} ${p.symbol}`, 0, 0);
+        if (L.fengshui && p.fengshuiYi) {
+          // 风水宜忌指示模式：三行沿半径方向堆叠，局部 -y 为外侧、+y 为内侧
+          const nameOff = -14 * R.s * 1.25;
+          const jiOff = 13 * R.s * 1.25;
+          c.fillStyle = '#ffffff';
+          c.font = `bold ${FS.fsPalaceName}px sans-serif`;
+          c.fillText(`${p.name} ${p.symbol}`, 0, nameOff);
+          c.fillStyle = '#50e3c2';
+          c.font = `bold ${FS.fsPalaceSub}px sans-serif`;
+          c.fillText(`宜:${p.fengshuiYi}`, 0, 0);
+          c.fillStyle = '#ff7675';
+          c.font = `bold ${FS.fsPalaceSub}px sans-serif`;
+          c.fillText(`忌:${p.fengshuiJi}`, 0, jiOff);
+        } else {
+          c.fillStyle = '#ffffff';
+          c.font = `bold ${FS.palace}px sans-serif`;
+          c.fillText(`${p.name} ${p.symbol}`, 0, 0);
+        }
         c.restore();
       }
       // 八卦符号内环

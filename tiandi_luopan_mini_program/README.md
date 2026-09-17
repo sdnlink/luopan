@@ -20,12 +20,13 @@ tiandi_luopan_mini_program/
 │   ├── solar-terms.js       # 开普勒定气法节气推算（儒略日 + 二分太阳视黄经）
 │   ├── geomagnetic.js       # 纯 JS 离线全球地磁模型（WMM 2020-2025）
 │   ├── astronomy.js         # 真太阳时（Spencer 均时差）与四柱八字干支历
-│   └── fengshui.js          # 坐向双标、空亡诊断、一百二十分金吉凶
+│   ├── fengshui.js          # 坐向双标、空亡诊断、一百二十分金吉凶
+│   └── fengshui-palace.js   # 居家风水八方详勘知识库（8 宫 × 三组详勘）
 ├── components/
 │   └── calib-modal/         # 校准弹窗（用时注入组件，见下文）
 └── pages/
     └── index/
-        ├── index.wxml       # 状态栏、天心十道、Canvas 容器、信息面板与三个详解弹窗
+        ├── index.wxml       # 状态栏、天心十道、Canvas 容器、信息面板与四个详解弹窗
         ├── index.wxss       # 深空黑金质感样式表
         ├── index.js         # Canvas 2D 绘图引擎、双针系统、传感器与交互
         └── index.json       # 页面配置（声明 calib-modal 与占位组件）
@@ -129,6 +130,24 @@ tiandi_luopan_mini_program/
 - 双击：在 1.0x 与 2.2x 之间切换。
 
 缩放状态下自动关闭离屏位图缓存、改为矢量重绘，保证放大后文字与线条依然锐利。
+
+### 15. 居家风水八方详勘与空间布局全鉴
+
+对应 Android v1.2.4 新增的三项能力：
+
+1. **盘面八宫风水宜忌指示**：开启「🏡 八宫风水职能与宜忌环」图层后，
+   八宫环内按「宫名 / 宜 / 忌」三行沿半径方向堆叠显示，青绿为宜、暗红为忌。
+2. **实时方位速查卡片**：信息面板内随朝向与选中之山实时联动，展示该方位的
+   五行星宿、六亲代表、首要注意问题与居家布置要点。
+3. **八方详勘弹窗**：点击入口或速查卡进入，8 个方位标签可自由切换，
+   每方含四宫格概览 + 三组详勘：核心大忌、宜居布局、化解锦囊。
+
+数据位于 `utils/fengshui-palace.js`（8 宫 × 三组详勘，与 Android 版 1:1 对齐）；
+八宫的 `fengshuiYi` / `fengshuiJi` 字段位于 `utils/compass-data.js`。
+`getSitAndFaceDiagnosis` 额外返回 `facePalace` / `sitPalace`，用于确定当前所属的宫位。
+
+> 字号说明：三行堆叠的可用高度受 60 单位环宽限制，故字号系数取 1.25
+> （其他单层环为 1.6），以保证三行总跨度不溢出到相邻的二十四山环。
 
 ---
 

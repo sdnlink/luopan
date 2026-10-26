@@ -341,6 +341,20 @@ iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMess
    - **户型立极看板**：【全屋功能区合规体检看板】标题处配以 `👑 全案体检` 标识；
    - **体验策略**：所有标注 VIP 的功能均支持基础盘面预览，用户点击高级研判或导出时将弹出尊享收银台，兼顾体验与转化。
 
+### 5.7 国际化多语言支持 (i18n) 与系统语言自适应
+
+为了服务全球华人及海外易学研习者，系统内置了专业的国际化与多语言切换引擎：
+
+1. **多语言体系支持**：
+   - **🇨🇳 简体中文 (`zh-Hans`)**：大陆标准规范简体中文；
+   - **🇭🇰 繁體中文 (`zh-Hant`)**：港澳台及海外华人专业正體易學用語（如「坐山立向」、「玄空九宮飛星」、「八路黃泉水法」、「一百二十分金」）；
+   - **🇬🇧 English (`en`)**：面向国际用户与海外爱好者的专业术语英译（如 "Later Bagua", "Pure True Axis", "120 FenJin Division", "Yellow Springs Law", "Flying Stars"）。
+
+2. **多模态跟随系统与即时响应**：
+   - **原生广播联动**：Android 端监听 `onConfigurationChanged` 与 `Locale.getDefault()`，iOS 端结合 `Locale.preferredLanguages`，在用户变更系统语言时通过 `onSystemLanguageUpdate` 原生管道即时更新 Web 界面；
+   - **Web 标准监听**：自动监听浏览器 `languagechange` 事件与 `navigator.languages` 探测序列；
+   - **双轨控制**：用户既可选择默认的 **「📱 跟随系统」**，亦可通过顶部栏 `🌐 语言` 按钮或设置弹窗随时手动锁定特定语言，偏好自动持久化至本地存储。
+
 ---
 
 ## 6. 演象 2.0 全息罗盘升级架构与产品设计文档 (PRD)

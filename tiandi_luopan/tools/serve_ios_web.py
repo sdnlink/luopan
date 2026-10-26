@@ -19,9 +19,14 @@ def start_server(port=8080):
     web_dir = os.path.abspath("ios/TiandiLuopan/www")
     os.chdir(web_dir)
     
-    Handler = http.server.SimpleHTTPRequestHandler
-    
-    with socketserver.TCPServer(("", port), Handler) as httpd:
+    class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+        def end_headers(self):
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+            super().end_headers()
+
+    with socketserver.TCPServer(("", port), NoCacheHandler) as httpd:
         local_ip = get_local_ip()
         print("=" * 60)
         print("  演象·时空罗盘 (iOS PWA / Web 局域网真机调试服务器)")

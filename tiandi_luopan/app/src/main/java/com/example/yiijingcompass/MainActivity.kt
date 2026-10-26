@@ -189,6 +189,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($currentLatitude, $currentLongitude, $currentAltitude, $hasAltitude, '$escapedCoords');}", null)
                 webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
                 webView.evaluateJavascript("if(window.onNativeTiltUpdate){window.onNativeTiltUpdate($pitchStr, $rollStr);}", null)
+                val sysLang = java.util.Locale.getDefault().toLanguageTag()
+                webView.evaluateJavascript("if(window.onSystemLanguageUpdate){window.onSystemLanguageUpdate('$sysLang');}", null)
             }
         }
 
@@ -341,6 +343,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 val txId = "TX_AND_" + System.currentTimeMillis()
                 webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('$channel', true, '$txId');}", null)
             }
+        }
+
+        @JavascriptInterface
+        fun getSystemLanguage(): String {
+            return java.util.Locale.getDefault().toLanguageTag()
         }
 
         @JavascriptInterface
@@ -1186,6 +1193,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             webView.goBack()
         } else {
             super.onBackPressed()
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val sysLang = java.util.Locale.getDefault().toLanguageTag()
+        webView.post {
+            webView.evaluateJavascript("if(window.onSystemLanguageUpdate){window.onSystemLanguageUpdate('$sysLang');}", null)
         }
     }
 

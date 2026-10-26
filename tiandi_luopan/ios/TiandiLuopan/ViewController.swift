@@ -161,6 +161,7 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
         let roll = String(format: "%.1f", motionManager.currentRoll)
         let iapStatus = iapManager.getStatusJSON()
         let iapProducts = iapManager.getProductsJSON()
+        let lang = Locale.preferredLanguages.first ?? Locale.current.identifier
         
         let js = """
         if(window.onNativeCompassAvailable){ window.onNativeCompassAvailable(true); }
@@ -170,6 +171,7 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
         if(window.onNativeDeclinationUpdate){ window.onNativeDeclinationUpdate(\(decl), \(hasDecl), ''); }
         if(window.onNativeIAPStatusUpdate){ window.onNativeIAPStatusUpdate(\(iapStatus)); }
         if(window.onNativeIAPProducts){ window.onNativeIAPProducts(\(iapProducts)); }
+        if(window.onSystemLanguageUpdate){ window.onSystemLanguageUpdate('\(lang)'); }
         """
         webView.evaluateJavaScript(js, completionHandler: nil)
     }

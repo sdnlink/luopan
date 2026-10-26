@@ -3,6 +3,7 @@ import CoreLocation
 import CoreMotion
 import Combine
 import UIKit
+import QuartzCore
 
 public protocol CompassMotionManagerDelegate: AnyObject {
     func didUpdateHeading(magneticHeading: Double, trueHeading: Double, accuracy: Double)

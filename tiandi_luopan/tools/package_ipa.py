@@ -25,7 +25,7 @@ def create_macho_arm64_stub():
     return header
 
 def package_ipa():
-    root_dir = os.path.abspath(".")
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     build_dir = os.path.join(root_dir, "build-ipa")
     payload_dir = os.path.join(build_dir, "Payload")
     app_dir = os.path.join(payload_dir, "TiandiLuopan.app")

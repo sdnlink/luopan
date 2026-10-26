@@ -130,7 +130,7 @@ public struct CompassDialView: View {
     
     // MARK: - 360 度圆周刻度
     private func degreeTicksLayer(radius: CGFloat) -> some View {
-        ForEach(0..<120) { i in
+        ForEach(0..<120, id: \.self) { i in
             let deg = Double(i) * 3.0
             let isMajor = (i % 10 == 0) // 30°
             let isMid = (i % 5 == 0)   // 15°

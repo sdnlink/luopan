@@ -66,7 +66,7 @@ public struct SettingsView: View {
                                     Spacer()
                                     Text("恢复已有购买 (Restore Purchases)")
                                         .font(.system(size: 11))
-                                        .foregroundColor(Color.cyan)
+                                        .foregroundColor(Color.yanCyan)
                                     Spacer()
                                 }
                             }

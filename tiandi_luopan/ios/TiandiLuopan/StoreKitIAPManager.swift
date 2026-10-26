@@ -48,10 +48,13 @@ public protocol StoreKitIAPManagerDelegate: AnyObject {
 
 // MARK: - StoreKit 管理器
 
-public class StoreKitIAPManager: NSObject, SKProductsRequestDelegate, SKPaymentTransactionObserver {
+public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDelegate, SKPaymentTransactionObserver {
     
     public static let shared = StoreKitIAPManager()
     public weak var delegate: StoreKitIAPManagerDelegate?
+    
+    @Published public var isVIPUser: Bool = false
+    @Published public var isLifetimeUser: Bool = false
     
     private var productsRequest: SKProductsRequest?
     private var availableProducts: [String: SKProduct] = [:]
@@ -65,12 +68,18 @@ public class StoreKitIAPManager: NSObject, SKProductsRequestDelegate, SKPaymentT
     
     private override init() {
         super.init()
+        self.isVIPUser = isVIP()
+        self.isLifetimeUser = isLifetime()
         SKPaymentQueue.default().add(self)
         fetchProducts()
     }
     
     deinit {
         SKPaymentQueue.default().remove(self)
+    }
+    
+    public func purchase(productId: String) {
+        purchaseProduct(id: productId)
     }
     
     // MARK: - 商品信息请求
@@ -218,6 +227,11 @@ public class StoreKitIAPManager: NSObject, SKProductsRequestDelegate, SKPaymentT
             defaults.set(current + 1, forKey: kTianjiCredits)
         }
         defaults.synchronize()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isVIPUser = self.isVIP()
+            self.isLifetimeUser = self.isLifetime()
+        }
     }
     
     public func isVIP() -> Bool {

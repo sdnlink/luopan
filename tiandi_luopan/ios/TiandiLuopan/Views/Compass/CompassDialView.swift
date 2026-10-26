@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 原生高性能矢量罗盘盘面视图 (Pure SwiftUI Compass Dial)
+// MARK: - 原生高性能矢量罗盘盘面视图 (Pure SwiftUI Compass Dial - 120Hz ProMotion)
 
 public struct CompassDialView: View {
     @ObservedObject var motion = CompassMotionManager.shared
@@ -23,7 +23,7 @@ public struct CompassDialView: View {
             let radius = size * 0.47
             
             ZStack {
-                // 1. 随向旋转主盘 (支持陀螺仪自动随向 + 单指触控手动拨盘)
+                // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)
                 ZStack {
                     // 底盘渐变与同心金环
                     dialBackground(radius: radius)
@@ -43,16 +43,19 @@ public struct CompassDialView: View {
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
-                .rotationEffect(.degrees(-motion.heading - motion.manualOffset - currentDragDelta))
-                .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.86), value: motion.heading)
+                .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
+                .animation(.interactiveSpring(response: 0.12, dampingFraction: 0.88), value: motion.continuousHeading)
                 
                 // 2. 固定不动的十字天心线 (Crosshair)
                 crosshairLayer(size: size)
                 
-                // 3. 天池中央水平仪双轴气泡 (Level Bubble)
+                // 3. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
+                magneticNeedleLayer(radius: radius * 0.26)
+                
+                // 4. 天池中央水平仪双轴气泡 (Level Bubble)
                 levelBubbleLayer(center: center, maxRadius: radius * 0.22)
                 
-                // 4. 正北红线与正南指示针
+                // 5. 正北红三角顶针与正南对准刻度
                 northSouthIndexLayer(radius: radius)
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -95,20 +98,20 @@ public struct CompassDialView: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(red: 0.14, green: 0.13, blue: 0.11), Color(red: 0.08, green: 0.08, blue: 0.09), Color(red: 0.04, green: 0.04, blue: 0.05)],
+                        colors: [Color(red: 0.15, green: 0.14, blue: 0.12), Color(red: 0.08, green: 0.08, blue: 0.09), Color(red: 0.03, green: 0.03, blue: 0.04)],
                         center: .center,
                         startRadius: 0,
                         endRadius: radius
                     )
                 )
                 .frame(width: radius * 2, height: radius * 2)
-                .shadow(color: Color.black.opacity(0.8), radius: 15, x: 0, y: 8)
+                .shadow(color: Color.black.opacity(0.85), radius: 18, x: 0, y: 10)
             
             // 外圈金边
             Circle()
                 .stroke(
                     LinearGradient(
-                        colors: [Color(red: 0.9, green: 0.75, blue: 0.35), Color(red: 0.6, green: 0.45, blue: 0.15), Color(red: 0.95, green: 0.85, blue: 0.45)],
+                        colors: [Color(red: 0.95, green: 0.8, blue: 0.4), Color(red: 0.6, green: 0.45, blue: 0.15), Color(red: 0.95, green: 0.85, blue: 0.45)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -119,7 +122,7 @@ public struct CompassDialView: View {
             // 同心分隔金线
             ForEach([0.86, 0.68, 0.46, 0.28], id: \.self) { rRatio in
                 Circle()
-                    .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.4), lineWidth: 1)
+                    .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.35), lineWidth: 1)
                     .frame(width: radius * CGFloat(rRatio) * 2, height: radius * CGFloat(rRatio) * 2)
             }
         }
@@ -190,7 +193,7 @@ public struct CompassDialView: View {
     private func tianChiLayer(radius: CGFloat) -> some View {
         ZStack {
             Circle()
-                .fill(Color(red: 0.05, green: 0.05, blue: 0.06))
+                .fill(Color(red: 0.04, green: 0.04, blue: 0.05))
                 .frame(width: radius * 2, height: radius * 2)
             
             // 天池外金环
@@ -198,10 +201,10 @@ public struct CompassDialView: View {
                 .stroke(Color(red: 0.9, green: 0.75, blue: 0.35), lineWidth: 2)
                 .frame(width: radius * 2, height: radius * 2)
             
-            // 海底红线 (子午红线)
+            // 海底红线 (子午基准线)
             Rectangle()
                 .fill(Color.red.opacity(0.85))
-                .frame(width: 1.5, height: radius * 1.8)
+                .frame(width: 1.5, height: radius * 1.85)
             
             // 南北红点
             Circle()
@@ -213,6 +216,56 @@ public struct CompassDialView: View {
                 .frame(width: 5, height: 5)
                 .offset(y: radius * 0.75)
         }
+    }
+    
+    // MARK: - 传统红蓝双色红宝石磁针 (Magnetic Needle)
+    private func magneticNeedleLayer(radius: CGFloat) -> some View {
+        ZStack {
+            // 南针 (赤红朱雀尖端)
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: -3.5, y: -radius * 0.8))
+                path.addLine(to: CGPoint(x: 0, y: -radius * 0.92))
+                path.addLine(to: CGPoint(x: 3.5, y: -radius * 0.8))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [Color(red: 0.95, green: 0.25, blue: 0.25), Color(red: 0.7, green: 0.1, blue: 0.1)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            
+            // 北针 (青蓝玄武尖端)
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: -3.5, y: radius * 0.8))
+                path.addLine(to: CGPoint(x: 0, y: radius * 0.92))
+                path.addLine(to: CGPoint(x: 3.5, y: radius * 0.8))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.1, green: 0.25, blue: 0.6)],
+                    startPoint: .bottom,
+                    endPoint: .top
+                )
+            )
+            
+            // 针轴黄铜顶心
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(red: 0.95, green: 0.85, blue: 0.5), Color(red: 0.6, green: 0.45, blue: 0.2)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 5
+                    )
+                )
+                .frame(width: 10, height: 10)
+        }
+        .allowsHitTesting(false)
     }
     
     // MARK: - 固定十字天心红线 (Crosshair)
@@ -248,12 +301,12 @@ public struct CompassDialView: View {
         return ZStack {
             // 水平基准绿圈
             Circle()
-                .stroke(motion.isLevel ? Color.green.opacity(0.8) : Color.white.opacity(0.3), lineWidth: 1.5)
+                .stroke(motion.isLevel ? Color.green.opacity(0.85) : Color.white.opacity(0.35), lineWidth: 1.5)
                 .frame(width: 22, height: 22)
             
             // 游动水平气泡
             Circle()
-                .fill(motion.isLevel ? Color.green.opacity(0.85) : Color.yellow.opacity(0.8))
+                .fill(motion.isLevel ? Color.green.opacity(0.9) : Color.yellow.opacity(0.85))
                 .frame(width: 10, height: 10)
                 .offset(x: clampedX, y: clampedY)
                 .animation(.interactiveSpring(response: 0.1, dampingFraction: 0.7), value: motion.pitch)

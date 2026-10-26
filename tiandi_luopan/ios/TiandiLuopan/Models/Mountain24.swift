@@ -81,8 +81,35 @@ public struct CompassHeadingState {
     public var fenJinDesc: String = ""        // 分金描述 (如: 丁巳丁亥分金)
     
     public var pitch: Double = 0.0            // 俯仰角
-    public var roll: Double = 0.0             // 横滚角
     public var isLevel: Bool = true           // 是否水平 (< 2°)
+    
+    public init(
+        heading: Double = 0.0,
+        trueHeading: Double = 0.0,
+        sittingAngle: Double = 180.0,
+        facingAngle: Double = 0.0,
+        facingMountain: Mountain24Item,
+        sittingMountain: Mountain24Item,
+        isJianXiang: Bool = false,
+        jianXiangDegree: Double = 0.0,
+        fenJinDesc: String = "",
+        pitch: Double = 0.0,
+        roll: Double = 0.0,
+        isLevel: Bool = true
+    ) {
+        self.heading = heading
+        self.trueHeading = trueHeading
+        self.sittingAngle = sittingAngle
+        self.facingAngle = facingAngle
+        self.facingMountain = facingMountain
+        self.sittingMountain = sittingMountain
+        self.isJianXiang = isJianXiang
+        self.jianXiangDegree = jianXiangDegree
+        self.fenJinDesc = fenJinDesc
+        self.pitch = pitch
+        self.roll = roll
+        self.isLevel = isLevel
+    }
 }
 
 public final class Mountain24Data {

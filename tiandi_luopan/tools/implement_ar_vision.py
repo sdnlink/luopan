@@ -318,10 +318,10 @@ def implement():
         }
     '''
 
-    # Inject ar_css into <style> before </head>
+    # Inject ar_css inside <head> with <style> tags
     head_end_pos = content.find("</head>")
     if head_end_pos != -1:
-        content = content[:head_end_pos] + ar_css + "\n" + content[head_end_pos:]
+        content = content[:head_end_pos] + "\n    <style>\n" + ar_css + "\n    </style>\n" + content[head_end_pos:]
 
     # 2. Updated HTML inside id="view-ar"
     old_ar_html_regex = r'<div class="app-view" id="view-ar">.*?</div>\s*<!-- ===== Tab 3:'

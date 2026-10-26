@@ -14,7 +14,12 @@ public struct CameraPreviewView: UIViewRepresentable {
         }
         
         public func setupSession() {
-            guard captureSession == nil else { return }
+            guard captureSession == nil else {
+                if let session = captureSession, !session.isRunning {
+                    DispatchQueue.global(qos: .userInitiated).async { session.startRunning() }
+                }
+                return
+            }
             
             let session = AVCaptureSession()
             session.sessionPreset = .high
@@ -42,7 +47,9 @@ public struct CameraPreviewView: UIViewRepresentable {
         
         public func stopSession() {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.captureSession?.stopRunning()
+                if let s = self?.captureSession, s.isRunning {
+                    s.stopRunning()
+                }
             }
         }
     }
@@ -55,6 +62,11 @@ public struct CameraPreviewView: UIViewRepresentable {
     }
     
     public func updateUIView(_ uiView: CameraUIView, context: Context) {}
+    
+    // 视图离开时彻底释放相机资源 (解决后台常驻耗电与绿点占用问题)
+    public static func dismantleUIView(_ uiView: CameraUIView, coordinator: ()) {
+        uiView.stopSession()
+    }
 }
 
 // MARK: - AR 实景天心透视与形煞智能标注视图 (AR Vision View)
@@ -68,6 +80,7 @@ public struct ARVisionView: View {
     @State private var targetOffset: CGSize = .zero
     @State private var showRemedySheet: Bool = false
     @State private var hasCameraPermission: Bool = false
+    @State private var showSnapshotToast: Bool = false
     
     private let shaList = ExteriorShaEngine.shared.database
     
@@ -110,6 +123,23 @@ public struct ARVisionView: View {
             VStack {
                 topStatusBar()
                 Spacer()
+                
+                // 截图存证保存提示
+                if showSnapshotToast {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("勘察报告水印快照已成功保存至相册")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
                 // 6. 底部形煞智能研判卡与切换条
                 bottomShaControlPanel()
             }

@@ -4,10 +4,14 @@ import SwiftUI
 
 public struct SettingsView: View {
     @ObservedObject var motion = CompassMotionManager.shared
-    @State private var isProUnlocked: Bool = false
+    @ObservedObject var iap = StoreKitIAPManager.shared
     @State private var showCalibrationGuide: Bool = false
     
     public init() {}
+    
+    private var isProUnlocked: Bool {
+        return iap.isLifetimeUser || iap.isVIPUser
+    }
     
     public var body: some View {
         NavigationView {
@@ -37,9 +41,9 @@ public struct SettingsView: View {
                         
                         if !isProUnlocked {
                             Button(action: {
-                                StoreKitIAPManager.shared.purchase(productId: "com.tiandiluopan.pro_lifetime")
+                                iap.purchase(productId: IAPProductID.proLifetime.rawValue)
                             }) {
-                                Text("立即激活专业版 (¥68 永久)")
+                                Text("立即激活大师终身版 (一次买断)")
                                     .font(.system(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 10)
@@ -54,6 +58,19 @@ public struct SettingsView: View {
                                     .cornerRadius(8)
                             }
                             .padding(.top, 4)
+                            
+                            Button(action: {
+                                iap.restorePurchases()
+                            }) {
+                                HStack {
+                                    Spacer()
+                                    Text("恢复已有购买 (Restore Purchases)")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Color.cyan)
+                                    Spacer()
+                                }
+                            }
+                            .padding(.top, 2)
                         }
                     }
                     .padding(.vertical, 4)
@@ -100,9 +117,9 @@ public struct SettingsView: View {
                     }
                     
                     HStack {
-                        Text("视太阳时偏差")
+                        Text("视太阳时状态")
                         Spacer()
-                        Text("高精度经度视太阳时自动同步")
+                        Text("经度视太阳时毫秒级自动同步")
                             .foregroundColor(.secondary)
                             .font(.system(size: 12))
                     }
@@ -120,7 +137,7 @@ public struct SettingsView: View {
                     HStack {
                         Text("版本号")
                         Spacer()
-                        Text("v1.3.0 (Pure Swift Edition)")
+                        Text("v1.3.0 (Pure Swift Pro Edition)")
                             .foregroundColor(.secondary)
                             .font(.system(size: 12))
                     }

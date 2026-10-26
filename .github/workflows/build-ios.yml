@@ -8,9 +8,13 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-macos:
+    name: Build via Xcode (macOS)
     runs-on: macos-14
-
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: tiandi_luopan
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,9 +47,35 @@ jobs:
           mkdir -p dist-ios
           cp build/YanXiangCompass-v1.3.0.ipa dist-ios/
 
-      - name: Upload IPA Artifact
+      - name: Upload Xcode IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YanXiangCompass-iOS-IPA
-          path: dist-ios/YanXiangCompass-v1.3.0.ipa
+          name: YanXiangCompass-Xcode-IPA
+          path: tiandi_luopan/dist-ios/YanXiangCompass-v1.3.0.ipa
+          retention-days: 14
+
+  build-universal:
+    name: Build Universal IPA (Ubuntu Fast Runner)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tiandi_luopan
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Package Universal IPA
+        run: |
+          python tools/package_ipa.py
+
+      - name: Upload Universal IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YanXiangCompass-Universal-IPA
+          path: tiandi_luopan/dist-ios/YanXiangCompass-v1.3.0.ipa
           retention-days: 14

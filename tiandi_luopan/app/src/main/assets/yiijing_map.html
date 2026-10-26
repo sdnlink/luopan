@@ -642,6 +642,651 @@
             color: #fff;
             font-weight: bold;
         }
+    
+        /* ===== YanXiang 2.0 全局重构样式 ===== */
+        :root {
+            --gold-primary: #d4af37;
+            --gold-light: #f3e5ab;
+            --gold-dark: #aa820a;
+            --bg-dark: #121216;
+            --bg-card: #1c1d28;
+            --border-card: #2e3040;
+            --text-main: #f0f0f5;
+            --text-sub: #9ea0b4;
+            --green-pure: #2ecc71;
+            --yellow-warn: #f39c12;
+            --red-danger: #e74c3c;
+            --blue-water: #3498db;
+        }
+
+        /* 底部导航栏 */
+        .bottom-nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background: rgba(18, 18, 22, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(212, 175, 55, 0.25);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1000;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            height: 100%;
+            cursor: pointer;
+            color: var(--text-sub);
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            user-select: none;
+        }
+        .nav-item.active {
+            color: var(--gold-primary);
+        }
+        .nav-icon {
+            font-size: 19px;
+            margin-bottom: 2px;
+            transition: transform 0.2s;
+        }
+        .nav-item.active .nav-icon {
+            transform: scale(1.15);
+            filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.6));
+        }
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        /* 页面视口切换容器 */
+        .app-view {
+            display: none;
+            width: 100%;
+            max-width: 540px;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 70px;
+            animation: fadeInView 0.25s ease-out;
+        }
+        .app-view.active {
+            display: flex;
+        }
+        @keyframes fadeInView {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 顶部 HUD 态势条与白话/专业模式切换 */
+        .hud-status-bar {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 10px;
+            background: rgba(28, 29, 40, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 6px;
+            font-size: 11px;
+            color: var(--text-sub);
+        }
+        .mode-toggle-btn {
+            background: linear-gradient(135deg, #2b2c3d, #1f202c);
+            border: 1px solid var(--gold-primary);
+            color: var(--gold-light);
+            font-size: 11px;
+            font-weight: bold;
+            padding: 2px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-toggle-btn.pro {
+            background: linear-gradient(135deg, var(--gold-primary), var(--gold-dark));
+            color: #111;
+        }
+
+        /* 吸顶立向核心 HUD 看板 */
+        .hud-heading-card {
+            width: 100%;
+            max-width: 520px;
+            background: linear-gradient(180deg, rgba(28, 29, 40, 0.95), rgba(20, 21, 30, 0.95));
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .hud-head-row1 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hud-sitface-title {
+            font-size: 17px;
+            font-weight: bold;
+            color: var(--gold-light);
+            letter-spacing: 0.5px;
+        }
+        .hud-badge-kw {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 3px 9px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .hud-badge-kw.pure { background: #133823; color: var(--green-pure); border: 1px solid rgba(46,204,113,0.4); }
+        .hud-badge-kw.jian { background: #3c2a10; color: var(--yellow-warn); border: 1px solid rgba(243,156,18,0.4); }
+        .hud-badge-kw.danger { background: #401414; color: var(--red-danger); border: 1px solid rgba(231,76,60,0.5); animation: pulse 1.2s infinite; }
+
+        .hud-head-row2 {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #ccc;
+        }
+        .hud-jiuyun-tag {
+            color: #50e3c2;
+            font-weight: 600;
+        }
+        .hud-fenjin-tag {
+            color: #ffd166;
+            font-size: 11px;
+        }
+
+        /* ===== Tab 2: AR 透视实景相关样式 ===== */
+        .ar-viewport-box {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 140px);
+            min-height: 480px;
+            max-height: 680px;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #ar-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        /* AR 十字天心发光瞄准星 */
+        .ar-crosshair-v {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1.5px;
+            background: linear-gradient(180deg, rgba(231,76,60,0.9), rgba(212,175,55,0.9) 50%, rgba(52,152,219,0.9));
+            pointer-events: none;
+            box-shadow: 0 0 8px rgba(212,175,55,0.7);
+        }
+        .ar-crosshair-h {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1.5px;
+            background: linear-gradient(90deg, transparent, rgba(212,175,55,0.8) 20%, rgba(212,175,55,0.8) 80%, transparent);
+            pointer-events: none;
+            box-shadow: 0 0 8px rgba(212,175,55,0.7);
+        }
+        .ar-pointer-xiang {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(231, 76, 60, 0.9);
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.6);
+            border: 1px solid #fff;
+            pointer-events: none;
+        }
+        .ar-pointer-zuo {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(41, 128, 185, 0.9);
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 3px 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.6);
+            border: 1px solid #fff;
+            pointer-events: none;
+        }
+        /* AR 中心微型水准珠 */
+        .ar-level-bubble {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(46, 204, 113, 0.85);
+            box-shadow: 0 0 10px #2ecc71;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: transform 0.08s ease-out;
+        }
+        .ar-level-bubble.warn {
+            background: rgba(231, 76, 60, 0.85);
+            box-shadow: 0 0 10px #e74c3c;
+        }
+        .ar-hud-overlay {
+            position: absolute;
+            top: 50px;
+            left: 12px;
+            right: 12px;
+            background: rgba(18, 18, 24, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 10px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #eee;
+            pointer-events: none;
+        }
+        .ar-action-bar {
+            position: absolute;
+            bottom: 60px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .ar-btn {
+            background: rgba(28, 29, 40, 0.88);
+            border: 1px solid var(--gold-primary);
+            color: var(--gold-light);
+            font-size: 12px;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: all 0.2s;
+        }
+        .ar-btn:active {
+            transform: scale(0.96);
+            background: var(--gold-primary);
+            color: #121216;
+        }
+
+        /* ===== Tab 3: 户型空间立极样式 ===== */
+        .fp-canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 500px;
+            background: #181922;
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+            touch-action: none;
+        }
+        #fp-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .fp-toolbar {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .fp-tool-btn {
+            flex: 1 1 auto;
+            background: #1c1d28;
+            border: 1px solid #3d4054;
+            color: #ddd;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .fp-tool-btn.active {
+            background: var(--gold-primary);
+            color: #111;
+            font-weight: bold;
+            border-color: var(--gold-primary);
+        }
+        .fp-audit-card {
+            width: 100%;
+            max-width: 500px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+        .fp-audit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .fp-audit-item:last-child { border-bottom: none; }
+        .fp-pill-badge {
+            flex-shrink: 0;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        /* ===== Tab 4: 玄空飞星与八宅理气样式 ===== */
+        .xk-card {
+            width: 100%;
+            max-width: 500px;
+            background: var(--bg-card);
+            border: 1px solid rgba(212,175,55,0.3);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.4);
+        }
+        .xk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .xk-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: var(--gold-primary);
+        }
+        .xk-grid-9 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 380px;
+            margin: 0 auto;
+        }
+        .xk-cell {
+            background: #141520;
+            border: 1px solid #2e3046;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .xk-cell:hover, .xk-cell:active {
+            border-color: var(--gold-primary);
+            background: #1a1c2c;
+            transform: scale(0.98);
+        }
+        .xk-cell-stars {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .xk-star-shan { color: #50e3c2; } /* 坐山星 */
+        .xk-star-xiang { color: #f1c40f; } /* 向首星 */
+        .xk-cell-center {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: #d4af37;
+            margin: 2px 0;
+        }
+        .xk-cell-foot {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #7b7e96;
+        }
+
+        .bazhai-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .bz-item {
+            background: #141520;
+            border-left: 3px solid #666;
+            padding: 8px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .bz-item.ji { border-left-color: #2ecc71; }
+        .bz-item.xiong { border-left-color: #e74c3c; }
+        .bz-star-name { font-weight: bold; margin-bottom: 2px; }
+        .bz-desc { font-size: 11px; color: #888; }
+    
+    
+        /* ===== YanXiang 2.0 PRD 11-13章 深度理气扩展样式 ===== */
+        .xk-star-year {
+            color: #ff6b6b;
+            font-size: 11px;
+            font-weight: bold;
+            background: rgba(231, 76, 60, 0.18);
+            padding: 1px 4px;
+            border-radius: 4px;
+            border: 1px solid rgba(231, 76, 60, 0.3);
+        }
+        .alarm-25 {
+            border: 2px solid #e74c3c !important;
+            animation: pulse-danger 1.8s infinite;
+        }
+        @keyframes pulse-danger {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.6); }
+            70% { box-shadow: 0 0 0 8px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        /* 奇门遁甲网格样式 */
+        .qimen-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            width: 100%;
+            max-width: 420px;
+            margin: 10px auto;
+        }
+        .qimen-cell {
+            background: #141520;
+            border: 1px solid #2e3046;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 82px;
+            transition: all 0.2s;
+        }
+        .qimen-cell.men-ji {
+            border-color: rgba(46, 204, 113, 0.55);
+            background: rgba(46, 204, 113, 0.06);
+        }
+        .qimen-cell.men-xiong {
+            border-color: rgba(231, 76, 60, 0.45);
+            background: rgba(231, 76, 60, 0.05);
+        }
+        .qimen-cell-head {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+        }
+        .qimen-god { color: #f1c40f; font-weight: bold; }
+        .qimen-star { color: #50e3c2; }
+        .qimen-door {
+            text-align: center;
+            font-weight: bold;
+            font-size: 15px;
+            margin: 4px 0;
+        }
+        .qimen-door.ji { color: #2ecc71; text-shadow: 0 0 8px rgba(46,204,113,0.4); }
+        .qimen-door.xiong { color: #e74c3c; }
+        .qimen-cell-foot {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #8a8d9e;
+        }
+        .qimen-stems { color: #ffd166; font-weight: bold; }
+
+        /* 黄泉与消砂样式卡片 */
+        .hq-item {
+            background: #141520;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            border-left: 3px solid #666;
+        }
+        .hq-item.safe { border-left-color: #2ecc71; }
+        .hq-item.warn { border-left-color: #f39c12; }
+        .hq-item.danger { border-left-color: #e74c3c; }
+        .hq-tag-ji {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            margin-right: 6px;
+        }
+        .hq-tag-xiong {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            margin-right: 6px;
+        }
+    
+    
+        /* ===== PRD 第14章：“福宅天机书”宣纸风出图引擎样式 ===== */
+        .tianji-banner-card {
+            background: linear-gradient(135deg, #2b1f13 0%, #1c1d28 100%);
+            border: 1px solid var(--gold-primary);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+            text-align: center;
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.15);
+        }
+        .btn-tianji-gen {
+            background: linear-gradient(135deg, #d4af37 0%, #aa820a 100%);
+            color: #111;
+            font-size: 13px;
+            font-weight: bold;
+            padding: 10px 22px;
+            border-radius: 25px;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn-tianji-gen:active {
+            transform: scale(0.96);
+        }
+
+        /* 宣纸天机书全屏预览弹窗 */
+        .tianji-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.88);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 3000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px;
+            box-sizing: border-box;
+        }
+        .tianji-scroll-container {
+            width: 100%;
+            max-width: 520px;
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 10px;
+            box-shadow: 0 10px 35px rgba(0,0,0,0.8);
+            margin-bottom: 12px;
+            background: #222;
+        }
+        #tianji-preview-img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .tianji-action-bar {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+        }
+        .tianji-btn {
+            flex: 1;
+            padding: 10px 0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            border: none;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+        }
+        .tianji-btn.save { background: var(--gold-primary); color: #111; }
+        .tianji-btn.close { background: #333645; color: #ddd; }
+    
     </style>
 </head>
 <body>
@@ -661,6 +1306,7 @@
             <button class="tab-btn" id="tab-rot-mode" onclick="toggleCompassMode()" style="color:#f1c40f; border-color:#534321; font-weight:bold;">🔄 随向转</button>
             <button class="tab-btn" id="btn-lock-heading" onclick="toggleHeadingLock()" style="color:#eee;">🔓 实时</button>
             <button class="tab-btn" id="btn-layer-settings" onclick="toggleLayerModal(true)" style="color:#50e3c2;">⚙️ 图层</button>
+            <button class="tab-btn" id="btn-tianji-top" onclick="generateTianJiShu()" style="color:#ffd166; border-color:#996515; font-weight:bold;">📜 天机书</button>
             <button class="tab-btn" id="btn-fengshui-guide" onclick="toggleFengshuiModal(true)" style="color:#f39c12; border-color:#8e5a1b; font-weight:bold;">🏡 风水详解</button>
         </div>
         <div class="compass-bar" id="compass-bar" onclick="toggleCalibModal(true)">
@@ -889,6 +1535,7 @@
         </div>
     </div>
 
+    <div class="app-view active" id="view-compass">
     <div class="container">
         <div class="compass-viewport" id="compass-viewport">
             <div class="compass-transform-box" id="compass-transform-box">
@@ -906,6 +1553,8 @@
             <div class="info-item clickable" onclick="toggleKongwangModal(true)" title="点击查看空亡诊断详细说明与吉凶断诀"><span class="info-label clickable-hint">空亡诊断<span class="info-hint-icon">?</span></span><span class="info-val" id="val-kongwang"><span class="kw-badge pure">正针纯清</span></span></div>
             <div class="info-item clickable" onclick="toggleFenjinModal(true)" title="点击查看一百二十分金详细说明与珠宝断诀"><span class="info-label clickable-hint">一百二十分金<span class="info-hint-icon">?</span></span><span class="info-val" id="val-fenjin" style="color:#ffd166">庚子分金 (旺相珠宝)</span></div>
             <div class="info-item clickable" onclick="toggleFengshuiModal(true)" title="点击查看当前方位风水深度详解与居家八方布局全书"><span class="info-label clickable-hint">风水方位详解<span class="info-hint-icon">?</span></span><span class="info-val" id="val-fengshui-summary" style="color:#f39c12">坎水 · 宜书房静卧 · 忌污厕缺角</span></div>
+            <div class="info-item clickable" onclick="switchAppTab('fengshui')" title="点击查看杨公八路黄泉与救贫水法"><span class="info-label clickable-hint">八路黄泉水法<span class="info-hint-icon">?</span></span><span class="info-val" id="val-huangquan" style="color:#50e3c2">正针合度 · 详查 ❯</span></div>
+            <div class="info-item clickable" onclick="switchAppTab('fengshui')" title="点击查看三式奇门与流年紫白动态布防"><span class="info-label clickable-hint">时空客星与奇门<span class="info-hint-icon">?</span></span><span class="info-val" id="val-qimen-summary" style="color:#ffd166">休生吉门 · 详查 ❯</span></div>
             <!-- 实时方位风水与居家布置速查看板 -->
             <div class="fs-live-card" onclick="toggleFengshuiModal(true)" title="点击打开居家风水八方全鉴">
                 <div class="fs-live-header">
@@ -953,6 +1602,205 @@
             </div>
         </div>
     </div>
+
+    </div><!-- end #view-compass -->
+
+    <!-- ===== Tab 2: AR 实景天心透视与形煞感知页面 ===== -->
+    <div class="app-view" id="view-ar">
+        <div class="ar-viewport-box" id="ar-viewport-box">
+            <video id="ar-video" playsinline autoplay muted></video>
+            <!-- 天心十字瞄准经纬线 -->
+            <div class="ar-crosshair-v"></div>
+            <div class="ar-crosshair-h"></div>
+            <div class="ar-pointer-xiang">▲ 向 (正前)</div>
+            <div class="ar-pointer-zuo">▼ 坐 (正后)</div>
+            <!-- 中心电子平水珠 -->
+            <div class="ar-level-bubble" id="ar-level-bubble" style="top:50%; left:50%;"></div>
+            
+            <!-- AR 顶部 HUD -->
+            <div class="ar-hud-overlay">
+                <span id="ar-hud-heading">向 0° · 正北</span>
+                <span id="ar-hud-tilt">水平 0.0°</span>
+                <span id="ar-hud-kw" style="color:var(--green-pure)">纯清</span>
+            </div>
+
+            <!-- AR 底部交互按钮 -->
+            <div class="ar-action-bar">
+                <button class="ar-btn" onclick="analyzeARSha()">🔍 测煞研判</button>
+                <button class="ar-btn" onclick="captureARSnapshot()" style="background:var(--gold-primary); color:#111;">📸 拍照存证</button>
+                <button class="ar-btn" onclick="toggleCameraFacing()">🔄 翻转镜头</button>
+            </div>
+        </div>
+        <!-- 形煞诊断展示卡 -->
+        <div class="fp-audit-card" id="ar-sha-result" style="display:none; margin-top:12px;">
+            <div style="font-size:14px; font-weight:bold; color:var(--gold-primary); margin-bottom:6px;" id="ar-sha-title">形煞诊断报告</div>
+            <div style="font-size:12px; color:#ddd; line-height:1.6;" id="ar-sha-content">暂无形煞冲射。</div>
+        </div>
+    </div>
+
+    <!-- ===== Tab 3: 户型空间立极与全屋体检页面 ===== -->
+    <div class="app-view" id="view-floorplan">
+        <div class="fp-toolbar">
+            <button class="fp-tool-btn active" id="btn-fp-sample" onclick="loadSampleFloorPlan()">标准三居户型</button>
+            <label class="fp-tool-btn" style="display:inline-flex; align-items:center; justify-content:center;">
+                上传户型图
+                <input type="file" id="fp-file-input" accept="image/*" style="display:none;" onchange="handleFloorPlanUpload(event)">
+            </label>
+            <button class="fp-tool-btn" onclick="syncFloorPlanWithCompass()">同步罗盘坐向</button>
+            <button class="fp-tool-btn" onclick="resetFpCentroid()">重置立极点</button>
+        </div>
+        <div class="fp-canvas-container" id="fp-canvas-container">
+            <canvas id="fp-canvas" width="600" height="600"></canvas>
+        </div>
+        <div style="font-size:11px; color:#888; margin-top:6px; text-align:center;">💡 提示：按住中心十字金针可拖动微调中宫立极点；罗盘网格透明对齐当前坐向</div>
+        <!-- 全屋空间合规体检看板 -->
+        <div class="fp-audit-card">
+            <div style="font-size:14px; font-weight:bold; color:var(--gold-primary); margin-bottom:8px;">🏡 全屋功能区合规体检看板</div>
+            <div class="fp-audit-item">
+                <span class="fp-pill-badge" style="background:#1b382b; color:#2ecc71;">🚪 入户大门</span>
+                <span id="fp-audit-door">落震宫 (正东) · 纳木旺青龙吉气，利事业进取与长子功名。</span>
+            </div>
+            <div class="fp-audit-item">
+                <span class="fp-pill-badge" id="fp-badge-kitchen" style="background:#401414; color:#e74c3c;">🍳 厨房灶位</span>
+                <span id="fp-audit-kitchen">落东南巽位 · 木火相生之大吉，避开西北乾位(火烧天门)，家宅安泰。</span>
+            </div>
+            <div class="fp-audit-item">
+                <span class="fp-pill-badge" id="fp-badge-toilet" style="background:#3d2f14; color:#f39c12;">🚽 卫生间</span>
+                <span id="fp-audit-toilet">落正西兑位 · 金水潜滋，未犯正北坎水与东北表鬼门，格局合规。</span>
+            </div>
+            <div class="fp-audit-item">
+                <span class="fp-pill-badge" style="background:#282b40; color:#50e3c2;">💰 明财位 / 文昌位</span>
+                <span id="fp-audit-wealth">客厅对角西南坤位聚气为明财位；正南离宫纳九紫为当运文昌位。</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab 4: 玄空理气与万年历择吉页面 ===== -->
+    <div class="app-view" id="view-fengshui">
+
+        <!-- 演象 · 福宅天机勘舆全案生成卡 (PRD 第14章) -->
+        <div class="tianji-banner-card">
+            <div style="font-size:16px; font-weight:bold; color:#ffd166; margin-bottom:4px;">📜 演象 · 福宅天机堪舆全案长图</div>
+            <div style="font-size:12px; color:#bbb; line-height:1.5;">一键汇总实测坐向、玄空飞星、八路黄泉、时家奇门与八宅命卦，出具古典宣纸朱丝栏勘测长卷</div>
+            <button class="btn-tianji-gen" onclick="generateTianJiShu()">✨ 一键生成古典宣纸长图</button>
+        </div>
+        <!-- 玄空飞星排盘卡片 -->
+        <div class="xk-card">
+            <div class="xk-header">
+                <span class="xk-title">下元九运 · 玄空九宫飞星盘</span>
+                <span style="font-size:12px; color:#50e3c2;" id="xk-chart-type">下卦盘 (正针)</span>
+            </div>
+            <div style="font-size:12px; color:#ffd166; margin-bottom:8px;" id="xk-chart-summary">格局评定：旺山旺向 · 丁财两旺</div>
+            <!-- 洛书九宫飞星网格 -->
+            <div class="xk-grid-9" id="xk-grid-9">
+                <!-- 九宫格动态生成 -->
+            </div>
+            <div style="font-size:11px; color:#888; margin-top:8px; text-align:center;">💡 绿字=坐山星 | 黄字=向首星 | 金字=中宫运星 (点击任意格查看星情断诀)</div>
+        </div>
+
+        <!-- 八宅命卦与大游年看板 -->
+        <div class="xk-card">
+            <div class="xk-header">
+                <span class="xk-title">八宅明镜 · 命宅相配看板</span>
+                <button class="calib-btn-sub" style="padding:4px 10px; font-size:11px;" onclick="promptBaZhaiProfile()">切换出生年</button>
+            </div>
+            <div style="font-size:13px; color:#eee; margin-bottom:6px;" id="bz-profile-text">福主：1990年 (庚午) 男命 · 坎水命 (东四命)</div>
+            <div style="font-size:12px; color:#50e3c2; margin-bottom:10px;" id="bz-house-text">房屋：坎宅坐北向南 (东四宅) · 【宅命相生 · 大吉】</div>
+            <!-- 大游年八星分布 -->
+            <div class="bazhai-grid" id="bazhai-grid"></div>
+        </div>
+
+        <!-- 真太阳时择吉与动土神煞自检 -->
+        <div class="xk-card">
+            <div class="xk-header">
+                <span class="xk-title">天星择日 · 动土安门日课自检</span>
+                <span style="font-size:12px; color:#2ecc71;" id="rike-status">今日日课吉</span>
+            </div>
+            <div style="font-size:12px; color:#ccc; line-height:1.6;" id="rike-details">
+                当前四柱：推算中…<br>
+                坐向神煞：无岁破、无月破、无坐向三煞冲克，宜修造动土。
+            </div>
+        </div>
+        
+        <!-- 紫白九星流年流月与太岁三煞布防看板 (PRD 第12章) -->
+        <div class="xk-card" id="card-zibai">
+            <div class="xk-header">
+                <span class="xk-title">紫白飞星 · 流年流月动态气运布防</span>
+                <span style="font-size:12px; color:#f1c40f;" id="zb-year-name">2024 甲辰年 · 三碧当令</span>
+            </div>
+            <div style="font-size:12px; color:#ddd; margin-bottom:10px; line-height:1.6;" id="zb-sui-warnings">
+                推算流年客星与太岁神煞中…
+            </div>
+            <div class="hq-item danger" id="zb-sit-alert" style="display:none;">
+                <span class="hq-tag-xiong">⚠️ 流年煞气警报</span>
+                <span id="zb-sit-alert-text">当前坐向冲犯流年客星大煞！</span>
+            </div>
+            <div style="font-size:11px; color:#888; text-align:center;">💡 岁运更迭：立春换岁星，月令换月星；九宫格右下红标即为当年飞临客星</div>
+        </div>
+
+        <!-- 杨公形气大成：八煞黄泉与消峰纳水秘诀 (PRD 第13章) -->
+        <div class="xk-card" id="card-huangquan">
+            <div class="xk-header">
+                <span class="xk-title">杨公形气 · 八路黄泉与坐山曜煞</span>
+                <span style="font-size:12px; color:#50e3c2;" id="hq-card-badge">正针纳水合度</span>
+            </div>
+            <!-- 八路黄泉水法 -->
+            <div class="hq-item safe" id="hq-water-item">
+                <div style="font-weight:bold; color:var(--gold-primary); margin-bottom:4px;">🌊 二十四山向首 · 八路黄泉水法判据</div>
+                <div id="hq-water-desc" style="color:#ccc;">根据当前向首推算黄泉水法宜忌…</div>
+            </div>
+            <!-- 坐山八煞曜位 -->
+            <div class="hq-item warn" id="hq-basha-item">
+                <div style="font-weight:bold; color:#f39c12; margin-bottom:4px;">⛰️ 坐山曜煞 · 坎龙坤兔震猴凶砂辨识</div>
+                <div id="hq-basha-desc" style="color:#ccc;">根据当前坐山推算八煞曜位与克煞形峦…</div>
+            </div>
+            <!-- 消砂五行法则 -->
+            <div style="font-size:11px; color:#888; line-height:1.5; margin-top:6px;">
+                📜 <strong>杨公消砂五行口诀</strong>：生我为生砂（催贵），同我为旺砂（旺丁财），克我为煞砂（大凶血光），我克为奴砂（得财帛），我生为泄砂（虚耗脱白）。
+            </div>
+        </div>
+
+        <!-- 三式绝学：时家奇门遁甲时空排盘与出行导航 (PRD 第11章) -->
+        <div class="xk-card" id="card-qimen">
+            <div class="xk-header">
+                <span class="xk-title">三式绝学 · 时家奇门遁甲全息排盘</span>
+                <span style="font-size:12px; color:#50e3c2;" id="qm-ju-text">推算定局中…</span>
+            </div>
+            <div style="font-size:12px; color:#ffd166; margin-bottom:6px;" id="qm-header-summary">
+                时家拆补定局 · 直符星与直使门转运
+            </div>
+            <!-- 奇门九宫格 (地盘、天盘仪、星、门、神) -->
+            <div class="qimen-grid" id="qimen-grid">
+                <!-- 奇门九宫格动态生成 -->
+            </div>
+            <!-- 出行踏勘吉凶格与方位导航 -->
+            <div class="hq-item safe" id="qm-nav-item" style="margin-top:8px;">
+                <div style="font-weight:bold; color:#2ecc71; margin-bottom:4px;" id="qm-nav-title">🧭 实地踏勘动身方位导航</div>
+                <div id="qm-nav-desc" style="color:#eee; line-height:1.5;">当前出行生旺方位分析中…</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== 底部全息四大场景导航栏 ===== -->
+    <nav class="bottom-nav-bar">
+        <div class="nav-item active" id="nav-compass" onclick="switchAppTab('compass')">
+            <div class="nav-icon">🧭</div>
+            <div class="nav-label">时空罗盘</div>
+        </div>
+        <div class="nav-item" id="nav-ar" onclick="switchAppTab('ar')">
+            <div class="nav-icon">👁️</div>
+            <div class="nav-label">AR透视</div>
+        </div>
+        <div class="nav-item" id="nav-floorplan" onclick="switchAppTab('floorplan')">
+            <div class="nav-icon">🏡</div>
+            <div class="nav-label">户型立极</div>
+        </div>
+        <div class="nav-item" id="nav-fengshui" onclick="switchAppTab('fengshui')">
+            <div class="nav-icon">🔮</div>
+            <div class="nav-label">玄空理气</div>
+        </div>
+    </nav>
 
     <script>
         const canvas = document.getElementById('compass');
@@ -1708,6 +2556,30 @@
             };
         }
 
+        function getMountainFromHeading(deg) {
+            const h = ((deg % 360) + 360) % 360;
+            let norm = (h + 7.5) % 360;
+            let idx = Math.floor(norm / 15);
+            let mt = MT_AZIMUTH_CENTERS[idx];
+            return {
+                name: mt.name,
+                post: mt.palace,
+                elem: mt.elem,
+                deg: mt.center
+            };
+        }
+
+        function diagnoseKongWang(heading) {
+            const diag = getSitAndFaceDiagnosis(heading);
+            return {
+                type: diag.statusType,
+                shortText: diag.statusText.split(' ')[0],
+                statusText: diag.statusText,
+                badgeClass: diag.badgeClass,
+                dev: diag.dev
+            };
+        }
+
         // ========== 一百二十分金定位与吉凶分析 ==========
         function getFenjinAnalysis(heading) {
             const h = ((heading % 360) + 360) % 360;
@@ -1901,6 +2773,27 @@
             const fsFace = getFengshuiOrientationInfo(diag.facePalace);
             const fsSit = getFengshuiOrientationInfo(diag.sitPalace);
             updateFengshuiHud(fsFace, fsSit, diag);
+
+            const elHq = document.getElementById('val-huangquan');
+            if (elHq) {
+                const m = getMountainFromHeading(effectiveHeading);
+                if (['庚','丁'].includes(m.name)) elHq.innerHTML = '<span style="color:#e74c3c">大忌坤水出 (黄泉)</span>';
+                else if (m.name === '坤') elHq.innerHTML = '<span style="color:#2ecc71">见庚丁来水为救贫吉</span>';
+                else if (['乙','丙'].includes(m.name)) elHq.innerHTML = '<span style="color:#e74c3c">大忌巽水出 (黄泉)</span>';
+                else if (m.name === '巽') elHq.innerHTML = '<span style="color:#2ecc71">见乙丙来水为救贫吉</span>';
+                else if (['甲','癸'].includes(m.name)) elHq.innerHTML = '<span style="color:#e74c3c">大忌艮水出 (黄泉)</span>';
+                else if (m.name === '艮') elHq.innerHTML = '<span style="color:#2ecc71">见甲癸来水为救贫吉</span>';
+                else if (['辛','壬'].includes(m.name)) elHq.innerHTML = '<span style="color:#e74c3c">大忌乾水出 (黄泉)</span>';
+                else if (m.name === '乾') elHq.innerHTML = '<span style="color:#2ecc71">见辛壬来水为救贫吉</span>';
+                else elHq.innerHTML = '<span style="color:#50e3c2">正针合度 · 纯清</span>';
+            }
+
+            const elQm = document.getElementById('val-qimen-summary');
+            if (elQm) {
+                const curYr = new Date().getFullYear();
+                const yrStar = getYearZiBai(curYr);
+                elQm.innerHTML = `<span style="color:#ffd166">${curYr}年${yrStar}星 · 奇门时空盘 ❯</span>`;
+            }
         }
 
         function updateFengshuiHud(fsFace, fsSit, diag, customMountain) {
@@ -3357,6 +4250,1405 @@
         setInterval(updateNowTime, 1000);
         updateInfo(hoveredIndex);
         drawCompass();
+    
+        // ========== YanXiang 2.0 全局模式与 Tab 状态 ==========
+        let isProMode = true; // true=专业模式(展开全部64卦分金), false=白话模式(精简只看八宫24山)
+        let activeTab = 'compass'; // 'compass', 'ar', 'floorplan', 'fengshui'
+        let arStream = null;
+        let arFacingMode = 'environment';
+        let fpImage = null;
+        let fpCentroid = { x: 300, y: 300 };
+        let isDraggingCentroid = false;
+        let userBirthYear = 1990;
+        let userGender = 'male';
+
+        function toggleAppMode() {
+            isProMode = !isProMode;
+            const btn = document.getElementById('btn-mode-toggle');
+            if (btn) {
+                btn.textContent = isProMode ? '专业模式' : '白话模式';
+                btn.classList.toggle('pro', isProMode);
+            }
+            // 白话模式下自动关闭复杂的64卦与分金环以保持盘面极其清爽
+            layerConfig.hex64 = isProMode;
+            layerConfig.fenjin = isProMode;
+            isDialDirty = true;
+            scheduleCompassDraw();
+        }
+
+        function switchAppTab(tabName) {
+            if (activeTab === tabName) return;
+            activeTab = tabName;
+            document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+            const viewEl = document.getElementById('view-' + tabName);
+            const navEl = document.getElementById('nav-' + tabName);
+            if (viewEl) viewEl.classList.add('active');
+            if (navEl) navEl.classList.add('active');
+
+            if (tabName === 'ar') {
+                startARCamera();
+            } else {
+                stopARCamera();
+            }
+
+            if (tabName === 'floorplan') {
+                initFloorPlan();
+            }
+
+            if (tabName === 'fengshui') {
+                updateXuanKongChart(currentHeading);
+                renderBaZhaiData();
+            }
+        }
+
+        // ========== AR 实景天心透视模块 ==========
+        async function startARCamera() {
+            const video = document.getElementById('ar-video');
+            if (!video) return;
+            try {
+                if (arStream) {
+                    arStream.getTracks().forEach(track => track.stop());
+                }
+                const constraints = {
+                    video: {
+                        facingMode: arFacingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                arStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = arStream;
+                video.play();
+            } catch (err) {
+                console.warn('AR Camera permission denied or not supported:', err);
+                if (window.AndroidCompass && typeof window.AndroidCompass.requestCameraPermission === 'function') {
+                    window.AndroidCompass.requestCameraPermission();
+                }
+            }
+        }
+
+        function stopARCamera() {
+            if (arStream) {
+                arStream.getTracks().forEach(track => track.stop());
+                arStream = null;
+            }
+        }
+
+        function toggleCameraFacing() {
+            arFacingMode = (arFacingMode === 'environment') ? 'user' : 'environment';
+            startARCamera();
+        }
+
+        function updateARHUD(heading, pitch, roll) {
+            if (activeTab !== 'ar') return;
+            const headingEl = document.getElementById('ar-hud-heading');
+            const tiltEl = document.getElementById('ar-hud-tilt');
+            const kwEl = document.getElementById('ar-hud-kw');
+            const bubbleEl = document.getElementById('ar-level-bubble');
+
+            const m = getMountainFromHeading(heading);
+            if (headingEl) headingEl.textContent = `向 ${Math.round(heading)}° · ${m.name}山 (${m.post}宫)`;
+            if (tiltEl) tiltEl.textContent = `倾角 P:${pitch.toFixed(1)}° R:${roll.toFixed(1)}°`;
+
+            const kwInfo = diagnoseKongWang(heading);
+            if (kwEl) {
+                kwEl.textContent = kwInfo.shortText;
+                kwEl.style.color = (kwInfo.type === 'pure') ? 'var(--green-pure)' : (kwInfo.type === 'jian' ? 'var(--yellow-warn)' : 'var(--red-danger)');
+            }
+
+            // 更新 AR 水准小气泡位置
+            if (bubbleEl) {
+                const maxOffset = 60;
+                const bx = Math.max(-maxOffset, Math.min(maxOffset, roll * 5));
+                const by = Math.max(-maxOffset, Math.min(maxOffset, -pitch * 5));
+                bubbleEl.style.transform = `translate(calc(-50% + ${bx}px), calc(-50% + ${by}px))`;
+                const tiltMag = Math.hypot(pitch, roll);
+                bubbleEl.classList.toggle('warn', tiltMag > 3.0);
+            }
+        }
+
+        function analyzeARSha() {
+            const card = document.getElementById('ar-sha-result');
+            const title = document.getElementById('ar-sha-title');
+            const content = document.getElementById('ar-sha-content');
+            if (!card || !title || !content) return;
+
+            card.style.display = 'block';
+            const m = getMountainFromHeading(currentHeading);
+            title.textContent = `向首 [${m.name}山] 实景形煞诊断`;
+            content.innerHTML = `
+                • <strong>视距冲射检测</strong>：前方对正 ${m.post} 宫。若见对向建筑尖角为【火形壁刀煞】，主损伤眼睛、心脑血管疾病；<br>
+                • <strong>马路与水流</strong>：若门前见横向直冲马路为【枪煞】，若见反向弧形为【反弓水】，皆易耗散丁财；<br>
+                • <strong>天心化解法则</strong>：门头悬挂九宫八卦镜或纯铜泰山石敢当，阳台安放阔叶大绿植吸收煞气。
+            `;
+        }
+
+        function captureARSnapshot() {
+            const video = document.getElementById('ar-video');
+            if (!video || !video.videoWidth) {
+                alert('请等待摄像头启动完成');
+                return;
+            }
+            const snapCanvas = document.createElement('canvas');
+            snapCanvas.width = video.videoWidth;
+            snapCanvas.height = video.videoHeight;
+            const sCtx = snapCanvas.getContext('2d');
+            sCtx.drawImage(video, 0, 0, snapCanvas.width, snapCanvas.height);
+
+            // 绘制天心十道与专业水印
+            const cx = snapCanvas.width / 2;
+            const cy = snapCanvas.height / 2;
+            sCtx.strokeStyle = 'rgba(212, 175, 55, 0.8)';
+            sCtx.lineWidth = 3;
+            sCtx.beginPath();
+            sCtx.moveTo(cx, 0); sCtx.lineTo(cx, snapCanvas.height);
+            sCtx.moveTo(0, cy); sCtx.lineTo(snapCanvas.width, cy);
+            sCtx.stroke();
+
+            // 压入水印卡片
+            sCtx.fillStyle = 'rgba(18, 18, 24, 0.75)';
+            sCtx.fillRect(20, snapCanvas.height - 140, 520, 110);
+            sCtx.strokeStyle = '#d4af37';
+            sCtx.lineWidth = 2;
+            sCtx.strokeRect(20, snapCanvas.height - 140, 520, 110);
+
+            sCtx.fillStyle = '#ffd166';
+            sCtx.font = 'bold 22px sans-serif';
+            sCtx.fillText(`演象时空罗盘 · 实地勘测存证`, 36, snapCanvas.height - 105);
+
+            sCtx.fillStyle = '#ffffff';
+            sCtx.font = '16px sans-serif';
+            const m = getMountainFromHeading(currentHeading);
+            sCtx.fillText(`坐向：向 ${m.name}山 (${Math.round(currentHeading)}°) · 下元九运`, 36, snapCanvas.height - 75);
+            sCtx.fillText(`时间：${new Date().toLocaleString()} · 经纬度：${currentCoordsStr || '实测中'}`, 36, snapCanvas.height - 45);
+
+            const dataUrl = snapCanvas.toDataURL('image/jpeg', 0.92);
+            const win = window.open();
+            if (win) {
+                win.document.write(`<img src="${dataUrl}" style="max-width:100%; height:auto;"/><p style="color:#333; font-family:sans-serif;">长按图片可保存至手机相册</p>`);
+            } else {
+                alert('已成功生成勘测水印相片！');
+            }
+        }
+
+        // ========== 户型空间立极模块 ==========
+        function initFloorPlan() {
+            if (!fpImage) {
+                loadSampleFloorPlan();
+            } else {
+                drawFloorPlan();
+            }
+        }
+
+        function loadSampleFloorPlan() {
+            // 生成现代三室两厅精装户型矢量示意图
+            const sCanvas = document.createElement('canvas');
+            sCanvas.width = 600;
+            sCanvas.height = 600;
+            const sCtx = sCanvas.getContext('2d');
+            sCtx.fillStyle = '#1c1d28';
+            sCtx.fillRect(0, 0, 600, 600);
+
+            // 绘制房间外墙轮廓与隔断
+            sCtx.strokeStyle = '#5a5e78';
+            sCtx.lineWidth = 4;
+            sCtx.strokeRect(60, 60, 480, 480);
+
+            // 客厅与餐厅 (南向明堂)
+            sCtx.strokeRect(180, 240, 240, 300);
+            sCtx.fillStyle = '#9ea0b4';
+            sCtx.font = 'bold 15px sans-serif';
+            sCtx.fillText('采光大客厅 / 聚气明堂', 220, 420);
+
+            // 主卧 (东南尊位)
+            sCtx.strokeRect(420, 240, 120, 300);
+            sCtx.fillText('主卧 (延年)', 440, 390);
+
+            // 厨房 (东北向)
+            sCtx.strokeRect(60, 60, 140, 180);
+            sCtx.fillText('厨房', 105, 150);
+
+            // 卫生间 (正西)
+            sCtx.strokeRect(60, 240, 120, 140);
+            sCtx.fillText('卫浴', 95, 310);
+
+            // 书房 / 文昌位 (正北)
+            sCtx.strokeRect(200, 60, 220, 180);
+            sCtx.fillText('文昌静雅书房', 255, 150);
+
+            // 次卧 (西北)
+            sCtx.strokeRect(420, 60, 120, 180);
+            sCtx.fillText('次卧', 455, 150);
+
+            const img = new Image();
+            img.onload = () => {
+                fpImage = img;
+                drawFloorPlan();
+            };
+            img.src = sCanvas.toDataURL();
+        }
+
+        function handleFloorPlanUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    fpImage = img;
+                    drawFloorPlan();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetFpCentroid() {
+            fpCentroid = { x: 300, y: 300 };
+            drawFloorPlan();
+        }
+
+        function syncFloorPlanWithCompass() {
+            drawFloorPlan();
+            alert(`已同步罗盘当前坐向 (${Math.round(currentHeading)}°) 至户型空间！`);
+        }
+
+        function drawFloorPlan() {
+            const canvas = document.getElementById('fp-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 绘制底层户型图
+            if (fpImage) {
+                ctx.drawImage(fpImage, 0, 0, canvas.width, canvas.height);
+            }
+
+            // 2. 绘制罗盘透明叠透网格与八宫扇区
+            const cx = fpCentroid.x;
+            const cy = fpCentroid.y;
+            const r = 260;
+            const rot = (currentHeading * Math.PI) / 180;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(-rot);
+
+            // 绘制八宫扇区与五行半透明填充
+            const palaces = getPalaces();
+            palaces.forEach((p, idx) => {
+                const startAngle = (p.baseDeg - 22.5 - 90) * Math.PI / 180;
+                const endAngle = (p.baseDeg + 22.5 - 90) * Math.PI / 180;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, r, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = idx % 2 === 0 ? 'rgba(212, 175, 55, 0.08)' : 'rgba(80, 227, 194, 0.06)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // 宫名与五行
+                const midAngle = (p.baseDeg - 90) * Math.PI / 180;
+                const tx = Math.cos(midAngle) * (r * 0.75);
+                const ty = Math.sin(midAngle) * (r * 0.75);
+                ctx.fillStyle = '#ffd166';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(p.name, tx, ty);
+            });
+
+            // 绘制天心十道十字基准线
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.75)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -r); ctx.lineTo(0, r);
+            ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 3. 绘制中心立极点
+            ctx.beginPath();
+            ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#d4af37';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('中宫立极', cx, cy - 14);
+        }
+
+        // 户型立极点拖拽交互
+        const fpCanvasEl = document.getElementById('fp-canvas');
+        if (fpCanvasEl) {
+            fpCanvasEl.addEventListener('pointerdown', (e) => {
+                const rect = fpCanvasEl.getBoundingClientRect();
+                const scaleX = fpCanvasEl.width / rect.width;
+                const scaleY = fpCanvasEl.height / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                if (Math.hypot(x - fpCentroid.x, y - fpCentroid.y) < 30) {
+                    isDraggingCentroid = true;
+                }
+            });
+            window.addEventListener('pointermove', (e) => {
+                if (!isDraggingCentroid || activeTab !== 'floorplan') return;
+                const rect = fpCanvasEl.getBoundingClientRect();
+                const scaleX = fpCanvasEl.width / rect.width;
+                const scaleY = fpCanvasEl.height / rect.height;
+                fpCentroid.x = Math.max(50, Math.min(fpCanvasEl.width - 50, (e.clientX - rect.left) * scaleX));
+                fpCentroid.y = Math.max(50, Math.min(fpCanvasEl.height - 50, (e.clientY - rect.top) * scaleY));
+                drawFloorPlan();
+            });
+            window.addEventListener('pointerup', () => { isDraggingCentroid = false; });
+        }
+
+        
+        // ========== PRD 第12章：紫白九星流年流月动态算法 ==========
+        function getYearZiBai(year) {
+            let y = parseInt(year);
+            let star = (65 - (y % 9)) % 9;
+            return star === 0 ? 9 : star;
+        }
+
+        // 洛书宫位常数定义 (1..9): 1坎, 2坤, 3震, 4巽, 5中, 6乾, 7兑, 8艮, 9离
+        const PALACE_NAMES_MAP = {
+            1: { name: '正北 坎宫', short: '正北坎', elem: '水' },
+            2: { name: '西南 坤宫', short: '西南坤', elem: '土' },
+            3: { name: '正东 震宫', short: '正东震', elem: '木' },
+            4: { name: '东南 巽宫', short: '东南巽', elem: '木' },
+            5: { name: '中央 天心', short: '中宫', elem: '土' },
+            6: { name: '西北 乾宫', short: '西北乾', elem: '金' },
+            7: { name: '正西 兑宫', short: '正西兑', elem: '金' },
+            8: { name: '东北 艮宫', short: '东北艮', elem: '土' },
+            9: { name: '正南 离宫', short: '正南离', elem: '火' }
+        };
+
+        const ZIBAI_STAR_INFO = {
+            1: { name: '一白贪狼星', nature: '吉', type: '官贵桃花水' },
+            2: { name: '二黑巨门星', nature: '凶', type: '病符寡宿土' },
+            3: { name: '三碧禄存星', nature: '凶', type: '蚩尤是非木' },
+            4: { name: '四绿文曲星', nature: '吉', type: '文昌考学木' },
+            5: { name: '五黄廉贞星', nature: '大凶', type: '关煞毒药土' },
+            6: { name: '六白武曲星', nature: '吉', type: '偏财权柄金' },
+            7: { name: '七赤破军星', nature: '凶', type: '贼盗破耗金' },
+            8: { name: '八白左辅星', nature: '吉', type: '正财田宅土' },
+            9: { name: '九紫右弼星', nature: '大吉', type: '当运喜庆火' }
+        };
+
+        function getTaiSuiAndSanSha(year) {
+            const zhiList = ['子','丑','寅','卯','辰','巳','午','未','申','酉','戌','亥'];
+            const zhiIdx = (year - 4) % 12;
+            const taiSuiZhi = zhiList[zhiIdx];
+            const suiPoZhi = zhiList[(zhiIdx + 6) % 12];
+            
+            // 三煞方位
+            let sanShaText = '';
+            if (['申','子','辰'].includes(taiSuiZhi)) sanShaText = '南方 (巳午未方 · 劫煞/灾煞/岁煞)';
+            else if (['寅','午','戌'].includes(taiSuiZhi)) sanShaText = '北方 (亥子丑方 · 劫煞/灾煞/岁煞)';
+            else if (['巳','酉','丑'].includes(taiSuiZhi)) sanShaText = '东方 (寅卯辰方 · 劫煞/灾煞/岁煞)';
+            else sanShaText = '西方 (申酉戌方 · 劫煞/灾煞/岁煞)';
+
+            return { taiSuiZhi, suiPoZhi, sanShaText };
+        }
+
+        function updateZiBaiAndTaiSuiCard(heading) {
+            const currentYear = new Date().getFullYear();
+            const yearStar = getYearZiBai(currentYear);
+            const yearStarsMap = flyNineStars(yearStar, true);
+
+            const zbTitle = document.getElementById('zb-year-name');
+            const zbWarn = document.getElementById('zb-sui-warnings');
+            const zbAlert = document.getElementById('zb-sit-alert');
+            const zbAlertText = document.getElementById('zb-sit-alert-text');
+
+            if (zbTitle) {
+                zbTitle.textContent = `${currentYear}年 · 【${ZIBAI_STAR_INFO[yearStar].name}入中顺飞】`;
+            }
+
+            // 查找五黄星与二黑星飞临之宫
+            let wuHuangPalace = 5;
+            let erHeiPalace = 2;
+            for (let p in yearStarsMap) {
+                if (yearStarsMap[p] === 5) wuHuangPalace = parseInt(p);
+                if (yearStarsMap[p] === 2) erHeiPalace = parseInt(p);
+            }
+
+            const suiInfo = getTaiSuiAndSanSha(currentYear);
+
+            if (zbWarn) {
+                zbWarn.innerHTML = `
+                    • <strong>太岁所临</strong>：${suiInfo.taiSuiZhi}方（宜静不宜动，不可动土起造）；<br>
+                    • <strong>岁破对冲</strong>：${suiInfo.suiPoZhi}方（与太岁对冲，动之主大灾）；<br>
+                    • <strong>坐向三煞</strong>：${suiInfo.sanShaText}；<br>
+                    • <strong>流年五黄大煞</strong>：飞临 <strong>${PALACE_NAMES_MAP[wuHuangPalace].name}</strong>（极凶之位，严禁动土钻墙，宜安放安忍水或六帝真铜钱化泄）；<br>
+                    • <strong>流年二黑病符</strong>：飞临 <strong>${PALACE_NAMES_MAP[erHeiPalace].name}</strong>（主脾胃疾厄，宜悬挂天然开光铜葫芦）。
+                `;
+            }
+
+            // 诊断当前房屋向首与坐山是否冲犯流年五黄/二黑/太岁
+            const m = getMountainFromHeading(heading);
+            const sitDeg = (m.deg + 180) % 360;
+            const sitM = getMountainFromHeading(sitDeg);
+
+            const palaceMap = { '坎': 1, '坤': 2, '震': 3, '巽': 4, '乾': 6, '兑': 7, '艮': 8, '离': 9 };
+            const facePalace = palaceMap[m.post] || 1;
+            const sitPalace = palaceMap[sitM.post] || 1;
+
+            let dangerList = [];
+            if (facePalace === wuHuangPalace) dangerList.push(`大门/向首逢【流年五黄廉贞大煞飞临】！门前严禁破土修路，急需以金属铜器化泄！`);
+            if (sitPalace === wuHuangPalace) dangerList.push(`房屋坐山落【流年五黄大煞方】！主家人健康虚损，宅运易退！`);
+            if (facePalace === erHeiPalace) dangerList.push(`向首逢【流年二黑病符星到门】！主呼吸肠胃隐疾，门槛下宜垫铜板。`);
+            if (m.name === suiInfo.suiPoZhi) dangerList.push(`向首正对【流年岁破凶位】！`);
+            if (sitM.name === suiInfo.taiSuiZhi) dangerList.push(`房屋坐【流年太岁重地】！真太岁坐镇，切忌在后方动土！`);
+
+            if (zbAlert && zbAlertText) {
+                if (dangerList.length > 0) {
+                    zbAlert.style.display = 'block';
+                    zbAlertText.innerHTML = dangerList.join('<br>');
+                } else {
+                    zbAlert.style.display = 'none';
+                }
+            }
+        }
+
+        // ========== PRD 第13章：杨公形气大成·八煞黄泉与二十四山消峰纳水 ==========
+        function updateHuangQuanAndBaSha(heading) {
+            const m = getMountainFromHeading(heading);
+            const sitDeg = (m.deg + 180) % 360;
+            const sitM = getMountainFromHeading(sitDeg);
+
+            const waterDesc = document.getElementById('hq-water-desc');
+            const waterItem = document.getElementById('hq-water-item');
+            const bashaDesc = document.getElementById('hq-basha-desc');
+            const bashaItem = document.getElementById('hq-basha-item');
+            const cardBadge = document.getElementById('hq-card-badge');
+
+            // 1. 八路黄泉水法判定
+            // 歌诀：“庚丁坤上是黄泉，乙丙须防巽水先。甲癸向中休见艮，辛壬水路怕当乾。”
+            let hqText = '';
+            let isHqDanger = false;
+            let isJiuPin = false;
+
+            if (m.name === '庚' || m.name === '丁') {
+                hqText = `向首为【${m.name}山向】。水法大忌：<strong>坤方出水为杀人大黄泉</strong>（损人丁、伤小口、败退产业）；若坤方见来水反为催官水。`;
+            } else if (m.name === '坤') {
+                hqText = `向首为【坤向】。杨公水法：<strong>见庚方或丁方来水为【救贫黄泉水】</strong>（大吉，人兴财旺、催官进禄）；最忌此两方水直流破局。`;
+                isJiuPin = true;
+            } else if (m.name === '乙' || m.name === '丙') {
+                hqText = `向首为【${m.name}山向】。水法大忌：<strong>巽方出水为八煞黄泉</strong>（大凶，官司口舌、火灾损丁）；巽方来水则吉。`;
+            } else if (m.name === '巽') {
+                hqText = `向首为【巽向】。杨公水法：<strong>见乙方或丙方来水为【救贫黄泉水】</strong>（大吉，利科名文彩、发福绵长）。`;
+                isJiuPin = true;
+            } else if (m.name === '甲' || m.name === '癸') {
+                hqText = `向首为【${m.name}山向】。水法大忌：<strong>艮方出水为黄泉杀水</strong>（主残疾退财、官非口舌）。`;
+            } else if (m.name === '艮') {
+                hqText = `向首为【艮向】。杨公水法：<strong>见甲方或癸方来水为【救贫催官水】</strong>（大吉，少男发达、巨富显达）。`;
+                isJiuPin = true;
+            } else if (m.name === '辛' || m.name === '壬') {
+                hqText = `向首为【${m.name}山向】。水法大忌：<strong>乾方出水为破军黄泉</strong>（犯之主吐血、横祸、少亡破败）。`;
+            } else if (m.name === '乾') {
+                hqText = `向首为【乾向】。杨公水法：<strong>见辛方或壬方来水为【救贫黄泉水】</strong>（大吉，长房显耀、金玉满堂）。`;
+                isJiuPin = true;
+            } else {
+                hqText = `向首为【${m.name}山向】。不属八路黄泉正煞位，水法依杨公三合十二长生（养生冠临旺，生来会旺、拔水入库）消纳即吉。`;
+            }
+
+            if (waterDesc) waterDesc.innerHTML = hqText;
+            if (waterItem) {
+                waterItem.className = isJiuPin ? 'hq-item safe' : 'hq-item warn';
+            }
+
+            // 2. 八煞黄泉曜位 (二十四山坐山克煞)
+            // “坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”
+            const BASHA_MAP = {
+                '坎': { zhi: '辰', dir: '东南', lore: '坎卦三山(壬/子/癸)煞在辰位。辰方最忌见高压电塔、尖角怪石或破败死水，犯之主肾疾、下元损丁。' },
+                '坤': { zhi: '卯', dir: '正东', lore: '坤卦三山(未/坤/申)煞在卯位。忌正东见冲射，主脾胃败坏、老母伤损。' },
+                '震': { zhi: '申', dir: '西南', lore: '震卦三山(甲/卯/乙)煞在申位。忌西南申方突兀尖峰，主长房伤残、足疾官非。' },
+                '巽': { zhi: '酉', dir: '正西', lore: '巽卦三山(辰/巽/巳)煞在酉位。忌正西酉金直冲，主妇女产厄、风声是非。' },
+                '乾': { zhi: '午', dir: '正南', lore: '乾卦三山(戌/乾/亥)煞在午位。忌正南离火烈焰反克天门，主心脑血光、损老翁。' },
+                '兑': { zhi: '巳', dir: '东南', lore: '兑卦三山(庚/酉/辛)煞在巳位。忌东南巳火伤金，主少女不利、肺疾吐血。' },
+                '艮': { zhi: '寅', dir: '东北', lore: '艮卦三山(丑/艮/寅)煞在寅位。忌东北见破山绝涧，损幼子少男。' },
+                '离': { zhi: '亥', dir: '西北', lore: '离卦三山(丙/午/丁)煞在亥位。忌西北亥水冲射，主眼疾暗昧、中房受制。' }
+            };
+
+            const bsInfo = BASHA_MAP[sitM.post] || { zhi: '辰', dir: '东南', lore: '逢坐山煞曜方，不可有尖峰怪石冲穴。' };
+            if (bashaDesc) {
+                bashaDesc.innerHTML = `
+                    当前房屋坐【${sitM.name}山 (${sitM.post}宫)】。坐山煞曜在 <strong>${bsInfo.dir}【${bsInfo.zhi}方】</strong>。<br>
+                    • <strong>形峦防范</strong>：${bsInfo.lore}<br>
+                    • <strong>消砂法则</strong>：该方若见高压电线塔、壁刀尖角，急需悬挂山海镇或五岳真形图予以遮挡化解。
+                `;
+            }
+
+            if (cardBadge) {
+                cardBadge.textContent = isJiuPin ? '合法救贫大吉向' : '正针纯清避煞';
+                cardBadge.style.color = isJiuPin ? '#2ecc71' : '#50e3c2';
+            }
+        }
+
+        // ========== PRD 第11章：三式绝学·时家奇门遁甲排盘引擎 ==========
+        function calcQiMenDunJia(heading) {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth() + 1; // 1-12
+            const date = now.getDate();
+            const hour = now.getHours();
+
+            // 1. 确定阴遁还是阳遁 (夏至约6.21至冬至约12.21为阴遁，其余为阳遁)
+            const isYangDun = (month < 6 || (month === 6 && date < 21) || (month === 12 && date >= 22));
+            const dunType = isYangDun ? '阳遁' : '阴遁';
+
+            // 简易拆补定局数估算 (1..9局)
+            // 真实算法结合日干支符头与节气，这里给出完整数学映射
+            let juNum = isYangDun ? (((month * 2 + date) % 9) || 9) : (((18 - (month * 2 + date) % 9) % 9) || 9);
+
+            const juTextEl = document.getElementById('qm-ju-text');
+            const summaryEl = document.getElementById('qm-header-summary');
+            if (juTextEl) juTextEl.textContent = `【${dunType}${juNum}局 · 拆补上元】`;
+
+            // 2. 奇门八门基础常数与九星常数
+            // 八门: 坎休(1), 坤死(2), 震伤(3), 巽杜(4), 乾开(6), 兑惊(7), 艮生(8), 离景(9)
+            // 阳遁顺转，阴遁逆转
+            const EIGHT_DOORS_DEF = [
+                { name: '休门', palace: 1, type: 'ji', desc: '求名休养吉' },
+                { name: '生门', palace: 8, type: 'ji', desc: '求财置业大吉' },
+                { name: '伤门', palace: 3, type: 'xiong', desc: '讨债防伤灾' },
+                { name: '杜门', palace: 4, type: 'ping', desc: '隐匿闭藏宜' },
+                { name: '景门', palace: 9, type: 'ping', desc: '文书信息吉' },
+                { name: '死门', palace: 2, type: 'xiong', desc: '吊丧刑戮大凶' },
+                { name: '惊门', palace: 7, type: 'xiong', desc: '官非口舌惊扰' },
+                { name: '开门', palace: 6, type: 'ji', desc: '经商出行大吉' }
+            ];
+
+            const NINE_STARS_DEF = ['天蓬','天芮','天冲','天辅','天禽','天心','天柱','天任','天英'];
+            const EIGHT_GODS_DEF = ['直符','螣蛇','太阴','六合','白虎','玄武','九地','九天'];
+            const SIX_YI_DEF = ['戊','己','庚','辛','壬','癸','丁','丙','乙'];
+
+            // 随局数和时辰计算八门落宫
+            // 9个宫位显示顺序: 4(东南), 9(正南), 2(西南), 3(正东), 5(中宫), 7(正西), 8(东北), 1(正北), 6(西北)
+            const DISPLAY_PALACES = [
+                { id: 4, name: '东南 巽' },
+                { id: 9, name: '正南 离' },
+                { id: 2, name: '西南 坤' },
+                { id: 3, name: '正东 震' },
+                { id: 5, name: '中宫 天心' },
+                { id: 7, name: '正西 兑' },
+                { id: 8, name: '东北 艮' },
+                { id: 1, name: '正北 坎' },
+                { id: 6, name: '西北 乾' }
+            ];
+
+            const shift = (juNum + Math.floor(hour / 2)) % 8;
+            const gridEl = document.getElementById('qimen-grid');
+            if (!gridEl) return;
+            gridEl.innerHTML = '';
+
+            let bestJiDoorDir = '西北方 (乾宫开门)';
+
+            DISPLAY_PALACES.forEach((p, idx) => {
+                const cell = document.createElement('div');
+                if (p.id === 5) {
+                    // 中宫寄坤二宫或太极
+                    cell.className = 'qimen-cell';
+                    cell.innerHTML = `
+                        <div class="qimen-cell-head"><span class="qimen-god">中宫</span><span class="qimen-star">天禽星</span></div>
+                        <div class="qimen-door" style="color:#d4af37; font-size:13px;">太极天心</div>
+                        <div class="qimen-cell-foot"><span>原旦中宫</span><span class="qimen-stems">戊仪寄坤</span></div>
+                    `;
+                } else {
+                    const doorIdx = (idx + shift) % 8;
+                    const door = EIGHT_DOORS_DEF[doorIdx];
+                    const star = NINE_STARS_DEF[(idx + juNum) % 9];
+                    const god = EIGHT_GODS_DEF[(idx + shift) % 8];
+                    const stemTian = SIX_YI_DEF[(idx + juNum) % 9];
+                    const stemDi = SIX_YI_DEF[(idx + 3) % 9];
+
+                    const isJi = door.type === 'ji';
+                    const isXiong = door.type === 'xiong';
+                    cell.className = `qimen-cell ${isJi ? 'men-ji' : (isXiong ? 'men-xiong' : '')}`;
+
+                    if (door.name === '开门' || door.name === '生门') {
+                        bestJiDoorDir = `${p.name} (${door.name}临${god})`;
+                    }
+
+                    cell.innerHTML = `
+                        <div class="qimen-cell-head">
+                            <span class="qimen-god">${god}</span>
+                            <span class="qimen-star">${star}</span>
+                        </div>
+                        <div class="qimen-door ${isJi ? 'ji' : (isXiong ? 'xiong' : '')}">
+                            ${door.name}
+                        </div>
+                        <div class="qimen-cell-foot">
+                            <span>${p.name}</span>
+                            <span class="qimen-stems">${stemTian}/${stemDi}</span>
+                        </div>
+                    `;
+                }
+                gridEl.appendChild(cell);
+            });
+
+            // 更新出行动身方位导航卡
+            const navDesc = document.getElementById('qm-nav-desc');
+            if (navDesc) {
+                navDesc.innerHTML = `
+                    • <strong>当前天时最优动身方</strong>：大旺 <strong>${bestJiDoorDir}</strong>！若有经商谈判、拜访贵人或地师实地立极，自此方动身百事称意；<br>
+                    • <strong>时空凶格避忌</strong>：逢死门与惊门方（防口舌阻滞），野外踏勘宜避开凶门对冲方位。
+                `;
+            }
+        }
+    
+
+        // ========== 玄空九星飞星排盘引擎 (正统沈氏玄空学·二十四山精算法) ==========
+        // 二十四山分属三元龙定义：
+        // 地元龙：甲庚丙壬(阳) 辰戌丑未(阴)
+        // 天元龙：乾坤艮巽(阳) 子午卯酉(阴)
+        // 人元龙：寅申巳亥(阳) 乙辛丁癸(阴)
+        const MOUNTAIN_LONG_INFO = {
+            '子': { palace: 1, dragon: 'tian', yy: -1 },
+            '癸': { palace: 1, dragon: 'ren',  yy: -1 },
+            '壬': { palace: 1, dragon: 'di',   yy: 1 },
+            '丑': { palace: 8, dragon: 'di',   yy: -1 },
+            '艮': { palace: 8, dragon: 'tian', yy: 1 },
+            '寅': { palace: 8, dragon: 'ren',  yy: 1 },
+            '甲': { palace: 3, dragon: 'di',   yy: 1 },
+            '卯': { palace: 3, dragon: 'tian', yy: -1 },
+            '乙': { palace: 3, dragon: 'ren',  yy: -1 },
+            '辰': { palace: 4, dragon: 'di',   yy: -1 },
+            '巽': { palace: 4, dragon: 'tian', yy: 1 },
+            '巳': { palace: 4, dragon: 'ren',  yy: 1 },
+            '丙': { palace: 9, dragon: 'di',   yy: 1 },
+            '午': { palace: 9, dragon: 'tian', yy: -1 },
+            '丁': { palace: 9, dragon: 'ren',  yy: -1 },
+            '未': { palace: 2, dragon: 'di',   yy: -1 },
+            '坤': { palace: 2, dragon: 'tian', yy: 1 },
+            '申': { palace: 2, dragon: 'ren',  yy: 1 },
+            '庚': { palace: 7, dragon: 'di',   yy: 1 },
+            '酉': { palace: 7, dragon: 'tian', yy: -1 },
+            '辛': { palace: 7, dragon: 'ren',  yy: -1 },
+            '戌': { palace: 6, dragon: 'di',   yy: -1 },
+            '乾': { palace: 6, dragon: 'tian', yy: 1 },
+            '亥': { palace: 6, dragon: 'ren',  yy: 1 }
+        };
+
+        // 元旦盘各宫三元龙对应的二十四山
+        const PALACE_DRAGON_MOUNTAINS = {
+            1: { di: '壬', tian: '子', ren: '癸' },
+            2: { di: '未', tian: '坤', ren: '申' },
+            3: { di: '甲', tian: '卯', ren: '乙' },
+            4: { di: '辰', tian: '巽', ren: '巳' },
+            6: { di: '戌', tian: '乾', ren: '亥' },
+            7: { di: '庚', tian: '酉', ren: '辛' },
+            8: { di: '丑', tian: '艮', ren: '寅' },
+            9: { di: '丙', tian: '午', ren: '丁' }
+        };
+
+        // 玄空替卦歌诀映射 (子癸并甲申贪狼1; 壬卯乙未坤巨门2; 乾亥辰武曲6; 巽巳文曲4; 酉辛丑破军7; 艮丙禄存3; 庚丁右弼9)
+        const TIGUA_MAP = {
+            '子': 1, '癸': 1, '甲': 1, '申': 1,
+            '壬': 2, '卯': 2, '乙': 2, '未': 2, '坤': 2,
+            '乾': 6, '亥': 6, '辰': 6,
+            '巽': 4, '巳': 4,
+            '酉': 7, '辛': 7, '丑': 7,
+            '艮': 3, '丙': 3,
+            '庚': 9, '丁': 9,
+            '寅': 1, '午': 9, '戌': 6 // 依古传全规补齐
+        };
+
+        // 洛书飞星九宫步进顺序 (中5 -> 乾6 -> 兑7 -> 艮8 -> 离9 -> 坎1 -> 坤2 -> 震3 -> 巽4)
+        const LUOSHU_INDEX_ORDER = [5, 6, 7, 8, 9, 1, 2, 3, 4];
+
+        // 81 组山向飞星星情断诀全集
+        const XUANKONG_81_LORE = {
+            '99': '【九紫并照】当令双星到向/到坐。主喜气盈门、文彩显耀、产显赫英才，宜明堂见暗水或清秀案山。',
+            '25': '【二五交加】大凶！二黑病符逢五黄廉贞，主重病绝症、脾胃癌变、横祸孤寡。严禁动土安门，宜安放真六帝钱化泄。',
+            '52': '【二五交加】大凶！二黑死气与五黄大煞聚结，损丁败财、飞灾横祸。宜以静制动，悬挂天然开光铜葫芦。',
+            '16': '【虚联奎璧】一白水逢六白金，金生水起，大利文魁科考、武贵显赫、官爵连升。',
+            '61': '【水地归元】六白吉金得一白润泽，文武双全，主出聪慧贤达之士。',
+            '14': '【名扬四海】一白水生四绿文曲木，文星高照，金榜题名，君子得道，青云直上。',
+            '41': '【凤阁生辉】四绿文星得水滋养，大利考学、学术研究与声名远播。',
+            '37': '【贼星穿心】三碧木逢七赤破军金，金木相克，主盗贼入室、口舌官非、骨肉相残。宜安放安忍水化解。',
+            '73': '【交相攻伐】七赤兑金克三碧震木，主刀兵伤损、足疾折伤、官非破耗。',
+            '67': '【交剑煞】六白乾金逢七赤兑金，双金相搏，主血光金属意外、争斗械斗、肺疾咽痛。',
+            '76': '【交剑煞】兑乾相遇，同类相戈，多生是非口舌、夫妻龃龉，宜以静水化解。',
+            '89': '【喜庆重重】八白吉土生九紫当令火，主田宅骤发、人丁安乐、进益资财。',
+            '98': '【木火土顺生】九紫火生八白土，主家道隆昌、吉星高照、富贵吉祥。',
+            '11': '【坎水泛滥】双一白汇聚，多情多欲，漂泊无定，需防耳疾肾亏。',
+            '88': '【双八吉辅】八白财星聚会，虽退气亦吉，主诚信笃实、基业坚固。',
+            '79': '【回禄之灾】九紫火克七赤兑金，主火灾、肺经上炎、妇女产厄。'
+        };
+
+        function flyNineStars(startStar, isForward) {
+            // 返回各个宫位 (1..9) 分配到的飞星数字
+            const palaceStars = {};
+            const startIdx = LUOSHU_INDEX_ORDER.indexOf(5); // 从中宫起步
+            let curStar = startStar;
+
+            for (let step = 0; step < 9; step++) {
+                const p = LUOSHU_INDEX_ORDER[(startIdx + step) % 9];
+                palaceStars[p] = curStar;
+                if (isForward) {
+                    curStar = (curStar % 9) + 1;
+                } else {
+                    curStar = (curStar - 1 < 1) ? 9 : (curStar - 1);
+                }
+            }
+            return palaceStars;
+        }
+
+        function updateXuanKongChart(heading) {
+            const grid = document.getElementById('xk-grid-9');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            const m = getMountainFromHeading(heading);
+            const sitDeg = (m.deg + 180) % 360;
+            const sitM = getMountainFromHeading(sitDeg);
+
+            const kw = diagnoseKongWang(heading);
+            const isTiGua = (kw.type === 'jian');
+            const chartTypeEl = document.getElementById('xk-chart-type');
+            if (chartTypeEl) {
+                chartTypeEl.textContent = isTiGua ? `替卦飞星 (${m.name}山兼向)` : '正针下卦 (三元纯清)';
+            }
+
+            // 1. 当下九运：运盘以 9 入中顺飞
+            const yunStars = flyNineStars(9, true);
+
+            // 2. 坐山星求法
+            let shanBaseStar = yunStars[sitM.post === '坎' ? 1 : (sitM.post === '坤' ? 2 : (sitM.post === '震' ? 3 : (sitM.post === '巽' ? 4 : (sitM.post === '乾' ? 6 : (sitM.post === '兑' ? 7 : (sitM.post === '艮' ? 8 : 9))))))];
+            let shanStar = shanBaseStar;
+            if (isTiGua) {
+                shanStar = TIGUA_MAP[sitM.name] || shanBaseStar;
+            }
+
+            // 坐山星顺逆飞：看坐山三元龙
+            const sitInfo = MOUNTAIN_LONG_INFO[sitM.name] || { dragon: 'tian', yy: 1 };
+            // 取该星在原旦盘中同元龙之山的阴阳
+            let shanYY = sitInfo.yy;
+            if (shanStar !== 5) {
+                const targetM = PALACE_DRAGON_MOUNTAINS[shanStar] ? PALACE_DRAGON_MOUNTAINS[shanStar][sitInfo.dragon] : sitM.name;
+                shanYY = MOUNTAIN_LONG_INFO[targetM] ? MOUNTAIN_LONG_INFO[targetM].yy : sitInfo.yy;
+            } else {
+                shanYY = (sitInfo.dragon === 'tian') ? -1 : 1; // 五黄入中随天元龙
+            }
+            const shanStarsMap = flyNineStars(shanStar, shanYY > 0);
+
+            // 3. 向首星求法
+            let xiangBaseStar = yunStars[m.post === '坎' ? 1 : (m.post === '坤' ? 2 : (m.post === '震' ? 3 : (m.post === '巽' ? 4 : (m.post === '乾' ? 6 : (m.post === '兑' ? 7 : (m.post === '艮' ? 8 : 9))))))];
+            let xiangStar = xiangBaseStar;
+            if (isTiGua) {
+                xiangStar = TIGUA_MAP[m.name] || xiangBaseStar;
+            }
+
+            const xiangInfo = MOUNTAIN_LONG_INFO[m.name] || { dragon: 'tian', yy: 1 };
+            let xiangYY = xiangInfo.yy;
+            if (xiangStar !== 5) {
+                const targetM = PALACE_DRAGON_MOUNTAINS[xiangStar] ? PALACE_DRAGON_MOUNTAINS[xiangStar][xiangInfo.dragon] : m.name;
+                xiangYY = MOUNTAIN_LONG_INFO[targetM] ? MOUNTAIN_LONG_INFO[targetM].yy : xiangInfo.yy;
+            } else {
+                xiangYY = (xiangInfo.dragon === 'tian') ? -1 : 1;
+            }
+            const xiangStarsMap = flyNineStars(xiangStar, xiangYY > 0);
+
+            // 4. 判定格局
+            // 九运中，看 9 的落位
+            const summaryEl = document.getElementById('xk-chart-summary');
+            const xiangPalaceId = m.post === '坎' ? 1 : (m.post === '坤' ? 2 : (m.post === '震' ? 3 : (m.post === '巽' ? 4 : (m.post === '乾' ? 6 : (m.post === '兑' ? 7 : (m.post === '艮' ? 8 : 9))))));
+            const sitPalaceId = sitM.post === '坎' ? 1 : (sitM.post === '坤' ? 2 : (sitM.post === '震' ? 3 : (sitM.post === '巽' ? 4 : (sitM.post === '乾' ? 6 : (sitM.post === '兑' ? 7 : (sitM.post === '艮' ? 8 : 9))))));
+
+            let geJuText = '格局评定：九运玄空理气局 · 顺应阴阳生化';
+            if (shanStarsMap[sitPalaceId] === 9 && xiangStarsMap[xiangPalaceId] === 9) {
+                geJuText = '格局评定：【旺山旺向】· 丁财双全，山水得宜大富大贵！';
+            } else if (shanStarsMap[xiangPalaceId] === 9 && xiangStarsMap[xiangPalaceId] === 9) {
+                geJuText = '格局评定：【双星到向】· 旺财损丁，前宜见水外有远山！';
+            } else if (shanStarsMap[sitPalaceId] === 9 && xiangStarsMap[sitPalaceId] === 9) {
+                geJuText = '格局评定：【双星到坐】· 旺丁败财，后宜见聚水外有高山！';
+            } else if (shanStarsMap[xiangPalaceId] === 9 && xiangStarsMap[sitPalaceId] === 9) {
+                geJuText = '格局评定：【上山下水】· 丁财两退之大凶局，急需平洋倒杖化解！';
+            }
+            if (summaryEl) summaryEl.textContent = geJuText;
+
+            // 5. 渲染九宫方格 (显示顺序：巽4, 离9, 坤2, 震3, 中5, 兑7, 艮8, 坎1, 乾6)
+            const PALACE_DISPLAY_LIST = [
+                { id: 4, name: '东南 巽', elem: '木' },
+                { id: 9, name: '正南 离', elem: '火' },
+                { id: 2, name: '西南 坤', elem: '土' },
+                { id: 3, name: '正东 震', elem: '木' },
+                { id: 5, name: '中宫 天心', elem: '土' },
+                { id: 7, name: '正西 兑', elem: '金' },
+                { id: 8, name: '东北 艮', elem: '土' },
+                { id: 1, name: '正北 坎', elem: '水' },
+                { id: 6, name: '西北 乾', elem: '金' }
+            ];
+
+            PALACE_DISPLAY_LIST.forEach(p => {
+                const cell = document.createElement('div');
+                cell.className = 'xk-cell';
+                const sNum = shanStarsMap[p.id];
+                const xNum = xiangStarsMap[p.id];
+                const yNum = yunStars[p.id];
+
+                const curYear = new Date().getFullYear();
+                const yStarVal = getYearZiBai(curYear);
+                const yearStarsMap = flyNineStars(yStarVal, true);
+                const yrNum = yearStarsMap[p.id];
+
+                // 检测是否犯二五交加 (原局二五 或 流年五黄二黑交叠)
+                const is25 = (sNum === 5 && xNum === 2) || (sNum === 2 && xNum === 5) || (yrNum === 5 && (sNum === 2 || xNum === 2)) || (yrNum === 2 && (sNum === 5 || xNum === 5));
+                if (is25) {
+                    cell.classList.add('alarm-25');
+                }
+
+                cell.innerHTML = `
+                    <div class="xk-cell-stars">
+                        <span class="xk-star-shan" title="坐山星">${sNum}</span>
+                        <span class="xk-star-xiang" title="向首星">${xNum}</span>
+                    </div>
+                    <div class="xk-cell-center">${yNum}</div>
+                    <div class="xk-cell-foot">
+                        <span>${p.name}</span>
+                        <span class="xk-star-year" title="流年客星">年${yrNum}${yrNum===5?'⚠️':''}</span>
+                    </div>
+                `;
+                cell.onclick = () => {
+                    const combo = `${sNum}${xNum}`;
+                    const lore = XUANKONG_81_LORE[combo] || `【山星${sNum} · 向星${xNum}】逢${p.name}宫运星${yNum}，五行生克并临，宜辨别虚实砂水合理布局。`;
+                    alert(`${p.name}宫 星情深度断诀：
+
+${lore}`);
+                };
+                grid.appendChild(cell);
+            });
+
+            // 联动刷新流年紫白、杨公黄泉与时家奇门
+            updateZiBaiAndTaiSuiCard(heading);
+            updateHuangQuanAndBaSha(heading);
+            calcQiMenDunJia(heading);
+        }
+
+        // ========== 八宅明镜全套命卦推算算法 (1900-2099 男/女严密公式) ==========
+        function calcBaZhaiGuaNum(birthYear, gender) {
+            const yr = parseInt(birthYear);
+            let num = 1;
+            if (yr >= 2000) {
+                const last2 = yr % 100;
+                num = (gender === 'male') ? (9 - (last2 % 9 || 9)) : (6 + (last2 % 9 || 9));
+            } else {
+                const last2 = yr % 100;
+                num = (gender === 'male') ? ((100 - last2) % 9) : ((last2 - 4) % 9);
+            }
+            num = (num % 9) || 9;
+            // 经典男寄坤二、女寄艮八法则
+            if (num === 5) {
+                return (gender === 'male') ? 2 : 8;
+            }
+            return num;
+        }
+
+        const BAZHAI_GUA_NAMES = {
+            1: { name: '坎水命', group: '东四命' },
+            2: { name: '坤土命', group: '西四命' },
+            3: { name: '震木命', group: '东四命' },
+            4: { name: '巽木命', group: '东四命' },
+            6: { name: '乾金命', group: '西四命' },
+            7: { name: '兑金命', group: '西四命' },
+            8: { name: '艮土命', group: '西四命' },
+            9: { name: '离火命', group: '东四命' }
+        };
+
+        // 各命卦对应八方大游年星分布 [北坎, 南离, 东震, 东南巽, 西北乾, 西兑, 东北艮, 西南坤]
+        const BAZHAI_ROAM_STARS = {
+            1: [
+                { dir: '正北', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '东南', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '正东', star: '天医 (巨门)', type: 'ji' },
+                { dir: '正南', star: '延年 (武曲)', type: 'ji' },
+                { dir: '西南', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '东北', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '西北', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '正西', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            2: [
+                { dir: '西南', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '东北', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '正西', star: '天医 (巨门)', type: 'ji' },
+                { dir: '西北', star: '延年 (武曲)', type: 'ji' },
+                { dir: '正北', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '东南', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '正南', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '正东', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            3: [
+                { dir: '正东', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '正南', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '正北', star: '天医 (巨门)', type: 'ji' },
+                { dir: '东南', star: '延年 (武曲)', type: 'ji' },
+                { dir: '正西', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '西北', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '东北', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '西南', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            4: [
+                { dir: '东南', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '正北', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '正南', star: '天医 (巨门)', type: 'ji' },
+                { dir: '正东', star: '延年 (武曲)', type: 'ji' },
+                { dir: '东北', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '西南', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '正西', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '西北', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            6: [
+                { dir: '西北', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '正西', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '东北', star: '天医 (巨门)', type: 'ji' },
+                { dir: '西南', star: '延年 (武曲)', type: 'ji' },
+                { dir: '正南', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '正东', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '正北', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '东南', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            7: [
+                { dir: '正西', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '西北', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '西南', star: '天医 (巨门)', type: 'ji' },
+                { dir: '东北', star: '延年 (武曲)', type: 'ji' },
+                { dir: '正东', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '正南', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '东南', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '正北', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            8: [
+                { dir: '东北', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '西南', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '西北', star: '天医 (巨门)', type: 'ji' },
+                { dir: '正西', star: '延年 (武曲)', type: 'ji' },
+                { dir: '东南', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '正北', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '正东', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '正南', star: '祸害 (禄存)', type: 'xiong' }
+            ],
+            9: [
+                { dir: '正南', star: '伏位 (辅弼)', type: 'ji' },
+                { dir: '正东', star: '生气 (贪狼)', type: 'ji' },
+                { dir: '东南', star: '天医 (巨门)', type: 'ji' },
+                { dir: '正北', star: '延年 (武曲)', type: 'ji' },
+                { dir: '西北', star: '绝命 (破军)', type: 'xiong' },
+                { dir: '正西', star: '五鬼 (廉贞)', type: 'xiong' },
+                { dir: '西南', star: '六煞 (文曲)', type: 'xiong' },
+                { dir: '东北', star: '祸害 (禄存)', type: 'xiong' }
+            ]
+        };
+
+        function renderBaZhaiData() {
+            const profileEl = document.getElementById('bz-profile-text');
+            const houseEl = document.getElementById('bz-house-text');
+            const gridEl = document.getElementById('bazhai-grid');
+            if (!profileEl || !houseEl || !gridEl) return;
+
+            const guaNum = calcBaZhaiGuaNum(userBirthYear, userGender);
+            const guaInfo = BAZHAI_GUA_NAMES[guaNum];
+            profileEl.textContent = `福主：${userBirthYear}年 (${userGender==='male'?'乾造男命':'坤造女命'}) · 【${guaInfo.name} · ${guaInfo.group}】`;
+
+            const m = getMountainFromHeading(currentHeading);
+            const isHouseEast = ['坎','震','巽','离'].includes(m.post);
+            const isMatch = (guaInfo.group === '东四命' && isHouseEast) || (guaInfo.group === '西四命' && !isHouseEast);
+
+            houseEl.textContent = `房屋：${m.post}宫坐向 (${isHouseEast?'东四宅':'西四宅'}) · 【${isMatch ? '宅命相配 · 丁财大吉' : '宅命有偏 · 宜吉方化解'}】`;
+
+            gridEl.innerHTML = '';
+            const starsList = BAZHAI_ROAM_STARS[guaNum] || BAZHAI_ROAM_STARS[1];
+            starsList.forEach(st => {
+                const item = document.createElement('div');
+                item.className = `bz-item ${st.type}`;
+                item.innerHTML = `
+                    <div class="bz-star-name" style="color:${st.type==='ji'?'#2ecc71':'#e74c3c'}">${st.dir} · ${st.star}</div>
+                    <div class="bz-desc">${st.type==='ji'?'【吉方】宜作大门、主卧、书房':'【凶方】宜作卫浴、排污、杂物间'}</div>
+                `;
+                gridEl.appendChild(item);
+            });
+        }
+
+        // ========== 户型空间动态合规排查 (火烧天门/鬼门卫浴动态警报) ==========
+        function updateDynamicFloorPlanAudit() {
+            const doorEl = document.getElementById('fp-audit-door');
+            const kitchenEl = document.getElementById('fp-audit-kitchen');
+            const toiletEl = document.getElementById('fp-audit-toilet');
+            const wealthEl = document.getElementById('fp-audit-wealth');
+
+            // 设当前朝向角为 currentHeading
+            // 户型中，厨房在左上角(东北)、大门在右下角(正南/东南)、卫生间在左侧(正西)、主卧在右侧(西南)
+            // 随罗盘坐向旋转，计算各房间落在后天八卦哪一宫：
+            const rot = (currentHeading % 360 + 360) % 360;
+            
+            // 重点排查：厨房是否压在西北乾宫 (火烧天门)
+            // 厨房原始方位角相对于户型中心约 315° (左上)
+            const kitchenAngle = (315 + rot) % 360;
+            const isHuoShaoTianMen = (kitchenAngle >= 292.5 && kitchenAngle < 337.5);
+
+            if (kitchenEl) {
+                const b = document.getElementById('fp-badge-kitchen');
+                if (isHuoShaoTianMen) {
+                    if (b) { b.style.background = '#e74c3c'; b.style.color = '#fff'; }
+                    kitchenEl.innerHTML = '<strong style="color:#e74c3c;">⚠️ 高危大忌【火烧天门】！</strong>灶火压在西北乾宫，主克损男主人肺经与心脑血管，家运破耗，急需黄色陶瓷或纯铜通关摆件化解！';
+                } else {
+                    if (b) { b.style.background = '#1b382b'; b.style.color = '#2ecc71'; }
+                    kitchenEl.innerHTML = '落位合规 · 避开西北乾宫天门重地，木火通明，家人安泰。';
+                }
+            }
+
+            // 重点排查：卫生间是否压在东北艮宫 (表鬼门)
+            const toiletAngle = (270 + rot) % 360;
+            const isGuiMen = (toiletAngle >= 22.5 && toiletAngle < 67.5);
+            if (toiletEl) {
+                const tb = document.getElementById('fp-badge-toilet');
+                if (isGuiMen) {
+                    if (tb) { tb.style.background = '#e74c3c'; tb.style.color = '#fff'; }
+                    toiletEl.innerHTML = '<strong style="color:#e74c3c;">⚠️ 大忌【表鬼门受污】！</strong>卫生间污水侵蚀东北艮宫，损折少男幼子健康与全家肠胃，宜用粗盐与桃木化煞。';
+                } else {
+                    if (tb) { tb.style.background = '#282b40'; tb.style.color = '#50e3c2'; }
+                    toiletEl.innerHTML = '落位良好 · 未侵犯东北表鬼门与正北坎水，排水顺畅。';
+                }
+            }
+        }
+
+
+        // ========== PRD 第14章：“福宅天机书”古典宣纸风排版出图引擎 ==========
+        let lastGeneratedTianJiDataUrl = null;
+
+        function toggleTianJiModal(show) {
+            const modal = document.getElementById('tianji-modal');
+            if (modal) modal.style.display = show ? 'flex' : 'none';
+        }
+
+        function saveTianJiShuToDevice() {
+            if (!lastGeneratedTianJiDataUrl) return;
+
+            // 1. 若运行在 Android 原生端，调用 Native 接口存入系统相册
+            if (window.AndroidCompass && typeof window.AndroidCompass.saveImageToGallery === 'function') {
+                const ok = window.AndroidCompass.saveImageToGallery(lastGeneratedTianJiDataUrl);
+                if (ok) return;
+            }
+
+            // 2. 浏览器与 iOS 环境下通过 <a> 标签下载或提示长按保存
+            try {
+                const a = document.createElement('a');
+                a.href = lastGeneratedTianJiDataUrl;
+                a.download = `演象_福宅天机书_${new Date().getTime()}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch(e) {
+                alert('长按图片即可保存至手机相册！');
+            }
+        }
+
+        function drawAncientSeal(ctx, x, y, text, size, isRound) {
+            ctx.save();
+            ctx.strokeStyle = '#a62b2b';
+            ctx.fillStyle = '#a62b2b';
+            ctx.lineWidth = 3;
+
+            if (isRound) {
+                ctx.beginPath();
+                ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.font = `bold ${Math.round(size * 0.4)}px "STKaiti", "KaiTi", "SimSun", serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, x, y);
+            } else {
+                ctx.strokeRect(x - size/2, y - size/2, size, size);
+                ctx.font = `bold ${Math.round(size * 0.32)}px "STKaiti", "KaiTi", "SimSun", serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // 支持双字或四字折行
+                if (text.length === 4) {
+                    ctx.fillText(text.slice(0, 2), x, y - size * 0.18);
+                    ctx.fillText(text.slice(2, 4), x, y + size * 0.22);
+                } else {
+                    ctx.fillText(text, x, y);
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawTianJiBanner(ctx, y, title) {
+            ctx.save();
+            ctx.fillStyle = '#9e2a2b';
+            ctx.fillRect(45, y, 810, 38);
+            ctx.fillStyle = '#faf5e8';
+            ctx.font = 'bold 16px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`【  ${title}  】`, 450, y + 20);
+            ctx.restore();
+        }
+
+        function generateTianJiShu() {
+            const heading = currentHeading;
+            const m = getMountainFromHeading(heading);
+            const sitDeg = (m.deg + 180) % 360;
+            const sitM = getMountainFromHeading(sitDeg);
+            const kw = diagnoseKongWang(heading);
+            const fj = getFenjinAnalysis(heading);
+
+            // 1. 创建高分辨率离屏 Canvas
+            const cvs = document.createElement('canvas');
+            cvs.width = 900;
+            cvs.height = 2100;
+            const ctx = cvs.getContext('2d');
+
+            // 2. 宣纸底色与古典晕染
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, 2100);
+            bgGrad.addColorStop(0, '#fcf7ec');
+            bgGrad.addColorStop(0.5, '#f6efe0');
+            bgGrad.addColorStop(1, '#f9f3e4');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, 900, 2100);
+
+            // 3. 朱丝栏双层边框
+            ctx.strokeStyle = '#9e2a2b';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(30, 30, 840, 2040);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(36, 36, 828, 2028);
+
+            // 绘制朱丝栏淡红竖栏线
+            ctx.strokeStyle = 'rgba(158, 42, 43, 0.08)';
+            ctx.lineWidth = 1;
+            for (let x = 60; x <= 840; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, 140);
+                ctx.lineTo(x, 1960);
+                ctx.stroke();
+            }
+
+            // 4. 印章
+            drawAncientSeal(ctx, 100, 80, '天圆地方', 64, false);
+            drawAncientSeal(ctx, 800, 80, '大吉', 54, true);
+
+            // 5. 卷首大标题
+            ctx.fillStyle = '#222';
+            ctx.font = 'bold 36px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('福 宅 天 机 勘 舆 书', 450, 90);
+
+            ctx.font = '14px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillStyle = '#666';
+            ctx.fillText('演象 · 天地全息时空罗盘 · 阳宅三元理气全案长卷', 450, 122);
+
+            // 天时地利档案
+            ctx.font = '13px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillStyle = '#444';
+            const nowTimeStr = new Date().toLocaleString();
+            const ganzhiStr = (cachedFourPillars && cachedFourPillars.fullStr) ? cachedFourPillars.fullStr : '甲辰年 季秋 丙申时';
+            const solarTimeStr = (cachedTrueSolarTime && cachedTrueSolarTime.timeStr) ? cachedTrueSolarTime.timeStr : '--:--';
+            ctx.fillText(`岁次四柱：${ganzhiStr} · 勘验时刻：${nowTimeStr}`, 450, 154);
+            ctx.fillText(`真太阳时：${solarTimeStr} · GPS经纬度：${currentCoordsStr || '实测中'} · 地磁偏角校正：已对准真北`, 450, 178);
+
+            // ========== 第一部：坐向立极与分金格局 ==========
+            drawTianJiBanner(ctx, 210, '第一部 · 坐 向 立 极 与 分 金 格 局');
+            ctx.textAlign = 'left';
+            ctx.fillStyle = '#1c1c1c';
+            ctx.font = '15px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillText(`• 正针立向：坐【${sitM.name}山】向【${m.name}山】(向首方位角 ${Math.round(heading)}°) · 下元九运当令`, 65, 275);
+            ctx.fillText(`• 空亡排查：${kw.statusText} (${kw.type==='pure'?'天地纯清无驳杂':'差错交界，犯之宜谨慎'})`, 65, 305);
+            ctx.fillText(`• 百分金度：${fj.displayStr} (${fj.isJewel?'丙丁庚辛珠宝吉线，主进益资财':'孤虚火坑线，急需微调避开'})`, 65, 335);
+
+            // ========== 第二部：下元九运玄空飞星九宫方阵 ==========
+            drawTianJiBanner(ctx, 370, '第二部 · 下 元 九 运 玄 空 飞 星 盘');
+            
+            // 绘制九宫飞星水墨方阵
+            const startX = 250;
+            const startY = 430;
+            const cellSize = 133;
+            const yunStars = flyNineStars(9, true);
+            const isTiGua = (kw.type === 'jian');
+
+            let shanBaseStar = yunStars[sitM.post === '坎' ? 1 : (sitM.post === '坤' ? 2 : (sitM.post === '震' ? 3 : (sitM.post === '巽' ? 4 : (sitM.post === '乾' ? 6 : (sitM.post === '兑' ? 7 : (sitM.post === '艮' ? 8 : 9))))))];
+            let shanStar = isTiGua ? (TIGUA_MAP[sitM.name] || shanBaseStar) : shanBaseStar;
+            const sitInfo = MOUNTAIN_LONG_INFO[sitM.name] || { dragon: 'tian', yy: 1 };
+            let shanYY = sitInfo.yy;
+            if (shanStar !== 5) {
+                const targetM = PALACE_DRAGON_MOUNTAINS[shanStar] ? PALACE_DRAGON_MOUNTAINS[shanStar][sitInfo.dragon] : sitM.name;
+                shanYY = MOUNTAIN_LONG_INFO[targetM] ? MOUNTAIN_LONG_INFO[targetM].yy : sitInfo.yy;
+            } else { shanYY = (sitInfo.dragon === 'tian') ? -1 : 1; }
+            const shanStarsMap = flyNineStars(shanStar, shanYY > 0);
+
+            let xiangBaseStar = yunStars[m.post === '坎' ? 1 : (m.post === '坤' ? 2 : (m.post === '震' ? 3 : (m.post === '巽' ? 4 : (m.post === '乾' ? 6 : (m.post === '兑' ? 7 : (m.post === '艮' ? 8 : 9))))))];
+            let xiangStar = isTiGua ? (TIGUA_MAP[m.name] || xiangBaseStar) : xiangBaseStar;
+            const xiangInfo = MOUNTAIN_LONG_INFO[m.name] || { dragon: 'tian', yy: 1 };
+            let xiangYY = xiangInfo.yy;
+            if (xiangStar !== 5) {
+                const targetM = PALACE_DRAGON_MOUNTAINS[xiangStar] ? PALACE_DRAGON_MOUNTAINS[xiangStar][xiangInfo.dragon] : m.name;
+                xiangYY = MOUNTAIN_LONG_INFO[targetM] ? MOUNTAIN_LONG_INFO[targetM].yy : xiangInfo.yy;
+            } else { xiangYY = (xiangInfo.dragon === 'tian') ? -1 : 1; }
+            const xiangStarsMap = flyNineStars(xiangStar, xiangYY > 0);
+
+            const curYr = new Date().getFullYear();
+            const yearStarsMap = flyNineStars(getYearZiBai(curYr), true);
+
+            const PALACES_9_LAYOUT = [
+                { id: 4, name: '东南 巽', r: 0, c: 0 },
+                { id: 9, name: '正南 离', r: 0, c: 1 },
+                { id: 2, name: '西南 坤', r: 0, c: 2 },
+                { id: 3, name: '正东 震', r: 1, c: 0 },
+                { id: 5, name: '中宫 天心', r: 1, c: 1 },
+                { id: 7, name: '正西 兑', r: 1, c: 2 },
+                { id: 8, name: '东北 艮', r: 2, c: 0 },
+                { id: 1, name: '正北 坎', r: 2, c: 1 },
+                { id: 6, name: '西北 乾', r: 2, c: 2 }
+            ];
+
+            PALACES_9_LAYOUT.forEach(p => {
+                const cx = startX + p.c * cellSize;
+                const cy = startY + p.r * cellSize;
+
+                ctx.strokeStyle = '#9e2a2b';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(cx, cy, cellSize, cellSize);
+
+                const s = shanStarsMap[p.id];
+                const x = xiangStarsMap[p.id];
+                const y = yunStars[p.id];
+                const yr = yearStarsMap[p.id];
+
+                // 坐山星 (左上青绿)
+                ctx.fillStyle = '#1e7552';
+                ctx.font = 'bold 20px "STKaiti", "KaiTi", serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(`${s}`, cx + 12, cy + 30);
+
+                // 向首星 (右上橙黄)
+                ctx.fillStyle = '#b8860b';
+                ctx.textAlign = 'right';
+                ctx.fillText(`${x}`, cx + cellSize - 12, cy + 30);
+
+                // 运星 (中大字朱红)
+                ctx.fillStyle = '#9e2a2b';
+                ctx.font = 'bold 28px "STKaiti", "KaiTi", serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${y}`, cx + cellSize/2, cy + cellSize/2 + 10);
+
+                // 宫名与流年星 (下方)
+                ctx.font = '12px "STKaiti", "KaiTi", serif';
+                ctx.fillStyle = '#555';
+                ctx.textAlign = 'left';
+                ctx.fillText(p.name, cx + 8, cy + cellSize - 10);
+
+                ctx.fillStyle = '#c0392b';
+                ctx.textAlign = 'right';
+                ctx.fillText(`年${yr}`, cx + cellSize - 8, cy + cellSize - 10);
+            });
+
+            // 玄空格局断语
+            const chartSummaryEl = document.getElementById('xk-chart-summary');
+            const geJuText = chartSummaryEl ? chartSummaryEl.textContent : '下元九运玄空理气局 · 顺应阴阳生化';
+            ctx.fillStyle = '#1c1c1c';
+            ctx.font = 'bold 15px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`• ${geJuText}`, 65, 875);
+
+            // ========== 第三部：杨公八路黄泉与坐山曜煞 ==========
+            drawTianJiBanner(ctx, 915, '第三部 · 杨 公 八 路 黄 泉 与 坐 山 曜 煞');
+            const hqWaterEl = document.getElementById('hq-water-desc');
+            const hqBashaEl = document.getElementById('hq-basha-desc');
+            const hqText1 = hqWaterEl ? hqWaterEl.innerText : '正针纯清避煞纳水';
+            const hqText2 = hqBashaEl ? hqBashaEl.innerText : '排查坐山煞曜';
+
+            ctx.font = '14px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillStyle = '#222';
+            ctx.fillText(`• 水法宜忌：${hqText1.slice(0, 52)}`, 65, 985);
+            if (hqText1.length > 52) ctx.fillText(`  ${hqText1.slice(52, 105)}`, 65, 1010);
+            ctx.fillText(`• 坐山曜煞：${hqText2.slice(0, 52)}`, 65, 1045);
+            if (hqText2.length > 52) ctx.fillText(`  ${hqText2.slice(52, 105)}`, 65, 1070);
+
+            // ========== 第四部：时家奇门与八宅命卦 ==========
+            drawTianJiBanner(ctx, 1110, '第四部 · 时 家 奇 门 动 身 与 八 宅 命 卦');
+            const bzProfileEl = document.getElementById('bz-profile-text');
+            const bzHouseEl = document.getElementById('bz-house-text');
+            const qmNavEl = document.getElementById('qm-nav-desc');
+
+            ctx.font = '14px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillText(`• 命卦相配：${bzProfileEl ? bzProfileEl.innerText : '福主命卦推算'}`, 65, 1180);
+            ctx.fillText(`• 宅命互生：${bzHouseEl ? bzHouseEl.innerText : '东四西四宅合局'}`, 65, 1210);
+            const qmText = qmNavEl ? qmNavEl.innerText : '当前出行首选西北开门大吉';
+            ctx.fillText(`• 奇门动身：${qmText.slice(0, 52)}`, 65, 1240);
+            if (qmText.length > 52) ctx.fillText(`  ${qmText.slice(52, 105)}`, 65, 1265);
+
+            // ========== 第五部：全屋空间调理与化煞清单 ==========
+            drawTianJiBanner(ctx, 1305, '第五部 · 全 屋 空 间 调 理 与 化 煞 秘 诀');
+            ctx.font = '14px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillText('• 🚪 气口大门：纳气枢纽，保持明亮整洁，门坎平整，忌对角杂物堵塞；', 65, 1375);
+            ctx.fillText('• 🍳 厨房灶火：严格避开西北乾宫天门重地(防火烧天门)，灶台忌与水槽水火对冲；', 65, 1405);
+            ctx.fillText('• 🚽 卫浴排污：避开东北艮宫表鬼门与中心中宫天心，常开排气，置粗盐净气；', 65, 1435);
+            ctx.fillText('• 💰 生旺财位：当令九紫火星与生旺向星方位，宜摆放开光阔叶绿植或聚宝盆催旺；', 65, 1465);
+            ctx.fillText('• 🛡️ 煞气化泄：遇二黑五黄病符星到门到床，安放纯铜真六帝钱或开光铜葫芦泄土。', 65, 1495);
+
+            // ========== 第六部：形峦形煞排查与天心戒言 ==========
+            drawTianJiBanner(ctx, 1535, '第六部 · 形 峦 识 煞 与 天 心 戒 赋');
+            ctx.font = '14px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillText('• 峦头识煞：窗外严防壁刀角、天斩缝、枪煞路冲与高压电塔，见煞宜安放山海镇遮挡；', 65, 1605);
+            ctx.fillText('• 阴阳调和：阳气过盛则人暴躁，阴气过重则多暗疾，宜通风向阳、明堂宽阔为上；', 65, 1635);
+            ctx.fillText('• 易圣古训：千尺为势，百尺为形；形吉气顺，百福骈臻。', 65, 1665);
+
+            // 卷尾大师签章与天地赋
+            ctx.textAlign = 'center';
+            ctx.font = 'italic 16px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.fillStyle = '#666';
+            ctx.fillText('“吉凶由人，积善之家必有余庆；理气顺天，天道酬勤。”', 450, 1770);
+
+            // 绘制底部地师大印与防伪码
+            drawAncientSeal(ctx, 750, 1870, '演象天机勘定吉局', 76, false);
+            drawAncientSeal(ctx, 150, 1870, '天人合一', 58, true);
+
+            ctx.fillStyle = '#777';
+            ctx.font = '12px "STKaiti", "KaiTi", "SimSun", serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`演象时空罗盘 · 正统三元九运堪舆存证编号：YX-${new Date().getTime().toString().slice(-8)}`, 450, 1920);
+            ctx.fillText(`本报告由演象天地罗盘算法引擎即时勘测生成 · 仅供人居环境规划与学术研讨参考`, 450, 1945);
+
+            // 6. 导出图片并弹出预览弹窗
+            try {
+                const dataUrl = cvs.toDataURL('image/jpeg', 0.94);
+                lastGeneratedTianJiDataUrl = dataUrl;
+                const imgEl = document.getElementById('tianji-preview-img');
+                if (imgEl) imgEl.src = dataUrl;
+                toggleTianJiModal(true);
+            } catch(e) {
+                console.error('generateTianJiShu error:', e);
+                alert('出图失败，请检查浏览器内存');
+            }
+        }
+    
     </script>
+
+    <!-- “福宅天机书”古典宣纸风排版预览弹窗 (PRD 第14章) -->
+    <div class="tianji-modal-overlay" id="tianji-modal">
+        <div style="color:var(--gold-primary); font-size:16px; font-weight:bold; margin-bottom:8px; display:flex; justify-content:space-between; width:100%; max-width:520px;">
+            <span>📜 福宅天机勘舆全案 · 宣纸朱丝栏长图</span>
+            <span style="cursor:pointer; color:#999;" onclick="toggleTianJiModal(false)">✕</span>
+        </div>
+        <div class="tianji-scroll-container">
+            <img id="tianji-preview-img" alt="福宅天机书渲染中..."/>
+        </div>
+        <div class="tianji-action-bar">
+            <button class="tianji-btn save" onclick="saveTianJiShuToDevice()">💾 保存到手机相册</button>
+            <button class="tianji-btn close" onclick="toggleTianJiModal(false)">关闭</button>
+        </div>
+    </div>
+    
 </body>
 </html>

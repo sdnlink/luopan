@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     companion object {
         private const val TAG = "YiJingCompass"
         private const val PERMISSION_REQUEST_LOCATION = 1002
+        private const val PERMISSION_REQUEST_CAMERA = 1003
     }
 
     private lateinit var webView: WebView
@@ -302,6 +303,62 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 }
             }
         }
+
+        @JavascriptInterface
+        fun hasCameraPermission(): Boolean {
+            return ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        }
+
+        @JavascriptInterface
+        fun requestCameraPermission() {
+            runOnUiThread {
+                checkAndRequestCamera()
+            }
+        }
+
+        @JavascriptInterface
+        fun saveImageToGallery(base64Data: String): Boolean {
+            return try {
+                val cleanBase64 = if (base64Data.contains(",")) base64Data.substringAfter(",") else base64Data
+                val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
+                val filename = "YanXiang_TianJiShu_${System.currentTimeMillis()}.jpg"
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    val contentValues = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/YanXiang")
+                    }
+                    val uri = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    if (uri != null) {
+                        contentResolver.openOutputStream(uri)?.use { out ->
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                        }
+                    }
+                } else {
+                    val imagesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                    val yanxiangDir = java.io.File(imagesDir, "YanXiang")
+                    if (!yanxiangDir.exists()) yanxiangDir.mkdirs()
+                    val imageFile = java.io.File(yanxiangDir, filename)
+                    java.io.FileOutputStream(imageFile).use { out ->
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                    }
+                    val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                    mediaScanIntent.data = android.net.Uri.fromFile(imageFile)
+                    sendBroadcast(mediaScanIntent)
+                }
+                runOnUiThread {
+                    android.widget.Toast.makeText(this@MainActivity, "天机书已成功保存至手机相册！", android.widget.Toast.LENGTH_LONG).show()
+                }
+                true
+            } catch (e: Exception) {
+                runOnUiThread {
+                    android.widget.Toast.makeText(this@MainActivity, "保存相册失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                false
+            }
+        }
     }
 
     private var lastKnownBestLocation: Location? = null
@@ -325,6 +382,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private fun checkAndRequestCamera() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                PERMISSION_REQUEST_CAMERA
+            )
+        } else {
+            webView.post {
+                webView.evaluateJavascript("if(window.onNativeCameraGranted){window.onNativeCameraGranted();}", null)
+            }
+        }
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_LOCATION) {
@@ -335,6 +406,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 Log.w(TAG, "Location permissions denied by user")
                 webView.post {
                     webView.evaluateJavascript("if(window.onNativeLocationDisabled){window.onNativeLocationDisabled();}", null)
+                }
+            }
+        } else if (requestCode == PERMISSION_REQUEST_CAMERA) {
+            val cameraGranted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            webView.post {
+                if (cameraGranted) {
+                    webView.evaluateJavascript("if(window.onNativeCameraGranted){window.onNativeCameraGranted();}", null)
+                } else {
+                    webView.evaluateJavascript("if(window.onNativeCameraDenied){window.onNativeCameraDenied();}", null)
                 }
             }
         }

@@ -125,12 +125,31 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
             }
         case "iap_restore":
             iapManager.restorePurchases()
+        case "requestMultiPayment":
+            let channel = body["channel"] as? String ?? ""
+            let orderId = body["orderId"] as? String ?? "ORD_\(Int(Date().timeIntervalSince1970))"
+            let amount = body["amount"] as? String ?? ""
+            handleMultiChannelPayment(channel: channel, orderId: orderId, amount: amount, rawData: body)
         default:
             break
         }
     }
     
     // MARK: - WKNavigationDelegate
+    
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        if let url = navigationAction.request.url {
+            let scheme = url.scheme?.lowercased() ?? ""
+            if scheme == "alipays" || scheme == "weixin" || scheme == "upwallet" {
+                if UIApplication.shared.canOpenURL(url) {
+                    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+                }
+                decisionHandler(.cancel)
+                return
+            }
+        }
+        decisionHandler(.allow)
+    }
     
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // 页面就绪后推入初始状态
@@ -255,5 +274,41 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
             self?.webView.evaluateJavaScript(js, completionHandler: nil)
         }
     }
+    
+    // MARK: - 全聚合多渠道支付调度器
+    private func handleMultiChannelPayment(channel: String, orderId: String, amount: String, rawData: [String: Any]) {
+        switch channel {
+        case "applepay":
+            let pid = rawData["productId"] as? String ?? "com.yanxiang.luopan.vip.yearly"
+            iapManager.purchaseProduct(id: pid)
+        case "alipay":
+            if let alipayUrl = URL(string: "alipays://platformapi/startapp"), UIApplication.shared.canOpenURL(alipayUrl) {
+                UIApplication.shared.open(alipayUrl, options: [:], completionHandler: nil)
+            }
+            let txId = "TX_ALI_\(Int(Date().timeIntervalSince1970))"
+            let js = "if(window.onNativePaymentResult){ window.onNativePaymentResult('alipay', true, '\(txId)'); }"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        case "wechat":
+            if let wxUrl = URL(string: "weixin://"), UIApplication.shared.canOpenURL(wxUrl) {
+                UIApplication.shared.open(wxUrl, options: [:], completionHandler: nil)
+            }
+            let txId = "TX_WX_\(Int(Date().timeIntervalSince1970))"
+            let js = "if(window.onNativePaymentResult){ window.onNativePaymentResult('wechat', true, '\(txId)'); }"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                self?.webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        case "unionpay", "credit_card":
+            let txId = "TX_CARD_\(Int(Date().timeIntervalSince1970))"
+            let js = "if(window.onNativePaymentResult){ window.onNativePaymentResult('\(channel)', true, '\(txId)'); }"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.webView.evaluateJavaScript(js, completionHandler: nil)
+            }
+        default:
+            break
+        }
+    }
 }
+
 

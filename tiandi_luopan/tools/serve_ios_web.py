@@ -26,6 +26,16 @@ def start_server(port=8080):
             self.send_header('Expires', '0')
             super().end_headers()
 
+        def guess_type(self, path):
+            ctype = super().guess_type(path)
+            if ctype.startswith('text/html'):
+                return 'text/html; charset=utf-8'
+            if ctype.startswith('application/javascript') or ctype.startswith('text/javascript'):
+                return 'application/javascript; charset=utf-8'
+            if ctype.startswith('text/'):
+                return f"{ctype}; charset=utf-8"
+            return ctype
+
     with socketserver.TCPServer(("", port), NoCacheHandler) as httpd:
         local_ip = get_local_ip()
         print("=" * 60)

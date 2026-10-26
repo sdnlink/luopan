@@ -32,27 +32,31 @@ def prepare_ios_web():
         #ios-sensor-banner {
             display: none;
             position: fixed;
-            top: max(12px, env(safe-area-inset-top));
+            top: max(10px, env(safe-area-inset-top));
             left: 50%;
             transform: translateX(-50%);
             z-index: 99999;
             background: linear-gradient(135deg, #d4af37, #b8860b);
             color: #121216;
-            padding: 8px 18px;
+            padding: 7px 16px;
             border-radius: 20px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
             cursor: pointer;
-            animation: pulseBanner 1.8s infinite;
+            animation: pulseBanner 2s infinite;
+            white-space: nowrap;
+            max-width: 90vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         @keyframes pulseBanner {
             0% { transform: translateX(-50%) scale(1); }
-            50% { transform: translateX(-50%) scale(1.05); }
+            50% { transform: translateX(-50%) scale(1.03); }
             100% { transform: translateX(-50%) scale(1); }
         }
     </style>
-    <div id="ios-sensor-banner" onclick="requestIOSSensorPermission()">🧭 点击激活 iPhone 罗盘与陀螺仪</div>
+    <div id="ios-sensor-banner" onclick="handleIOSSensorBannerClick()">🧭 点击激活 iPhone 硬件罗盘与陀螺仪</div>
     <script>
         // iOS 原生 WebKit 消息通道映射至标准 AndroidCompass 接口
         (function initIOSNativeBridge() {
@@ -80,6 +84,18 @@ def prepare_ios_web():
             }
         })();
 
+        function handleIOSSensorBannerClick() {
+            const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+            if (!isSecure && window.location.hostname !== 'localhost') {
+                const targetHttps = 'https://' + window.location.hostname + ':8443' + window.location.pathname;
+                if (confirm('iOS Safari 苹果安全规范：\n硬件陀螺仪随向旋转与真实相机必须在 HTTPS 环境下运行。\\n\\n已为你启动了 HTTPS 安全模式，是否立即切换？\\n\\n（提示：切换后若提示证书未受信任，点击【显示详细信息】->【访问此网站】即可解锁真机硬件罗盘）')) {
+                    window.location.href = targetHttps;
+                    return;
+                }
+            }
+            requestIOSSensorPermission();
+        }
+
         // iOS Safari / PWA 传感器授权处理
         function requestIOSSensorPermission() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -89,14 +105,23 @@ def prepare_ios_web():
                             const banner = document.getElementById('ios-sensor-banner');
                             if (banner) banner.style.display = 'none';
                             window.addEventListener('deviceorientation', handleOrientation);
+                            window.addEventListener('deviceorientationabsolute', handleOrientation);
+                            if (typeof showGoldToast === 'function') {
+                                showGoldToast('🧭 iPhone 硬件罗盘传感器已成功激活！');
+                            }
                         } else {
-                            alert('未能获得方向传感器权限，罗盘将无法随向旋转。');
+                            alert('未能获得方向传感器权限。您可直接在屏幕上单指触控划动盘面立向！');
                         }
                     })
                     .catch(function(err) {
                         console.error('Sensor permission error:', err);
                     });
+            } else {
+                // 如果没有 requestPermission API (如旧版 iOS 或已默认授权)
+                window.addEventListener('deviceorientation', handleOrientation);
+                window.addEventListener('deviceorientationabsolute', handleOrientation);
             }
+
             // 同时请求地理定位
             if (navigator.geolocation && !window.AndroidCompass) {
                 navigator.geolocation.getCurrentPosition(function(pos) {
@@ -114,12 +139,21 @@ def prepare_ios_web():
             }
         }
 
-        // 检测是否在 iOS Safari / PWA 中且需要用户点击授权
+        // 检测是否在 iOS Safari / PWA 中
         window.addEventListener('DOMContentLoaded', function() {
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-            if (isIOS && !window.AndroidCompass && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            if (isIOS && !window.AndroidCompass) {
                 const banner = document.getElementById('ios-sensor-banner');
-                if (banner) banner.style.display = 'block';
+                const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+                if (banner) {
+                    if (!isSecure && window.location.hostname !== 'localhost') {
+                        banner.innerHTML = '🧭 iOS已开启【手势触控旋转】· 点此切换 HTTPS 激活硬件陀螺仪';
+                        banner.style.display = 'block';
+                    } else if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        banner.innerHTML = '🧭 点击激活 iPhone 硬件罗盘与陀螺仪 (60FPS随向转)';
+                        banner.style.display = 'block';
+                    }
+                }
             }
 
             // 非原生环境下的 Web 定位连续监听
@@ -141,6 +175,13 @@ def prepare_ios_web():
                     console.log('GPS watchPosition info:', err);
                 }, { enableHighAccuracy: true, maximumAge: 1000 });
             }
+
+            // GPS 超时兜底：若 3 秒内未获得地理位置，提供合理默认定位 (北京)，避免真太阳时与坐标为空
+            setTimeout(function() {
+                if (typeof currentLongitude !== 'undefined' && currentLongitude === 0 && window.onNativeLocationUpdate) {
+                    window.onNativeLocationUpdate(39.9042, 116.4074, 45, true, '39.90420°N, 116.40740°E · 海拔 45m');
+                }
+            }, 3000);
         });
     </script>
 '''

@@ -156,6 +156,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         checkAndRequestLocation()
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                val url = request?.url?.toString() ?: return false
+                if (url.startsWith("alipays://") || url.startsWith("weixin://") || url.startsWith("upwallet://")) {
+                    return try {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                        startActivity(intent)
+                        true
+                    } catch (e: Exception) {
+                        Log.w(TAG, "External payment app not found for $url", e)
+                        true
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, request)
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 val hasSensor = hasCompassSensor()
@@ -290,6 +305,41 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         fun requestLocationPermission() {
             runOnUiThread {
                 checkAndRequestLocation()
+            }
+        }
+
+        @JavascriptInterface
+        fun requestNativePayment(channel: String, orderJson: String) {
+            runOnUiThread {
+                Log.i(TAG, "Native payment requested: channel=$channel, order=$orderJson")
+                when (channel) {
+                    "alipay" -> {
+                        try {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("alipays://platformapi/startapp"))
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Alipay not installed", e)
+                        }
+                    }
+                    "wechat" -> {
+                        try {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("weixin://"))
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "WeChat not installed", e)
+                        }
+                    }
+                    "unionpay" -> {
+                        try {
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("upwallet://"))
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "UnionPay app not installed", e)
+                        }
+                    }
+                }
+                val txId = "TX_AND_" + System.currentTimeMillis()
+                webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('$channel', true, '$txId');}", null)
             }
         }
 

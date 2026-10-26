@@ -72,7 +72,10 @@ def prepare_ios_web():
                     getLongitude: function() { return window.__iosLon || 0; },
                     getDeclination: function() { return window.__iosDeclination || 0; },
                     hasDeclination: function() { return !!window.__iosHasDeclination; },
-                    getCoordsDesc: function() { return window.__iosCoordsDesc || ""; }
+                    getCoordsDesc: function() { return window.__iosCoordsDesc || ""; },
+                    purchaseProduct: function(pid) { handler.postMessage({action: "iap_purchase", productId: pid}); },
+                    restorePurchases: function() { handler.postMessage({action: "iap_restore"}); },
+                    getIAPStatus: function() { handler.postMessage({action: "iap_getStatus"}); }
                 };
             }
         })();

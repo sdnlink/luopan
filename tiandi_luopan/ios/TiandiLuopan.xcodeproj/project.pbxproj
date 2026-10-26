@@ -16,6 +16,8 @@
 		1007 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2007 /* WebKit.framework */; };
 		1008 /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2008 /* CoreLocation.framework */; };
 		1009 /* CoreMotion.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2009 /* CoreMotion.framework */; };
+		1010 /* StoreKitIAPManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2011 /* StoreKitIAPManager.swift */; };
+		1011 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2012 /* StoreKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +32,8 @@
 		2008 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		2009 /* CoreMotion.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMotion.framework; path = System/Library/Frameworks/CoreMotion.framework; sourceTree = SDKROOT; };
 		2010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2011 /* StoreKitIAPManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitIAPManager.swift; sourceTree = "<group>"; };
+		2012 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +44,7 @@
 				1007 /* WebKit.framework in Frameworks */,
 				1008 /* CoreLocation.framework in Frameworks */,
 				1009 /* CoreMotion.framework in Frameworks */,
+				1011 /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +67,7 @@
 				2002 /* SceneDelegate.swift */,
 				2003 /* ViewController.swift */,
 				2004 /* CompassMotionManager.swift */,
+				2011 /* StoreKitIAPManager.swift */,
 				2005 /* Assets.xcassets */,
 				2006 /* www */,
 				2010 /* Info.plist */,
@@ -75,6 +81,7 @@
 				2007 /* WebKit.framework */,
 				2008 /* CoreLocation.framework */,
 				2009 /* CoreMotion.framework */,
+				2012 /* StoreKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -161,6 +168,7 @@
 				1002 /* SceneDelegate.swift in Sources */,
 				1003 /* ViewController.swift in Sources */,
 				1004 /* CompassMotionManager.swift in Sources */,
+				1010 /* StoreKitIAPManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

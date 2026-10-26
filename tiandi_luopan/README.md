@@ -304,6 +304,24 @@ python tools/serve_ios_web.py
 ```
 iPhone 连接同一 Wi-Fi，用 Safari 打开控制台输出的局域网网址，点击底部分享按钮 -> **「添加到主屏幕」**，即可免签名作为独立全屏 App 运行，享受 60FPS 流畅罗盘。
 
+### 5.5 Apple In-App Purchase (IAP) 原生内购与付费权益接入
+
+iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMessageHandler` 双向桥接通道，符合 App Store 审核准则（支持非消耗品与自动续期订阅恢复购买）：
+
+* **原生管理器**：[`StoreKitIAPManager.swift`](file:///e:/code/android/tiandi_luopan/ios/TiandiLuopan/StoreKitIAPManager.swift)
+* **商品配置清单 (Apple App Store Connect)**：
+  | 商品 ID (Product Identifier) | 类型 | 官方参考定价 | 权益说明 |
+  | :--- | :--- | :--- | :--- |
+  | `com.yanxiang.luopan.vip.yearly` | 自动续期订阅 (Auto-Renewable) | ¥198/年 | 演象·年度堪舆会员（解锁全场景全息交互、奇门全息排盘、紫白客星布防、宣纸长图无限导出） |
+  | `com.yanxiang.luopan.pro.lifetime` | 非消耗品 (Non-Consumable) | ¥298 | 演象·大师终身专业版（一次付费，终身永久享受所有专业特权与未来算法升级） |
+  | `com.yanxiang.luopan.floorplan.single` | 消耗品 (Consumable) | ¥19.9/套 | 户型空间立极·单套房型全案体检（几何重心立极、全屋动线与明财文昌位吉凶诊断） |
+  | `com.yanxiang.luopan.tianji.single` | 消耗品 (Consumable) | ¥9.9/次 | 福宅天机堪舆全案宣纸长卷·单次无水印高清长图导出 |
+
+* **审核合规保障**：
+  - 支持 **恢复已购项目 (Restore Purchases)**，一键找回已购权益；
+  - 界面提供用户服务协议、隐私保护政策弹窗与自动续费订阅扣款详细说明；
+  - Web 预览环境下内置友好交易模拟，支持无缝测试付费流程。
+
 ---
 
 ## 6. 演象 2.0 全息罗盘升级架构与产品设计文档 (PRD)

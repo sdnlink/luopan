@@ -45,6 +45,10 @@
 	<string>演象时空罗盘需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。</string>
 	<key>NSMotionUsageDescription</key>
 	<string>演象时空罗盘需要使用高精度运动传感器以驱动双轴太极水准仪与指南针。</string>
+	<key>NSCameraUsageDescription</key>
+	<string>演象时空罗盘需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>演象时空罗盘需要将实景勘测长图与水印存证快照保存至您的相册。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

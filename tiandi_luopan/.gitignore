@@ -25,3 +25,7 @@ ios/**/DerivedData/
 ios/**/*.xcodeproj/xcuserdata/
 ios/**/*.xcodeproj/project.xcworkspace/xcuserdata/
 
+# 本地调试 SSL 证书密钥
+.cert/
+ios/.cert/
+*.pem

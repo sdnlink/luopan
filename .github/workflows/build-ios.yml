@@ -26,6 +26,7 @@ jobs:
 
       - name: Build Archive
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project ios/TiandiLuopan.xcodeproj \
             -scheme TiandiLuopan \
@@ -34,7 +35,11 @@ jobs:
             -archivePath build/TiandiLuopan.xcarchive \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || {
+              echo "::error::Xcodebuild Archive Failed. Printing Error Details:"
+              grep -E "error:|fatal error:" xcodebuild.log || tail -n 120 xcodebuild.log
+              exit 1
+            }
 
       - name: Package Unsigned IPA
         run: |

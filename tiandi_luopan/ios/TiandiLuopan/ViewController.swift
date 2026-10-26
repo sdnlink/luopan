@@ -1,10 +1,11 @@
 import UIKit
 import WebKit
 
-class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, CompassMotionManagerDelegate {
+class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, CompassMotionManagerDelegate, StoreKitIAPManagerDelegate {
     
     private var webView: WKWebView!
     private let motionManager = CompassMotionManager.shared
+    private let iapManager = StoreKitIAPManager.shared
     
     override var preferredStatusBarStyle: UIStatusBarStyle {
         return .lightContent
@@ -26,6 +27,8 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
         
         motionManager.delegate = self
         motionManager.start()
+        
+        iapManager.delegate = self
     }
     
     deinit {
@@ -108,6 +111,20 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
             motionManager.refreshLocation()
         case "requestLocationPermission":
             motionManager.requestLocationPermission()
+            
+        // MARK: - Apple In-App Purchase (IAP) 原生桥接通道
+        case "iap_getProducts":
+            let json = iapManager.getProductsJSON()
+            webView.evaluateJavaScript("if(window.onNativeIAPProducts){window.onNativeIAPProducts(\(json));}", completionHandler: nil)
+        case "iap_getStatus":
+            let json = iapManager.getStatusJSON()
+            webView.evaluateJavaScript("if(window.onNativeIAPStatusUpdate){window.onNativeIAPStatusUpdate(\(json));}", completionHandler: nil)
+        case "iap_purchase":
+            if let pid = body["productId"] as? String {
+                iapManager.purchaseProduct(id: pid)
+            }
+        case "iap_restore":
+            iapManager.restorePurchases()
         default:
             break
         }
@@ -123,6 +140,8 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
         let speed = String(format: "%.1f", motionManager.currentSpeedKmH)
         let pitch = String(format: "%.1f", motionManager.currentPitch)
         let roll = String(format: "%.1f", motionManager.currentRoll)
+        let iapStatus = iapManager.getStatusJSON()
+        let iapProducts = iapManager.getProductsJSON()
         
         let js = """
         if(window.onNativeCompassAvailable){ window.onNativeCompassAvailable(true); }
@@ -130,6 +149,8 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
         if(window.onNativeSpeedUpdate){ window.onNativeSpeedUpdate(\(speed)); }
         if(window.onNativeTiltUpdate){ window.onNativeTiltUpdate(\(pitch), \(roll)); }
         if(window.onNativeDeclinationUpdate){ window.onNativeDeclinationUpdate(\(decl), \(hasDecl), ''); }
+        if(window.onNativeIAPStatusUpdate){ window.onNativeIAPStatusUpdate(\(iapStatus)); }
+        if(window.onNativeIAPProducts){ window.onNativeIAPProducts(\(iapProducts)); }
         """
         webView.evaluateJavaScript(js, completionHandler: nil)
     }
@@ -193,4 +214,46 @@ class ViewController: UIViewController, WKScriptMessageHandler, WKNavigationDele
             self?.webView.evaluateJavaScript(js, completionHandler: nil)
         }
     }
+    
+    // MARK: - StoreKitIAPManagerDelegate
+    
+    func iapManagerDidUpdateProducts(_ products: [SKProduct]) {
+        let json = iapManager.getProductsJSON()
+        let js = "if(window.onNativeIAPProducts){ window.onNativeIAPProducts(\(json)); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func iapManagerDidCompletePurchase(productId: String, transactionId: String) {
+        let statusJson = iapManager.getStatusJSON()
+        let js = """
+        if(window.onNativeIAPStatusUpdate){ window.onNativeIAPStatusUpdate(\(statusJson)); }
+        if(window.onNativeIAPPurchaseSuccess){ window.onNativeIAPPurchaseSuccess('\(productId)', '\(transactionId)'); }
+        """
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func iapManagerDidFailPurchase(productId: String, errorMsg: String) {
+        let escapedError = errorMsg.replacingOccurrences(of: "'", with: "\\'")
+        let js = "if(window.onNativeIAPPurchaseError){ window.onNativeIAPPurchaseError('\(productId)', '\(escapedError)'); }"
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
+    
+    func iapManagerDidRestorePurchases(unlockedProductIds: [String]) {
+        let statusJson = iapManager.getStatusJSON()
+        let listStr = unlockedProductIds.map { "'\($0)'" }.joined(separator: ",")
+        let js = """
+        if(window.onNativeIAPStatusUpdate){ window.onNativeIAPStatusUpdate(\(statusJson)); }
+        if(window.onNativeIAPRestoreSuccess){ window.onNativeIAPRestoreSuccess([\(listStr)]); }
+        """
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(js, completionHandler: nil)
+        }
+    }
 }
+

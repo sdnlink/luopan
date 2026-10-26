@@ -30,7 +30,7 @@ def package_ipa():
     payload_dir = os.path.join(build_dir, "Payload")
     app_dir = os.path.join(payload_dir, "TiandiLuopan.app")
     dist_dir = os.path.join(root_dir, "dist-ios")
-    ipa_path = os.path.join(dist_dir, "YanXiangCompass-v1.2.4.ipa")
+    ipa_path = os.path.join(dist_dir, "YanXiangCompass-v1.3.0.ipa")
 
     # Clean previous build
     if os.path.exists(build_dir):

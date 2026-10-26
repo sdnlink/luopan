@@ -1,5 +1,11 @@
 import SwiftUI
 
+// MARK: - iOS 14.0 颜色向下兼容扩展
+extension Color {
+    public static let yanCyan = Color(red: 0.0, green: 0.82, blue: 0.95)
+    public static let yanBrown = Color(red: 0.65, green: 0.45, blue: 0.25)
+}
+
 // MARK: - 演象·时空罗盘 纯原生 SwiftUI 根视图 (Root Content View)
 
 public struct RootContentView: View {

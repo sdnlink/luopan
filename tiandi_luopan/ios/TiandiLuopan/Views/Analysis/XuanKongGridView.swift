@@ -140,7 +140,7 @@ public struct XuanKongGridView: View {
             HStack {
                 Text("运\(cell.periodStar)")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color.cyan)
+                    .foregroundColor(Color.yanCyan)
                 Spacer()
                 if cell.isShaWuHuang || cell.isShaErHei {
                     Text("煞")

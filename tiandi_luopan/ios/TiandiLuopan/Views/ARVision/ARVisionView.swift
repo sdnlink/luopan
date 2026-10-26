@@ -104,7 +104,7 @@ public struct ARVisionView: View {
                 Rectangle()
                     .fill(
                         LinearGradient(
-                            colors: [Color.clear, Color.cyan.opacity(0.6), Color.cyan, Color.clear],
+                            colors: [Color.clear, Color.yanCyan.opacity(0.6), Color.yanCyan, Color.clear],
                             startPoint: .top,
                             endPoint: .bottom
                         )
@@ -179,25 +179,25 @@ public struct ARVisionView: View {
         ZStack {
             // 外圈绿/金刻度准星
             Circle()
-                .stroke(Color.cyan.opacity(0.5), lineWidth: 1.5)
+                .stroke(Color.yanCyan.opacity(0.5), lineWidth: 1.5)
                 .frame(width: 140, height: 140)
             
             Circle()
-                .stroke(Color.cyan.opacity(0.8), lineWidth: 1)
+                .stroke(Color.yanCyan.opacity(0.8), lineWidth: 1)
                 .frame(width: 40, height: 40)
             
             // 十字线
             Rectangle()
-                .fill(Color.cyan.opacity(0.6))
+                .fill(Color.yanCyan.opacity(0.6))
                 .frame(width: 1, height: 180)
             Rectangle()
-                .fill(Color.cyan.opacity(0.6))
+                .fill(Color.yanCyan.opacity(0.6))
                 .frame(width: 180, height: 1)
             
             // 方位角角标
             Text("\(String(format: "%.1f", motion.headingState.facingAngle))°")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(.cyan)
+                .foregroundColor(.yanCyan)
                 .offset(y: -50)
         }
         .allowsHitTesting(false)
@@ -289,7 +289,7 @@ public struct ARVisionView: View {
                                 .font(.system(size: 12, weight: idx == selectedShaIndex ? .bold : .medium))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
-                                .background(idx == selectedShaIndex ? Color.cyan.opacity(0.8) : Color.white.opacity(0.15))
+                                .background(idx == selectedShaIndex ? Color.yanCyan.opacity(0.8) : Color.white.opacity(0.15))
                                 .foregroundColor(idx == selectedShaIndex ? .black : .white)
                                 .cornerRadius(12)
                         }
@@ -363,7 +363,7 @@ public struct ShaRemedyDetailSheet: View {
                             .font(.system(size: 15, weight: .bold))
                         Text(sha.classicalText)
                             .font(.system(size: 13, weight: .medium, design: .serif))
-                            .foregroundColor(.brown)
+                            .foregroundColor(.yanBrown)
                             .padding(10)
                             .background(Color.yellow.opacity(0.1))
                             .cornerRadius(8)

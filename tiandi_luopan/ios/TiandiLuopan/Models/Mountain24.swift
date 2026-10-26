@@ -81,6 +81,7 @@ public struct CompassHeadingState {
     public var fenJinDesc: String = ""        // 分金描述 (如: 丁巳丁亥分金)
     
     public var pitch: Double = 0.0            // 俯仰角
+    public var roll: Double = 0.0             // 横滚角
     public var isLevel: Bool = true           // 是否水平 (< 2°)
     
     public init(

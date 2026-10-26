@@ -140,7 +140,7 @@ public struct BaZhaiView: View {
             .padding(.horizontal, 16)
             
             VStack(spacing: 8) {
-                ForEach(shItems.prefix(12)) { item in
+                ForEach(Array(shItems.prefix(12))) { item in
                     HStack {
                         Text(item.mountainName + "山")
                             .font(.system(size: 15, weight: .bold, design: .serif))

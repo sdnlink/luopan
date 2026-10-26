@@ -175,17 +175,24 @@ public struct CompassDialView: View {
     }
     
     // MARK: - 先天八卦环
+    private struct GuaItem: Identifiable {
+        let id: String
+        let angle: Double
+    }
+    
     private func eightGuaLayer(radius: CGFloat) -> some View {
-        let guas = [
-            ("坎", 0.0), ("艮", 45.0), ("震", 90.0), ("巽", 135.0),
-            ("离", 180.0), ("坤", 225.0), ("兑", 270.0), ("乾", 315.0)
+        let guas: [GuaItem] = [
+            GuaItem(id: "坎", angle: 0.0), GuaItem(id: "艮", angle: 45.0),
+            GuaItem(id: "震", angle: 90.0), GuaItem(id: "巽", angle: 135.0),
+            GuaItem(id: "离", angle: 180.0), GuaItem(id: "坤", angle: 225.0),
+            GuaItem(id: "兑", angle: 270.0), GuaItem(id: "乾", angle: 315.0)
         ]
-        return ForEach(guas, id: \.0) { item in
-            Text(item.0)
+        return ForEach(guas) { item in
+            Text(item.id)
                 .font(.system(size: 15, weight: .black, design: .serif))
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
                 .offset(y: -radius + 14)
-                .rotationEffect(.degrees(item.1))
+                .rotationEffect(.degrees(item.angle))
         }
     }
     

@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 // MARK: - 原生高清相机预览层 (AVCaptureSession Representable)
 

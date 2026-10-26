@@ -1,5 +1,6 @@
 import Foundation
 import StoreKit
+import Combine
 
 // MARK: - IAP 商品与权益定义
 

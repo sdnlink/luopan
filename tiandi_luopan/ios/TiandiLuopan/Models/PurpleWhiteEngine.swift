@@ -232,16 +232,19 @@ public class PurpleWhiteEngine {
             let isSuiPo = (pId == suiPoPalace)
             let isSanSha = sanShaPalaces.contains(pId)
             
-            // 二五交加判断
-            let isDanger25 = (yStar == 5 && mStar == 2) || (yStar == 2 && mStar == 5) || (yStar == 5 && pId == 2) || (yStar == 2 && pId == 5)
+            // 二五交加必须由同一宫的流年、流月客星实际形成 2/5 组合。
+            // 仅凭宫位编号为 2 或 5 会把正常星位误报为重煞。
+            let isDanger25 = (yStar == 5 && mStar == 2) || (yStar == 2 && mStar == 5)
+            let hasFiveYellow = yStar == 5 || mStar == 5
+            let hasIllnessStar = yStar == 2 || mStar == 2
             
             var advice = ""
             if lang == .en {
                 if isDanger25 {
                     advice = "[2-5 Severe Taboo] Illness Star meets Five Yellow. Hang 6-Emperor coins & brass gourd."
-                } else if yStar == 5 {
-                    advice = "[Five Yellow Taboo] Earth sha; avoid drilling; place pacifying water cure."
-                } else if yStar == 2 {
+                } else if hasFiveYellow {
+                    advice = "[Five Yellow Taboo] Annual or monthly Earth sha; avoid drilling and place a pacifying cure."
+                } else if hasIllnessStar {
                     advice = "[Illness Star] Guard digestion & health; utilize copper feng shui items."
                 } else if yStar == 9 {
                     advice = "[Auspicious Star] 9-Purple brings joy & vitality; display fresh plants."
@@ -255,9 +258,9 @@ public class PurpleWhiteEngine {
             } else if lang == .zhHant {
                 if isDanger25 {
                     advice = "【二五交加重煞】病符逢五黃，宜懸掛六帝古錢與銅葫蘆化解"
-                } else if yStar == 5 {
-                    advice = "【歲煞五黃】不宜動土鑽牆，宜安放安忍水安撫土氣"
-                } else if yStar == 2 {
+                } else if hasFiveYellow {
+                    advice = "【歲月五黃】不宜動土鑽牆，宜安放安忍水安撫土氣"
+                } else if hasIllnessStar {
                     advice = "【病符臨門】注意脾胃與婦科，宜用銅制風水法物化洩"
                 } else if yStar == 9 {
                     advice = "【當令吉星】九紫喜慶星飛臨，宜擺放紅綠綠植催旺姻緣添丁"
@@ -271,9 +274,9 @@ public class PurpleWhiteEngine {
             } else {
                 if isDanger25 {
                     advice = "【二五交加重煞】病符逢五黄，宜悬挂六帝古钱与铜葫芦化解"
-                } else if yStar == 5 {
-                    advice = "【岁煞五黄】不宜动土钻墙，宜安放安忍水安抚土气"
-                } else if yStar == 2 {
+                } else if hasFiveYellow {
+                    advice = "【岁月五黄】不宜动土钻墙，宜安放安忍水安抚土气"
+                } else if hasIllnessStar {
                     advice = "【病符临门】注意脾胃与妇科，宜用铜制风水法物化泄"
                 } else if yStar == 9 {
                     advice = "【当令吉星】九紫喜庆星飞临，宜摆放红绿绿植催旺姻缘添丁"

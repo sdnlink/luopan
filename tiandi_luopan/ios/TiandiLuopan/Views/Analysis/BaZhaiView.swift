@@ -264,7 +264,7 @@ public struct BaZhaiView: View {
                                 .foregroundColor(.white)
                         }
                         Spacer()
-                        Text("\(lang.t("clash_at"))【\(basha.shaDir)\(basha.shaZhi)】")
+                        Text("\(lang.t("clash_at"))【\(basha.localizedShaDir)】")
                             .font(.system(size: 11, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -296,7 +296,7 @@ public struct BaZhaiView: View {
                 // 3. 三合十二长生水法总纲卡
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(lang.t("water_rule_12")): \(state.sittingMountain.name)\(lang.t("mountain_suffix"))")
+                        Text("\(lang.t("water_rule_12")): \(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text(lang.t("water_rule_desc"))
@@ -314,17 +314,17 @@ public struct BaZhaiView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(shItems.prefix(12))) { item in
                         HStack {
-                            Text(item.mountainName + lang.t("mountain_suffix"))
+                            Text(item.localizedMountainName + lang.t("mountain_suffix"))
                                 .font(.system(size: 15, weight: .bold, design: .serif))
                                 .foregroundColor(.white)
-                                .frame(width: 50, alignment: .leading)
+                                .frame(width: 60, alignment: .leading)
                             
-                            Text("【\(item.phase.rawValue)】")
+                            Text("【\(item.phase.localizedName)】")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(item.phase == .changSheng || item.phase == .diWang ? Color.green : (item.phase == .mu || item.phase == .jue ? Color.orange : Color.white.opacity(0.8)))
-                                .frame(width: 70, alignment: .leading)
+                                .frame(width: 80, alignment: .leading)
                             
-                            Text(item.phase.waterRule)
+                            Text(item.phase.localizedWaterRule)
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.8))
                             

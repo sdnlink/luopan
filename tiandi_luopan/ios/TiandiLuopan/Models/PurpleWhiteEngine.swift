@@ -23,6 +23,7 @@ public struct PurpleWhiteChart {
     public let month: Int
     public let yearCentralStar: Int
     public let monthCentralStar: Int
+    public let currentFacingPalace: Int // 当前罗盘向首对应的洛书宫号
     public let taiSuiDescription: String
     public let suiPoDescription: String
     public let sanShaDescription: String
@@ -310,10 +311,28 @@ public class PurpleWhiteEngine {
             month: effectiveMonth,
             yearCentralStar: yCenter,
             monthCentralStar: mCenter,
+            currentFacingPalace: palaceID(for: heading),
             taiSuiDescription: taiSuiDesc,
             suiPoDescription: suiPoDesc,
             sanShaDescription: sanShaDesc,
             palaceItems: palaceItems
         )
+    }
+
+    /// Map the live compass bearing to the corresponding eight-direction
+    /// Luoshu palace. The center palace has no bearing and is not returned.
+    private func palaceID(for heading: Double) -> Int {
+        let normalized = (heading.truncatingRemainder(dividingBy: 360.0) + 360.0)
+            .truncatingRemainder(dividingBy: 360.0)
+        switch normalized {
+        case 337.5..<360.0, 0.0..<22.5: return 1   // North / Kan
+        case 22.5..<67.5: return 8                 // Northeast / Gen
+        case 67.5..<112.5: return 3                // East / Zhen
+        case 112.5..<157.5: return 4               // Southeast / Xun
+        case 157.5..<202.5: return 9               // South / Li
+        case 202.5..<247.5: return 2               // Southwest / Kun
+        case 247.5..<292.5: return 7               // West / Dui
+        default: return 6                          // Northwest / Qian
+        }
     }
 }

@@ -244,7 +244,10 @@ public class QimenEngine {
                     tianStem: "戊",
                     diStem: "戊",
                     isTaiJiCenter: true,
-                    isDoorAuspicious: true
+                    // The center palace has no door. Mark it neutral so the
+                    // grid does not render the placeholder as an auspicious
+                    // travel gate.
+                    isDoorAuspicious: false
                 ))
             } else {
                 // `displayPalaceDefs` includes the center at index 4.  Using

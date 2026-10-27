@@ -5,6 +5,7 @@ import SwiftUI
 public struct FloorplanView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     
     @State private var rooms: [FloorplanRoom] = FloorplanEngine.shared.generateSampleRooms()
     @State private var centroid: CGPoint = CGPoint(x: 0.5, y: 0.5) // 归一化重心
@@ -60,7 +61,7 @@ public struct FloorplanView: View {
     private func topControlBar() -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("户型空间立极 · 全屋体检")
+                Text(lang.t("floorplan_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text("当前立向: \(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.name)山\(motion.headingState.facingMountain.name)向)")
@@ -80,7 +81,7 @@ public struct FloorplanView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "photo.badge.plus")
-                    Text(userFloorplanImage == nil ? "导入图纸" : "更换图纸")
+                    Text(userFloorplanImage == nil ? lang.t("import_plan") : lang.t("change_plan"))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 7)
@@ -94,7 +95,7 @@ public struct FloorplanView: View {
                 Button(action: {
                     userFloorplanImage = nil
                 }) {
-                    Text("重置示例")
+                    Text(lang.t("reset_sample"))
                         .font(.system(size: 10))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 5)
@@ -283,7 +284,7 @@ public struct FloorplanView: View {
     private func auditListSection(report: [FloorplanAuditItem]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("🏠 全屋风水格局体检清单 (\(report.count)条诊断)")
+                Text("🏠 \(lang.t("audit_checklist")) (\(report.count))")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Spacer()

@@ -100,6 +100,7 @@ public struct CameraPreviewView: UIViewRepresentable {
 public struct ARVisionView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     
     // 激光扫描线动画
     @State private var scanOffset: CGFloat = -180
@@ -169,7 +170,7 @@ public struct ARVisionView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("勘察报告水印快照已成功保存至相册")
+                        Text(lang.t("save_success"))
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
                     }
@@ -317,7 +318,7 @@ public struct ARVisionView: View {
     private func topStatusBar() -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("AR 实景天心透视")
+                Text(lang.t("ar_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text("物理向首: \(motion.headingState.facingMountain.name)山 (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
@@ -348,7 +349,7 @@ public struct ARVisionView: View {
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: "camera.fill")
-                    Text("存证快照")
+                    Text(lang.t("capture_proof"))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 9)
@@ -364,7 +365,7 @@ public struct ARVisionView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "shield.lefthalf.fill")
-                    Text("化解锦囊")
+                    Text(lang.t("remedy_guide"))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 9)

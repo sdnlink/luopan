@@ -5,6 +5,7 @@ import SwiftUI
 public struct XuanKongGridView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedSubTab: Int = 0 // 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门
     @State private var selectedPeriod: Int = 9
     @State private var showTianJiShuSheet: Bool = false
@@ -60,10 +61,10 @@ public struct XuanKongGridView: View {
     // MARK: - 子 Tab 切换栏
     private func subTabBar() -> some View {
         HStack(spacing: 0) {
-            tabButton(title: "玄空九星", index: 0)
-            tabButton(title: "八宅三合", index: 1)
-            tabButton(title: "紫白客星", index: 2)
-            tabButton(title: "时家奇门", index: 3)
+            tabButton(title: lang.t("xuankong_stars"), index: 0)
+            tabButton(title: lang.t("bazhai_sanhe"), index: 1)
+            tabButton(title: lang.t("purple_white"), index: 2)
+            tabButton(title: lang.t("qimen_dunjia"), index: 3)
         }
         .background(Color.white.opacity(0.08))
         .cornerRadius(8)
@@ -90,7 +91,7 @@ public struct XuanKongGridView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "scroll.fill")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text("福宅天机堪舆全案长卷")
+                    Text(lang.t("tianji_scroll"))
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -104,7 +105,7 @@ public struct XuanKongGridView: View {
             Button(action: {
                 showTianJiShuSheet = true
             }) {
-                Text("一键出图")
+                Text(lang.t("one_click_export"))
                     .font(.system(size: 11, weight: .bold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
@@ -145,7 +146,7 @@ public struct XuanKongGridView: View {
     // MARK: - 元运切换栏
     private func periodPickerBar() -> some View {
         VStack(spacing: 6) {
-            Text("元运选择 (当前下元九运 2024-2043)")
+            Text(lang.t("current_period_9"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.white.opacity(0.6))
             

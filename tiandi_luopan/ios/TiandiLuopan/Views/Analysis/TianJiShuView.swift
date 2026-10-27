@@ -5,6 +5,7 @@ import SwiftUI
 public struct TianJiShuView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     
     @State private var scrollImage: UIImage? = nil
@@ -88,7 +89,7 @@ public struct TianJiShuView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "square.and.arrow.down.fill")
-                                        Text("保存至相册")
+                                        Text(lang.t("save_to_photos"))
                                     }
                                     .font(.system(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
@@ -114,7 +115,7 @@ public struct TianJiShuView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "square.and.arrow.up.fill")
-                                        Text("长卷分享与打印")
+                                        Text(lang.t("share_and_print"))
                                     }
                                     .font(.system(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
@@ -134,7 +135,7 @@ public struct TianJiShuView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "checkmark.seal.fill")
                                 .foregroundColor(.green)
-                            Text("宣纸天机书已成功保存至系统相册！")
+                            Text(lang.t("save_success"))
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white)
                         }
@@ -146,8 +147,8 @@ public struct TianJiShuView: View {
                     }
                 }
             }
-            .navigationBarTitle("福宅天机书 · 宣纸长卷", displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarTitle(lang.t("tianji_scroll"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(lang.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
             .onAppear {

@@ -119,7 +119,7 @@ public final class ZeRiEngine {
             } else {
                 suiPo = "今日【\(dayBranch)日】直冲年支太岁【\(yearBranch)位】，犯【岁破大煞】，主百事不利。"
             }
-            warnings.append(suiPo!)
+            if let suiPo = suiPo { warnings.append(suiPo) }
         }
         
         // 月破冲煞：日支冲当令月支
@@ -131,7 +131,7 @@ public final class ZeRiEngine {
             } else {
                 yuePo = "今日【\(dayBranch)日】直冲月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
             }
-            warnings.append(yuePo!)
+            if let yuePo = yuePo { warnings.append(yuePo) }
         }
         
         // 坐山冲犯：二十四山要先归并到对应的十二地支，不能只匹配
@@ -155,7 +155,7 @@ public final class ZeRiEngine {
             } else {
                 sanSha = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }
-            warnings.append(sanSha!)
+            if let sanSha = sanSha { warnings.append(sanSha) }
         }
         
         let isAuspicious = warnings.isEmpty

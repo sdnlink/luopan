@@ -29,7 +29,7 @@ public final class WorldMagneticModel {
         c.calendar = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(secondsFromGMT: 0)
         c.year = 2020; c.month = 1; c.day = 1
-        return c.date!
+        return c.date ?? Date(timeIntervalSince1970: 0)
     }()
 
     private init() {}

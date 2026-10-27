@@ -62,7 +62,11 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     @Published public private(set) var lastCompletedProductID: String?
     
     public var hasUnlockedVIP: Bool {
-        return isVIPUser || isLifetimeUser
+        // Read the persisted expiry on every entitlement check. The app can
+        // remain in the foreground past an annual expiry, so relying only on
+        // the last published Boolean would keep premium screens unlocked
+        // until the next scene activation.
+        return isLifetimeUser || isVIP()
     }
     
     public var canUseFloorplan: Bool {

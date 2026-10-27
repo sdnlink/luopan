@@ -5,6 +5,7 @@ import SwiftUI
 public struct BaZhaiView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedSubTab: Int = 0 // 0: 八宅明镜, 1: 三合水法
     @State private var showPaywall: Bool = false
     public var isEmbedded: Bool = false

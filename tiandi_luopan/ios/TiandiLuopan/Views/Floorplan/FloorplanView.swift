@@ -360,6 +360,7 @@ public struct FloorplanView: View {
 public struct RoomAuditDetailSheet: View {
     public let room: FloorplanRoom
     @Environment(\.presentationMode) var presentationMode
+    @ObservedObject var lang = LocalizationManager.shared
     
     public init(room: FloorplanRoom) {
         self.room = room

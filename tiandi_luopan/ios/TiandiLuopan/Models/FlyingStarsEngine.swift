@@ -16,6 +16,18 @@ public struct PalaceCell: Identifiable {
     public let isShaWuHuang: Bool   // 是否五黄大煞
     public let isShaErHei: Bool     // 是否二黑病符
     
+    public var sittingStar: Int { mountainStar }
+    public var element: String {
+        switch id {
+        case 0: return "水"
+        case 1, 4, 7: return "土"
+        case 2, 3: return "木"
+        case 5, 6: return "金"
+        case 8: return "火"
+        default: return "土"
+        }
+    }
+    
     public var evaluation: String {
         if mountainStar == 9 && facingStar == 9 {
             return "九运双星会向 · 财源广聚"
@@ -33,6 +45,8 @@ public struct PalaceCell: Identifiable {
     }
 }
 
+public typealias XuanKongPalace = PalaceCell
+
 public struct XuanKongChart {
     public let period: Int                // 当前元运 (1..9, 现为九运 2024-2043)
     public let sittingMountain: String   // 坐山
@@ -42,6 +56,7 @@ public struct XuanKongChart {
     public let isQiXingDaJie: Bool       // 七星打劫局
     public let palaces: [PalaceCell]     // 九宫格数据
     public let summaryAnalysis: String   // 综合格局断语
+    public var patternDesc: String { summaryAnalysis }
 }
 
 public final class FlyingStarsEngine {

@@ -56,7 +56,7 @@ public struct PurpleWhiteView: View {
                 // 3x3 九宫飞星网格 (流年客星与二五交加报警)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(chart.palaceItems) { item in
-                        palaceCellView(item: item)
+                        palaceCellView(item: item, isFacing: item.palaceId == chart.currentFacingPalace)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -83,13 +83,13 @@ public struct PurpleWhiteView: View {
         .cornerRadius(6)
     }
     
-    private func palaceCellView(item: PurpleWhitePalaceItem) -> some View {
+    private func palaceCellView(item: PurpleWhitePalaceItem, isFacing: Bool) -> some View {
         // Both annual and monthly Five Yellow can affect the current palace;
         // the chart's advice uses the same rule so the visual warning cannot
         // disagree with the detail text.
         let isDanger = item.isDanger25 || item.yearGuestStar == 5 || item.monthGuestStar == 5
         let isJi = [1, 4, 6, 8, 9].contains(item.yearGuestStar)
-        let strokeColor = isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12))
+        let strokeColor = isFacing ? Color.yanCyan : (isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12)))
         let bgColor = isDanger ? Color.red.opacity(0.12) : (isJi ? Color.green.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         
         return VStack(spacing: 2) {
@@ -107,6 +107,11 @@ public struct PurpleWhiteView: View {
                     Text(lang.t("tag_sansha"))
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.purple)
+                }
+                if isFacing {
+                    Image(systemName: "location.north.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.yanCyan)
                 }
             }
             

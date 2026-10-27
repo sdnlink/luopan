@@ -5240,6 +5240,7 @@
             }
         }
     
+        let webSmoothedHeading = null;
         function handleOrientation(e){
             // 若原生桥接已存在则不处理网页传感器，避免多重事件冲突
             if (window.AndroidCompass) return;
@@ -5247,8 +5248,8 @@
             if (isTouchDraggingCompass) return;
 
             if (e.beta !== null && e.beta !== undefined && e.gamma !== null && e.gamma !== undefined) {
-                currentPitch = e.beta;
-                currentRoll = e.gamma;
+                currentPitch = currentPitch * 0.82 + e.beta * 0.18;
+                currentRoll = currentRoll * 0.82 + e.gamma * 0.18;
                 updateTiltDisplay();
             }
             if (isHeadingLocked) return;
@@ -5262,8 +5263,26 @@
             if (heading !== undefined && !isNaN(heading)) {
                 compassEnabled = true;
                 const norm = ((heading % 360) + 360) % 360;
-                targetHeading = norm;
-                currentHeading = norm; // 消除补间滞后，达到原生 60FPS
+                if (webSmoothedHeading === null) {
+                    webSmoothedHeading = norm;
+                } else {
+                    let diff = norm - webSmoothedHeading;
+                    if (diff > 180) diff -= 360;
+                    else if (diff < -180) diff += 360;
+                    
+                    const absDiff = Math.abs(diff);
+                    let alpha = 0.2;
+                    if (absDiff < 0.15) {
+                        alpha = 0.03; // 死区滤除微抖
+                    } else if (absDiff < 1.0) {
+                        alpha = 0.15;
+                    } else {
+                        alpha = 0.55;
+                    }
+                    webSmoothedHeading = (webSmoothedHeading + diff * alpha + 360) % 360;
+                }
+                currentHeading = webSmoothedHeading;
+                targetHeading = webSmoothedHeading;
                 isAnimatingCompass = false;
                 scheduleCompassDraw();
                 scheduleThrottledDomUpdate();

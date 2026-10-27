@@ -38,8 +38,10 @@ public final class ZeRiEngine {
         let day = comp.day ?? 27
         let hour = comp.hour ?? 12
         
-        // 1. 年柱干支
-        let yOffset = (year - 4) % 60
+        // 1. 年柱干支 (严格遵循立春交岁天干地支更迭法则)
+        let isBeforeLiChun = (month < 2 || (month == 2 && day < 4))
+        let gzYear = isBeforeLiChun ? (year - 1) : year
+        let yOffset = (gzYear - 4) % 60
         let yearStem = stems[((yOffset % 10) + 10) % 10]
         let yearBranch = branches[((yOffset % 12) + 12) % 12]
         

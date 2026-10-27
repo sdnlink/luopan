@@ -63,8 +63,9 @@ public struct CompassDialView: View {
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
+                .drawingGroup() // 启用 Metal GPU 纹理光栅化，彻底消除旋转时几百个图层的 CPU 测量与重绘负荷
                 .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
-                .animation(.interactiveSpring(response: 0.12, dampingFraction: 0.88), value: motion.continuousHeading)
+                .animation(.linear(duration: 0.05), value: motion.continuousHeading)
                 
                 // 2. 固定不动的十字天心线 (Crosshair)
                 crosshairLayer(size: size)

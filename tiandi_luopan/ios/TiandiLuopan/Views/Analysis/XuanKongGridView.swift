@@ -7,7 +7,7 @@ public struct XuanKongGridView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedSubTab: Int = 0 // 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门
-    @State private var selectedPeriod: Int = 9
+    @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     @State private var showTianJiShuSheet: Bool = false
     @State private var showPaywall: Bool = false
     
@@ -134,7 +134,7 @@ public struct XuanKongGridView: View {
     // MARK: - 玄空九星排盘内容
     private func xuanKongContent(chart: XuanKongChart) -> some View {
         VStack(spacing: 14) {
-            periodPickerBar()
+            periodPickerBar(chart: chart)
             patternBadgeView(chart: chart)
             ninePalacesGrid(chart: chart)
                 .padding(.horizontal, 16)
@@ -143,18 +143,24 @@ public struct XuanKongGridView: View {
         }
     }
     
-    // MARK: - 元运切换栏
-    private func periodPickerBar() -> some View {
-        VStack(spacing: 6) {
-            Text(lang.t("current_period_9"))
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+    // MARK: - 元运切换栏 (完全根据天文学与干支历法动态推导，杜绝任何硬编码)
+    private func periodPickerBar(chart: XuanKongChart) -> some View {
+        let curPeriod = FlyingStarsEngine.shared.currentPeriod(for: Date())
+        
+        return VStack(spacing: 6) {
+            Text(chart.periodMeta.label)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(chart.periodMeta.isCurrent ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.75))
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(1...9, id: \.self) { p in
+                        let isCur = (p == curPeriod)
+                        let isSelected = (p == selectedPeriod)
+                        let isLocked = (!isCur && !iap.hasUnlockedVIP)
+                        
                         Button(action: {
-                            if p != 9 && !iap.hasUnlockedVIP {
+                            if isLocked {
                                 showPaywall = true
                             } else {
                                 selectedPeriod = p
@@ -162,15 +168,15 @@ public struct XuanKongGridView: View {
                         }) {
                             HStack(spacing: 2) {
                                 Text("\(p)\(lang.t("xuankong_period_unit"))")
-                                if p != 9 && !iap.hasUnlockedVIP {
+                                if isLocked {
                                     Image(systemName: "lock.fill")
                                         .font(.system(size: 8))
                                 }
                             }
-                            .font(.system(size: 13, weight: p == selectedPeriod ? .bold : .medium))
-                            .frame(width: p != 9 && !iap.hasUnlockedVIP ? 52 : 44, height: 32)
-                            .background(p == selectedPeriod ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
-                            .foregroundColor(p == selectedPeriod ? .black : .white)
+                            .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                            .frame(width: isLocked ? 52 : 44, height: 32)
+                            .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
+                            .foregroundColor(isSelected ? .black : .white)
                             .cornerRadius(8)
                         }
                     }

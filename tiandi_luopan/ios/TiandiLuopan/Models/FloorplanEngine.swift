@@ -72,46 +72,58 @@ public class FloorplanEngine {
     
     private init() {}
     
-    // 生成演示标准三室两厅精装户型
+    // 生成演示标准三室两厅精装户型 (支持根据当前语言动态输出，杜绝英文下出现中文硬编码)
     public func generateSampleRooms() -> [FloorplanRoom] {
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
+        let doorName = isEn ? "Main Entrance (South Qi)" : (isHant ? "入戶大門 (正南明堂納氣)" : "入户大门 (正南明堂纳气)")
+        let livingName = isEn ? "Spacious Living Room" : (isHant ? "聚氣大客廳" : "聚气大客厅")
+        let masterName = isEn ? "Master Bedroom" : (isHant ? "尊貴主臥" : "尊贵主卧")
+        let studyName = isEn ? "Quiet Study Room" : (isHant ? "文昌靜雅書房" : "文昌静雅书房")
+        let secondBedName = isEn ? "Second Bedroom" : (isHant ? "靜心次臥" : "静心次卧")
+        let kitchenName = isEn ? "Gourmet Kitchen" : (isHant ? "膳食廚房" : "膳食厨房")
+        let bathroomName = isEn ? "Main Bathroom" : (isHant ? "主衛浴間" : "主卫浴间")
+        let balconyName = isEn ? "South Balcony" : (isHant ? "南向大陽台" : "南向大阳台")
+        
         return [
             FloorplanRoom(
-                name: "入户大门 (正南明堂纳气)",
+                name: doorName,
                 type: .door,
                 rect: CGRect(x: 0.40, y: 0.82, width: 0.20, height: 0.12)
             ),
             FloorplanRoom(
-                name: "聚气大客厅",
+                name: livingName,
                 type: .livingRoom,
                 rect: CGRect(x: 0.32, y: 0.45, width: 0.38, height: 0.36)
             ),
             FloorplanRoom(
-                name: "尊贵主卧",
+                name: masterName,
                 type: .masterBedroom,
                 rect: CGRect(x: 0.70, y: 0.42, width: 0.25, height: 0.45)
             ),
             FloorplanRoom(
-                name: "文昌静雅书房",
+                name: studyName,
                 type: .study,
                 rect: CGRect(x: 0.32, y: 0.10, width: 0.35, height: 0.30)
             ),
             FloorplanRoom(
-                name: "静心次卧",
+                name: secondBedName,
                 type: .secondBedroom,
                 rect: CGRect(x: 0.70, y: 0.10, width: 0.25, height: 0.30)
             ),
             FloorplanRoom(
-                name: "膳食厨房",
+                name: kitchenName,
                 type: .kitchen,
                 rect: CGRect(x: 0.05, y: 0.10, width: 0.24, height: 0.30)
             ),
             FloorplanRoom(
-                name: "主卫浴间",
+                name: bathroomName,
                 type: .bathroom,
                 rect: CGRect(x: 0.05, y: 0.45, width: 0.24, height: 0.25)
             ),
             FloorplanRoom(
-                name: "南向大阳台",
+                name: balconyName,
                 type: .balcony,
                 rect: CGRect(x: 0.32, y: 0.88, width: 0.38, height: 0.10)
             )
@@ -124,6 +136,8 @@ public class FloorplanEngine {
         var auditReport: [FloorplanAuditItem] = []
         
         let degPerRad = 180.0 / Double.pi
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
         
         for room in rooms {
             var r = room
@@ -143,7 +157,13 @@ public class FloorplanEngine {
             
             // 解算八卦宫位: 坎(0°/北), 艮(45°/东北), 震(90°/东), 巽(135°/东南), 离(180°/南), 坤(225°/西南), 兑(270°/西), 乾(315°/西北)
             let palace = resolvePalace(geoAngle: geoAngle)
-            r.palaceName = "\(palace.dir) \(palace.gua)宫"
+            if isEn {
+                r.palaceName = "\(palace.dir) (\(palace.gua) Palace)"
+            } else if isHant {
+                r.palaceName = "\(palace.dir) \(palace.gua)宮"
+            } else {
+                r.palaceName = "\(palace.dir) \(palace.gua)宫"
+            }
             
             // 风水动态研判
             let audit = evaluateRoom(type: r.type, palaceGua: palace.gua, palaceDir: palace.dir)
@@ -179,14 +199,37 @@ public class FloorplanEngine {
     }
     
     private func resolvePalace(geoAngle: Double) -> (dir: String, gua: String) {
-        if geoAngle >= 337.5 || geoAngle < 22.5 { return ("正北", "坎") }
-        if geoAngle >= 22.5 && geoAngle < 67.5 { return ("东北", "艮") }
-        if geoAngle >= 67.5 && geoAngle < 112.5 { return ("正东", "震") }
-        if geoAngle >= 112.5 && geoAngle < 157.5 { return ("东南", "巽") }
-        if geoAngle >= 157.5 && geoAngle < 202.5 { return ("正南", "离") }
-        if geoAngle >= 202.5 && geoAngle < 247.5 { return ("西南", "坤") }
-        if geoAngle >= 247.5 && geoAngle < 292.5 { return ("正西", "兑") }
-        return ("西北", "乾")
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
+        if isEn {
+            if geoAngle >= 337.5 || geoAngle < 22.5 { return ("North", "Kan") }
+            if geoAngle >= 22.5 && geoAngle < 67.5 { return ("Northeast", "Gen") }
+            if geoAngle >= 67.5 && geoAngle < 112.5 { return ("East", "Zhen") }
+            if geoAngle >= 112.5 && geoAngle < 157.5 { return ("Southeast", "Xun") }
+            if geoAngle >= 157.5 && geoAngle < 202.5 { return ("South", "Li") }
+            if geoAngle >= 202.5 && geoAngle < 247.5 { return ("Southwest", "Kun") }
+            if geoAngle >= 247.5 && geoAngle < 292.5 { return ("West", "Dui") }
+            return ("Northwest", "Qian")
+        } else if isHant {
+            if geoAngle >= 337.5 || geoAngle < 22.5 { return ("正北", "坎") }
+            if geoAngle >= 22.5 && geoAngle < 67.5 { return ("東北", "艮") }
+            if geoAngle >= 67.5 && geoAngle < 112.5 { return ("正東", "震") }
+            if geoAngle >= 112.5 && geoAngle < 157.5 { return ("東南", "巽") }
+            if geoAngle >= 157.5 && geoAngle < 202.5 { return ("正南", "離") }
+            if geoAngle >= 202.5 && geoAngle < 247.5 { return ("西南", "坤") }
+            if geoAngle >= 247.5 && geoAngle < 292.5 { return ("正西", "兌") }
+            return ("西北", "乾")
+        } else {
+            if geoAngle >= 337.5 || geoAngle < 22.5 { return ("正北", "坎") }
+            if geoAngle >= 22.5 && geoAngle < 67.5 { return ("东北", "艮") }
+            if geoAngle >= 67.5 && geoAngle < 112.5 { return ("正东", "震") }
+            if geoAngle >= 112.5 && geoAngle < 157.5 { return ("东南", "巽") }
+            if geoAngle >= 157.5 && geoAngle < 202.5 { return ("正南", "离") }
+            if geoAngle >= 202.5 && geoAngle < 247.5 { return ("西南", "坤") }
+            if geoAngle >= 247.5 && geoAngle < 292.5 { return ("正西", "兑") }
+            return ("西北", "乾")
+        }
     }
     
     private func evaluateRoom(type: FloorplanRoomType, palaceGua: String, palaceDir: String) -> (title: String, level: String, lore: String, advice: String) {

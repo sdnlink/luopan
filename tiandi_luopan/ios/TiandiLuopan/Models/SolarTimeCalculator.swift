@@ -52,10 +52,15 @@ public final class SolarTimeCalculator {
         let termIdx = (dayOfYear / 15) % 24
         let termName = solarTerms[termIdx]
         
-        // 简要四柱干支生成
+        // 简要四柱干支生成 (严格遵循立春交岁正统天文学天干地支更迭法则)
         let year = calendar.component(.year, from: date)
-        let yearStem = heavenlyStems[(year - 4) % 10]
-        let yearBranch = earthlyBranches[(year - 4) % 12]
+        let month = calendar.component(.month, from: date)
+        let day = calendar.component(.day, from: date)
+        let isBeforeLiChun = (month < 2 || (month == 2 && day < 4))
+        let gzYear = isBeforeLiChun ? (year - 1) : year
+        
+        let yearStem = heavenlyStems[((gzYear - 4) % 10 + 10) % 10]
+        let yearBranch = earthlyBranches[((gzYear - 4) % 12 + 12) % 12]
         let bazi = "\(yearStem)\(yearBranch)年 · \(termName)令"
         
         return SolarTimeResult(

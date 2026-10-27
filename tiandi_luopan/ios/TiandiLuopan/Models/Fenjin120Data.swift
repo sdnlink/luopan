@@ -34,9 +34,11 @@ public struct FenjinItem: Identifiable {
             }
         case .zhHant:
             return grade.replacingOccurrences(of: "旺相大吉", with: "旺相大吉")
+                .replacingOccurrences(of: "孤虚", with: "孤虛")
                 .replacingOccurrences(of: "差错", with: "差錯")
                 .replacingOccurrences(of: "退财", with: "退財")
                 .replacingOccurrences(of: "空亡", with: "空亡")
+                .replacingOccurrences(of: "龟", with: "龜")
         default: return grade
         }
     }
@@ -58,6 +60,16 @@ public struct FenjinItem: Identifiable {
                 .replacingOccurrences(of: "旺相", with: "旺相")
                 .replacingOccurrences(of: "气", with: "氣")
                 .replacingOccurrences(of: "煞气", with: "煞氣")
+                .replacingOccurrences(of: "阴", with: "陰")
+                .replacingOccurrences(of: "阳", with: "陽")
+                .replacingOccurrences(of: "财", with: "財")
+                .replacingOccurrences(of: "龟", with: "龜")
+                .replacingOccurrences(of: "针", with: "針")
+                .replacingOccurrences(of: "祸", with: "禍")
+                .replacingOccurrences(of: "师", with: "師")
+                .replacingOccurrences(of: "绝", with: "絕")
+                .replacingOccurrences(of: "横", with: "橫")
+                .replacingOccurrences(of: "发", with: "發")
         default: return lore
         }
     }

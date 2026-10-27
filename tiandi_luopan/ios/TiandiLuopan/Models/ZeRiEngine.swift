@@ -151,7 +151,7 @@ public final class ZeRiEngine {
             if lang == .en {
                 sanSha = "Day branch clashes with House Sitting Mountain (\(sitting.pinyin)); Sitting Clash Taboo."
             } else if lang == .zhHant {
-                sanSha = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.name)山】，犯【衝山大忌】，切勿動土安門！"
+                sanSha = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.localizedName)山】，犯【衝山大忌】，切勿動土安門！"
             } else {
                 sanSha = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }

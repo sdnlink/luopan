@@ -924,14 +924,14 @@ public struct ARVisionView: View {
                 """
             } else if isHant {
                 infoText = """
-                向首方位: \(mFacing.name)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
+                向首方位: \(mFacing.localizedName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(mFacing.localizedPalace)
                 識別形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
                 現場經緯: \(coordsStr)
                 勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(Date().timeIntervalSince1970))
                 """
             } else {
                 infoText = """
-                向首方位: \(mFacing.name)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
+                向首方位: \(mFacing.localizedName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.localizedPalace)
                 识别形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
                 现场经纬: \(coordsStr)
                 勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(Date().timeIntervalSince1970))

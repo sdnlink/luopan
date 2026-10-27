@@ -229,11 +229,11 @@ public final class Mountain24Data {
                 fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Direct Alignment"
             }
         } else if isHant {
-            var s = "\(sittingM.name)山\(facingM.name)向"
+            var s = "\(sittingM.localizedName)山\(facingM.localizedName)向"
             if isJian {
                 let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
                 let neighborM = mountain(for: neighborAngle)
-                s += " 兼 \(neighborM.name) (偏\(String(format: "%.1f", jianDeg))°)"
+                s += " 兼 \(neighborM.localizedName) (偏\(String(format: "%.1f", jianDeg))°)"
             } else {
                 s += " 正針下卦"
             }

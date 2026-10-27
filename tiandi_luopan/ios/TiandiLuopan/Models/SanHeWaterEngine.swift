@@ -194,6 +194,7 @@ public final class SanHeWaterEngine {
     public func resolveHuangQuanWater(facing: Mountain24Item) -> HuangQuanWaterResult {
         let name = facing.name
         let pinyin = facing.pinyin
+        let localizedName = facing.localizedName
         let lang = LocalizationManager.shared.effectiveLanguage
         
         var desc = ""
@@ -274,7 +275,7 @@ public final class SanHeWaterEngine {
                 isJiuPin = true
                 badge = "救貧大吉向首"
             } else {
-                desc = "向首為【\(name)山向】。不屬八路黃泉正煞位，水法依楊公三合十二長生（養生冠臨旺，生來會旺、拔水入庫）消納即吉。"
+                desc = "向首為【\(localizedName)山向】。不屬八路黃泉正煞位，水法依楊公三合十二長生（養生冠臨旺，生來會旺、拔水入庫）消納即吉。"
                 badge = "正針純清納水"
             }
         } else {
@@ -339,7 +340,17 @@ public final class SanHeWaterEngine {
             lore = "Sitting Mountain Sha in \(info.dir) (\(info.zhi)). Strictly avoid high-voltage towers, sharp rocks, or stagnant water in this sector."
         } else if lang == .zhHant {
             remedy = "消砂法則：該方若見高壓電線塔、壁刀尖角，急需懸掛山海鎮或五嶽真形圖予以遮擋化解。"
-            lore = info.lore
+            let hantLore: [String: String] = [
+                "坎": "坎卦三山（壬／子／癸）煞在辰位。辰方最忌見高壓電塔、尖角怪石或破敗死水，犯之主腎疾、下元損丁。",
+                "坤": "坤卦三山（未／坤／申）煞在卯位。忌正東見衝射，主脾胃敗壞、老母傷損。",
+                "震": "震卦三山（甲／卯／乙）煞在申位。忌西南申方突兀尖峰，主長房傷殘、足疾官非。",
+                "巽": "巽卦三山（辰／巽／巳）煞在酉位。忌正西酉金直衝，主婦女產厄、風聲是非。",
+                "乾": "乾卦三山（戌／乾／亥）煞在午位。忌正南離火烈焰反克天門，主心腦血光、損老翁。",
+                "兑": "兌卦三山（庚／酉／辛）煞在巳位。忌東南巳火傷金，主少女不利、肺疾吐血。",
+                "艮": "艮卦三山（丑／艮／寅）煞在寅位。忌東北見破山絕澗，損幼子少男。",
+                "离": "離卦三山（丙／午／丁）煞在亥位。忌西北亥水衝射，主眼疾暗昧、中房受制。"
+            ]
+            lore = hantLore[palace] ?? info.lore
         } else {
             remedy = "消砂法则：该方若见高压电线塔、壁刀尖角，急需悬挂山海镇或五岳真形图予以遮挡化解。"
             lore = info.lore

@@ -35,13 +35,15 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public var roll: Double = 0.0
     @Published public var isLevel: Bool = true
     
-    @Published public var latitude: Double = 39.9042
-    @Published public var longitude: Double = 116.4074
-    @Published public var altitude: Double = 45.0
+    @Published public var latitude: Double = 0.0
+    @Published public var longitude: Double = 0.0
+    @Published public var altitude: Double = 0.0
     @Published public var speedKmH: Double = 0.0
-    @Published public var coordsDesc: String = "39.90420°N, 116.40740°E · 45m"
-    @Published public var trueSolarTimeStr: String = "12:00:00"
-    @Published public var solarTimeDesc: String = "12:00:00"
+    @Published public var coordsDesc: String = ""
+    @Published public private(set) var hasLocationFix: Bool = false
+    @Published public private(set) var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published public var trueSolarTimeStr: String = "--:--:--"
+    @Published public var solarTimeDesc: String = ""
     
     @Published public var isDistorted: Bool = false
     @Published public var magneticStrengthUT: Double = 48.0
@@ -63,10 +65,25 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastSolarCalcTime: TimeInterval = 0
     private var lastResolvedHeading: Double = -999.0
     private var lastResolvedTime: TimeInterval = 0
+    private var cancellables = Set<AnyCancellable>()
     
     override public init() {
         super.init()
         setupLocationManager()
+        locationAuthorizationStatus = locationManager.authorizationStatus
+        coordsDesc = LocalizationManager.shared.t("location_unavailable")
+        solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+        // Keep the placeholder location out of user-visible reports until an
+        // actual Core Location fix has arrived.
+        latitude = 0.0
+        longitude = 0.0
+        LocalizationManager.shared.$effectiveLanguage
+            .sink { [weak self] _ in
+                guard let self = self, !self.hasLocationFix else { return }
+                self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
+                self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+            }
+            .store(in: &cancellables)
         hapticTick.prepare()
         hapticLevel.prepare()
     }
@@ -89,6 +106,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
         
         let status = locationManager.authorizationStatus
+        locationAuthorizationStatus = status
         if status == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
         } else if status == .authorizedWhenInUse || status == .authorizedAlways {
@@ -109,8 +127,23 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     public func requestLocationPermission() {
         locationManager.requestWhenInUseAuthorization()
     }
+
+    /// Once the user has denied location access, iOS will not show the
+    /// permission prompt again. Expose a direct settings action so the GPS
+    /// dependent true-north and solar-time features can be recovered.
+    public func openLocationSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url) else { return }
+        UIApplication.shared.open(url)
+    }
     
     public func refreshLocation() {
+        let status = locationManager.authorizationStatus
+        locationAuthorizationStatus = status
+        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+            locationManager.requestWhenInUseAuthorization()
+            return
+        }
         locationManager.startUpdatingLocation()
     }
     
@@ -187,11 +220,25 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
         
         // 节流 headingState 广播：防止一秒数十次全量 TabView 深度重绘风暴引发手机发烫
-        let angleDelta = abs(effective - lastResolvedHeading)
+        // Headings are circular.  A transition such as 359.9° -> 0.1° is a
+        // 0.2° movement and must not be treated as a 359.8° jump; otherwise
+        // the throttled state update fires on every north crossing.
+        let angleDelta: Double
+        if lastResolvedHeading < 0 {
+            angleDelta = .infinity
+        } else {
+            let rawAngleDelta = abs(effective - lastResolvedHeading)
+            angleDelta = min(rawAngleDelta, 360.0 - rawAngleDelta)
+        }
         if force || angleDelta >= 0.25 || (now - lastResolvedTime >= 0.1) {
             lastResolvedHeading = effective
             lastResolvedTime = now
-            let resolved = Mountain24Data.shared.resolveHeadingState(heading: effective, pitch: pitch, roll: roll)
+            let resolved = Mountain24Data.shared.resolveHeadingState(
+                heading: effective,
+                pitch: pitch,
+                roll: roll,
+                trueHeading: trueHeading
+            )
             self.headingState = resolved
             
             // 跨越二十四山边界时触发微触觉反馈
@@ -209,6 +256,13 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             wasLevel = resolved.isLevel
         }
         
+        // 没有真实经度时不展示基于占位经度计算出的太阳时。
+        guard hasLocationFix else {
+            trueSolarTimeStr = "--:--:--"
+            solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+            return
+        }
+
         // 节流真太阳时历法计算：真太阳时以秒为单位，每 1.0 秒最多计算一次球面三角，大幅减低 CPU 负荷
         if force || (now - lastSolarCalcTime >= 1.0) {
             lastSolarCalcTime = now
@@ -264,8 +318,17 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
-            guard self.isRunning else { return }
             let status = manager.authorizationStatus
+            self.locationAuthorizationStatus = status
+            if status == .denied || status == .restricted {
+                self.hasLocationFix = false
+                self.hasDeclination = false
+                self.currentDeclination = 0.0
+                self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
+                self.trueSolarTimeStr = "--:--:--"
+                self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+            }
+            guard self.isRunning else { return }
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 manager.startUpdatingLocation()
                 if CLLocationManager.headingAvailable() {
@@ -284,10 +347,21 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         DispatchQueue.main.async {
             self.magneticHeading = mag
             
-            if newHeading.trueHeading >= 0 {
+            // Core Location's trueHeading is useful as a first estimate, but its
+            // value depends on the OS location cache. Once a WMM result exists,
+            // keep the two needles driven by the same offline model everywhere.
+            if newHeading.trueHeading >= 0 && !self.hasDeclination &&
+                (self.locationAuthorizationStatus == .authorizedWhenInUse || self.locationAuthorizationStatus == .authorizedAlways) {
                 self.trueHeading = newHeading.trueHeading
-                self.currentDeclination = newHeading.trueHeading - newHeading.magneticHeading
+                var declination = newHeading.trueHeading - newHeading.magneticHeading
+                if declination > 180.0 { declination -= 360.0 }
+                if declination < -180.0 { declination += 360.0 }
+                self.currentDeclination = declination
                 self.hasDeclination = true
+            }
+            if self.hasDeclination {
+                self.trueHeading = (mag + self.currentDeclination + 360.0)
+                    .truncatingRemainder(dividingBy: 360.0)
             }
             
             if !self.isLocked {
@@ -297,7 +371,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             
             if now - self.lastHeadingTime >= 0.033 {
                 self.lastHeadingTime = now
-                self.delegate?.didUpdateHeading(magneticHeading: newHeading.magneticHeading, trueHeading: newHeading.trueHeading, accuracy: newHeading.headingAccuracy)
+                self.delegate?.didUpdateHeading(magneticHeading: mag, trueHeading: self.trueHeading, accuracy: newHeading.headingAccuracy)
             }
             
             let accLevel: Int
@@ -314,9 +388,27 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         guard let loc = locations.last else { return }
         
         DispatchQueue.main.async {
+            guard loc.coordinate.latitude.isFinite,
+                  loc.coordinate.longitude.isFinite,
+                  loc.horizontalAccuracy >= 0 else { return }
+            self.locationAuthorizationStatus = manager.authorizationStatus
+            self.hasLocationFix = true
             self.latitude = loc.coordinate.latitude
             self.longitude = loc.coordinate.longitude
             self.altitude = loc.altitude
+
+            let wmm = WorldMagneticModel.shared.field(
+                latitude: loc.coordinate.latitude,
+                longitude: loc.coordinate.longitude,
+                altitudeMeters: loc.altitude,
+                date: Date()
+            )
+            self.currentDeclination = wmm.declination
+            self.hasDeclination = true
+            // East declination rotates a magnetic bearing clockwise toward true
+            // north. Normalize to [0, 360) for consumers and the dial renderer.
+            self.trueHeading = (self.magneticHeading + wmm.declination + 360.0)
+                .truncatingRemainder(dividingBy: 360.0)
             
             let isEn = LocalizationManager.shared.effectiveLanguage == .en
             let latLabel = loc.coordinate.latitude >= 0 ? LocalizationManager.shared.t("lat_north") : LocalizationManager.shared.t("lat_south")
@@ -344,10 +436,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 accuracy: loc.horizontalAccuracy
             )
             
-            // 获得有效定位后及时挂起 GPS，切断手机真机高功耗持续发热源
-            if loc.horizontalAccuracy > 0 && loc.horizontalAccuracy < 100 {
-                self.locationManager.stopUpdatingLocation()
-            }
+            // Keep location updates alive: speed and the live coordinate shown
+            // by the compass must continue to refresh after the first fix.
         }
     }
 }

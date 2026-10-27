@@ -9,6 +9,37 @@ public struct SolarTermItem: Identifiable {
     public let season: String          // "春", "夏", "秋", "冬"
     public let hexagramName: String?   // 十二消息卦/辟卦 (如 "地天泰")
     public let isMajorTerm: Bool       // 是否为分至点 (春分、秋分、夏至、冬至)
+
+    public var localizedName: String {
+        let language = LocalizationManager.shared.effectiveLanguage
+        if language == .en {
+            return ["冬至": "Winter Solstice", "小寒": "Minor Cold", "大寒": "Major Cold", "立春": "Start of Spring", "雨水": "Rain Water", "惊蛰": "Awakening of Insects", "春分": "Spring Equinox", "清明": "Clear and Bright", "谷雨": "Grain Rain", "立夏": "Start of Summer", "小满": "Grain Buds", "芒种": "Grain in Ear", "夏至": "Summer Solstice", "小暑": "Minor Heat", "大暑": "Major Heat", "立秋": "Start of Autumn", "处暑": "End of Heat", "白露": "White Dew", "秋分": "Autumn Equinox", "寒露": "Cold Dew", "霜降": "Frost Descent", "立冬": "Start of Winter", "小雪": "Minor Snow", "大雪": "Major Snow"][name] ?? name
+        }
+        if language == .zhHant {
+            return ["惊蛰": "驚蟄", "小满": "小滿", "芒种": "芒種", "处暑": "處暑"][name] ?? name
+        }
+        return name
+    }
+
+    /// Short label used inside the compact compass ring. It must follow the
+    /// selected language instead of exposing the source Chinese hexagram name.
+    public var localizedHexagramLabel: String? {
+        guard let hexagramName = hexagramName else { return nil }
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return ["地雷复": "Fu", "地泽临": "Lin", "地天泰": "Tai", "雷天大壮": "Da Zhuang", "泽天夬": "Guai", "乾为天": "Qian", "天风姤": "Gou", "天山遁": "Dun", "天地否": "Pi", "风地观": "Guan", "山地剥": "Bo", "坤为地": "Kun"][hexagramName] ?? "Hexagram"
+        case .zhHant:
+            return hexagramName
+                .replacingOccurrences(of: "复", with: "復")
+                .replacingOccurrences(of: "泽", with: "澤")
+                .replacingOccurrences(of: "壮", with: "壯")
+                .replacingOccurrences(of: "遁", with: "遯")
+                .replacingOccurrences(of: "观", with: "觀")
+                .replacingOccurrences(of: "剥", with: "剝")
+        default:
+            return hexagramName
+        }
+    }
 }
 
 public class SolarTermsData {

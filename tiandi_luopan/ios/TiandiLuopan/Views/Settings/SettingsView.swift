@@ -8,6 +8,8 @@ public struct SettingsView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showCalibrationGuide: Bool = false
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
+    @State private var paymentError: String = ""
+    @State private var showPaymentError: Bool = false
     
     public init() {
         UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
@@ -71,6 +73,7 @@ public struct SettingsView: View {
                                 .foregroundColor(.black)
                                 .cornerRadius(8)
                             }
+                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts)
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -108,13 +111,28 @@ public struct SettingsView: View {
                         }
                     }
                     
-                    HStack {
-                        Text(lang.t("gps_coords"))
-                        Spacer()
-                        Text(motion.coordsDesc)
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(lang.t("gps_coords"))
+                            Spacer()
+                            Text(motion.coordsDesc)
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 11))
+                                .lineLimit(1)
+                        }
+                        if motion.locationAuthorizationStatus == .denied || motion.locationAuthorizationStatus == .restricted {
+                            Button(lang.t("open_system_settings")) {
+                                motion.openLocationSettings()
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.yanCyan)
+                        } else if motion.locationAuthorizationStatus == .notDetermined {
+                            Button(lang.t("request_location_permission")) {
+                                motion.requestLocationPermission()
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color.yanCyan)
+                        }
                     }
                     
                     HStack {
@@ -165,7 +183,7 @@ public struct SettingsView: View {
                     HStack {
                         Text(lang.t("settings_app_version"))
                         Spacer()
-                        Text("v1.3.0 (SwiftUI Native 2.0)")
+                        Text(lang.t("settings_version_value"))
                             .foregroundColor(.secondary)
                             .font(.system(size: 13))
                     }
@@ -184,6 +202,15 @@ public struct SettingsView: View {
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet()
             }
+        .onReceive(iap.$lastErrorMessage) { message in
+            if let message = message {
+                paymentError = message
+                showPaymentError = true
+            }
+        }
+        .alert(isPresented: $showPaymentError) {
+            Alert(title: Text(lang.t("payment_failed_title")), message: Text(paymentError), dismissButton: .default(Text(lang.t("done"))))
+        }
         }
         .preferredColorScheme(.dark)
     }
@@ -214,7 +241,7 @@ public struct SettingsView: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
-                Text(id.priceText)
+                Text(iap.localizedPrice(for: id))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
@@ -239,7 +266,7 @@ public struct SettingsView: View {
                 .font(.system(size: 12))
                 .foregroundColor(.white.opacity(0.85))
             Spacer()
-            Text("VIP")
+            Text(lang.t("vip_short"))
                 .font(.system(size: 9, weight: .bold))
                 .foregroundColor(.yellow)
         }

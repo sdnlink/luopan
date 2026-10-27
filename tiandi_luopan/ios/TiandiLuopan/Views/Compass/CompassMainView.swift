@@ -88,7 +88,8 @@ public struct CompassMainView: View {
     // MARK: - 罗盘工具条
     private func compassToolBar() -> some View {
         let m = motion.headingState.facingMountain
-        let delta = abs(motion.headingState.facingAngle - m.centerAngle)
+        let rawDelta = abs(motion.headingState.facingAngle - m.centerAngle)
+        let delta = min(rawDelta, 360.0 - rawDelta)
         let kwStatus = delta < 1.5 ? lang.t("pure_alignment") : (delta < 4.5 ? lang.t("sub_mountain") : lang.t("small_void"))
         let kwColor = delta < 1.5 ? Color.green : (delta < 4.5 ? Color.yellow : Color.orange)
         
@@ -190,7 +191,7 @@ public struct CompassMainView: View {
             VStack(spacing: 6) {
                 HStack {
                     HStack(spacing: 6) {
-                        Text(hex.name)
+                        Text(hex.localizedName)
                             .font(.system(size: 15, weight: .bold, design: .serif))
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text(fenjin.jiaziName)
@@ -200,7 +201,7 @@ public struct CompassMainView: View {
                             .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
                             .foregroundColor(fenjin.isAuspicious ? Color.green : Color.red)
                             .cornerRadius(4)
-                        Text(fenjin.grade)
+                        Text(fenjin.localizedGrade)
                             .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.7))
                     }
@@ -218,7 +219,7 @@ public struct CompassMainView: View {
                 }
                 
                 HStack {
-                    Text(fenjin.lore)
+                    Text(fenjin.localizedLore)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)

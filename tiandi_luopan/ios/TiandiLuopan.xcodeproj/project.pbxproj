@@ -34,6 +34,8 @@
 		1036 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2036 /* SettingsView.swift */; };
 		1037 /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2037 /* RootContentView.swift */; };
 		1040 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2040 /* AVFoundation.framework */; };
+		1041 /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2041 /* Vision.framework */; };
+		1042 /* Photos.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2042 /* Photos.framework */; };
 		1050 /* Fenjin120Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2050 /* Fenjin120Data.swift */; };
 		1051 /* FloorplanEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2051 /* FloorplanEngine.swift */; };
 		1052 /* PurpleWhiteEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2052 /* PurpleWhiteEngine.swift */; };
@@ -54,6 +56,8 @@
 		1067 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2067 /* CalibrationSheet.swift */; };
 		1068 /* VIPPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2068 /* VIPPaywallSheet.swift */; };
 		1069 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2069 /* LocalizationManager.swift */; };
+		1070 /* WorldMagneticModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2070 /* WorldMagneticModel.swift */; };
+		1071 /* OnDeviceShaAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2071 /* OnDeviceShaAnalyzer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,6 +90,8 @@
 		2036 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/SettingsView.swift"; sourceTree = "<group>"; };
 		2037 /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/RootContentView.swift"; sourceTree = "<group>"; };
 		2040 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		2041 /* Vision.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Vision.framework; path = System/Library/Frameworks/Vision.framework; sourceTree = SDKROOT; };
+		2042 /* Photos.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Photos.framework; path = System/Library/Frameworks/Photos.framework; sourceTree = SDKROOT; };
 		2050 /* Fenjin120Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/Fenjin120Data.swift"; sourceTree = "<group>"; };
 		2051 /* FloorplanEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/FloorplanEngine.swift"; sourceTree = "<group>"; };
 		2052 /* PurpleWhiteEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/PurpleWhiteEngine.swift"; sourceTree = "<group>"; };
@@ -106,6 +112,8 @@
 		2067 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CalibrationSheet.swift"; sourceTree = "<group>"; };
 		2068 /* VIPPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/VIPPaywallSheet.swift"; sourceTree = "<group>"; };
 		2069 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/LocalizationManager.swift"; sourceTree = "<group>"; };
+		2070 /* WorldMagneticModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WorldMagneticModel.swift"; sourceTree = "<group>"; };
+		2071 /* OnDeviceShaAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/OnDeviceShaAnalyzer.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -118,6 +126,8 @@
 				1009 /* CoreMotion.framework in Frameworks */,
 				1011 /* StoreKit.framework in Frameworks */,
 				1040 /* AVFoundation.framework in Frameworks */,
+				1041 /* Vision.framework in Frameworks */,
+				1042 /* Photos.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,6 +189,8 @@
 				2067 /* CalibrationSheet.swift */,
 				2068 /* VIPPaywallSheet.swift */,
 				2069 /* LocalizationManager.swift */,
+				2070 /* WorldMagneticModel.swift */,
+				2071 /* OnDeviceShaAnalyzer.swift */,
 
 
 
@@ -194,6 +206,8 @@
 				2009 /* CoreMotion.framework */,
 				2012 /* StoreKit.framework */,
 				2040 /* AVFoundation.framework */,
+				2041 /* Vision.framework */,
+				2042 /* Photos.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -316,6 +330,8 @@
 				1067 /* CalibrationSheet.swift in Sources */,
 				1068 /* VIPPaywallSheet.swift in Sources */,
 				1069 /* LocalizationManager.swift in Sources */,
+				1070 /* WorldMagneticModel.swift in Sources */,
+				1071 /* OnDeviceShaAnalyzer.swift in Sources */,
 
 
 

@@ -24,14 +24,19 @@ public final class SolarTimeCalculator {
     private let heavenlyStems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     private let earthlyBranches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
 
-    public func calculate(date: Date = Date(), longitude: Double = 116.4074) -> SolarTimeResult {
+    public func calculate(date: Date = Date(), longitude: Double = 0.0) -> SolarTimeResult {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
 
         let components = calendar.dateComponents([.hour, .minute, .second], from: date)
         let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        // 以当前系统时区的标准经线为基准；中国时区仍然等于东经 120°，在其他地区也不会误套北京时间。
-        let timezoneMeridian = Double(calendar.timeZone.secondsFromGMT(for: date)) / 3600.0 * 15.0
+        // 以当前系统时区的标准经线为基准；中国时区仍然等于东经 120°，
+        // 在其他地区也不会误套北京时间。secondsFromGMT(for:) 包含夏令时，
+        // 直接使用会在夏令时地区额外产生 1 小时（15°）的经度误差；
+        // 真太阳时应以时区的标准偏移量作为民用钟表基准。
+        let daylightSavingOffset = calendar.timeZone.daylightSavingTimeOffset(for: date)
+        let standardSecondsFromGMT = calendar.timeZone.secondsFromGMT(for: date) - Int(daylightSavingOffset)
+        let timezoneMeridian = Double(standardSecondsFromGMT) / 3600.0 * 15.0
         let longitudeOffset = (longitude - timezoneMeridian) * 4.0
         let daysInYear = Double(calendar.range(of: .day, in: .year, for: date)?.count ?? 365)
         let fractionalDay = Double(dayOfYear - 1)
@@ -53,8 +58,12 @@ public final class SolarTimeCalculator {
         formatter.dateFormat = "HH:mm:ss"
         formatter.timeZone = calendar.timeZone
 
-        let termIndex = solarTermIndex(for: solarApparentLongitude(for: date))
-        let bazi = calculateBazi(for: trueSolarDate, termIndex: termIndex, calendar: calendar)
+        let termIndex = solarTermIndex(for: date)
+        // Four Pillars use local apparent solar time.  A longitude correction
+        // can move an instant across a solar-term boundary, so derive the
+        // year/month pillar bucket from the corrected instant as well.
+        let baziTermIndex = solarTermIndex(for: trueSolarDate)
+        let bazi = calculateBazi(for: trueSolarDate, termIndex: baziTermIndex, calendar: calendar)
 
         return SolarTimeResult(
             standardTimeString: formatter.string(from: date),
@@ -71,6 +80,30 @@ public final class SolarTimeCalculator {
         return result >= 0 ? result : result + 360.0
     }
 
+    /// Returns the current solar-term bucket (0 = 小寒 ... 23 = 冬至).
+    /// Keeping this calculation in one place prevents the date-selection
+    /// engines from silently falling back to Gregorian month boundaries.
+    public func solarTermIndex(for date: Date) -> Int {
+        solarTermIndex(forLongitude: solarApparentLongitude(for: date))
+    }
+
+    /// Fractional days elapsed since the start of the current 15° solar-term
+    /// bucket.  This is used by the Qimen 拆补 method to split each term into
+    /// upper, middle and lower five-day yuan segments.
+    public func solarTermProgress(for date: Date) -> Double {
+        let longitude = solarApparentLongitude(for: date)
+        let shifted = normalizedDegrees(longitude - 285.0)
+        let degreesIntoTerm = shifted.truncatingRemainder(dividingBy: 15.0)
+        // Mean apparent solar motion; the low-order longitude model above is
+        // already the limiting accuracy of this offline calculation.
+        return degreesIntoTerm / 0.98564736
+    }
+
+    private func solarTermIndex(forLongitude longitude: Double) -> Int {
+        let shifted = normalizedDegrees(longitude - 285.0)
+        return min(23, Int(floor(shifted / 15.0)))
+    }
+
     /// Meeus 低阶太阳位置公式。它直接按太阳视黄经确定节气，避免固定 15 天间隔造成的节气错位。
     private func solarApparentLongitude(for date: Date) -> Double {
         let julianDate = date.timeIntervalSince1970 / 86_400.0 + 2_440_587.5
@@ -84,11 +117,6 @@ public final class SolarTimeCalculator {
         return normalizedDegrees(meanLongitude + equationOfCenter)
     }
 
-    private func solarTermIndex(for longitude: Double) -> Int {
-        let shifted = normalizedDegrees(longitude - 285.0)
-        return min(23, Int(floor(shifted / 15.0)))
-    }
-
     private func positiveModulo(_ value: Int, _ modulus: Int) -> Int {
         let result = value % modulus
         return result >= 0 ? result : result + modulus
@@ -96,6 +124,13 @@ public final class SolarTimeCalculator {
 
     private func calculateBazi(for date: Date, termIndex: Int, calendar: Calendar) -> String {
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+        // In the traditional convention the day changes at 子初 (23:00),
+        // while the year/month still follow the solar-term bucket supplied by
+        // the caller. Apply the one-day rollover only to the day pillar.
+        let dayPillarDate = (components.hour ?? 0) >= 23
+            ? (calendar.date(byAdding: .day, value: 1, to: date) ?? date)
+            : date
+        let dayComponents = calendar.dateComponents([.year, .month, .day], from: dayPillarDate)
         let civilYear = components.year ?? 2000
         let ganzhiYear = termIndex >= 2 ? civilYear : civilYear - 1
         let yearCycle = positiveModulo(ganzhiYear - 4, 60)
@@ -107,9 +142,9 @@ public final class SolarTimeCalculator {
         let monthStemStart = positiveModulo((yearStem % 5) * 2 + 2, 10)
         let monthStem = positiveModulo(monthStemStart + positiveModulo(monthBranch - 2, 12), 10)
 
-        let year = components.year ?? 2000
-        let month = components.month ?? 1
-        let day = components.day ?? 1
+        let year = dayComponents.year ?? civilYear
+        let month = dayComponents.month ?? (components.month ?? 1)
+        let day = dayComponents.day ?? (components.day ?? 1)
         let a = (14 - month) / 12
         let y = year + 4800 - a
         let m = month + 12 * a - 3
@@ -122,9 +157,23 @@ public final class SolarTimeCalculator {
         let hourBranch = ((hour + 1) / 2) % 12
         let hourStem = positiveModulo((dayStem % 5) * 2 + hourBranch, 10)
 
-        return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
-            + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
-            + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
-            + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])时"
+        let language = LocalizationManager.shared.effectiveLanguage
+        if language == .en {
+            let stemPinyin = ["Jia", "Yi", "Bing", "Ding", "Wu", "Ji", "Geng", "Xin", "Ren", "Gui"]
+            let branchPinyin = ["Zi", "Chou", "Yin", "Mao", "Chen", "Si", "Wu", "Wei", "Shen", "You", "Xu", "Hai"]
+            return "\(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) Year · "
+                + "\(stemPinyin[monthStem])-\(branchPinyin[monthBranch]) Month · "
+                + "\(stemPinyin[dayStem])-\(branchPinyin[dayBranch]) Day · "
+                + "\(stemPinyin[hourStem])-\(branchPinyin[hourBranch]) Hour"
+        }
+
+        let yearSuffix = "年"
+        let monthSuffix = "月"
+        let daySuffix = "日"
+        let hourSuffix = language == .zhHant ? "時" : "时"
+        return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])\(yearSuffix) "
+            + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])\(monthSuffix) "
+            + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])\(daySuffix) "
+            + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])\(hourSuffix)"
     }
 }

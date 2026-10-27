@@ -4,8 +4,9 @@ Validate Swift syntax: balanced braces, parentheses, and scope resolution across
 """
 import os
 import re
+from pathlib import Path
 
-ROOT_DIR = r"e:\code\android\tiandi_luopan\ios\TiandiLuopan"
+ROOT_DIR = Path(__file__).resolve().parents[1] / "ios" / "TiandiLuopan"
 
 def check_file(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -46,7 +47,7 @@ def check_file(path):
 def main():
     total_files = 0
     total_errors = 0
-    for root, dirs, files in os.walk(ROOT_DIR):
+    for root, dirs, files in os.walk(str(ROOT_DIR)):
         for f in sorted(files):
             if f.endswith('.swift'):
                 total_files += 1

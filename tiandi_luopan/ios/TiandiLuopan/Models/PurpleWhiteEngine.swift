@@ -99,11 +99,13 @@ public class PurpleWhiteEngine {
     
     public func calcMonthStar(year: Int, month: Int) -> Int {
         // 年支五虎遁确定月飞星入中
-        let yRem = year % 12
+        // Gregorian year % 12 is not the earthly-branch index (for example,
+        // 2024 is 甲辰, whose branch index is 4). Normalize from 甲子 4 CE.
+        let branchIndex = ((year - 4) % 12 + 12) % 12
         var baseStar = 2
-        if [4, 7, 10, 1].contains(yRem) { // 子午卯酉年
+        if [0, 3, 6, 9].contains(branchIndex) { // 子午卯酉年
             baseStar = 8
-        } else if [2, 5, 8, 11].contains(yRem) { // 辰戌丑未年
+        } else if [1, 4, 7, 10].contains(branchIndex) { // 辰戌丑未年
             baseStar = 5
         } else { // 寅申巳亥年
             baseStar = 2
@@ -127,17 +129,29 @@ public class PurpleWhiteEngine {
         let calendar = Calendar.current
         let rawYear = calendar.component(.year, from: date)
         let rawMonth = calendar.component(.month, from: date)
-        let day = calendar.component(.day, from: date)
+        let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
         
-        // 历法天文学精准立春交岁法则 (立春通常在公历2月4日左右): 2月4日之前严格归属前一年干支岁次与年星入中
-        let isBeforeLichun = (rawMonth < 2 || (rawMonth == 2 && day < 4))
+        // 立春交岁按太阳黄经判断，避免固定 2 月 4 日在不同年份错位。
+        let isBeforeLichun = rawMonth < 2 || (rawMonth == 2 && solarTermIndex < 2)
         let effectiveYear = isBeforeLichun ? (rawYear - 1) : rawYear
         
-        // 历法节气交月 (每月4~7日交节，交节前属上月流月星)
-        let effectiveMonth = (day < 5) ? (rawMonth == 1 ? 12 : rawMonth - 1) : rawMonth
+        // 流月按节气月界计算。界面保留公历一月的 1 月显示习惯，避免
+        // 冬至桶把整个月标题显示成 12 月；客星计算则使用传统节气月，
+        // 以寅月为正月（1），小寒、大寒归丑月（12）。
+        let effectiveMonth: Int
+        if rawMonth == 1 {
+            effectiveMonth = 1
+        } else if solarTermIndex < 2 {
+            effectiveMonth = max(1, rawMonth - 1)
+        } else {
+            effectiveMonth = min(12, 2 + (solarTermIndex - 2) / 2)
+        }
+        let solarMonthForStar = solarTermIndex < 2
+            ? 12
+            : min(11, 1 + (solarTermIndex - 2) / 2)
         
         let yCenter = calcYearStar(year: effectiveYear)
-        let mCenter = calcMonthStar(year: effectiveYear, month: effectiveMonth)
+        let mCenter = calcMonthStar(year: effectiveYear, month: solarMonthForStar)
         
         let yearStarsMap = flyStars(centralStar: yCenter)
         let monthStarsMap = flyStars(centralStar: mCenter)

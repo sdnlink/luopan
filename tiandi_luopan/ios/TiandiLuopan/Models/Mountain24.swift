@@ -73,7 +73,13 @@ public struct Mountain24Item: Identifiable, Codable {
     public var post: String { palace }
     
     public var localizedName: String {
-        return LocalizationManager.shared.effectiveLanguage == .en ? pinyin : name
+        let language = LocalizationManager.shared.effectiveLanguage
+        if language == .en { return pinyin }
+        if language == .zhHant {
+            return name.replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "离", with: "離")
+        }
+        return name
     }
     
     public var localizedPalace: String {
@@ -82,7 +88,22 @@ public struct Mountain24Item: Identifiable, Codable {
             let enPalaces = ["坎": "Kan", "坤": "Kun", "震": "Zhen", "巽": "Xun", "乾": "Qian", "兑": "Dui", "艮": "Gen", "离": "Li"]
             return enPalaces[palace] ?? palace
         }
+        if lang == .zhHant {
+            return ["兑": "兌", "离": "離"][palace] ?? palace
+        }
         return palace
+    }
+
+    public var localizedElement: String {
+        guard LocalizationManager.shared.effectiveLanguage == .en else { return element }
+        switch element {
+        case "水": return "Water"
+        case "木": return "Wood"
+        case "火": return "Fire"
+        case "土": return "Earth"
+        case "金": return "Metal"
+        default: return element
+        }
     }
 }
 
@@ -180,7 +201,7 @@ public final class Mountain24Data {
         return mountains[1] // 默认子山
     }
     
-    public func resolveHeadingState(heading: Double, pitch: Double = 0.0, roll: Double = 0.0) -> CompassHeadingState {
+    public func resolveHeadingState(heading: Double, pitch: Double = 0.0, roll: Double = 0.0, trueHeading: Double? = nil) -> CompassHeadingState {
         let normHeading = (heading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
         let facingAngle = normHeading
         let sittingAngle = (normHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
@@ -233,7 +254,7 @@ public final class Mountain24Data {
         
         return CompassHeadingState(
             heading: normHeading,
-            trueHeading: normHeading,
+            trueHeading: trueHeading.map { ($0.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0) } ?? normHeading,
             sittingAngle: sittingAngle,
             facingAngle: facingAngle,
             facingMountain: facingM,

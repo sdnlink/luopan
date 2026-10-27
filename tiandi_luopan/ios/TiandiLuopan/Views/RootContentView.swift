@@ -6,7 +6,7 @@ extension Color {
     public static let yanBrown = Color(red: 0.65, green: 0.45, blue: 0.25)
 }
 
-// MARK: - 演象·时空罗盘 纯原生 SwiftUI 根视图 (Root Content View - PRD 5.0 标准五大场景)
+// MARK: - 天机演象 纯原生 SwiftUI 根视图 (Root Content View - PRD 5.0 标准五大场景)
 
 public struct RootContentView: View {
     @StateObject private var motion = CompassMotionManager.shared

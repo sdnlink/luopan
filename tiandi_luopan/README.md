@@ -1,4 +1,4 @@
-# 演象 · 时空罗盘 (YanXiang Compass)
+# 天机演象 (TianJi YanXiang)
 
 > **天地人合一 · 时空一体化数字易学罗盘**  
 > 一款深度融合**传统风水勘测规范**、**现代高精度天体力学**与**移动传感器融合算法**的专业级 Android 综合时空罗盘应用。
@@ -114,7 +114,7 @@
   - **两针之间的金黄色虚线弧**：标注两针相差的角度，即**当地地磁偏角（Magnetic Declination）**。
 * **原理与算法**：
   - 地磁北极与地理北极并不重合，且地磁偏角随全球经纬度和时间演变。例如北京地区当前地磁偏西约 7.3°。
-  - iOS 版本使用 **Core Location 的真北/磁北航向数据**，结合 GPS 位置计算并展示系统提供的当地磁偏角。
+  - iOS 版本使用 **WMM 2020-2025 离线地磁模型**结合 GPS 经纬度/海拔计算当地磁偏角；定位尚未可用时再使用 Core Location 的真北航向作为临时兜底。
   - 界面同时输出 `磁: 正东 92° · 卯山 | 真: 正东 84° (偏西7.3°)`。
 * **核心用途**：破解传统罗盘与现代建筑图纸无法对齐的难题。古时杨公设立天盘缝针就是因为发现了地磁偏角。本系统让测量者在磁方位与真方位之间任意切换对照。
 
@@ -270,7 +270,9 @@
 
 ### 项目编译与打包
 
-本仓库已内置便携式 JDK 17 与 Gradle 包装器，支持自动化无依赖构建：
+仓库提供 Gradle Wrapper。Windows 脚本可使用项目目录下的 `.tools` SDK/JDK；Linux/macOS 需要预先安装 JDK 17、Android SDK 34 和 Build-Tools 34.0.0。
+
+Release 签名不会从源码读取密码。需要签名时，将 `yanxiang.jks` 放在项目根目录，并通过环境变量或 Gradle 属性提供 `YANXIANG_STORE_PASSWORD`、`YANXIANG_KEY_ALIAS`、`YANXIANG_KEY_PASSWORD`；缺少这些变量时仍可生成未签名 release 包用于 CI 构建检查。
 
 ```powershell
 # 1. 一键编译 Release 签名版本 APK
@@ -280,9 +282,20 @@
 .\setup_and_build.ps1 -Target debug
 
 # 3. 产物路径 (携带版本号)
-# app/build/outputs/apk/release/yanxiang-v1.2.2.apk (约 4.9 MB)
-# 根目录下亦会同步生成 yanxiang-v1.2.2.apk
+# app/build/outputs/apk/release/yanxiang-v1.2.4.apk
+# 根目录下亦会同步生成 yanxiang-v1.2.4.apk
 ```
+
+Linux/macOS：
+
+```bash
+export JAVA_HOME=/path/to/jdk-17
+export ANDROID_SDK_ROOT=/path/to/android-sdk
+./setup_and_build.sh debug
+# 或直接执行：./gradlew assembleDebug
+```
+
+若只需要验证 Kotlin/资源配置，可先运行 `./gradlew tasks`；首次执行需要联网下载 Gradle 和 Maven 依赖。
 
 ### 快捷安装到手机 (ADB)
 ```powershell
@@ -297,7 +310,7 @@
 本仓库现已全面提供适用于 **iPhone (iOS 14.0+)** 的移植版本与标准安装包：
 
 ### 5.1 产物与工程路径
-* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.2.3.ipa` (约 1.83 MB)
+* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.0.ipa`
 * **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj` (Swift 5.x + WebKit + CoreLocation + CoreMotion)
 * **Web / PWA 资源**：`ios/TiandiLuopan/www/`
 
@@ -313,7 +326,7 @@
 #### 方式 1：通过签名工具直接安装 IPA（无需 Mac）
 * 使用 **爱思助手 (3uTools)**、**Sideloadly** 或 **AltStore**：
   1. 将 iPhone 通过数据线连接电脑；
-  2. 打开 Sideloadly / 爱思助手，将 `dist-ios/YanXiangCompass-v1.2.3.ipa` 拖入；
+  2. 打开 Sideloadly / 爱思助手，将 `dist-ios/YanXiangCompass-v1.3.0.ipa` 拖入；
   3. 输入您的免费 Apple ID 进行一键签名安装；
   4. 首次打开在 iPhone「设置 -> 通用 -> VPN与设备管理」信任开发者证书即可。
 * 若设备已越狱或拥有 **TrollStore**，可直接将 IPA 发送至手机无视证书永久安装。

@@ -18,7 +18,8 @@ public struct FloorplanView: View {
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
     @State private var activeRoomStartRect: CGRect? = nil
-    @State private var smoothedFacing: Double = 0.0
+    @State private var centroidDragStart: CGPoint? = nil
+    @State private var didConsumeFloorplanCredit: Bool = false
     
     public init() {}
     
@@ -59,11 +60,45 @@ public struct FloorplanView: View {
             RoomAuditDetailSheet(room: room)
         }
         .sheet(isPresented: $showImagePicker) {
-            FloorplanImagePicker(selectedImage: $userFloorplanImage)
+            FloorplanImagePicker(selectedImage: $userFloorplanImage) {
+                if !iap.hasUnlockedVIP && !didConsumeFloorplanCredit {
+                    if iap.consumeFloorplanCredit() {
+                        didConsumeFloorplanCredit = true
+                    } else {
+                        userFloorplanImage = nil
+                        showPaywall = true
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .floorplanSingle)
         }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            // Keep the user's room geometry while refreshing language-dependent
+            // sample labels and diagnostics.
+            let rects = rooms.map(\.rect)
+            let refreshed = FloorplanEngine.shared.generateSampleRooms()
+            rooms = refreshed.enumerated().map { index, room in
+                var updated = room
+                if index < rects.count { updated.rect = rects[index] }
+                return updated
+            }
+        }
+    }
+
+    private var hasFloorplanAccess: Bool {
+        iap.hasUnlockedVIP || didConsumeFloorplanCredit
+    }
+
+    private func acquireFloorplanAccess() -> Bool {
+        if iap.hasUnlockedVIP || didConsumeFloorplanCredit { return true }
+        guard iap.consumeFloorplanCredit() else {
+            showPaywall = true
+            return false
+        }
+        didConsumeFloorplanCredit = true
+        return true
     }
     
     // MARK: - 顶栏控制
@@ -73,7 +108,7 @@ public struct FloorplanView: View {
                 Text(lang.t("floorplan_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.name)\(lang.t("mountain_suffix"))\(motion.headingState.facingMountain.name)\(lang.t("facing_suffix")))")
+                Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(motion.headingState.facingMountain.localizedName)\(lang.t("facing_suffix")))")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -82,10 +117,10 @@ public struct FloorplanView: View {
             
             // 导入真实户型图纸
             Button(action: {
-                if !iap.canUseFloorplan {
-                    showPaywall = true
-                } else {
+                if iap.hasUnlockedVIP || didConsumeFloorplanCredit || iap.floorplanCreditsCount > 0 {
                     showImagePicker = true
+                } else {
+                    showPaywall = true
                 }
             }) {
                 HStack(spacing: 3) {
@@ -219,9 +254,7 @@ public struct FloorplanView: View {
         
         return Button(action: {
             if isEditingRooms { return }
-            if !iap.canUseFloorplan {
-                showPaywall = true
-            } else {
+            if acquireFloorplanAccess() {
                 selectedRoom = room
             }
         }) {
@@ -327,9 +360,16 @@ public struct FloorplanView: View {
         .gesture(
             DragGesture()
                 .onChanged { val in
-                    let newX = max(0.1, min(0.9, val.location.x / w))
-                    let newY = max(0.1, min(0.9, val.location.y / h))
+                    if centroidDragStart == nil {
+                        centroidDragStart = centroid
+                    }
+                    guard let start = centroidDragStart else { return }
+                    let newX = max(0.1, min(0.9, start.x + val.translation.width / max(w, 1)))
+                    let newY = max(0.1, min(0.9, start.y + val.translation.height / max(h, 1)))
                     centroid = CGPoint(x: newX, y: newY)
+                }
+                .onEnded { _ in
+                    centroidDragStart = nil
                 }
         )
     }
@@ -350,7 +390,7 @@ public struct FloorplanView: View {
             
             ScrollView {
                 VStack(spacing: 8) {
-                    if !iap.canUseFloorplan {
+                    if !hasFloorplanAccess {
                         VIPLockCardView(
                             title: lang.t("privilege_floorplan_title"),
                             featureDesc: lang.t("privilege_floorplan_desc"),
@@ -529,20 +569,10 @@ public struct RoomAuditDetailSheet: View {
     }
     
     private var localizedLevel: String {
-        let isEn = LocalizationManager.shared.effectiveLanguage == .en
-        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
-        if isEn {
-            if room.isGood { return "Auspicious" }
-            if room.isSevere { return "Severe Taboo" }
-            if room.isWarning { return "Warning" }
-            return "Neutral"
-        } else if isHant {
-            if room.isGood { return "吉" }
-            if room.isSevere { return "嚴重煞氣" }
-            if room.isWarning { return "預警" }
-            return "平"
-        } else {
-            return room.inspectionLevel
-        }
+        let lang = LocalizationManager.shared
+        if room.isGood { return lang.t("floorplan_level_auspicious") }
+        if room.isSevere { return lang.t("floorplan_level_severe") }
+        if room.isWarning { return lang.t("floorplan_level_warning") }
+        return lang.t("floorplan_level_neutral")
     }
 }

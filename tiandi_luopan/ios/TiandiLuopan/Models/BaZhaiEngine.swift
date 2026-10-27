@@ -121,6 +121,10 @@ public struct BaZhaiAnalysis {
             let map = ["坎宅": "Kan House", "坤宅": "Kun House", "震宅": "Zhen House", "巽宅": "Xun House", "乾宅": "Qian House", "兑宅": "Dui House", "艮宅": "Gen House", "离宅": "Li House"]
             return map[houseGua] ?? houseGua
         }
+        if lang == .zhHant {
+            let map = ["坎宅": "坎宅", "坤宅": "坤宅", "震宅": "震宅", "巽宅": "巽宅", "乾宅": "乾宅", "兑宅": "兌宅", "艮宅": "艮宅", "离宅": "離宅"]
+            return map[houseGua] ?? houseGua
+        }
         return houseGua
     }
     

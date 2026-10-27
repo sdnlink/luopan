@@ -17,12 +17,12 @@ public struct FenjinDetailSheet: View {
                             Text("【\(fenjin.jiaziName)】\(lang.t("fenjin_title_suffix"))")
                                 .font(.system(size: 26, weight: .bold, design: .serif))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                            Text("\(lang.t("fenjin_mountain_belong"))：\(fenjin.mountainName) · \(lang.t("fenjin_index_prefix"))\(fenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", fenjin.centerAngle))°)")
+                            Text("\(lang.t("fenjin_mountain_belong"))：\(fenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(fenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", fenjin.centerAngle))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Text(fenjin.grade)
+                        Text(fenjin.localizedGrade)
                             .font(.system(size: 13, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -46,7 +46,7 @@ public struct FenjinDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_lore_section"))
                             .font(.system(size: 15, weight: .bold))
-                        Text(fenjin.lore)
+                        Text(fenjin.localizedLore)
                             .font(.system(size: 14))
                             .lineSpacing(4)
                             .padding(12)

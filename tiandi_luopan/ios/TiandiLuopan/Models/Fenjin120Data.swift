@@ -13,6 +13,54 @@ public struct FenjinItem: Identifiable {
     public let grade: String           // "旺相大吉", "孤虚差错", "龟甲空亡", "平稳"
     public let isAuspicious: Bool      // 是否为可用吉度
     public let lore: String            // 秘诀断语
+
+    public var localizedMountainName: String {
+        if let mountain = Mountain24Data.shared.mountains.first(where: { $0.name == mountainName }) {
+            return mountain.localizedName
+        }
+        return mountainName
+    }
+
+    public var localizedGrade: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch grade {
+            case "旺相大吉": return "Auspicious Prosperity"
+            case "孤虚差错": return "Lone Void Error"
+            case "差错退财": return "Error · Wealth Drain"
+            case "龟甲空亡": return "Turtle-Shell Void"
+            case "差错退气": return "Error · Retreating Qi"
+            default: return "Balanced"
+            }
+        case .zhHant:
+            return grade.replacingOccurrences(of: "旺相大吉", with: "旺相大吉")
+                .replacingOccurrences(of: "差错", with: "差錯")
+                .replacingOccurrences(of: "退财", with: "退財")
+                .replacingOccurrences(of: "空亡", with: "空亡")
+        default: return grade
+        }
+    }
+
+    public var localizedLore: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch grade {
+            case "旺相大吉": return "Prosperous and well-timed; supports wealth, harmony and lasting fortune."
+            case "孤虚差错": return "Lone-void error qi; associated with retreat and wealth loss. Avoid establishing a facing here."
+            case "差错退财": return "Excess yin and hidden drain make it difficult to gather qi or retain wealth."
+            case "龟甲空亡": return "Turtle-shell void; a depleted degree associated with setbacks and illness. Avoid using it."
+            case "差错退气": return "Retreating qi makes it difficult to sustain momentum or responsibility."
+            default: return "The qi is balanced; use ordinary orientation judgment."
+            }
+        case .zhHant:
+            return lore.replacingOccurrences(of: "差错", with: "差錯")
+                .replacingOccurrences(of: "退财", with: "退財")
+                .replacingOccurrences(of: "旺相", with: "旺相")
+                .replacingOccurrences(of: "气", with: "氣")
+                .replacingOccurrences(of: "煞气", with: "煞氣")
+        default: return lore
+        }
+    }
 }
 
 public class Fenjin120Data {
@@ -39,19 +87,21 @@ public class Fenjin120Data {
         var items: [FenjinItem] = []
         let mountains = Mountain24Data.shared.mountains
         
-        let jiaziCycle = [
-            "甲子","乙丑","丙寅","丁卯","戊辰","己巳","庚午","辛未","壬申","癸酉",
-            "甲戌","乙亥","丙子","丁丑","戊寅","己卯","庚辰","辛巳","壬午","癸未",
-            "甲申","乙酉","丙戌","丁亥","戊子","己丑","庚寅","辛卯","壬辰","癸巳",
-            "甲午","乙未","丙申","丁酉","戊戌","己亥","庚子","辛丑","壬寅","癸卯",
-            "甲辰","乙巳","丙午","丁未","戊申","己酉","庚戌","辛亥","壬子","癸丑",
-            "甲寅","乙卯","丙辰","丁巳","戊午","己未","庚申","辛酉","壬戌","癸亥"
-        ]
+        // Each mountain contains five same-branch 120-fen-jin degrees.
+        // The previous sequential 60-cycle assigned 子山 as 甲子/乙丑/…,
+        // which mixed branches inside one mountain.  Generate the valid five
+        // Jiazi combinations from the mountain's three-mountain branch group.
+        let branchGroups = [0, 1, 3, 4, 6, 7, 9, 10]
+        let branchNames = ["子", "丑", "卯", "辰", "午", "未", "酉", "戌"]
+        let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
         
-        var globalIndex = 0
         for m in mountains {
+            let group = min(max(m.id / 3, 0), branchGroups.count - 1)
+            let branchIndex = branchGroups[group]
+            let branch = branchNames[group]
+            let firstStemIndex = branchIndex % 2
             for i in 0..<5 {
-                let jiazi = jiaziCycle[globalIndex % 60]
+                let jiazi = "\(stems[firstStemIndex + i * 2])\(branch)"
                 let startA = (m.startAngle + Double(i) * 3.0).truncatingRemainder(dividingBy: 360)
                 let endA = (m.startAngle + Double(i + 1) * 3.0).truncatingRemainder(dividingBy: 360)
                 let centerA = (m.startAngle + Double(i) * 3.0 + 1.5).truncatingRemainder(dividingBy: 360)
@@ -70,7 +120,6 @@ public class Fenjin120Data {
                     isAuspicious: meta.ji,
                     lore: meta.lore
                 ))
-                globalIndex += 1
             }
         }
         self.allFenjin = items
@@ -91,6 +140,19 @@ public class Fenjin120Data {
                 }
             }
         }
-        return allFenjin.first!
+        // The table is generated from the fixed 24-mountain data and should
+        // never be empty, but keep the lookup total so a future data change
+        // cannot crash the compass at runtime.
+        return allFenjin.first ?? FenjinItem(
+            mountainName: "子",
+            index: 1,
+            jiaziName: "甲子",
+            startAngle: 0,
+            endAngle: 3,
+            centerAngle: 1.5,
+            grade: "平稳",
+            isAuspicious: false,
+            lore: "气场平平"
+        )
     }
 }

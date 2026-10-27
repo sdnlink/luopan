@@ -31,35 +31,55 @@ public final class ZeRiEngine {
     ]
     
     public func analyze(date: Date = Date(), sitting: Mountain24Item) -> ZeRiAnalysis {
-        let calendar = Calendar(identifier: .gregorian)
+        var calendar = Calendar(identifier: .gregorian)
+        // Date is an absolute instant; all selectable-day pillars must use
+        // the user's civil time zone so a late-night local date is not shifted
+        // to the previous/next day by a GMT calendar.
+        calendar.timeZone = .current
         let comp = calendar.dateComponents([.year, .month, .day, .hour], from: date)
         let now = Date()
         let year = comp.year ?? calendar.component(.year, from: now)
         let month = comp.month ?? calendar.component(.month, from: now)
         let day = comp.day ?? calendar.component(.day, from: now)
         let hour = comp.hour ?? calendar.component(.hour, from: now)
+
+        // 子初 begins at 23:00 in the traditional day-pillar convention.
+        // Keep year/month pillars on the original solar-term date, while the
+        // day pillar advances at 子初 instead of waiting until civil midnight.
+        let dayPillarDate = hour >= 23 ? (calendar.date(byAdding: .day, value: 1, to: date) ?? date) : date
+        let dayPillarComp = calendar.dateComponents([.year, .month, .day], from: dayPillarDate)
         
         let lang = LocalizationManager.shared.effectiveLanguage
         
         // 1. 年柱干支 (严格遵循立春交岁天干地支更迭法则)
-        let isBeforeLiChun = (month < 2 || (month == 2 && day < 4))
+        let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
+        let isBeforeLiChun = month < 2 || (month == 2 && termIndex < 2)
         let gzYear = isBeforeLiChun ? (year - 1) : year
         let yOffset = (gzYear - 4) % 60
         let yearStem = stems[((yOffset % 10) + 10) % 10]
         let yearBranch = branches[((yOffset % 12) + 12) % 12]
         
-        // 2. 月柱干支 (五虎遁年起月诀)
-        let mBranchIdx = (month + 1) % 12
+        // 2. 月柱干支 (五虎遁年起月诀)。月界按节气切换，不能直接用
+        // 公历月份；例如立春前仍属丑月，惊蛰后才进入卯月。
+        let mBranchIdx: Int
+        if termIndex < 2 {
+            mBranchIdx = 1 // 小寒、大寒：丑月
+        } else {
+            mBranchIdx = (2 + (termIndex - 2) / 2) % 12
+        }
         let mBranch = branches[mBranchIdx]
         let stemIdx = stems.firstIndex(of: yearStem) ?? 0
         let mStemStart = (stemIdx % 5) * 2 + 2
-        let mStem = stems[(mStemStart + month - 1) % 10]
+        let mStem = stems[(mStemStart + (mBranchIdx - 2 + 12) % 12) % 10]
         
         // 3. 日柱干支 (高精度儒略日算法)
-        let a = (14 - month) / 12
-        let y = year + 4800 - a
-        let m = month + 12 * a - 3
-        let jdn = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
+        let pillarYear = dayPillarComp.year ?? year
+        let pillarMonth = dayPillarComp.month ?? month
+        let pillarDay = dayPillarComp.day ?? day
+        let a = (14 - pillarMonth) / 12
+        let y = pillarYear + 4800 - a
+        let m = pillarMonth + 12 * a - 3
+        let jdn = pillarDay + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
         let dayGZIndex = (jdn + 49) % 60
         let dayStem = stems[dayGZIndex % 10]
         let dayBranch = branches[dayGZIndex % 12]
@@ -114,8 +134,20 @@ public final class ZeRiEngine {
             warnings.append(yuePo!)
         }
         
-        // 坐山冲犯：日支直冲房屋坐山地支
-        if let sClash = clashMap[sitting.name], sClash == dayBranch {
+        // 坐山冲犯：二十四山要先归并到对应的十二地支，不能只匹配
+        // 子、丑、寅等十二个正支山；例如壬/癸山同属子山地支。
+        let mountainBranch: [String: String] = [
+            "壬": "子", "子": "子", "癸": "子",
+            "丑": "丑", "艮": "丑", "寅": "丑",
+            "甲": "卯", "卯": "卯", "乙": "卯",
+            "辰": "辰", "巽": "辰", "巳": "辰",
+            "丙": "午", "午": "午", "丁": "午",
+            "未": "未", "坤": "未", "申": "未",
+            "庚": "酉", "酉": "酉", "辛": "酉",
+            "戌": "戌", "乾": "戌", "亥": "戌"
+        ]
+        let sittingBranch = mountainBranch[sitting.name] ?? sitting.name
+        if let sClash = clashMap[sittingBranch], sClash == dayBranch {
             if lang == .en {
                 sanSha = "Day branch clashes with House Sitting Mountain (\(sitting.pinyin)); Sitting Clash Taboo."
             } else if lang == .zhHant {

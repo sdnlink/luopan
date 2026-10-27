@@ -22,10 +22,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         UIApplication.shared.isIdleTimerDisabled = true
+        StoreKitIAPManager.shared.refreshEntitlements()
         CompassMotionManager.shared.start()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
+        UIApplication.shared.isIdleTimerDisabled = false
         CompassMotionManager.shared.stop()
     }
 
@@ -34,6 +36,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
+        UIApplication.shared.isIdleTimerDisabled = false
         CompassMotionManager.shared.stop()
     }
 }

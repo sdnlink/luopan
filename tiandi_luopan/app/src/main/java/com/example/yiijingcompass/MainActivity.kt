@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         private const val TAG = "YiJingCompass"
         private const val PERMISSION_REQUEST_LOCATION = 1002
         private const val PERMISSION_REQUEST_CAMERA = 1003
+        private const val PERMISSION_REQUEST_STORAGE = 1004
     }
 
     private lateinit var webView: WebView
@@ -141,14 +142,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         settings.builtInZoomControls = false
         settings.displayZoomControls = false
         settings.allowFileAccess = true
-        settings.allowContentAccess = true
+        settings.allowContentAccess = false
         @Suppress("DEPRECATION")
-        settings.allowFileAccessFromFileURLs = true
+        settings.allowFileAccessFromFileURLs = false
         @Suppress("DEPRECATION")
-        settings.allowUniversalAccessFromFileURLs = true
+        settings.allowUniversalAccessFromFileURLs = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mediaPlaybackRequiresUserGesture = false
-        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
         webView.addJavascriptInterface(CompassJsInterface(), "AndroidCompass")
 
@@ -206,11 +207,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 origin: String?,
                 callback: GeolocationPermissions.Callback?
             ) {
-                callback?.invoke(origin, true, false)
+                val trustedOrigin = origin?.startsWith("file:///android_asset/") == true
+                callback?.invoke(origin, trustedOrigin, false)
             }
 
             override fun onPermissionRequest(request: PermissionRequest?) {
-                request?.grant(request.resources)
+                if (request == null) return
+                val trustedOrigin = request.origin?.toString()?.startsWith("file:///android_asset/") == true
+                val cameraRequested = request.resources?.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE) == true
+                val cameraGranted = ContextCompat.checkSelfPermission(
+                    this@MainActivity,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+                if (trustedOrigin && cameraRequested && cameraGranted) {
+                    request.grant(arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+                } else {
+                    request.deny()
+                }
             }
         }
 
@@ -314,11 +327,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         fun requestNativePayment(channel: String, orderJson: String) {
             runOnUiThread {
                 Log.i(TAG, "Native payment requested: channel=$channel, order=$orderJson")
+                var launched = false
                 when (channel) {
                     "alipay" -> {
                         try {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("alipays://platformapi/startapp"))
                             startActivity(intent)
+                            launched = true
                         } catch (e: Exception) {
                             Log.w(TAG, "Alipay not installed", e)
                         }
@@ -327,6 +342,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         try {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("weixin://"))
                             startActivity(intent)
+                            launched = true
                         } catch (e: Exception) {
                             Log.w(TAG, "WeChat not installed", e)
                         }
@@ -335,13 +351,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         try {
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("upwallet://"))
                             startActivity(intent)
+                            launched = true
                         } catch (e: Exception) {
                             Log.w(TAG, "UnionPay app not installed", e)
                         }
                     }
                 }
-                val txId = "TX_AND_" + System.currentTimeMillis()
-                webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('$channel', true, '$txId');}", null)
+                // Launching a wallet does not prove that a payment succeeded. The
+                // previous implementation granted local entitlements immediately,
+                // which allowed every native payment request to unlock products for free.
+                if (launched) {
+                    webView.evaluateJavascript("if(window.onNativePaymentPending){window.onNativePaymentPending('$channel');}", null)
+                } else {
+                    webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('$channel', false, '');}", null)
+                }
             }
         }
 
@@ -376,10 +399,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         @JavascriptInterface
         fun saveImageToGallery(base64Data: String): Boolean {
             return try {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                    ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    runOnUiThread {
+                        ActivityCompat.requestPermissions(
+                            this@MainActivity,
+                            arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                            PERMISSION_REQUEST_STORAGE
+                        )
+                        android.widget.Toast.makeText(
+                            this@MainActivity,
+                            "请允许存储权限后再次保存图片。",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    return false
+                }
                 val cleanBase64 = if (base64Data.contains(",")) base64Data.substringAfter(",") else base64Data
                 val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
                 val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
                 val filename = "YanXiang_TianJiShu_${System.currentTimeMillis()}.jpg"
+                var saved = false
 
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                     val contentValues = android.content.ContentValues().apply {
@@ -389,8 +433,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     }
                     val uri = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
                     if (uri != null) {
-                        contentResolver.openOutputStream(uri)?.use { out ->
+                        saved = contentResolver.openOutputStream(uri)?.use { out ->
                             bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                        } == true
+                        if (!saved) {
+                            contentResolver.delete(uri, null, null)
                         }
                     }
                 } else {
@@ -399,12 +446,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     if (!yanxiangDir.exists()) yanxiangDir.mkdirs()
                     val imageFile = java.io.File(yanxiangDir, filename)
                     java.io.FileOutputStream(imageFile).use { out ->
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
+                        saved = bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, out)
                     }
-                    val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-                    mediaScanIntent.data = android.net.Uri.fromFile(imageFile)
-                    sendBroadcast(mediaScanIntent)
+                    if (saved) {
+                        val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                        mediaScanIntent.data = android.net.Uri.fromFile(imageFile)
+                        sendBroadcast(mediaScanIntent)
+                    }
                 }
+                if (!saved) return false
                 runOnUiThread {
                     android.widget.Toast.makeText(this@MainActivity, "天机书已成功保存至手机相册！", android.widget.Toast.LENGTH_LONG).show()
                 }
@@ -474,6 +524,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     webView.evaluateJavascript("if(window.onNativeCameraDenied){window.onNativeCameraDenied();}", null)
                 }
             }
+        } else if (requestCode == PERMISSION_REQUEST_STORAGE) {
+            Log.i(TAG, "Storage permission result: ${grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED}")
         }
     }
 

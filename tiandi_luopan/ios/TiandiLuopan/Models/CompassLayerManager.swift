@@ -23,21 +23,65 @@ public enum CompassPreset: String, CaseIterable, Identifiable {
 
 public class CompassLayerManager: ObservableObject {
     public static let shared = CompassLayerManager()
-    
-    @Published public var showDegreeTicks: Bool = true
-    @Published public var showSolarTerms: Bool = true
-    @Published public var showHexagrams64: Bool = true
-    @Published public var showFenjin120: Bool = true
-    @Published public var showMountain24: Bool = true
-    @Published public var showEightGua: Bool = true
-    @Published public var showTrueNorthNeedle: Bool = true
-    @Published public var showLevelBubble: Bool = true
-    @Published public var currentPreset: CompassPreset = .comprehensive
+
+    private static let defaults = UserDefaults.standard
+    private static func storedBool(_ key: String, default value: Bool) -> Bool {
+        defaults.object(forKey: key) as? Bool ?? value
+    }
+
+    @Published public var showDegreeTicks: Bool = CompassLayerManager.storedBool("compass_layer_degree_ticks", default: true) {
+        didSet { Self.defaults.set(showDegreeTicks, forKey: "compass_layer_degree_ticks") }
+    }
+    @Published public var showSolarTerms: Bool = CompassLayerManager.storedBool("compass_layer_solar_terms", default: true) {
+        didSet { Self.defaults.set(showSolarTerms, forKey: "compass_layer_solar_terms") }
+    }
+    @Published public var showHexagrams64: Bool = CompassLayerManager.storedBool("compass_layer_hexagrams64", default: true) {
+        didSet { Self.defaults.set(showHexagrams64, forKey: "compass_layer_hexagrams64") }
+    }
+    @Published public var showFenjin120: Bool = CompassLayerManager.storedBool("compass_layer_fenjin120", default: true) {
+        didSet { Self.defaults.set(showFenjin120, forKey: "compass_layer_fenjin120") }
+    }
+    @Published public var showMountain24: Bool = CompassLayerManager.storedBool("compass_layer_mountain24", default: true) {
+        didSet { Self.defaults.set(showMountain24, forKey: "compass_layer_mountain24") }
+    }
+    @Published public var showEightGua: Bool = CompassLayerManager.storedBool("compass_layer_eight_gua", default: true) {
+        didSet { Self.defaults.set(showEightGua, forKey: "compass_layer_eight_gua") }
+    }
+    @Published public var showTrueNorthNeedle: Bool = CompassLayerManager.storedBool("compass_layer_true_north", default: true) {
+        didSet { Self.defaults.set(showTrueNorthNeedle, forKey: "compass_layer_true_north") }
+    }
+    @Published public var showLevelBubble: Bool = CompassLayerManager.storedBool("compass_layer_level_bubble", default: true) {
+        didSet { Self.defaults.set(showLevelBubble, forKey: "compass_layer_level_bubble") }
+    }
+    @Published public var currentPreset: CompassPreset = {
+        guard let raw = CompassLayerManager.defaults.string(forKey: "compass_layer_preset"),
+              let preset = CompassPreset(rawValue: raw) else { return .comprehensive }
+        return preset
+    }()
+
+    /// Manual switches can make the saved preset name stale. Resolve the
+    /// visible selection from the actual flags so the sheet never claims a
+    /// preset is active after the user customized one or more layers.
+    public var activePreset: CompassPreset? {
+        CompassPreset.allCases.first { preset in
+            switch preset {
+            case .comprehensive:
+                return showDegreeTicks && showSolarTerms && showHexagrams64 && showFenjin120 && showMountain24 && showEightGua && showTrueNorthNeedle && showLevelBubble
+            case .sanYuan:
+                return showDegreeTicks && !showSolarTerms && showHexagrams64 && showFenjin120 && showMountain24 && showEightGua && showTrueNorthNeedle && showLevelBubble
+            case .sanHe:
+                return showDegreeTicks && showSolarTerms && !showHexagrams64 && showFenjin120 && showMountain24 && showEightGua && showTrueNorthNeedle && showLevelBubble
+            case .minimalist:
+                return showDegreeTicks && !showSolarTerms && !showHexagrams64 && !showFenjin120 && showMountain24 && showEightGua && showTrueNorthNeedle && showLevelBubble
+            }
+        }
+    }
     
     private init() {}
     
     public func applyPreset(_ preset: CompassPreset) {
         currentPreset = preset
+        Self.defaults.set(preset.rawValue, forKey: "compass_layer_preset")
         switch preset {
         case .comprehensive:
             showDegreeTicks = true

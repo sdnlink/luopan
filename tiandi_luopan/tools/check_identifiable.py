@@ -1,7 +1,8 @@
 import os
 import re
+from pathlib import Path
 
-root_dir = "tiandi_luopan/ios/TiandiLuopan"
+root_dir = Path(__file__).resolve().parents[1] / "ios" / "TiandiLuopan"
 
 identifiable_structs = {}
 all_structs = {}

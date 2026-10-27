@@ -19,7 +19,63 @@ public enum StarLuckType: String, Codable {
         }
     }
     
+    public var localizedName: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            switch self {
+            case .shengQi: return "Sheng Qi (Vitality - Great Luck)"
+            case .yanNian: return "Yan Nian (Longevity - Great Luck)"
+            case .tianYi:  return "Tian Yi (Heavenly Doctor - Medium Luck)"
+            case .fuWei:   return "Fu Wei (Stability - Minor Luck)"
+            case .jueMing: return "Jue Ming (Calamity - Major Taboo)"
+            case .wuGui:   return "Wu Gui (Five Ghosts - Major Taboo)"
+            case .liuSha:  return "Liu Sha (Six Killings - Medium Taboo)"
+            case .huoHai:  return "Huo Hai (Mishap - Minor Taboo)"
+            }
+        } else if lang == .zhHant {
+            switch self {
+            case .shengQi: return "生氣 (貪狼大吉)"
+            case .yanNian: return "延年 (武曲大吉)"
+            case .tianYi:  return "天醫 (巨門中吉)"
+            case .fuWei:   return "伏位 (輔弼小吉)"
+            case .jueMing: return "絕命 (破軍大凶)"
+            case .wuGui:   return "五鬼 (廉貞大凶)"
+            case .liuSha:  return "六煞 (文曲中凶)"
+            case .huoHai:  return "禍害 (祿存小凶)"
+            }
+        }
+        return rawValue
+    }
+    
     public var actionSuggestion: String {
+        localizedSuggestion
+    }
+    
+    public var localizedSuggestion: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            switch self {
+            case .shengQi: return "Ideal for wealth growth, main entrance, master bedroom, and activating vibrant energy."
+            case .yanNian: return "Favors longevity, health, family harmony, and interpersonal relations; ideal for master bedroom or living room."
+            case .tianYi:  return "Dispels illness and misfortune, attracts benefactors; ideal for beds and sacred altars."
+            case .fuWei:   return "Stability, peace, and academic excellence; ideal for study, meditation, and children's room."
+            case .jueMing: return "Indicates exhaustion and health decline; strictly avoid for bedrooms/entrance; suitable for bathroom or storage."
+            case .wuGui:   return "Prone to quarrels, conflicts, and theft; counteract with heavy furnishings or peaceful water cures."
+            case .liuSha:  return "Disturbed peace and emotional turbulence; suitable for storage rooms or remedies."
+            case .huoHai:  return "Obstacles and petty disputes; requires stillness rather than dynamic movement."
+            }
+        } else if lang == .zhHant {
+            switch self {
+            case .shengQi: return "最利求財進職、開大門、置主臥、安動氣之源"
+            case .yanNian: return "利健康長壽、夫妻和睦、人際關係，宜主臥客堂"
+            case .tianYi:  return "消災解厄、身體強健、得貴人相扶，利安床與神位"
+            case .fuWei:   return "安穩守成、文昌得利，宜作書房、冥想及兒童房"
+            case .jueMing: return "主病痛耗散，嚴禁作臥房大門，宜作衛生間或儲物室"
+            case .wuGui:   return "易惹口舌是非、盜賊火災，宜壓以重物或化水局"
+            case .liuSha:  return "酒色桃花、心緒不寧，宜化解或設雜物間"
+            case .huoHai:  return "官非小人、財帛破耗，宜靜不宜動"
+            }
+        }
         switch self {
         case .shengQi: return "最利求财进职、开大门、置主卧、安动气之源"
         case .yanNian: return "利健康长寿、夫妻和睦、人际关系，宜主卧客堂"
@@ -38,6 +94,18 @@ public struct BaZhaiPalaceItem: Identifiable {
     public let direction: String
     public let guaName: String
     public let star: StarLuckType
+    
+    public var localizedDirection: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let enDirs = ["North (Kan)", "Southwest (Kun)", "East (Zhen)", "Southeast (Xun)", "Northwest (Qian)", "West (Dui)", "Northeast (Gen)", "South (Li)"]
+        let hantDirs = ["正北 (坎)", "西南 (坤)", "正東 (震)", "東南 (巽)", "西北 (乾)", "正西 (兌)", "東北 (艮)", "正南 (離)"]
+        if lang == .en && id < enDirs.count {
+            return enDirs[id]
+        } else if lang == .zhHant && id < hantDirs.count {
+            return hantDirs[id]
+        }
+        return direction
+    }
 }
 
 public struct BaZhaiAnalysis {
@@ -46,6 +114,37 @@ public struct BaZhaiAnalysis {
     public let gateDirection: String  // 大门开向
     public let gateStar: StarLuckType // 大门纳气吉凶
     public let items: [BaZhaiPalaceItem]
+    
+    public var localizedHouseGua: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let map = ["坎宅": "Kan House", "坤宅": "Kun House", "震宅": "Zhen House", "巽宅": "Xun House", "乾宅": "Qian House", "兑宅": "Dui House", "艮宅": "Gen House", "离宅": "Li House"]
+            return map[houseGua] ?? houseGua
+        }
+        return houseGua
+    }
+    
+    public var localizedHouseType: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            return houseType == "东四宅" ? "East House" : "West House"
+        } else if lang == .zhHant {
+            return houseType == "东四宅" ? "東四宅" : "西四宅"
+        }
+        return houseType
+    }
+    
+    public var localizedGateDirection: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let map = ["坎": "North (Kan)", "坤": "Southwest (Kun)", "震": "East (Zhen)", "巽": "Southeast (Xun)", "乾": "Northwest (Qian)", "兑": "West (Dui)", "艮": "Northeast (Gen)", "离": "South (Li)"]
+            return map[gateDirection] ?? gateDirection
+        } else if lang == .zhHant {
+            let map = ["坎": "正北 (坎)", "坤": "西南 (坤)", "震": "正東 (震)", "巽": "東南 (巽)", "乾": "西北 (乾)", "兑": "正西 (兌)", "艮": "東北 (艮)", "离": "正南 (離)"]
+            return map[gateDirection] ?? gateDirection
+        }
+        return gateDirection
+    }
 }
 
 public final class BaZhaiEngine {

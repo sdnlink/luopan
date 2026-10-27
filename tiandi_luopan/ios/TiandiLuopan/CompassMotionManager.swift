@@ -39,9 +39,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public var longitude: Double = 116.4074
     @Published public var altitude: Double = 45.0
     @Published public var speedKmH: Double = 0.0
-    @Published public var coordsDesc: String = "39.90420°N, 116.40740°E · 海拔 45m"
+    @Published public var coordsDesc: String = "39.90420°N, 116.40740°E · 45m"
     @Published public var trueSolarTimeStr: String = "12:00:00"
-    @Published public var solarTimeDesc: String = "真太阳时校准 · 均时差 +0.0分"
+    @Published public var solarTimeDesc: String = "12:00:00"
     
     @Published public var isDistorted: Bool = false
     @Published public var magneticStrengthUT: Double = 48.0
@@ -168,7 +168,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         let solarResult = SolarTimeCalculator.shared.calculate(date: Date(), longitude: self.longitude)
         self.trueSolarTimeStr = solarResult.trueSolarTimeString
         let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
-        self.solarTimeDesc = "\(solarResult.baziGanzhi) (均时差 \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))分)"
+        let eqLabel = LocalizationManager.shared.t("solar_eq_time"); let minUnit = LocalizationManager.shared.t("minute_unit"); self.solarTimeDesc = "\(solarResult.baziGanzhi) (\(eqLabel) \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))\(minUnit))"
     }
     
     private func startMotionUpdates() {
@@ -266,7 +266,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             
             let latStr = String(format: "%.5f°", abs(loc.coordinate.latitude)) + (loc.coordinate.latitude >= 0 ? "N" : "S")
             let lonStr = String(format: "%.5f°", abs(loc.coordinate.longitude)) + (loc.coordinate.longitude >= 0 ? "E" : "W")
-            let altStr = String(format: " · 海拔 %.0fm", loc.altitude)
+            let altStr = " · " + LocalizationManager.shared.t("altitude_label") + String(format: " %.0fm", loc.altitude)
             self.coordsDesc = "\(latStr), \(lonStr)\(altStr)"
             
             if loc.speed >= 0 {

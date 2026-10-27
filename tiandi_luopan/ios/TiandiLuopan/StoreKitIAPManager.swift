@@ -21,10 +21,10 @@ public enum IAPProductID: String, CaseIterable {
     
     var priceText: String {
         switch self {
-        case .vipYearly: return "¥198/年"
-        case .proLifetime: return "¥298"
-        case .floorplanSingle: return "¥19.9"
-        case .tianjiSingle: return "¥9.9"
+        case .vipYearly: return LocalizationManager.shared.t("price_vip_yearly")
+        case .proLifetime: return LocalizationManager.shared.t("price_pro_lifetime")
+        case .floorplanSingle: return LocalizationManager.shared.t("price_floorplan_single")
+        case .tianjiSingle: return LocalizationManager.shared.t("price_tianji_single")
         }
     }
     
@@ -128,7 +128,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     public func purchaseProduct(id: String) {
         guard SKPaymentQueue.canMakePayments() else {
-            delegate?.iapManagerDidFailPurchase(productId: id, errorMsg: "设备当前受家长控制或系统限制，无法完成应用内购买。")
+            delegate?.iapManagerDidFailPurchase(productId: id, errorMsg: LocalizationManager.shared.t("iap_err_parental_controls"))
             return
         }
         
@@ -197,23 +197,24 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     public func paymentQueue(_ queue: SKPaymentQueue, restoreCompletedTransactionsFailedWithError error: Error) {
         DispatchQueue.main.async { [weak self] in
-            self?.delegate?.iapManagerDidFailPurchase(productId: "", errorMsg: "恢复购买失败: \(error.localizedDescription)")
+            self?.delegate?.iapManagerDidFailPurchase(productId: "", errorMsg: "\(LocalizationManager.shared.t("iap_err_restore_failed_prefix"))\(error.localizedDescription)")
         }
     }
     
     private func handleFailed(_ transaction: SKPaymentTransaction) {
         let pid = transaction.payment.productIdentifier
-        var errorMsg = "购买已取消或发生未知错误"
+        let lang = LocalizationManager.shared
+        var errorMsg = lang.t("iap_err_cancelled_or_unknown")
         if let err = transaction.error as? SKError {
             switch err.code {
             case .paymentCancelled:
-                errorMsg = "用户已取消支付"
+                errorMsg = lang.t("iap_err_payment_cancelled")
             case .paymentNotAllowed:
-                errorMsg = "该 Apple ID 不允许进行应用内购买"
+                errorMsg = lang.t("iap_err_payment_not_allowed")
             case .paymentInvalid:
-                errorMsg = "支付凭证无效，请检查付款方式"
+                errorMsg = lang.t("iap_err_payment_invalid")
             case .clientInvalid:
-                errorMsg = "客户端无权发起支付"
+                errorMsg = lang.t("iap_err_client_invalid")
             default:
                 errorMsg = err.localizedDescription
             }

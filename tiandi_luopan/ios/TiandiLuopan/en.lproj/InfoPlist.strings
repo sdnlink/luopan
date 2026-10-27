@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "YanXiang Compass";
+"CFBundleName" = "YanXiang Compass";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "YanXiang Compass requires location access to calculate exact GPS coordinates, elevation, and true solar time.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "YanXiang Compass requires location access to calculate exact GPS coordinates, elevation, and true solar time.";
+"NSMotionUsageDescription" = "YanXiang Compass requires motion sensors to drive the 3D digital bubble level and precision compass.";
+"NSCameraUsageDescription" = "YanXiang Compass requires camera access for AR vision feng shui analysis and on-site orientation.";
+"NSPhotoLibraryAddUsageDescription" = "YanXiang Compass needs permission to save high-resolution classical feng shui scrolls to your photo library.";
+"NSPhotoLibraryUsageDescription" = "YanXiang Compass needs access to your photo library to save feng shui scrolls and survey snapshots.";

@@ -347,7 +347,13 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             if extendSubscription {
                 defaults.set(true, forKey: kIsVIP)
                 let purchaseDate = transactionDate ?? Date()
-                let baseDate = max(purchaseDate, Date(timeIntervalSince1970: oldExpiry))
+                // StoreKit can deliver a completed transaction after a
+                // temporary network outage. If its transaction date is more
+                // than a year old and no previous local expiry exists, using
+                // that date would unlock the purchase and immediately expire
+                // it. A completed purchase must grant one full local period;
+                // a still-active previous period remains the base for renewal.
+                let baseDate = max(Date(), max(purchaseDate, Date(timeIntervalSince1970: oldExpiry)))
                 let expireDate = baseDate.addingTimeInterval(365 * 24 * 3600)
                 defaults.set(expireDate.timeIntervalSince1970, forKey: kVIPExpireDate)
             } else if let restoredDate = transactionDate {

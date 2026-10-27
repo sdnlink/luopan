@@ -58,6 +58,7 @@
 		1069 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2069 /* LocalizationManager.swift */; };
 		1070 /* WorldMagneticModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2070 /* WorldMagneticModel.swift */; };
 		1071 /* OnDeviceShaAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2071 /* OnDeviceShaAnalyzer.swift */; };
+		1012 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2013 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -114,6 +115,9 @@
 		2069 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/LocalizationManager.swift"; sourceTree = "<group>"; };
 		2070 /* WorldMagneticModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WorldMagneticModel.swift"; sourceTree = "<group>"; };
 		2071 /* OnDeviceShaAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/OnDeviceShaAnalyzer.swift"; sourceTree = "<group>"; };
+		2014 /* en InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		2015 /* zh-Hans InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		2016 /* zh-Hant InfoPlist.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -191,11 +195,22 @@
 				2069 /* LocalizationManager.swift */,
 				2070 /* WorldMagneticModel.swift */,
 				2071 /* OnDeviceShaAnalyzer.swift */,
+				2013 /* InfoPlist.strings */,
 
 
 
 			);
 			path = TiandiLuopan;
+			sourceTree = "<group>";
+		};
+		2013 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				2014 /* en InfoPlist.strings */,
+				2015 /* zh-Hans InfoPlist.strings */,
+				2016 /* zh-Hant InfoPlist.strings */,
+			);
+			name = InfoPlist.strings;
 			sourceTree = "<group>";
 		};
 		4002 /* Frameworks */ = {
@@ -257,10 +272,12 @@
 			};
 			buildConfigurationList = 6002 /* Build configuration list for PBXProject "TiandiLuopan" */;
 			compatibilityVersion = "Xcode 14.0";
-			developmentRegion = zh_CN;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				zh_CN,
+				en,
+				zh-Hans,
+				zh-Hant,
 				Base,
 			);
 			mainGroup = 4000 /* MainGroup */;
@@ -280,6 +297,7 @@
 			files = (
 				1005 /* Assets.xcassets in Resources */,
 				1006 /* www in Resources */,
+				1012 /* InfoPlist.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -352,7 +370,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 123;
+				CURRENT_PROJECT_VERSION = 130;
 				ENABLE_BITCODE = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -369,7 +387,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -390,7 +408,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 123;
+				CURRENT_PROJECT_VERSION = 130;
 				ENABLE_BITCODE = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_OPTIMIZATION_LEVEL = s;
@@ -400,7 +418,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.3;
+				MARKETING_VERSION = 1.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_COMPILATION_MODE = "wholemodule";

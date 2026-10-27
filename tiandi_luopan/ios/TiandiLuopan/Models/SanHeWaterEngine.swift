@@ -246,7 +246,7 @@ public final class SanHeWaterEngine {
                 isDanger = true
                 badge = "大忌坤水破局"
             } else if name == "坤" {
-                desc = "向首为【坤向】。楊公水法：見庚方或丁方來水為【救貧黃泉水】（大吉，人興財旺、催官進祿）；最忌此兩方水直流破局。"
+                desc = "向首為【坤向】。楊公水法：見庚方或丁方來水為【救貧黃泉水】（大吉，人興財旺、催官進祿）；最忌此兩方水直流破局。"
                 isJiuPin = true
                 badge = "救貧大吉向首"
             } else if name == "乙" || name == "丙" {

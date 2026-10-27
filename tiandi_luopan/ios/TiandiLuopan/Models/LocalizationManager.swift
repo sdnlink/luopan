@@ -108,6 +108,8 @@ public class LocalizationManager: ObservableObject {
             "purple_white": "紫白客星",
             "qimen_dunjia": "时家奇门",
             "tianji_scroll": "福宅天机长卷",
+            "save_to_photos": "保存至相册",
+            "share_and_print": "长卷分享与打印",
             "period_selection": "元运选择",
             "current_period_9": "当前下元九运 (2024-2043)",
             "sitting_facing": "坐向分析",
@@ -135,6 +137,8 @@ public class LocalizationManager: ObservableObject {
             "app_language": "界面语言 (Language)",
             "done": "完成",
             "close": "关闭",
+            "one_click_export": "一键出图",
+            "save_success": "已成功保存至系统相册！",
             "pay_securely": "Apple Pay 一键开通所选服务"
         ],
         .zhHant: [
@@ -170,6 +174,8 @@ public class LocalizationManager: ObservableObject {
             "purple_white": "紫白客星",
             "qimen_dunjia": "時家奇門",
             "tianji_scroll": "福宅天機長卷",
+            "save_to_photos": "保存至相冊",
+            "share_and_print": "長卷分享與打印",
             "period_selection": "元運選擇",
             "current_period_9": "當前下元九運 (2024-2043)",
             "sitting_facing": "坐向分析",
@@ -197,6 +203,8 @@ public class LocalizationManager: ObservableObject {
             "app_language": "界面語言 (Language)",
             "done": "完成",
             "close": "關閉",
+            "one_click_export": "一鍵出圖",
+            "save_success": "已成功保存至系統相冊！",
             "pay_securely": "Apple Pay 一鍵開通所選服務"
         ],
         .en: [
@@ -232,6 +240,8 @@ public class LocalizationManager: ObservableObject {
             "purple_white": "Purple-White Stars",
             "qimen_dunjia": "QiMen DunJia",
             "tianji_scroll": "Celestial Scroll",
+            "save_to_photos": "Save to Photos",
+            "share_and_print": "Share & Print",
             "period_selection": "Period Selection",
             "current_period_9": "Current Period 9 (2024-2043)",
             "sitting_facing": "Sitting & Facing",
@@ -259,6 +269,8 @@ public class LocalizationManager: ObservableObject {
             "app_language": "App Language",
             "done": "Done",
             "close": "Close",
+            "one_click_export": "Export",
+            "save_success": "Saved to Photos successfully!",
             "pay_securely": "Pay with Apple Pay"
         ]
     ]

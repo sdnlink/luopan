@@ -92,15 +92,20 @@ public struct QimenPalaceCell: Identifiable {
     public var localizedPalaceName: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let hantMap = ["东南": "東南", "正南": "正南", "西南": "西南", "正东": "正東", "中宫": "中宮", "正西": "正西", "东北": "東北", "正北": "正北", "西北": "西北"]
+        let trigramEnMap = ["巽": "Xun", "离": "Li", "坤": "Kun", "震": "Zhen", "兑": "Dui", "艮": "Gen", "坎": "Kan", "乾": "Qian", "太极": "Taiji"]
+        let trigramHantMap = ["巽": "巽", "離": "離", "离": "離", "坤": "坤", "震": "震", "兌": "兌", "兑": "兌", "艮": "艮", "坎": "坎", "乾": "乾", "太極": "太極", "太极": "太極"]
         if lang == .zhHant {
             let parts = palaceName.split(separator: " ", maxSplits: 1).map(String.init)
-            if parts.count == 2 { return "\(hantMap[parts[0]] ?? parts[0]) \(parts[1].replacingOccurrences(of: "宫", with: "宮"))" }
+            if parts.count == 2 {
+                let trigram = trigramHantMap[parts[1]] ?? parts[1].replacingOccurrences(of: "宫", with: "宮")
+                return "\(hantMap[parts[0]] ?? parts[0]) \(trigram)"
+            }
             return hantMap[palaceName] ?? palaceName.replacingOccurrences(of: "宫", with: "宮")
         }
         guard lang == .en else { return palaceName }
         let map = ["东南": "Southeast", "正南": "South", "西南": "Southwest", "正东": "East", "中宫": "Center", "正西": "West", "东北": "Northeast", "正北": "North", "西北": "Northwest"]
         let parts = palaceName.split(separator: " ", maxSplits: 1).map(String.init)
-        if parts.count == 2 { return "\(map[parts[0]] ?? parts[0]) (\(parts[1]))" }
+        if parts.count == 2 { return "\(map[parts[0]] ?? parts[0]) (\(trigramEnMap[parts[1]] ?? parts[1]))" }
         return map[palaceName] ?? palaceName
     }
 }

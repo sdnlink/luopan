@@ -284,6 +284,8 @@ public class QimenEngine {
                         bestScore = candidateScore
                     } else if candidateScore > bestScore, isHant {
                         let hantDoor = door.localizedName
+                        let hantDirection = ["东南": "東南", "正南": "正南", "西南": "西南", "正东": "正東", "正西": "正西", "东北": "東北", "正北": "正北", "西北": "西北"][p.name] ?? p.name
+                        let hantTrigram = ["兑": "兌", "离": "離", "太极": "太極"][p.trigram] ?? p.trigram
                         let hantStar = QimenPalaceCell(
                             palaceId: p.id, palaceName: p.name, trigram: p.trigram,
                             doorName: door.name, doorLuck: door.luckType,
@@ -296,7 +298,7 @@ public class QimenEngine {
                             starName: star, godName: god, tianStem: "", diStem: "",
                             isTaiJiCenter: false, isDoorAuspicious: door.isAuspicious
                         ).localizedGodName
-                        bestDirection = "\(p.name)方 (\(p.trigram)宮\(hantDoor))"
+                        bestDirection = "\(hantDirection)方 (\(hantTrigram)宮\(hantDoor))"
                         bestReason = "臨\(hantStar)星與\(hantGod)神，\(door.localizedLore)"
                         bestBearing = Self.bearing(for: p.name)
                         bestScore = candidateScore
@@ -312,7 +314,8 @@ public class QimenEngine {
                         let direction = ["东南": "Southeast", "正南": "South", "西南": "Southwest", "正东": "East", "正西": "West", "东北": "Northeast", "正北": "North", "西北": "Northwest"][p.name] ?? p.name
                         tabooDirs.append("\(direction) · \(door.localizedName)")
                     } else if isHant {
-                        tabooDirs.append("\(p.name)\(door.localizedName)")
+                        let hantDirection = ["东南": "東南", "正南": "正南", "西南": "西南", "正东": "正東", "正西": "正西", "东北": "東北", "正北": "正北", "西北": "西北"][p.name] ?? p.name
+                        tabooDirs.append("\(hantDirection)\(door.localizedName)")
                     } else {
                         tabooDirs.append("\(p.name)\(door.name)")
                     }

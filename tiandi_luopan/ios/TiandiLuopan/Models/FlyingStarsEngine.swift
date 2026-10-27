@@ -384,15 +384,15 @@ public final class FlyingStarsEngine {
         if isEn {
             summary = "\(meta.label). Sitting \(sitting.pinyin) Facing \(facing.pinyin) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
         } else if isHant {
-            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sitting.name)山\(facing.name)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sitting.localizedName)山\(facing.localizedName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
         } else {
             summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sitting.name)山\(facing.name)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
         }
         
         return XuanKongChart(
             period: activePeriod,
-            sittingMountain: isEn ? sitting.pinyin : sitting.name,
-            facingMountain: isEn ? facing.pinyin : facing.name,
+            sittingMountain: isEn ? sitting.pinyin : (isHant ? sitting.localizedName : sitting.name),
+            facingMountain: isEn ? facing.pinyin : (isHant ? facing.localizedName : facing.name),
             patternType: pattern,
             isSanBanGua: false,
             isQiXingDaJie: false,

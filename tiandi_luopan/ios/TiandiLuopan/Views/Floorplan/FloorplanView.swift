@@ -15,6 +15,9 @@ public struct FloorplanView: View {
     @State private var userFloorplanImage: UIImage? = nil
     @State private var showImagePicker: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var isEditingRooms: Bool = false
+    @State private var activeRoomDragID: String? = nil
+    @State private var activeRoomStartRect: CGRect? = nil
     @State private var smoothedFacing: Double = 0.0
     
     public init() {}
@@ -129,6 +132,24 @@ public struct FloorplanView: View {
                 .foregroundColor(isSyncWithCompass ? .green : .orange)
                 .cornerRadius(6)
             }
+
+            // 导入户型图后，可手动把示例房间框调整到真实房间位置。
+            Button(action: {
+                isEditingRooms.toggle()
+                activeRoomDragID = nil
+                activeRoomStartRect = nil
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: isEditingRooms ? "checkmark.circle.fill" : "rectangle.3.group")
+                    Text(lang.t(isEditingRooms ? "floorplan_finish_rooms" : "floorplan_edit_rooms"))
+                }
+                .font(.system(size: 11, weight: .bold))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(isEditingRooms ? Color.green.opacity(0.25) : Color.white.opacity(0.1))
+                .foregroundColor(isEditingRooms ? .green : .white)
+                .cornerRadius(6)
+            }
             
             // 重置立极点
             Button(action: {
@@ -197,6 +218,7 @@ public struct FloorplanView: View {
         let bgColor = isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05))
         
         return Button(action: {
+            if isEditingRooms { return }
             if !iap.canUseFloorplan {
                 showPaywall = true
             } else {
@@ -227,6 +249,32 @@ public struct FloorplanView: View {
         }
         .frame(width: rw, height: rh)
         .position(x: rx + rw / 2, y: ry + rh / 2)
+        .simultaneousGesture(
+            DragGesture()
+                .onChanged { value in
+                    guard isEditingRooms else { return }
+
+                    if activeRoomDragID != room.id {
+                        activeRoomDragID = room.id
+                        activeRoomStartRect = room.rect
+                    }
+                    guard let startRect = activeRoomStartRect,
+                          let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }
+
+                    let dx = value.translation.width / max(w, 1)
+                    let dy = value.translation.height / max(h, 1)
+                    let maxX = max(0.0, 1.0 - startRect.width)
+                    let maxY = max(0.0, 1.0 - startRect.height)
+                    var updated = rooms[index]
+                    updated.rect.origin.x = max(0.0, min(maxX, startRect.origin.x + dx))
+                    updated.rect.origin.y = max(0.0, min(maxY, startRect.origin.y + dy))
+                    rooms[index] = updated
+                }
+                .onEnded { _ in
+                    activeRoomDragID = nil
+                    activeRoomStartRect = nil
+                }
+        )
     }
     
     private func compassOverlayLayer(centerPt: CGPoint, size: CGFloat) -> some View {

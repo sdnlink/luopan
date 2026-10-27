@@ -59,6 +59,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastTiltTime: TimeInterval = 0
     private var lastMountainIndex: Int = -1
     private var wasLevel: Bool = false
+    private var isRunning: Bool = false
     private var lastSolarCalcTime: TimeInterval = 0
     private var lastResolvedHeading: Double = -999.0
     private var lastResolvedTime: TimeInterval = 0
@@ -80,6 +81,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     }
     
     public func start() {
+        guard !isRunning else { return }
+        isRunning = true
+
         if CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
         }
@@ -95,6 +99,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     }
     
     public func stop() {
+        guard isRunning else { return }
+        isRunning = false
         locationManager.stopUpdatingHeading()
         locationManager.stopUpdatingLocation()
         motionManager.stopDeviceMotionUpdates()
@@ -258,6 +264,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         DispatchQueue.main.async {
+            guard self.isRunning else { return }
             let status = manager.authorizationStatus
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 manager.startUpdatingLocation()

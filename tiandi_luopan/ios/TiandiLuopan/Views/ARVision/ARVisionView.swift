@@ -7,15 +7,26 @@ import UIKit
 public struct CameraPreviewView: UIViewRepresentable {
     public var cameraPosition: AVCaptureDevice.Position
     public var isActive: Bool
+    public var captureTrigger: Int
+    public var onPhotoCaptured: ((UIImage?) -> Void)?
     
-    public init(cameraPosition: AVCaptureDevice.Position = .back, isActive: Bool = true) {
+    public init(
+        cameraPosition: AVCaptureDevice.Position = .back,
+        isActive: Bool = true,
+        captureTrigger: Int = 0,
+        onPhotoCaptured: ((UIImage?) -> Void)? = nil
+    ) {
         self.cameraPosition = cameraPosition
         self.isActive = isActive
+        self.captureTrigger = captureTrigger
+        self.onPhotoCaptured = onPhotoCaptured
     }
     
-    public class CameraUIView: UIView {
+    public class CameraUIView: UIView, AVCapturePhotoCaptureDelegate {
         private var captureSession: AVCaptureSession?
         private var previewLayer: AVCaptureVideoPreviewLayer?
+        private var photoCaptureOutput: AVCapturePhotoOutput?
+        private var photoCompletion: ((UIImage?) -> Void)?
         private var currentPosition: AVCaptureDevice.Position = .back
         
         override public func layoutSubviews() {
@@ -32,6 +43,8 @@ public struct CameraPreviewView: UIViewRepresentable {
                 previewLayer?.removeFromSuperlayer()
                 previewLayer = nil
             }
+            photoCaptureOutput = nil
+            photoCompletion = nil
             
             let session = AVCaptureSession()
             session.sessionPreset = .high
@@ -43,6 +56,14 @@ public struct CameraPreviewView: UIViewRepresentable {
             }
             
             session.addInput(input)
+
+            let photoOutput = AVCapturePhotoOutput()
+            if session.canAddOutput(photoOutput) {
+                session.addOutput(photoOutput)
+                self.photoCaptureOutput = photoOutput
+            } else {
+                self.photoCaptureOutput = nil
+            }
             
             let preview = AVCaptureVideoPreviewLayer(session: session)
             preview.videoGravity = .resizeAspectFill
@@ -54,6 +75,37 @@ public struct CameraPreviewView: UIViewRepresentable {
             
             DispatchQueue.global(qos: .userInitiated).async {
                 session.startRunning()
+            }
+        }
+
+        public func capturePhoto(completion: @escaping (UIImage?) -> Void) {
+            guard let photoOutput = photoCaptureOutput, captureSession?.isRunning == true else {
+                completion(nil)
+                return
+            }
+
+            photoCompletion = completion
+            let settings = AVCapturePhotoSettings()
+            settings.flashMode = .off
+            photoOutput.capturePhoto(with: settings, delegate: self)
+        }
+
+        public func photoOutput(
+            _ output: AVCapturePhotoOutput,
+            didFinishProcessingPhoto photo: AVCapturePhoto,
+            error: Error?
+        ) {
+            let image: UIImage?
+            if error == nil, let data = photo.fileDataRepresentation() {
+                image = UIImage(data: data)
+            } else {
+                image = nil
+            }
+
+            let completion = photoCompletion
+            photoCompletion = nil
+            DispatchQueue.main.async {
+                completion?(image)
             }
         }
         
@@ -94,18 +146,28 @@ public struct CameraPreviewView: UIViewRepresentable {
             context.coordinator.lastActive = isActive
             uiView.resumeSessionIfNeeded(position: cameraPosition)
         }
+
+        if context.coordinator.lastCaptureTrigger != captureTrigger {
+            context.coordinator.lastCaptureTrigger = captureTrigger
+            uiView.capturePhoto { image in
+                onPhotoCaptured?(image)
+            }
+        }
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(position: cameraPosition, active: isActive)
+        Coordinator(position: cameraPosition, active: isActive, captureTrigger: captureTrigger)
     }
     
     public class Coordinator {
         var lastPosition: AVCaptureDevice.Position
         var lastActive: Bool
-        init(position: AVCaptureDevice.Position, active: Bool) {
+        var lastCaptureTrigger: Int
+
+        init(position: AVCaptureDevice.Position, active: Bool, captureTrigger: Int) {
             self.lastPosition = position
             self.lastActive = active
+            self.lastCaptureTrigger = captureTrigger
         }
     }
     
@@ -133,6 +195,7 @@ public struct ARVisionView: View {
     @State private var hasCameraPermission: Bool = false
     @State private var showSnapshotToast: Bool = false
     @State private var cameraPosition: AVCaptureDevice.Position = .back
+    @State private var captureTrigger: Int = 0
     
     private let shaList = ExteriorShaEngine.shared.database
     
@@ -184,7 +247,14 @@ public struct ARVisionView: View {
         ZStack {
             // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             if hasCameraPermission && isActive {
-                CameraPreviewView(cameraPosition: cameraPosition, isActive: isActive)
+                CameraPreviewView(
+                    cameraPosition: cameraPosition,
+                    isActive: isActive,
+                    captureTrigger: captureTrigger,
+                    onPhotoCaptured: { image in
+                        captureAndSaveSnapshot(baseImage: image)
+                    }
+                )
                     .ignoresSafeArea()
             } else {
                 simulationCanvasLayer()
@@ -397,7 +467,11 @@ public struct ARVisionView: View {
                 if !iap.hasUnlockedVIP {
                     showPaywall = true
                 } else {
-                    captureAndSaveSnapshot()
+                    if hasCameraPermission && isActive {
+                        captureTrigger += 1
+                    } else {
+                        captureAndSaveSnapshot(baseImage: nil)
+                    }
                 }
             }) {
                 HStack(spacing: 4) {
@@ -506,7 +580,7 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
-    private func captureAndSaveSnapshot() {
+    private func captureAndSaveSnapshot(baseImage: UIImage?) {
         let size = CGSize(width: 1080, height: 1920)
         let renderer = UIGraphicsImageRenderer(size: size)
         
@@ -518,8 +592,25 @@ public struct ARVisionView: View {
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
             
-            // 底色
-            cg.setFillColor(UIColor(red: 18/255.0, green: 18/255.0, blue: 24/255.0, alpha: 1.0).cgColor)
+            // 相机帧作为底图；无相机权限或模拟器中使用可辨识的深色回退底图。
+            if let baseImage = baseImage {
+                let imageSize = baseImage.size
+                let fillScale = max(size.width / imageSize.width, size.height / imageSize.height)
+                let drawSize = CGSize(width: imageSize.width * fillScale, height: imageSize.height * fillScale)
+                let drawRect = CGRect(
+                    x: (size.width - drawSize.width) / 2,
+                    y: (size.height - drawSize.height) / 2,
+                    width: drawSize.width,
+                    height: drawSize.height
+                )
+                baseImage.draw(in: drawRect)
+            } else {
+                cg.setFillColor(UIColor(red: 18/255.0, green: 18/255.0, blue: 24/255.0, alpha: 1.0).cgColor)
+                cg.fill(CGRect(origin: .zero, size: size))
+            }
+
+            // HUD 在相机帧上保持可读性。
+            cg.setFillColor(UIColor.black.withAlphaComponent(0.12).cgColor)
             cg.fill(CGRect(origin: .zero, size: size))
             
             // 十字天心

@@ -1,75 +1,130 @@
 import Foundation
 
-// MARK: - 真太阳时与天文学节气经度计算器 (True Solar Time Calculator)
+// MARK: - 真太阳时与太阳黄经节气计算器
 
 public struct SolarTimeResult {
-    public let standardTimeString: String    // 本地平太阳时/北京时间
-    public let trueSolarTimeString: String    // 高精度视太阳时 (真太阳时)
-    public let timeOffsetMinutes: Double      // 经度与时差总校正分 (±分)
-    public let equationOfTimeMinutes: Double  // 地球公转真平太阳时差 (EOT)
-    public let solarTermName: String          // 当前节气
-    public let baziGanzhi: String             // 年月日时四柱干支
+    public let standardTimeString: String
+    public let trueSolarTimeString: String
+    public let timeOffsetMinutes: Double
+    public let equationOfTimeMinutes: Double
+    public let solarTermName: String
+    public let baziGanzhi: String
 }
 
 public final class SolarTimeCalculator {
     public static let shared = SolarTimeCalculator()
-    
-    // 二十四节气参考数据
+
+    // 以小寒 285°为起点，顺序为太阳视黄经每 15°对应的节气。
     private let solarTerms = [
         "小寒", "大寒", "立春", "雨水", "惊蛰", "春分",
         "清明", "谷雨", "立夏", "小满", "芒种", "夏至",
         "小暑", "大暑", "立秋", "处暑", "白露", "秋分",
         "寒露", "霜降", "立冬", "小雪", "大雪", "冬至"
     ]
-    
-    // 天干地支
     private let heavenlyStems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     private let earthlyBranches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-    
+
     public func calculate(date: Date = Date(), longitude: Double = 116.4074) -> SolarTimeResult {
-        let calendar = Calendar(identifier: .gregorian)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+
+        let components = calendar.dateComponents([.hour, .minute, .second], from: date)
         let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        
-        // 1. 经度时差：每经度相差 4 分钟 (相对于东经120°标准经线)
-        let lonDiff = longitude - 120.0
-        let lonOffsetMinutes = lonDiff * 4.0
-        
-        // 2. 地球轨道公转导致的真平太阳时差 (Equation of Time, 经典近似公式)
-        // B = 360/365 * (d - 81) 度
-        let bRad = (360.0 / 365.0 * Double(dayOfYear - 81)) * .pi / 180.0
-        let eotMinutes = 9.87 * sin(2.0 * bRad) - 7.53 * cos(bRad) - 1.5 * sin(bRad)
-        
-        let totalOffsetSeconds = (lonOffsetMinutes + eotMinutes) * 60.0
-        let trueSolarDate = date.addingTimeInterval(totalOffsetSeconds)
-        
+        // 以当前系统时区的标准经线为基准；中国时区仍然等于东经 120°，在其他地区也不会误套北京时间。
+        let timezoneMeridian = Double(calendar.timeZone.secondsFromGMT(for: date)) / 3600.0 * 15.0
+        let longitudeOffset = (longitude - timezoneMeridian) * 4.0
+        let daysInYear = Double(calendar.range(of: .day, in: .year, for: date)?.count ?? 365)
+        let fractionalDay = Double(dayOfYear - 1)
+            + Double((components.hour ?? 12) - 12) / 24.0
+            + Double(components.minute ?? 0) / 1_440.0
+            + Double(components.second ?? 0) / 86_400.0
+        let gamma = 2.0 * .pi / daysInYear * fractionalDay
+        let equationOfTime = 229.18 * (
+            0.000075
+            + 0.001868 * cos(gamma)
+            - 0.032077 * sin(gamma)
+            - 0.014615 * cos(2.0 * gamma)
+            - 0.040849 * sin(2.0 * gamma)
+        )
+        let totalOffsetMinutes = longitudeOffset + equationOfTime
+        let trueSolarDate = date.addingTimeInterval(totalOffsetMinutes * 60.0)
+
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
-        formatter.timeZone = TimeZone.current
-        let stdTimeStr = formatter.string(from: date)
-        let trueSolarStr = formatter.string(from: trueSolarDate)
-        
-        // 节气估算 (每15天一节气)
-        let termIdx = (dayOfYear / 15) % 24
-        let termName = solarTerms[termIdx]
-        
-        // 简要四柱干支生成 (严格遵循立春交岁正统天文学天干地支更迭法则)
-        let year = calendar.component(.year, from: date)
-        let month = calendar.component(.month, from: date)
-        let day = calendar.component(.day, from: date)
-        let isBeforeLiChun = (month < 2 || (month == 2 && day < 4))
-        let gzYear = isBeforeLiChun ? (year - 1) : year
-        
-        let yearStem = heavenlyStems[((gzYear - 4) % 10 + 10) % 10]
-        let yearBranch = earthlyBranches[((gzYear - 4) % 12 + 12) % 12]
-        let bazi = "\(yearStem)\(yearBranch)年 · \(termName)令"
-        
+        formatter.timeZone = calendar.timeZone
+
+        let termIndex = solarTermIndex(for: solarApparentLongitude(for: date))
+        let bazi = calculateBazi(for: trueSolarDate, termIndex: termIndex, calendar: calendar)
+
         return SolarTimeResult(
-            standardTimeString: stdTimeStr,
-            trueSolarTimeString: trueSolarStr,
-            timeOffsetMinutes: (lonOffsetMinutes + eotMinutes),
-            equationOfTimeMinutes: eotMinutes,
-            solarTermName: termName,
+            standardTimeString: formatter.string(from: date),
+            trueSolarTimeString: formatter.string(from: trueSolarDate),
+            timeOffsetMinutes: totalOffsetMinutes,
+            equationOfTimeMinutes: equationOfTime,
+            solarTermName: solarTerms[termIndex],
             baziGanzhi: bazi
         )
+    }
+
+    private func normalizedDegrees(_ value: Double) -> Double {
+        let result = value.truncatingRemainder(dividingBy: 360.0)
+        return result >= 0 ? result : result + 360.0
+    }
+
+    /// Meeus 低阶太阳位置公式。它直接按太阳视黄经确定节气，避免固定 15 天间隔造成的节气错位。
+    private func solarApparentLongitude(for date: Date) -> Double {
+        let julianDate = date.timeIntervalSince1970 / 86_400.0 + 2_440_587.5
+        let centuries = (julianDate - 2_451_545.0) / 36_525.0
+        let meanLongitude = normalizedDegrees(280.46646 + 36_000.76983 * centuries + 0.0003032 * centuries * centuries)
+        let meanAnomaly = normalizedDegrees(357.52911 + 35_999.05029 * centuries - 0.0001537 * centuries * centuries) * .pi / 180.0
+        let equationOfCenter =
+            (1.914602 - 0.004817 * centuries - 0.000014 * centuries * centuries) * sin(meanAnomaly)
+            + (0.019993 - 0.000101 * centuries) * sin(2.0 * meanAnomaly)
+            + 0.000289 * sin(3.0 * meanAnomaly)
+        return normalizedDegrees(meanLongitude + equationOfCenter)
+    }
+
+    private func solarTermIndex(for longitude: Double) -> Int {
+        let shifted = normalizedDegrees(longitude - 285.0)
+        return min(23, Int(floor(shifted / 15.0)))
+    }
+
+    private func positiveModulo(_ value: Int, _ modulus: Int) -> Int {
+        let result = value % modulus
+        return result >= 0 ? result : result + modulus
+    }
+
+    private func calculateBazi(for date: Date, termIndex: Int, calendar: Calendar) -> String {
+        let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+        let civilYear = components.year ?? 2000
+        let ganzhiYear = termIndex >= 2 ? civilYear : civilYear - 1
+        let yearCycle = positiveModulo(ganzhiYear - 4, 60)
+        let yearStem = yearCycle % 10
+        let yearBranch = yearCycle % 12
+
+        // 立春起寅月；小寒和大寒仍属于丑月。
+        let monthBranch = termIndex < 2 ? 1 : positiveModulo(2 + (termIndex - 2) / 2, 12)
+        let monthStemStart = positiveModulo((yearStem % 5) * 2 + 2, 10)
+        let monthStem = positiveModulo(monthStemStart + positiveModulo(monthBranch - 2, 12), 10)
+
+        let year = components.year ?? 2000
+        let month = components.month ?? 1
+        let day = components.day ?? 1
+        let a = (14 - month) / 12
+        let y = year + 4800 - a
+        let m = month + 12 * a - 3
+        let julianDay = day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32_045
+        let dayCycle = positiveModulo(julianDay + 49, 60)
+        let dayStem = dayCycle % 10
+        let dayBranch = dayCycle % 12
+
+        let hour = components.hour ?? 12
+        let hourBranch = ((hour + 1) / 2) % 12
+        let hourStem = positiveModulo((dayStem % 5) * 2 + hourBranch, 10)
+
+        return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+            + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
+            + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
+            + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])时"
     }
 }

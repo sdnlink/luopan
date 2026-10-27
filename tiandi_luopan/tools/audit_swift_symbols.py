@@ -1,19 +1,21 @@
 import os
 import re
+from pathlib import Path
 
-manager_path = "tiandi_luopan/ios/TiandiLuopan/CompassMotionManager.swift"
+ROOT_DIR = Path(__file__).resolve().parents[1]
+manager_path = ROOT_DIR / "ios" / "TiandiLuopan" / "CompassMotionManager.swift"
 with open(manager_path, "r", encoding="utf-8") as f:
     manager_code = f.read()
 
 # Collect all published properties and methods in CompassMotionManager
-manager_props = set(re.findall(r'@Published\s+public\s+var\s+([a-zA-Z0-9_]+)', manager_code))
+manager_props = set(re.findall(r'@Published\s+public\s+(?:private\(set\)\s+)?var\s+([a-zA-Z0-9_]+)', manager_code))
 manager_methods = set(re.findall(r'public\s+func\s+([a-zA-Z0-9_]+)', manager_code))
 all_manager_members = manager_props.union(manager_methods)
 
 print("CompassMotionManager members count:", len(all_manager_members))
 
 # Scan all other swift files
-root_dir = "tiandi_luopan/ios/TiandiLuopan"
+root_dir = ROOT_DIR / "ios" / "TiandiLuopan"
 missing_members = {}
 
 for root, dirs, files in os.walk(root_dir):
@@ -34,3 +36,6 @@ for root, dirs, files in os.walk(root_dir):
 print("\nMissing members in CompassMotionManager used by other files:")
 for m, files in missing_members.items():
     print(f"  - '{m}' used in: {files}")
+
+if missing_members:
+    raise SystemExit(1)

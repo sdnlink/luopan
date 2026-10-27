@@ -2434,24 +2434,6 @@
 
     
     
-    <!-- ===== 聚合支付扫码收银台弹窗 ===== -->
-    <div class="qr-pay-modal-overlay" id="qr-pay-modal" onclick="if(event.target===this)closeQrPayModal()">
-        <div class="qr-pay-card">
-            <div style="font-size:15px; font-weight:bold; color:#fff;" id="qr-title">微信安全收银台</div>
-            <div style="font-size:12px; color:#aaa; margin-top:2px;" id="qr-subtitle">请使用手机扫描下方二维码完成支付</div>
-            
-            <div class="qr-code-box">
-                <canvas id="qr-canvas" width="180" height="180"></canvas>
-            </div>
-
-            <div class="qr-amount-text" id="qr-amount">¥198.00</div>
-            <div class="qr-countdown-text">订单编号: <span id="qr-order-id">ORD_20261026</span> · 支付倒计时 <span id="qr-timer">14:59</span></div>
-
-            <button class="qr-sim-btn" onclick="simulateQrPaymentSuccess()">✨ 模拟完成扫码支付 (立即开通)</button>
-            <button class="qr-cancel-btn" onclick="closeQrPayModal()">取消并返回</button>
-        </div>
-    </div>
-
     <!-- ===== Apple In-App Purchase 会员中心与付费墙弹窗 ===== -->
     <div class="calib-modal-overlay" id="iap-modal" onclick="if(event.target===this)closeIAPModal()">
         <div class="calib-card vip-card-glow" style="max-height:90vh; overflow-y:auto; width:min(94vw, 460px);">
@@ -2565,121 +2547,26 @@
             </div>
 
 
-            <!-- 聚合支付渠道选择器 -->
+            <!-- Apple 官方安全内购渠道 -->
             <div class="pay-channels-title">
-                <span>💳 选择安全支付方式</span>
-                <span style="font-size:11px; color:#aaa;" id="iap-currency-hint">支持全球卡与国内主流通道</span>
+                <span> 官方安全支付</span>
+                <span style="font-size:11px; color:#aaa;" id="iap-currency-hint">通过 Apple ID 官方内购扣款</span>
             </div>
-            <div class="pay-channels-grid">
-                <!-- 渠道 1: 微信支付 (推荐) -->
-                <div class="pay-channel-item selected" id="pay-ch-wechat" onclick="selectPayChannel('wechat')">
-                    <div class="pay-channel-icon" style="background:rgba(39,174,96,0.18); color:#2ecc71;">🟢</div>
+            <div class="pay-channels-grid" style="grid-template-columns: 1fr;">
+                <!-- 唯一官方渠道: Apple StoreKit 官方内购 -->
+                <div class="pay-channel-item selected" id="pay-ch-applepay" onclick="selectPayChannel('applepay')">
+                    <div class="pay-channel-icon" style="background:rgba(255,255,255,0.15); color:#fff; font-size: 20px;"></div>
                     <div class="pay-channel-info">
-                        <div class="pay-channel-name">微信支付 <span class="channel-badge-hot">推荐</span></div>
-                        <div class="pay-channel-sub">微信零钱/借记卡/信用卡</div>
-                    </div>
-                </div>
-
-                <!-- 渠道 2: 支付宝 (推荐) -->
-                <div class="pay-channel-item" id="pay-ch-alipay" onclick="selectPayChannel('alipay')">
-                    <div class="pay-channel-icon" style="background:rgba(52,152,219,0.18); color:#3498db;">🔵</div>
-                    <div class="pay-channel-info">
-                        <div class="pay-channel-name">支付宝 <span class="channel-badge-hot" style="background:#2980b9;">分期</span></div>
-                        <div class="pay-channel-sub">余额宝/花呗分期/银行卡</div>
-                    </div>
-                </div>
-
-                <!-- 渠道 3: 国际信用卡 (Visa / Mastercard / 万事达) -->
-                <div class="pay-channel-item" id="pay-ch-card" onclick="selectPayChannel('credit_card')">
-                    <div class="pay-channel-icon" style="background:rgba(212,175,55,0.18); color:#ffd700;">💳</div>
-                    <div class="pay-channel-info">
-                        <div class="pay-channel-name">国际信用卡</div>
-                        <div class="channel-logos-row">
-                            <span class="cc-logo-mini cc-logo-visa">VISA</span>
-                            <span class="cc-logo-mini cc-logo-mc">Mastercard</span>
-                            <span class="cc-logo-mini cc-logo-up">银联</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 渠道 4: 银联云闪付 / 银行卡 -->
-                <div class="pay-channel-item" id="pay-ch-unionpay" onclick="selectPayChannel('unionpay')">
-                    <div class="pay-channel-icon" style="background:rgba(231,76,60,0.18); color:#e74c3c;">🔴</div>
-                    <div class="pay-channel-info">
-                        <div class="pay-channel-name">银联云闪付</div>
-                        <div class="pay-channel-sub">各大银行储蓄卡/信用卡</div>
-                    </div>
-                </div>
-
-                <!-- 渠道 5: Apple Pay (苹果设备专属) -->
-                <div class="pay-channel-item" id="pay-ch-applepay" onclick="selectPayChannel('applepay')">
-                    <div class="pay-channel-icon" style="background:rgba(255,255,255,0.15); color:#fff;"></div>
-                    <div class="pay-channel-info">
-                        <div class="pay-channel-name">Apple Pay</div>
-                        <div class="pay-channel-sub">绑定银联/Visa/万事达</div>
+                        <div class="pay-channel-name">Apple Pay / App Store 官方内购 <span class="channel-badge-hot">官方保障</span></div>
+                        <div class="pay-channel-sub">通过您的 Apple ID 账户进行安全扣款，支持面容/指纹极速确认</div>
                     </div>
                 </div>
             </div>
 
-            <!-- 国际信用卡 (Visa / Mastercard / 运通) 拟真表单卡片 -->
-            <div class="credit-card-container" id="credit-card-form-box">
-                <!-- 拟真卡面展示 -->
-                <div class="virtual-card">
-                    <div class="vc-top-row">
-                        <div class="vc-chip"></div>
-                        <div class="vc-brand-logo" id="vc-brand-display">
-                            <span>💳</span> <span id="vc-brand-text">VISA · Mastercard</span>
-                        </div>
-                    </div>
-                    <div class="vc-card-number" id="vc-num-display">•••• •••• •••• ••••</div>
-                    <div class="vc-bottom-row">
-                        <div>
-                            <div style="font-size:9px; color:#888;">CARDHOLDER NAME</div>
-                            <div class="vc-holder-name" id="vc-name-display">ZHANG SAN</div>
-                        </div>
-                        <div>
-                            <div style="font-size:9px; color:#888;">EXPIRES</div>
-                            <div class="vc-exp-val" id="vc-exp-display">MM/YY</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 信用卡表单输入框 -->
-                <div class="cc-form-grid">
-                    <div class="cc-input-group full">
-                        <label class="cc-label">
-                            <span>卡号 (Card Number)</span>
-                            <span id="cc-brand-badge" style="color:#ffd700; font-weight:bold;">万事达 / Visa / 银联</span>
-                        </label>
-                        <input type="text" class="cc-input" id="cc-input-number" placeholder="4000 1234 5678 9010" maxlength="19" oninput="handleCardNumberInput(this)">
-                    </div>
-                    <div class="cc-input-group full">
-                        <label class="cc-label">持卡人姓名 (Cardholder Name)</label>
-                        <input type="text" class="cc-input" id="cc-input-name" placeholder="ZHANG SAN (拼音或英文姓名)" oninput="handleCardNameInput(this)">
-                    </div>
-                    <div class="cc-input-group">
-                        <label class="cc-label">有效期 (Exp Date)</label>
-                        <input type="text" class="cc-input" id="cc-input-exp" placeholder="MM/YY" maxlength="5" oninput="handleCardExpInput(this)">
-                    </div>
-                    <div class="cc-input-group">
-                        <label class="cc-label">
-                            <span>安全码 (CVV/CVC)</span>
-                            <span style="color:#888; cursor:pointer;" onclick="alert('安全码为卡背签名栏末尾 3 位数字（运通卡为正面 4 位数字）')">❓</span>
-                        </label>
-                        <input type="password" class="cc-input" id="cc-input-cvv" placeholder="123" maxlength="4">
-                    </div>
-                </div>
-
-                <div class="cc-security-note">
-                    <span>🔒</span>
-                    <span>256位银行级 SSL 端到端加密 · 遵循 PCI-DSS 国际安全认证 · 本地不留存卡密</span>
-                </div>
-            </div>
-
-            <!-- 综合统一安全支付大按钮 -->
-            <button class="iap-btn-applepay" id="btn-iap-submit" onclick="executeUnifiedCheckout()">
-                <span id="iap-btn-icon">🟢</span>
-                <span id="iap-btn-label">立即通过微信安全支付</span>
+            <!-- Apple 官方安全支付大按钮 -->
+            <button class="iap-btn-applepay" id="btn-iap-submit" onclick="executeApplePurchase()">
+                <span id="iap-btn-icon"></span>
+                <span id="iap-btn-label">立即通过 Apple Pay 安全支付</span>
                 <span id="iap-btn-price">¥198</span>
             </button>
 
@@ -4343,369 +4230,32 @@
 
         
         // =======================================================
-        // 全聚合收银台：微信、支付宝、万事达/Visa信用卡、银联、Apple Pay
+        // 官方收银台：仅采用 Apple StoreKit / Apple Pay 官方支付
+        // 严格遵循 App Store 审核准则 3.1.1，杜绝任何第三方支付渠道
         // =======================================================
-        let selectedPayChannel = 'wechat'; // 'wechat', 'alipay', 'credit_card', 'unionpay', 'applepay'
-        let qrTimerInterval = null;
+        let selectedPayChannel = 'applepay';
 
-        // 选择支付渠道
         function selectPayChannel(channel) {
-            selectedPayChannel = channel;
-            const channels = ['wechat', 'alipay', 'card', 'unionpay', 'applepay'];
-            channels.forEach(ch => {
-                const el = document.getElementById('pay-ch-' + ch);
-                if (el) {
-                    if (ch === channel || (channel === 'credit_card' && ch === 'card')) {
-                        el.classList.add('selected');
-                    } else {
-                        el.classList.remove('selected');
-                    }
-                }
-            });
-
-            // 信用卡表单切换展开
-            const ccBox = document.getElementById('credit-card-form-box');
-            if (ccBox) {
-                ccBox.style.display = (channel === 'credit_card') ? 'flex' : 'none';
-            }
-
-            // 更新支付按钮文案与图标
+            selectedPayChannel = 'applepay';
             updateSubmitButtonUI();
         }
 
-        // 更新提交按钮文案与币种提示
         function updateSubmitButtonUI() {
             const btnIcon = document.getElementById('iap-btn-icon');
             const btnLabel = document.getElementById('iap-btn-label');
             const currencyHint = document.getElementById('iap-currency-hint');
 
-            const prices = {
-                'com.yanxiang.luopan.vip.yearly': { cny: '¥198', usd: '约 $27.50 USD' },
-                'com.yanxiang.luopan.pro.lifetime': { cny: '¥298', usd: '约 $41.50 USD' },
-                'com.yanxiang.luopan.floorplan.single': { cny: '¥19.9', usd: '约 $2.80 USD' },
-                'com.yanxiang.luopan.tianji.single': { cny: '¥9.9', usd: '约 $1.40 USD' }
-            };
-            const currentPrice = prices[selectedIAPProductId] || { cny: '¥198', usd: '约 $27.50 USD' };
-
-            switch (selectedPayChannel) {
-                case 'wechat':
-                    if (btnIcon) btnIcon.innerText = '🟢';
-                    if (btnLabel) btnLabel.innerText = '立即通过微信安全支付';
-                    if (currencyHint) currencyHint.innerText = '支持微信零钱/储蓄卡/信用卡';
-                    break;
-                case 'alipay':
-                    if (btnIcon) btnIcon.innerText = '🔵';
-                    if (btnLabel) btnLabel.innerText = '立即通过支付宝安全支付';
-                    if (currencyHint) currencyHint.innerText = '支持花呗分期/余额宝/银行卡';
-                    break;
-                case 'credit_card':
-                    if (btnIcon) btnIcon.innerText = '💳';
-                    if (btnLabel) btnLabel.innerText = '通过 Visa · Mastercard 确认支付';
-                    if (currencyHint) currencyHint.innerText = `支持全币种信用卡 (${currentPrice.usd})`;
-                    break;
-                case 'unionpay':
-                    if (btnIcon) btnIcon.innerText = '🔴';
-                    if (btnLabel) btnLabel.innerText = '立即通过银联云闪付支付';
-                    if (currencyHint) currencyHint.innerText = '支持工农中建招等各大银行';
-                    break;
-                case 'applepay':
-                    if (btnIcon) btnIcon.innerText = '';
-                    if (btnLabel) btnLabel.innerText = '立即通过 Apple Pay 安全支付';
-                    if (currencyHint) currencyHint.innerText = 'Apple ID 极速免密扣款';
-                    break;
-            }
+            if (btnIcon) btnIcon.innerText = '';
+            if (btnLabel) btnLabel.innerText = '立即通过 Apple Pay 安全支付';
+            if (currencyHint) currencyHint.innerText = '通过 Apple ID 官方内购扣款';
         }
 
-        // 信用卡表单交互与卡组织识别
-        function handleCardNumberInput(input) {
-            let val = input.value.replace(/\D/g, '');
-            let formatted = val.match(/.{1,4}/g)?.join(' ') || val;
-            input.value = formatted;
-            
-            const display = document.getElementById('vc-num-display');
-            if (display) {
-                display.innerText = formatted || '•••• •••• •••• ••••';
-            }
-
-            // 智能识别卡组织 IIN/BIN
-            const brandText = document.getElementById('vc-brand-text');
-            const brandBadge = document.getElementById('cc-brand-badge');
-            
-            if (val.startsWith('4')) {
-                if (brandText) brandText.innerText = 'VISA (维萨卡)';
-                if (brandBadge) brandBadge.innerHTML = '<span style="color:#f7b600">✓ VISA 信用卡</span>';
-            } else if (/^(5[1-5]|2[2-7])/.test(val)) {
-                if (brandText) brandText.innerText = 'Mastercard (万事达卡)';
-                if (brandBadge) brandBadge.innerHTML = '<span style="color:#f79e1b">✓ 万事达卡 (Mastercard)</span>';
-            } else if (val.startsWith('62')) {
-                if (brandText) brandText.innerText = 'UnionPay (中国银联)';
-                if (brandBadge) brandBadge.innerHTML = '<span style="color:#50e3c2">✓ 银联信用卡 / 借记卡</span>';
-            } else if (/^(34|37)/.test(val)) {
-                if (brandText) brandText.innerText = 'American Express (运通卡)';
-                if (brandBadge) brandBadge.innerHTML = '<span style="color:#3498db">✓ 美国运通 (AMEX)</span>';
-            } else {
-                if (brandText) brandText.innerText = 'Visa · Mastercard · 银联';
-                if (brandBadge) brandBadge.innerText = '万事达 / Visa / 银联';
-            }
-        }
-
-        function handleCardNameInput(input) {
-            const display = document.getElementById('vc-name-display');
-            if (display) {
-                display.innerText = input.value.toUpperCase() || 'ZHANG SAN';
-            }
-        }
-
-        function handleCardExpInput(input) {
-            let val = input.value.replace(/\D/g, '');
-            if (val.length >= 2) {
-                val = val.substring(0, 2) + '/' + val.substring(2, 4);
-            }
-            input.value = val;
-            const display = document.getElementById('vc-exp-display');
-            if (display) {
-                display.innerText = val || 'MM/YY';
-            }
-        }
-
-        // 统一收银台支付执行调度入口
         function executeUnifiedCheckout() {
-            const pid = selectedIAPProductId;
-            const channel = selectedPayChannel;
-            const prices = {
-                'com.yanxiang.luopan.vip.yearly': '198.00',
-                'com.yanxiang.luopan.pro.lifetime': '298.00',
-                'com.yanxiang.luopan.floorplan.single': '19.90',
-                'com.yanxiang.luopan.tianji.single': '9.90'
-            };
-            const amount = prices[pid] || '198.00';
-            const orderId = 'ORD_' + Date.now();
-
-            // 1. 国际信用卡分支处理
-            if (channel === 'credit_card') {
-                const numInput = document.getElementById('cc-input-number');
-                const expInput = document.getElementById('cc-input-exp');
-                const cvvInput = document.getElementById('cc-input-cvv');
-                const nameInput = document.getElementById('cc-input-name');
-
-                const cardNum = numInput ? numInput.value.replace(/\s/g, '') : '';
-                if (cardNum.length < 13) {
-                    alert('请输入完整的 16 位 Visa 或 Mastercard 信用卡号！');
-                    if (numInput) numInput.focus();
-                    return;
-                }
-                if (!expInput || expInput.value.length < 5) {
-                    alert('请输入正确的信用卡有效期 (MM/YY)！');
-                    if (expInput) expInput.focus();
-                    return;
-                }
-                if (!cvvInput || cvvInput.value.length < 3) {
-                    alert('请输入卡背 3 位 CVV/CVC 安全校验码！');
-                    if (cvvInput) cvvInput.focus();
-                    return;
-                }
-
-                // 呼起银行级 3D Secure 动态密码安全校验动画
-                const btn = document.getElementById('btn-iap-submit');
-                if (btn) {
-                    btn.disabled = true;
-                    btn.innerHTML = '<span>🔒 正在连接 Visa / Mastercard 3D Secure 安全验证…</span>';
-                }
-
-                setTimeout(() => {
-                    if (btn) btn.innerHTML = '<span>💳 银行扣款清算中…</span>';
-                    setTimeout(() => {
-                        if (btn) {
-                            btn.disabled = false;
-                            updateSubmitButtonUI();
-                        }
-                        simulateMultiPaymentSuccess('credit_card', 'TX_CC_' + Date.now(), 'Visa / 万事达信用卡');
-                    }, 800);
-                }, 1000);
-                return;
-            }
-
-            // 2. Apple Pay 原生渠道
-            if (channel === 'applepay') {
-                executeApplePurchase();
-                return;
-            }
-
-            // 3. Android 原生环境调起
-            if (window.AndroidCompass && window.AndroidCompass.requestNativePayment) {
-                window.AndroidCompass.requestNativePayment(channel, JSON.stringify({
-                    orderId: orderId,
-                    amount: amount,
-                    productId: pid
-                }));
-                return;
-            }
-
-            // 4. iOS 原生 WebKit 调起
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
-                window.webkit.messageHandlers.iOSCompass.postMessage({
-                    action: "requestMultiPayment",
-                    channel: channel,
-                    orderId: orderId,
-                    amount: amount,
-                    productId: pid
-                });
-                return;
-            }
-
-            // 5. Web / 桌面端收银扫码弹窗
-            openQrPayModal(channel, amount, orderId);
+            executeApplePurchase();
         }
 
-        // 打开扫码收银台弹窗 (微信/支付宝/银联)
-        function openQrPayModal(channel, amount, orderId) {
-            const modal = document.getElementById('qr-pay-modal');
-            const title = document.getElementById('qr-title');
-            const sub = document.getElementById('qr-subtitle');
-            const amt = document.getElementById('qr-amount');
-            const ord = document.getElementById('qr-order-id');
-
-            if (amt) amt.innerText = '¥' + amount;
-            if (ord) ord.innerText = orderId;
-
-            if (channel === 'wechat') {
-                if (title) title.innerHTML = '<span style="color:#2ecc71">🟢 微信支付收银台</span>';
-                if (sub) sub.innerText = '请使用微信 App 扫描二维码完成支付';
-            } else if (channel === 'alipay') {
-                if (title) title.innerHTML = '<span style="color:#3498db">🔵 支付宝收银台</span>';
-                if (sub) sub.innerText = '请使用支付宝 App 扫描二维码完成支付';
-            } else {
-                if (title) title.innerHTML = '<span style="color:#e74c3c">🔴 银联云闪付收银台</span>';
-                if (sub) sub.innerText = '请使用各大银行 App 或云闪付扫码';
-            }
-
-            drawSimulatedQRCode(channel);
-
-            if (modal) modal.style.display = 'flex';
-
-            // 倒计时
-            let seconds = 900;
-            if (qrTimerInterval) clearInterval(qrTimerInterval);
-            qrTimerInterval = setInterval(() => {
-                seconds--;
-                const min = String(Math.floor(seconds / 60)).padStart(2, '0');
-                const sec = String(seconds % 60).padStart(2, '0');
-                const timerEl = document.getElementById('qr-timer');
-                if (timerEl) timerEl.innerText = `${min}:${sec}`;
-                if (seconds <= 0) {
-                    clearInterval(qrTimerInterval);
-                    closeQrPayModal();
-                }
-            }, 1000);
-        }
-
-        function closeQrPayModal() {
-            const modal = document.getElementById('qr-pay-modal');
-            if (modal) modal.style.display = 'none';
-            if (qrTimerInterval) clearInterval(qrTimerInterval);
-        }
-
-        // 绘制拟真精美收银二维码
-        function drawSimulatedQRCode(channel) {
-            const canvas = document.getElementById('qr-canvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width, h = canvas.height;
-            ctx.clearRect(0, 0, w, h);
-
-            // 绘制定位角
-            ctx.fillStyle = channel === 'wechat' ? '#2ecc71' : (channel === 'alipay' ? '#3498db' : '#e74c3c');
-            function drawCorner(x, y) {
-                ctx.fillRect(x, y, 40, 40);
-                ctx.clearRect(x + 6, y + 6, 28, 28);
-                ctx.fillRect(x + 12, y + 12, 16, 16);
-            }
-            drawCorner(15, 15);
-            drawCorner(w - 55, 15);
-            drawCorner(15, h - 55);
-
-            // 填充数据点矩阵
-            ctx.fillStyle = '#222';
-            for (let r = 0; r < 14; r++) {
-                for (let c = 0; c < 14; c++) {
-                    if ((r < 4 && c < 4) || (r < 4 && c > 9) || (r > 9 && c < 4)) continue;
-                    if ((r * 7 + c * 13) % 3 === 0 || (r + c) % 2 === 0) {
-                        ctx.fillRect(20 + c * 10, 20 + r * 10, 8, 8);
-                    }
-                }
-            }
-
-            // 中心 Logo 徽标
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(w / 2, h / 2, 20, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = channel === 'wechat' ? '#2ecc71' : (channel === 'alipay' ? '#3498db' : '#e74c3c');
-            ctx.font = 'bold 18px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(channel === 'wechat' ? '微' : (channel === 'alipay' ? '支' : '银'), w / 2, h / 2);
-        }
-
-        // 模拟扫码支付成功
-        function simulateQrPaymentSuccess() {
-            closeQrPayModal();
-            const channelName = selectedPayChannel === 'wechat' ? '微信支付' : (selectedPayChannel === 'alipay' ? '支付宝' : '银联支付');
-            simulateMultiPaymentSuccess(selectedPayChannel, 'TX_QR_' + Date.now(), channelName);
-        }
-
-        // 多渠道统一发放权益与提示
-        function simulateMultiPaymentSuccess(channel, txId, channelName) {
-            const pid = selectedIAPProductId;
-            if (pid === 'com.yanxiang.luopan.pro.lifetime') {
-                userIAPStatus.isLifetime = true;
-                userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.luopan.vip.yearly') {
-                userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.luopan.floorplan.single') {
-                userIAPStatus.floorplanCredits = (userIAPStatus.floorplanCredits || 0) + 1;
-            } else if (pid === 'com.yanxiang.luopan.tianji.single') {
-                userIAPStatus.tianjiCredits = (userIAPStatus.tianjiCredits || 0) + 1;
-            }
-
-            try {
-                localStorage.setItem('yx_iap_status', JSON.stringify(userIAPStatus));
-            } catch(e) {}
-
-            closeIAPModal();
-            refreshIAPUI();
-            alert(`🎉 恭喜！通过【${channelName}】支付成功！\n交易单号: ${txId}\n您的尊享权益已实时开通生效！`);
-
-            if (pendingActionAfterPurchase) {
-                const action = pendingActionAfterPurchase;
-                pendingActionAfterPurchase = null;
-                action();
-            }
-        }
-
-        // Native 原生回调对接
-        window.onNativePaymentResult = function(channel, isSuccess, txId) {
-            if (isSuccess) {
-                const names = {
-                    'wechat': '微信支付',
-                    'alipay': '支付宝',
-                    'unionpay': '银联支付',
-                    'credit_card': '国际信用卡'
-                };
-                simulateMultiPaymentSuccess(channel, txId, names[channel] || channel);
-            } else {
-                alert('支付未完成或已被取消。');
-            }
-        };
-
-        // 挂载至全局
         window.selectPayChannel = selectPayChannel;
         window.executeUnifiedCheckout = executeUnifiedCheckout;
-        window.closeQrPayModal = closeQrPayModal;
-        window.simulateQrPaymentSuccess = simulateQrPaymentSuccess;
-        window.handleCardNumberInput = handleCardNumberInput;
-        window.handleCardNameInput = handleCardNameInput;
-        window.handleCardExpInput = handleCardExpInput;
 
         
         // ==============================================================
@@ -4790,12 +4340,9 @@
                 fpBtnRecenter: '重新标定重心',
                 vipTitle: '演象 · 尊享堪舆会员中心',
                 vipSub: '时空合一核心绝学 · 专业实勘与长卷导出',
-                vipPayTitle: '💳 选择安全支付方式',
-                vipPayHint: '支持全球卡与国内主流通道',
-                payWechat: '微信支付',
-                payAlipay: '支付宝',
-                payCard: '国际信用卡',
-                payUnion: '银联云闪付',
+                vipPayTitle: ' 官方安全支付',
+                vipPayHint: '通过 Apple ID 官方内购扣款',
+                payApple: 'Apple 官方内购',
                 btnPayNow: '立即安全支付',
                 btnRestore: '恢复已购项目',
                 langFollowSys: '📱 跟随系统',
@@ -4876,12 +4423,9 @@
                 fpBtnRecenter: '重新標定重心',
                 vipTitle: '演象 · 尊享堪輿會員中心',
                 vipSub: '時空合一核心絕學 · 專業實勘與長卷導出',
-                vipPayTitle: '💳 選擇安全支付方式',
-                vipPayHint: '支持全球卡與國內主流通道',
-                payWechat: '微信支付',
-                payAlipay: '支付寶',
-                payCard: '國際信用卡',
-                payUnion: '銀聯雲閃付',
+                vipPayTitle: ' 官方安全支付',
+                vipPayHint: '通過 Apple ID 官方內購扣款',
+                payApple: 'Apple 官方內購',
                 btnPayNow: '立即安全支付',
                 btnRestore: '恢復已購項目',
                 langFollowSys: '📱 跟隨系統',
@@ -4962,12 +4506,9 @@
                 fpBtnRecenter: 'Recalibrate Center',
                 vipTitle: 'YanXiang VIP Sanctuary & Cashier',
                 vipSub: 'Time-Space Esoteric Arts · Audits & Exports',
-                vipPayTitle: '💳 Select Payment Method',
-                vipPayHint: 'Global Cards & Mainstream Channels Supported',
-                payWechat: 'WeChat Pay',
-                payAlipay: 'Alipay',
-                payCard: 'Credit Card',
-                payUnion: 'UnionPay',
+                vipPayTitle: ' Official In-App Purchase',
+                vipPayHint: 'Billed securely to your Apple ID',
+                payApple: 'Apple In-App Purchase',
                 btnPayNow: 'Pay Securely Now',
                 btnRestore: 'Restore Purchases',
                 langFollowSys: '📱 Follow System',

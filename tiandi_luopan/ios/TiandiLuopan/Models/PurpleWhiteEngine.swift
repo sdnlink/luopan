@@ -32,31 +32,64 @@ public struct PurpleWhiteChart {
 public class PurpleWhiteEngine {
     public static let shared = PurpleWhiteEngine()
     
-    private let starNames = [
-        "", "一白贪狼水星", "二黑巨门土星(病符)", "三碧禄存木星(蚩尤)", "四绿文曲木星",
-        "五黄廉贞土星(大煞)", "六白武曲金星", "七赤破军金星", "八白左辅土星", "九紫右弼火星"
-    ]
-    
     // 洛书标准轨迹: [坎1, 坤2, 震3, 巽4, 中5, 乾6, 兑7, 艮8, 离9]
-    // 顺飞公式: palace = (centerStar + step - 1) % 9 + 1
     private let luoshuOrder = [5, 6, 7, 8, 9, 1, 2, 3, 4]
     
-    // 九宫网格展示次序 (从上到下，从左到右: 东南4, 正南9, 西南2; 正东3, 中宫5, 正西7; 东北8, 正北1, 西北6)
+    // 九宫网格展示次序 (东南4, 正南9, 西南2; 正东3, 中宫5, 正西7; 东北8, 正北1, 西北6)
     public let displayPalaceOrder = [4, 9, 2, 3, 5, 7, 8, 1, 6]
     
-    private let palaceNames: [Int: (dir: String, name: String)] = [
-        1: ("正北", "正北 坎宫"),
-        2: ("西南", "西南 坤宫"),
-        3: ("正东", "正东 震宫"),
-        4: ("东南", "东南 巽宫"),
-        5: ("中宫", "中央 太极"),
-        6: ("西北", "西北 乾宫"),
-        7: ("正西", "正西 兑宫"),
-        8: ("东北", "东北 艮宫"),
-        9: ("正南", "正南 离宫")
-    ]
-    
     private init() {}
+    
+    public func starName(for star: Int) -> String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let names = [
+                "", "1-White Greedy Wolf", "2-Black Illness Star", "3-Jade Storage Wood", "4-Green Wenqu Wood",
+                "5-Yellow Lianzhen Sha", "6-White Martial Metal", "7-Red Army Metal", "8-White Wealth Earth", "9-Purple Vital Fire"
+            ]
+            return (star >= 1 && star <= 9) ? names[star] : ""
+        } else if lang == .zhHant {
+            let names = [
+                "", "一白貪狼水星", "二黑巨門土星(病符)", "三碧祿存木星", "四綠文曲木星",
+                "五黃廉貞土星(大煞)", "六白武曲金星", "七赤破軍金星", "八白左輔土星", "九紫右弼火星"
+            ]
+            return (star >= 1 && star <= 9) ? names[star] : ""
+        } else {
+            let names = [
+                "", "一白贪狼水星", "二黑巨门土星(病符)", "三碧禄存木星", "四绿文曲木星",
+                "五黄廉贞土星(大煞)", "六白武曲金星", "七赤破军金星", "八白左辅土星", "九紫右弼火星"
+            ]
+            return (star >= 1 && star <= 9) ? names[star] : ""
+        }
+    }
+    
+    public func palaceDirection(palaceId: Int) -> String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let dirs = [1: "North", 2: "Southwest", 3: "East", 4: "Southeast", 5: "Center", 6: "Northwest", 7: "West", 8: "Northeast", 9: "South"]
+            return dirs[palaceId] ?? "Center"
+        } else if lang == .zhHant {
+            let dirs = [1: "正北", 2: "西南", 3: "正東", 4: "東南", 5: "中宮", 6: "西北", 7: "正西", 8: "東北", 9: "正南"]
+            return dirs[palaceId] ?? "中宮"
+        } else {
+            let dirs = [1: "正北", 2: "西南", 3: "正东", 4: "东南", 5: "中宫", 6: "西北", 7: "正西", 8: "东北", 9: "正南"]
+            return dirs[palaceId] ?? "中宫"
+        }
+    }
+    
+    public func palaceFullName(palaceId: Int) -> String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let full = [1: "North (Kan)", 2: "Southwest (Kun)", 3: "East (Zhen)", 4: "Southeast (Xun)", 5: "Center (Taiji)", 6: "Northwest (Qian)", 7: "West (Dui)", 8: "Northeast (Gen)", 9: "South (Li)"]
+            return full[palaceId] ?? "Center"
+        } else if lang == .zhHant {
+            let full = [1: "正北 坎宮", 2: "西南 坤宮", 3: "正東 震宮", 4: "東南 巽宮", 5: "中央 太極", 6: "西北 乾宮", 7: "正西 兌宮", 8: "東北 艮宮", 9: "正南 離宮"]
+            return full[palaceId] ?? "中央 太極"
+        } else {
+            let full = [1: "正北 坎宫", 2: "西南 坤宫", 3: "正东 震宫", 4: "东南 巽宫", 5: "中央 太极", 6: "西北 乾宫", 7: "正西 兑宫", 8: "东北 艮宫", 9: "正南 离宫"]
+            return full[palaceId] ?? "中央 太极"
+        }
+    }
     
     public func calcYearStar(year: Int) -> Int {
         var num = (11 - (year % 9)) % 9
@@ -92,60 +125,93 @@ public class PurpleWhiteEngine {
     
     public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> PurpleWhiteChart {
         let calendar = Calendar.current
-        let year = calendar.component(.year, from: date)
-        let month = calendar.component(.month, from: date)
+        let rawYear = calendar.component(.year, from: date)
+        let rawMonth = calendar.component(.month, from: date)
+        let day = calendar.component(.day, from: date)
         
-        let yCenter = calcYearStar(year: year)
-        let mCenter = calcMonthStar(year: year, month: month)
+        // 历法天文学精准立春交岁法则 (立春通常在公历2月4日左右): 2月4日之前严格归属前一年干支岁次与年星入中
+        let isBeforeLichun = (rawMonth < 2 || (rawMonth == 2 && day < 4))
+        let effectiveYear = isBeforeLichun ? (rawYear - 1) : rawYear
+        
+        // 历法节气交月 (每月4~7日交节，交节前属上月流月星)
+        let effectiveMonth = (day < 5) ? (rawMonth == 1 ? 12 : rawMonth - 1) : rawMonth
+        
+        let yCenter = calcYearStar(year: effectiveYear)
+        let mCenter = calcMonthStar(year: effectiveYear, month: effectiveMonth)
         
         let yearStarsMap = flyStars(centralStar: yCenter)
         let monthStarsMap = flyStars(centralStar: mCenter)
         
-        // 地支年对应太岁/岁破/三煞
-        let zhiIndex = (year - 4) % 12 // 0:子, 1:丑, 2:寅, 3:卯, 4:辰, 5:巳, 6:午, 7:未, 8:申, 9:酉, 10:戌, 11:亥
-        let zhiNames = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-        let curZhi = zhiNames[max(0, min(11, zhiIndex))]
+        // 地支年对应太岁/岁破/三煞 (基于立春后真实年支)
+        let zhiIndex = ((effectiveYear - 4) % 12 + 12) % 12
+        let lang = LocalizationManager.shared.effectiveLanguage
         
         var taiSuiPalace = 9
         var suiPoPalace = 1
         var sanShaPalaces = [1]
-        var taiSuiDesc = "\(curZhi)方"
-        var suiPoDesc = "对冲方"
-        var sanShaDesc = "北方"
         
-        // 太岁与三煞宫位对应
-        switch zhiIndex {
-        case 0: // 子
-            taiSuiPalace = 1; suiPoPalace = 9; sanShaPalaces = [9]; taiSuiDesc = "正北子方"; suiPoDesc = "正南午方"; sanShaDesc = "正南巳午未方"
-        case 1: // 丑
-            taiSuiPalace = 8; suiPoPalace = 2; sanShaPalaces = [3]; taiSuiDesc = "东北丑方"; suiPoDesc = "西南未方"; sanShaDesc = "正东寅卯辰方"
-        case 2: // 寅
-            taiSuiPalace = 8; suiPoPalace = 2; sanShaPalaces = [1]; taiSuiDesc = "东北寅方"; suiPoDesc = "西南申方"; sanShaDesc = "正北亥子丑方"
-        case 3: // 卯
-            taiSuiPalace = 3; suiPoPalace = 7; sanShaPalaces = [7]; taiSuiDesc = "正东卯方"; suiPoDesc = "正西酉方"; sanShaDesc = "正西申酉戌方"
-        case 4: // 辰
-            taiSuiPalace = 4; suiPoPalace = 6; sanShaPalaces = [9]; taiSuiDesc = "东南辰方"; suiPoDesc = "西北戌方"; sanShaDesc = "正南巳午未方"
-        case 5: // 巳
-            taiSuiPalace = 4; suiPoPalace = 6; sanShaPalaces = [3]; taiSuiDesc = "东南巳方"; suiPoDesc = "西北亥方"; sanShaDesc = "正东寅卯辰方"
-        case 6: // 午
-            taiSuiPalace = 9; suiPoPalace = 1; sanShaPalaces = [1]; taiSuiDesc = "正南午方"; suiPoDesc = "正北子方"; sanShaDesc = "正北亥子丑方"
-        case 7: // 未
-            taiSuiPalace = 2; suiPoPalace = 8; sanShaPalaces = [7]; taiSuiDesc = "西南未方"; suiPoDesc = "东北丑方"; sanShaDesc = "正西申酉戌方"
-        case 8: // 申
-            taiSuiPalace = 2; suiPoPalace = 8; sanShaPalaces = [9]; taiSuiDesc = "西南申方"; suiPoDesc = "东北寅方"; sanShaDesc = "正南巳午未方"
-        case 9: // 酉
-            taiSuiPalace = 7; suiPoPalace = 3; sanShaPalaces = [3]; taiSuiDesc = "正西酉方"; suiPoDesc = "正东卯方"; sanShaDesc = "正东寅卯辰方"
-        case 10: // 戌
-            taiSuiPalace = 6; suiPoPalace = 4; sanShaPalaces = [1]; taiSuiDesc = "西北戌方"; suiPoDesc = "东南辰方"; sanShaDesc = "正北亥子丑方"
-        case 11: // 亥
-            taiSuiPalace = 6; suiPoPalace = 4; sanShaPalaces = [7]; taiSuiDesc = "西北亥方"; suiPoDesc = "东南巳方"; sanShaDesc = "正西申酉戌方"
-        default:
-            break
+        var taiSuiDesc = ""
+        var suiPoDesc = ""
+        var sanShaDesc = ""
+        
+        if lang == .en {
+            let enConfig: [Int: (tsP: Int, spP: Int, ssP: [Int], ts: String, sp: String, ss: String)] = [
+                0: (1, 9, [9], "North (Zi)", "South (Wu)", "South (Si-Wu-Wei)"),
+                1: (8, 2, [3], "Northeast (Chou)", "Southwest (Wei)", "East (Yin-Mao-Chen)"),
+                2: (8, 2, [1], "Northeast (Yin)", "Southwest (Shen)", "North (Hai-Zi-Chou)"),
+                3: (3, 7, [7], "East (Mao)", "West (You)", "West (Shen-You-Xu)"),
+                4: (4, 6, [9], "Southeast (Chen)", "Northwest (Xu)", "South (Si-Wu-Wei)"),
+                5: (4, 6, [3], "Southeast (Si)", "Northwest (Hai)", "East (Yin-Mao-Chen)"),
+                6: (9, 1, [1], "South (Wu)", "North (Zi)", "North (Hai-Zi-Chou)"),
+                7: (2, 8, [7], "Southwest (Wei)", "Northeast (Chou)", "West (Shen-You-Xu)"),
+                8: (2, 8, [9], "Southwest (Shen)", "Northeast (Yin)", "South (Si-Wu-Wei)"),
+                9: (7, 3, [3], "West (You)", "East (Mao)", "East (Yin-Mao-Chen)"),
+                10: (6, 4, [1], "Northwest (Xu)", "Southeast (Chen)", "North (Hai-Zi-Chou)"),
+                11: (6, 4, [7], "Northwest (Hai)", "Southeast (Si)", "West (Shen-You-Xu)")
+            ]
+            let c = enConfig[zhiIndex] ?? (9, 1, [1], "South", "North", "North")
+            taiSuiPalace = c.tsP; suiPoPalace = c.spP; sanShaPalaces = c.ssP
+            taiSuiDesc = c.ts; suiPoDesc = c.sp; sanShaDesc = c.ss
+        } else if lang == .zhHant {
+            let hantConfig: [Int: (tsP: Int, spP: Int, ssP: [Int], ts: String, sp: String, ss: String)] = [
+                0: (1, 9, [9], "正北 (子方)", "正南 (午方)", "正南 (巳午未方)"),
+                1: (8, 2, [3], "東北 (丑方)", "西南 (未方)", "正東 (寅卯辰方)"),
+                2: (8, 2, [1], "東北 (寅方)", "西南 (申方)", "正北 (亥子丑方)"),
+                3: (3, 7, [7], "正東 (卯方)", "正西 (酉方)", "正西 (申酉戌方)"),
+                4: (4, 6, [9], "東南 (辰方)", "西北 (戌方)", "正南 (巳午未方)"),
+                5: (4, 6, [3], "東南 (巳方)", "西北 (亥方)", "正東 (寅卯辰方)"),
+                6: (9, 1, [1], "正南 (午方)", "正北 (子方)", "正北 (亥子丑方)"),
+                7: (2, 8, [7], "西南 (未方)", "東北 (丑方)", "正西 (申酉戌方)"),
+                8: (2, 8, [9], "西南 (申方)", "東北 (寅方)", "正南 (巳午未方)"),
+                9: (7, 3, [3], "正西 (酉方)", "正東 (卯方)", "正東 (寅卯辰方)"),
+                10: (6, 4, [1], "西北 (戌方)", "東南 (辰方)", "正北 (亥子丑方)"),
+                11: (6, 4, [7], "西北 (亥方)", "東南 (巳方)", "正西 (申酉戌方)")
+            ]
+            let c = hantConfig[zhiIndex] ?? (9, 1, [1], "正南方", "正北方", "正北方")
+            taiSuiPalace = c.tsP; suiPoPalace = c.spP; sanShaPalaces = c.ssP
+            taiSuiDesc = c.ts; suiPoDesc = c.sp; sanShaDesc = c.ss
+        } else {
+            let hansConfig: [Int: (tsP: Int, spP: Int, ssP: [Int], ts: String, sp: String, ss: String)] = [
+                0: (1, 9, [9], "正北 (子方)", "正南 (午方)", "正南 (巳午未方)"),
+                1: (8, 2, [3], "东北 (丑方)", "西南 (未方)", "正东 (寅卯辰方)"),
+                2: (8, 2, [1], "东北 (寅方)", "西南 (申方)", "正北 (亥子丑方)"),
+                3: (3, 7, [7], "正东 (卯方)", "正西 (酉方)", "正西 (申酉戌方)"),
+                4: (4, 6, [9], "东南 (辰方)", "西北 (戌方)", "正南 (巳午未方)"),
+                5: (4, 6, [3], "东南 (巳方)", "西北 (亥方)", "正东 (寅卯辰方)"),
+                6: (9, 1, [1], "正南 (午方)", "正北 (子方)", "正北 (亥子丑方)"),
+                7: (2, 8, [7], "西南 (未方)", "东北 (丑方)", "正西 (申酉戌方)"),
+                8: (2, 8, [9], "西南 (申方)", "东北 (寅方)", "正南 (巳午未方)"),
+                9: (7, 3, [3], "正西 (酉方)", "正东 (卯方)", "正东 (寅卯辰方)"),
+                10: (6, 4, [1], "西北 (戌方)", "东南 (辰方)", "正北 (亥子丑方)"),
+                11: (6, 4, [7], "西北 (亥方)", "东南 (巳方)", "正西 (申酉戌方)")
+            ]
+            let c = hansConfig[zhiIndex] ?? (9, 1, [1], "正南方", "正北方", "正北方")
+            taiSuiPalace = c.tsP; suiPoPalace = c.spP; sanShaPalaces = c.ssP
+            taiSuiDesc = c.ts; suiPoDesc = c.sp; sanShaDesc = c.ss
         }
         
         var palaceItems: [PurpleWhitePalaceItem] = []
         for pId in displayPalaceOrder {
-            let info = palaceNames[pId] ?? ("方位", "宫位")
             let yStar = yearStarsMap[pId] ?? 1
             let mStar = monthStarsMap[pId] ?? 1
             let isTaiSui = (pId == taiSuiPalace)
@@ -156,30 +222,64 @@ public class PurpleWhiteEngine {
             let isDanger25 = (yStar == 5 && mStar == 2) || (yStar == 2 && mStar == 5) || (yStar == 5 && pId == 2) || (yStar == 2 && pId == 5)
             
             var advice = ""
-            if isDanger25 {
-                advice = "【二五交加重煞】病符逢五黄，宜悬挂六帝古钱与铜葫芦化解"
-            } else if yStar == 5 {
-                advice = "【岁煞五黄】不宜动土钻墙，宜安放安忍水安抚土气"
-            } else if yStar == 2 {
-                advice = "【病符临门】注意脾胃与妇科，宜用铜制风水法物化泄"
-            } else if yStar == 9 {
-                advice = "【当令吉星】九紫喜庆星飞临，宜摆放红绿绿植催旺姻缘添丁"
-            } else if yStar == 8 {
-                advice = "【左辅财星】利田宅田庄，聚气生财"
-            } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                advice = "【吉星临宫】文昌与武贵齐聚，利学业仕途升迁"
+            if lang == .en {
+                if isDanger25 {
+                    advice = "[2-5 Severe Taboo] Illness Star meets Five Yellow. Hang 6-Emperor coins & brass gourd."
+                } else if yStar == 5 {
+                    advice = "[Five Yellow Taboo] Earth sha; avoid drilling; place pacifying water cure."
+                } else if yStar == 2 {
+                    advice = "[Illness Star] Guard digestion & health; utilize copper feng shui items."
+                } else if yStar == 9 {
+                    advice = "[Auspicious Star] 9-Purple brings joy & vitality; display fresh plants."
+                } else if yStar == 8 {
+                    advice = "[Wealth Star] Favors real estate and prosperity accumulation."
+                } else if yStar == 1 || yStar == 4 || yStar == 6 {
+                    advice = "[Noble Stars] Favors scholarly achievements and career advancement."
+                } else {
+                    advice = "Balanced energy; maintain regular harmonious arrangement."
+                }
+            } else if lang == .zhHant {
+                if isDanger25 {
+                    advice = "【二五交加重煞】病符逢五黃，宜懸掛六帝古錢與銅葫蘆化解"
+                } else if yStar == 5 {
+                    advice = "【歲煞五黃】不宜動土鑽牆，宜安放安忍水安撫土氣"
+                } else if yStar == 2 {
+                    advice = "【病符臨門】注意脾胃與婦科，宜用銅制風水法物化洩"
+                } else if yStar == 9 {
+                    advice = "【當令吉星】九紫喜慶星飛臨，宜擺放紅綠綠植催旺姻緣添丁"
+                } else if yStar == 8 {
+                    advice = "【左輔財星】利田宅田莊，聚氣生財"
+                } else if yStar == 1 || yStar == 4 || yStar == 6 {
+                    advice = "【吉星臨宮】文昌與武貴齊聚，利學業仕途升遷"
+                } else {
+                    advice = "氣場安平，按日常居家格局調理即可"
+                }
             } else {
-                advice = "气场安平，按日常居家格局调理即可"
+                if isDanger25 {
+                    advice = "【二五交加重煞】病符逢五黄，宜悬挂六帝古钱与铜葫芦化解"
+                } else if yStar == 5 {
+                    advice = "【岁煞五黄】不宜动土钻墙，宜安放安忍水安抚土气"
+                } else if yStar == 2 {
+                    advice = "【病符临门】注意脾胃与妇科，宜用铜制风水法物化泄"
+                } else if yStar == 9 {
+                    advice = "【当令吉星】九紫喜庆星飞临，宜摆放红绿绿植催旺姻缘添丁"
+                } else if yStar == 8 {
+                    advice = "【左辅财星】利田宅田庄，聚气生财"
+                } else if yStar == 1 || yStar == 4 || yStar == 6 {
+                    advice = "【吉星临宫】文昌与武贵齐聚，利学业仕途升迁"
+                } else {
+                    advice = "气场安平，按日常居家格局调理即可"
+                }
             }
             
             palaceItems.append(PurpleWhitePalaceItem(
                 palaceId: pId,
-                palaceName: info.name,
-                direction: info.dir,
+                palaceName: palaceFullName(palaceId: pId),
+                direction: palaceDirection(palaceId: pId),
                 originalStar: pId,
                 yearGuestStar: yStar,
                 monthGuestStar: mStar,
-                starName: starNames[yStar],
+                starName: starName(for: yStar),
                 isDanger25: isDanger25,
                 isTaiSui: isTaiSui,
                 isSuiPo: isSuiPo,
@@ -189,8 +289,8 @@ public class PurpleWhiteEngine {
         }
         
         return PurpleWhiteChart(
-            year: year,
-            month: month,
+            year: effectiveYear,
+            month: effectiveMonth,
             yearCentralStar: yCenter,
             monthCentralStar: mCenter,
             taiSuiDescription: taiSuiDesc,

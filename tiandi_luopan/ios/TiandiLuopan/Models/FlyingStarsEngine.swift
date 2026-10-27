@@ -191,7 +191,7 @@ public final class FlyingStarsEngine {
             element = isEn ? "Metal" : "金"
         case 7:
             yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
-            trigram = isEn ? "Dui" : "兑"
+            trigram = isEn ? "Dui" : (isHant ? "兌" : "兑")
             starName = isEn ? "7 Red PoJun" : (isHant ? "七赤破軍" : "七赤破军")
             element = isEn ? "Metal" : "金"
         case 8:
@@ -201,7 +201,7 @@ public final class FlyingStarsEngine {
             element = isEn ? "Earth" : "土"
         case 9:
             yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
-            trigram = isEn ? "Li" : "离"
+            trigram = isEn ? "Li" : (isHant ? "離" : "离")
             starName = isEn ? "9 Purple YouBi" : (isHant ? "九紫右弼" : "九紫右弼")
             element = isEn ? "Fire" : "火"
         default:

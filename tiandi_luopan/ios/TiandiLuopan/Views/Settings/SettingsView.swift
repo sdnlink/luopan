@@ -245,6 +245,7 @@ public struct SettingsView: View {
 // MARK: - 8字校准指南弹窗
 public struct CalibrationGuideSheet: View {
     @Environment(\.presentationMode) var presentationMode
+    @ObservedObject var lang = LocalizationManager.shared
     
     public var body: some View {
         NavigationView {

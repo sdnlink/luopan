@@ -66,7 +66,14 @@ public struct Mountain24Item: Identifiable, Codable {
     public var isCardinalOrCorner: Bool {
         return angleCenter.truncatingRemainder(dividingBy: 45.0) == 0.0
     }
+    public var centerAngle: Double { angleCenter }
+    public var startAngle: Double { angleStart }
+    public var endAngle: Double { angleEnd }
+    public var subIndex: Int { id }
+    public var post: String { palace }
 }
+
+public typealias Mountain24 = Mountain24Item
 
 // MARK: - 坐向全景分析结果
 

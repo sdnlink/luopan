@@ -5,6 +5,7 @@ import SwiftUI
 public struct PurpleWhiteView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     
     public init() {}

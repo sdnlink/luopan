@@ -5,6 +5,7 @@ import SwiftUI
 public struct CompassDialView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var layers = CompassLayerManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     
     // 手势与缩放状态
     @State private var dragStartAngle: Double = 0.0

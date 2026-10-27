@@ -163,6 +163,7 @@ public struct TianJiShuView: View {
                         self.isGenerating = false
                     }
                 }
+            }
             .sheet(isPresented: $showShareSheet) {
                 if let img = scrollImage {
                     TianJiActivityViewController(activityItems: [img])

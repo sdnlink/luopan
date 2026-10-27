@@ -138,6 +138,15 @@ public struct FloorplanView: View {
             if userFloorplanImage != nil {
                 Button(action: {
                     userFloorplanImage = nil
+                    // "Reset sample" must also restore the editable demo
+                    // layout. Previously it removed only the background image,
+                    // leaving dragged room rectangles and the centroid in the
+                    // imported plan's state.
+                    rooms = FloorplanEngine.shared.generateSampleRooms()
+                    centroid = CGPoint(x: 0.5, y: 0.5)
+                    isEditingRooms = false
+                    activeRoomDragID = nil
+                    activeRoomStartRect = nil
                 }) {
                     Text(lang.t("reset_sample"))
                         .font(.system(size: 10))

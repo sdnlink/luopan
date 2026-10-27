@@ -51,9 +51,10 @@ public struct BaZhaiView: View {
     
     // MARK: - 子 Tab 切换栏
     private func subTabBar() -> some View {
-        HStack(spacing: 0) {
+        let lang = LocalizationManager.shared
+        return HStack(spacing: 0) {
             Button(action: { selectedSubTab = 0 }) {
-                Text("八宅大游年 · 门宅纳气")
+                Text(lang.t("bazhai_tab_title"))
                     .font(.system(size: 13, weight: selectedSubTab == 0 ? .bold : .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -62,7 +63,7 @@ public struct BaZhaiView: View {
             }
             
             Button(action: { selectedSubTab = 1 }) {
-                Text("三合十二长生 · 黄泉水法")
+                Text(lang.t("sanhe_tab_title"))
                     .font(.system(size: 13, weight: selectedSubTab == 1 ? .bold : .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
@@ -93,7 +94,7 @@ public struct BaZhaiView: View {
                             .foregroundColor(Color.orange)
                             .cornerRadius(4)
                     }
-                    Text("向首开门方：\(bz.gateDirection)方 · 纳【\(bz.gateStar.rawValue)】")
+                    Text("\(lang.t("gate_facing_prefix"))：\(bz.gateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.rawValue)】")
                         .font(.system(size: 13))
                         .foregroundColor(bz.gateStar.isAuspicious ? Color.green : Color.red)
                 }
@@ -139,7 +140,7 @@ public struct BaZhaiView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "calendar.badge.clock")
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        Text("天星择日 · 动土安门日课自检")
+                        Text(lang.t("zeri_title"))
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
                     }
@@ -153,7 +154,7 @@ public struct BaZhaiView: View {
                         .cornerRadius(4)
                 }
                 
-                Text("当前四柱：\(zeri.fourPillarsText)")
+                Text("\(lang.t("current_four_pillars"))：\(zeri.fourPillarsText)")
                     .font(.system(size: 12, weight: .semibold, design: .serif))
                     .foregroundColor(Color.yanCyan)
                 
@@ -164,7 +165,7 @@ public struct BaZhaiView: View {
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
-                        Text("宜")
+                        Text(lang.t("auspicious_fit"))
                             .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
@@ -180,7 +181,7 @@ public struct BaZhaiView: View {
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
-                        Text("忌")
+                        Text(lang.t("inauspicious_avoid"))
                             .font(.system(size: 10, weight: .bold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
@@ -206,12 +207,13 @@ public struct BaZhaiView: View {
         let hq = SanHeWaterEngine.shared.resolveHuangQuanWater(facing: state.facingMountain)
         let basha = SanHeWaterEngine.shared.resolveBaSha(sitting: state.sittingMountain)
         
+        let lang = LocalizationManager.shared
         return VStack(spacing: 12) {
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
-                    title: "杨公八路黄泉与消砂 · VIP 专享",
-                    featureDesc: "二十四山向首八路黄泉水法宜忌判定、救贫黄泉水法纳水秘诀与八煞曜位形峦消砂法则，需解锁 VIP 绝学特权。",
-                    badge: "👑 VIP 绝学特权",
+                    title: lang.t("privilege_sanhe_title"),
+                    featureDesc: lang.t("privilege_sanhe_desc"),
+                    badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
                     onUnlockTap: { showPaywall = true }
                 )
@@ -222,7 +224,7 @@ public struct BaZhaiView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "drop.triangle.fill")
                                 .foregroundColor(Color.yanCyan)
-                            Text("杨公形气 · 八路黄泉水法")
+                            Text(lang.t("yang_gong_water_title"))
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                         }
@@ -241,7 +243,7 @@ public struct BaZhaiView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .lineSpacing(3)
                     
-                    Text("歌诀：“\(hq.quote)”")
+                    Text("\(lang.t("song_quote"))：“\(hq.quote)”")
                         .font(.system(size: 10, design: .serif))
                         .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 }
@@ -256,12 +258,12 @@ public struct BaZhaiView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "triangle.fill")
                                 .foregroundColor(Color.orange)
-                            Text("坐山曜煞 · 凶砂辨识与消纳")
+                            Text(lang.t("sitting_mountain_clash"))
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         Spacer()
-                        Text("煞在【\(basha.shaDir)\(basha.shaZhi)位】")
+                        Text("\(lang.t("clash_at"))【\(basha.shaDir)\(basha.shaZhi)】")
                             .font(.system(size: 11, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -280,7 +282,7 @@ public struct BaZhaiView: View {
                         .foregroundColor(Color.yellow.opacity(0.9))
                         .lineSpacing(2)
                     
-                    Text("口诀：“\(basha.song)”\n法则：\(basha.xiaoShaRule)")
+                    Text("\(lang.t("song_quote"))：“\(basha.song)”\n\(basha.xiaoShaRule)")
                         .font(.system(size: 10, design: .serif))
                         .foregroundColor(.white.opacity(0.6))
                         .lineSpacing(2)
@@ -293,10 +295,10 @@ public struct BaZhaiView: View {
                 // 3. 三合十二长生水法总纲卡
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("以【\(state.sittingMountain.name)山】考量十二长生水法")
+                        Text("\(lang.t("water_rule_12")): \(state.sittingMountain.name)\(lang.t("mountain_suffix"))")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        Text("生水旺水宜来流聚，死绝之气宜引出化煞")
+                        Text(lang.t("water_rule_desc"))
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.7))
                     }
@@ -311,7 +313,7 @@ public struct BaZhaiView: View {
                 VStack(spacing: 8) {
                     ForEach(Array(shItems.prefix(12))) { item in
                         HStack {
-                            Text(item.mountainName + "山")
+                            Text(item.mountainName + lang.t("mountain_suffix"))
                                 .font(.system(size: 15, weight: .bold, design: .serif))
                                 .foregroundColor(.white)
                                 .frame(width: 50, alignment: .leading)
@@ -328,7 +330,7 @@ public struct BaZhaiView: View {
                             Spacer()
                             
                             if item.isHuangQuanSha {
-                                Text("黄泉煞")
+                                Text(lang.t("huangquan_sha"))
                                     .font(.system(size: 9, weight: .bold))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)

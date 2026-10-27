@@ -24,6 +24,7 @@ public struct HexagramItem: Identifiable, Codable {
         self.luckDegree = luckDegree
         self.fenJinDetail = fenJinDetail
     }
+    public var isGreatAuspicious: Bool { luckDegree == "大吉" }
 }
 
 public final class Hexagram64Data {

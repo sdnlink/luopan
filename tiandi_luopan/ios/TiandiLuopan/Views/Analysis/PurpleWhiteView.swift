@@ -12,18 +12,19 @@ public struct PurpleWhiteView: View {
     public var body: some View {
         let chart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
         
-        VStack(spacing: 12) {
+        let lang = LocalizationManager.shared
+        return VStack(spacing: 12) {
             // 标题与太岁/三煞摘要栏
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text("紫白飞星 · 流年流月动态气运布防")
+                    Text(lang.t("purplewhite_header_title"))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
-                Text("\(chart.year)年 · \(chart.month)月")
+                Text("\(chart.year) · \(chart.month)")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
             }
@@ -31,9 +32,9 @@ public struct PurpleWhiteView: View {
             
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
-                    title: "紫白客星与太岁三煞 · VIP 专享",
-                    featureDesc: "流年九宫客星飞临排盘、流月客星气运吉凶、二五交加与太岁岁破三煞坐向冲克告警，需解锁 VIP 特权。",
-                    badge: "👑 VIP 绝学特权",
+                    title: lang.t("privilege_purplewhite_title"),
+                    featureDesc: lang.t("privilege_purplewhite_desc"),
+                    badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
                     onUnlockTap: { showPaywall = true }
                 )
@@ -43,9 +44,9 @@ public struct PurpleWhiteView: View {
             } else {
                 // 太岁、岁破、三煞警戒条
                 HStack(spacing: 8) {
-                    tagPill(title: "太岁", value: chart.taiSuiDescription, color: Color.red)
-                    tagPill(title: "岁破", value: chart.suiPoDescription, color: Color.orange)
-                    tagPill(title: "三煞", value: chart.sanShaDescription, color: Color.purple)
+                    tagPill(title: lang.t("tai_sui_label"), value: chart.taiSuiDescription, color: Color.red)
+                    tagPill(title: lang.t("sui_po_label"), value: chart.suiPoDescription, color: Color.orange)
+                    tagPill(title: lang.t("san_sha_label"), value: chart.sanShaDescription, color: Color.purple)
                 }
                 .padding(.horizontal, 16)
                 
@@ -93,11 +94,11 @@ public struct PurpleWhiteView: View {
                     .foregroundColor(.white)
                 Spacer()
                 if item.isTaiSui {
-                    Text("太岁")
+                    Text(lang.t("tag_taisui"))
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.red)
                 } else if item.isSanSha {
-                    Text("三煞")
+                    Text(lang.t("tag_sansha"))
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.purple)
                 }
@@ -109,7 +110,7 @@ public struct PurpleWhiteView: View {
                     .font(.system(size: 20, weight: .bold, design: .serif))
                     .foregroundColor(isDanger ? Color.red : (isJi ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.7)))
                 
-                Text("月\(item.monthGuestStar)")
+                Text("\(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
                     .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.5))
             }

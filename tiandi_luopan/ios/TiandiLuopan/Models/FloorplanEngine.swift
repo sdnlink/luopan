@@ -49,6 +49,10 @@ public struct FloorplanRoom: Identifiable {
         self.inspectionLevel = inspectionLevel
         self.inspectionAdvice = inspectionAdvice
     }
+    public var isSevere: Bool { inspectionLevel.contains("严重") || inspectionLevel.contains("大凶") }
+    public var isBad: Bool { isSevere || inspectionLevel.contains("凶") }
+    public var isGood: Bool { inspectionLevel.contains("吉") }
+    public var isWarning: Bool { inspectionLevel.contains("预警") }
 }
 
 public struct FloorplanAuditItem: Identifiable {
@@ -58,6 +62,9 @@ public struct FloorplanAuditItem: Identifiable {
     public let severity: String // "吉", "提示", "预警", "严重煞气"
     public let lore: String
     public let solution: String
+    public var isSevere: Bool { severity.contains("严重") }
+    public var isGood: Bool { severity.contains("吉") }
+    public var isWarning: Bool { severity.contains("预警") }
 }
 
 public class FloorplanEngine {

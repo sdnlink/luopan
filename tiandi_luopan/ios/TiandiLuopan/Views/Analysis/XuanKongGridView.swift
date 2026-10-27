@@ -95,7 +95,7 @@ public struct XuanKongGridView: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
                 }
-                Text("集成坐向立极、玄空九星、八路黄泉与奇门命卦")
+                Text(lang.t("xuankong_integrated_title"))
                     .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.65))
             }
@@ -161,7 +161,7 @@ public struct XuanKongGridView: View {
                             }
                         }) {
                             HStack(spacing: 2) {
-                                Text("\(p)运")
+                                Text("\(p)\(lang.t("xuankong_period_unit"))")
                                 if p != 9 && !iap.hasUnlockedVIP {
                                     Image(systemName: "lock.fill")
                                         .font(.system(size: 8))
@@ -184,7 +184,7 @@ public struct XuanKongGridView: View {
     private func patternBadgeView(chart: XuanKongChart) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 8) {
-                Text("\(chart.sittingMountain)山\(chart.facingMountain)向")
+                Text("\(chart.sittingMountain)\(lang.t("mountain_suffix"))\(chart.facingMountain)\(lang.t("facing_suffix"))")
                     .font(.system(size: 18, weight: .bold, design: .serif))
                     .foregroundColor(.white)
                 
@@ -260,7 +260,7 @@ public struct XuanKongGridView: View {
     // MARK: - 深度分析卡
     private func analysisCard(chart: XuanKongChart) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("📜 格局深研分析")
+            Text(lang.t("xuankong_deep_analysis"))
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
@@ -272,9 +272,9 @@ public struct XuanKongGridView: View {
             Divider().background(Color.white.opacity(0.1))
             
             VStack(alignment: .leading, spacing: 4) {
-                Text("• 旺财布局：向星当令之方宜开门见水，动水催财；")
-                Text("• 旺丁布局：山星当令之方宜设主卧、安床有靠；")
-                Text("• 二五化煞：二黑五黄交叠之宫位，悬挂六帝钱以金泄土。")
+                Text(lang.t("xuankong_wealth_advice"))
+                Text(lang.t("xuankong_health_advice"))
+                Text(lang.t("xuankong_remedy_advice"))
             }
             .font(.system(size: 11))
             .foregroundColor(.white.opacity(0.7))

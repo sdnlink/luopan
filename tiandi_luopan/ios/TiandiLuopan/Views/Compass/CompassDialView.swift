@@ -201,7 +201,7 @@ public struct CompassDialView: View {
         ForEach(hexagrams) { hex in
             Text(hex.name.prefix(2))
                 .font(.system(size: 7, weight: .semibold, design: .serif))
-                .foregroundColor(hex.luckDegree == "大吉" ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
+                .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
                 .offset(y: -radius + 8)
                 .rotationEffect(.degrees(hex.angleCenter))
         }
@@ -221,7 +221,7 @@ public struct CompassDialView: View {
     // MARK: - 二十四山正针环
     private func mountain24Layer(radius: CGFloat) -> some View {
         ForEach(mountains) { m in
-            let isMainBranch = ["子", "午", "卯", "酉", "乾", "坤", "艮", "巽"].contains(m.name)
+            let isMainBranch = m.isCardinalOrCorner
             
             VStack(spacing: 1) {
                 Text(m.name)
@@ -239,18 +239,24 @@ public struct CompassDialView: View {
     // MARK: - 先天八卦环
     private struct GuaItem: Identifiable {
         let id: String
+        let key: String
         let angle: Double
     }
     
     private func eightGuaLayer(radius: CGFloat) -> some View {
+        let lang = LocalizationManager.shared
         let guas: [GuaItem] = [
-            GuaItem(id: "坎", angle: 0.0), GuaItem(id: "艮", angle: 45.0),
-            GuaItem(id: "震", angle: 90.0), GuaItem(id: "巽", angle: 135.0),
-            GuaItem(id: "离", angle: 180.0), GuaItem(id: "坤", angle: 225.0),
-            GuaItem(id: "兑", angle: 270.0), GuaItem(id: "乾", angle: 315.0)
+            GuaItem(id: "kan", key: "gua_kan", angle: 0.0),
+            GuaItem(id: "gen", key: "gua_gen", angle: 45.0),
+            GuaItem(id: "zhen", key: "gua_zhen", angle: 90.0),
+            GuaItem(id: "xun", key: "gua_xun", angle: 135.0),
+            GuaItem(id: "li", key: "gua_li", angle: 180.0),
+            GuaItem(id: "kun", key: "gua_kun", angle: 225.0),
+            GuaItem(id: "dui", key: "gua_dui", angle: 270.0),
+            GuaItem(id: "qian", key: "gua_qian", angle: 315.0)
         ]
         return ForEach(guas) { item in
-            Text(item.id)
+            Text(lang.t(item.key))
                 .font(.system(size: 14, weight: .black, design: .serif))
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
                 .offset(y: -radius + 12)
@@ -350,7 +356,7 @@ public struct CompassDialView: View {
             )
             .shadow(color: Color.yellow.opacity(0.4), radius: 2)
             
-            Text("真")
+            Text(lang.t("true_north_short"))
                 .font(.system(size: 7, weight: .bold))
                 .foregroundColor(Color.black)
                 .offset(y: -radius * 0.72)

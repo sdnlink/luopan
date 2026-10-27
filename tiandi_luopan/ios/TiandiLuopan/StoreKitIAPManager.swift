@@ -12,10 +12,10 @@ public enum IAPProductID: String, CaseIterable {
     
     var title: String {
         switch self {
-        case .vipYearly: return "演象·年度堪舆会员 (连续包年)"
-        case .proLifetime: return "演象·大师终身专业版"
-        case .floorplanSingle: return "户型空间立极·全屋风水体检"
-        case .tianjiSingle: return "福宅天机堪舆全案宣纸长图"
+        case .vipYearly: return LocalizationManager.shared.t("product_vip_yearly_title")
+        case .proLifetime: return LocalizationManager.shared.t("product_pro_lifetime_title")
+        case .floorplanSingle: return LocalizationManager.shared.t("product_floorplan_single_title")
+        case .tianjiSingle: return LocalizationManager.shared.t("product_tianji_single_title")
         }
     }
     
@@ -30,10 +30,10 @@ public enum IAPProductID: String, CaseIterable {
     
     var desc: String {
         switch self {
-        case .vipYearly: return "全量解锁四大场景全息交互、奇门全息排盘、流年紫白布防、八煞黄泉及天机长图无限次导出"
-        case .proLifetime: return "一次付费，终身永久享受演象时空罗盘所有专业特权与未来更新"
-        case .floorplanSingle: return "解锁单套户型几何立极、大门灶卫明财文昌位吉凶深度诊断报告"
-        case .tianjiSingle: return "单次导出高精度无水印古典宣纸朱丝栏勘测长卷"
+        case .vipYearly: return LocalizationManager.shared.t("product_vip_yearly_desc")
+        case .proLifetime: return LocalizationManager.shared.t("product_pro_lifetime_desc")
+        case .floorplanSingle: return LocalizationManager.shared.t("product_floorplan_single_desc")
+        case .tianjiSingle: return LocalizationManager.shared.t("product_tianji_single_desc")
         }
     }
 }

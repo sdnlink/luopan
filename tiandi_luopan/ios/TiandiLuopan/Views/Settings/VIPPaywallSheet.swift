@@ -6,14 +6,14 @@ import StoreKit
 public struct VIPLockCardView: View {
     public let title: String
     public let featureDesc: String
-    public var badge: String = "👑 VIP 绝学特权"
+    public var badge: String = LocalizationManager.shared.t("vip_badge_title")
     public var targetProductId: IAPProductID = .vipYearly
     public var onUnlockTap: () -> Void
     
     public init(
         title: String,
         featureDesc: String,
-        badge: String = "👑 VIP 绝学特权",
+        badge: String = LocalizationManager.shared.t("vip_badge_title"),
         targetProductId: IAPProductID = .vipYearly,
         onUnlockTap: @escaping () -> Void
     ) {
@@ -53,7 +53,7 @@ public struct VIPLockCardView: View {
                 Button(action: onUnlockTap) {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
-                        Text("立即解锁特权 (\(targetProductId.priceText))")
+                        Text("\(LocalizationManager.shared.t("unlock_vip_now")) (\(targetProductId.priceText))")
                     }
                     .font(.system(size: 12, weight: .bold))
                     .frame(maxWidth: .infinity)
@@ -72,7 +72,7 @@ public struct VIPLockCardView: View {
                 Button(action: {
                     StoreKitIAPManager.shared.restorePurchases()
                 }) {
-                    Text("恢复购买")
+                    Text(LocalizationManager.shared.t("restore_purchases_btn"))
                         .font(.system(size: 11))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
@@ -123,22 +123,22 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 .padding(.top, 12)
                             
-                            Text("演象·时空罗盘 VIP 尊享特权")
+                            Text(LocalizationManager.shared.t("vip_sheet_title"))
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(.white)
                             
-                            Text("传承正统三元玄空、三式奇门与杨公形气风水绝学")
+                            Text(LocalizationManager.shared.t("vip_sheet_subtitle"))
                                 .font(.system(size: 11))
                                 .foregroundColor(.white.opacity(0.65))
                         }
                         
                         // 2. 核心特权清单
                         VStack(spacing: 8) {
-                            privilegeItem(icon: "sparkles", title: "时家奇门全息排盘", desc: "九星八门八神三奇六仪转盘与大吉出行方位导航")
-                            privilegeItem(icon: "calendar.badge.clock", title: "紫白客星与太岁三煞", desc: "流年流月客星飞临与二五交加凶煞动态布防")
-                            privilegeItem(icon: "drop.triangle.fill", title: "杨公八路黄泉与消砂", desc: "救贫水法判据、二十四山坐山克煞曜位精准辨识")
-                            privilegeItem(icon: "house.fill", title: "户型立极全屋体检", desc: "空间几何重心立极、火烧天门/水浸中宫全案体检")
-                            privilegeItem(icon: "scroll.fill", title: "福宅天机书宣纸长卷", desc: "高清无水印古典宣纸朱丝栏大师全案长卷导出与打印")
+                            privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
+                            privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
+                            privilegeItem(icon: "drop.triangle.fill", title: LocalizationManager.shared.t("privilege_sanhe_title"), desc: LocalizationManager.shared.t("privilege_sanhe_desc"))
+                            privilegeItem(icon: "house.fill", title: LocalizationManager.shared.t("privilege_floorplan_title"), desc: LocalizationManager.shared.t("privilege_floorplan_desc"))
+                            privilegeItem(icon: "scroll.fill", title: LocalizationManager.shared.t("privilege_tianji_title"), desc: LocalizationManager.shared.t("privilege_tianji_desc"))
                         }
                         .padding(12)
                         .background(Color(red: 0.12, green: 0.12, blue: 0.15))
@@ -149,25 +149,25 @@ public struct VIPPaywallSheet: View {
                         VStack(spacing: 8) {
                             productChoiceCard(
                                 id: .vipYearly,
-                                tag: "推荐 · 最具性价比",
+                                tag: LocalizationManager.shared.t("product_vip_yearly_tag"),
                                 isSelected: selectedProductId == IAPProductID.vipYearly.rawValue
                             )
                             
                             productChoiceCard(
                                 id: .proLifetime,
-                                tag: "一次买断 · 终身享用",
+                                tag: LocalizationManager.shared.t("product_pro_lifetime_tag"),
                                 isSelected: selectedProductId == IAPProductID.proLifetime.rawValue
                             )
                             
                             productChoiceCard(
                                 id: .floorplanSingle,
-                                tag: "单套户型全屋体检",
+                                tag: LocalizationManager.shared.t("product_floorplan_single_tag"),
                                 isSelected: selectedProductId == IAPProductID.floorplanSingle.rawValue
                             )
                             
                             productChoiceCard(
                                 id: .tianjiSingle,
-                                tag: "单次高清长卷导出",
+                                tag: LocalizationManager.shared.t("product_tianji_single_tag"),
                                 isSelected: selectedProductId == IAPProductID.tianjiSingle.rawValue
                             )
                         }
@@ -185,7 +185,7 @@ public struct VIPPaywallSheet: View {
                                             .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                             .padding(.trailing, 4)
                                     }
-                                    Text(isPurchasing ? "正在连接 App Store 安全支付…" : "立即开通 \(getSelectedProductTitle())")
+                                    Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(LocalizationManager.shared.t("unlock_vip_now")) (\(getSelectedProductTitle()))")
                                 }
                                 .font(.system(size: 14, weight: .bold))
                                 .frame(maxWidth: .infinity)
@@ -204,7 +204,7 @@ public struct VIPPaywallSheet: View {
                             Button(action: {
                                 iap.restorePurchases()
                             }) {
-                                Text("恢复已有购买 (Restore Purchases)")
+                                Text(LocalizationManager.shared.t("restore_purchases"))
                                     .font(.system(size: 11))
                                     .foregroundColor(Color.yanCyan)
                             }
@@ -214,7 +214,7 @@ public struct VIPPaywallSheet: View {
                         
                         // 5. 自动续期与苹果服务说明
                         VStack(spacing: 4) {
-                            Text("购买即代表同意《用户协议》与《隐私政策》。订阅款项将通过您的 Apple ID 账户扣除。")
+                            Text(LocalizationManager.shared.t("vip_legal_agreement"))
                                 .font(.system(size: 10))
                                 .foregroundColor(.white.opacity(0.45))
                                 .multilineTextAlignment(.center)
@@ -257,11 +257,11 @@ public struct VIPPaywallSheet: View {
     
     private func getSelectedProductTitle() -> String {
         switch selectedProductId {
-        case IAPProductID.vipYearly.rawValue: return "年度 VIP (¥198)"
-        case IAPProductID.proLifetime.rawValue: return "大师终身版 (¥298)"
-        case IAPProductID.floorplanSingle.rawValue: return "单套体检 (¥19.9)"
-        case IAPProductID.tianjiSingle.rawValue: return "单次天机书 (¥9.9)"
-        default: return "VIP 特权"
+        case IAPProductID.vipYearly.rawValue: return "\(LocalizationManager.shared.t("product_vip_yearly_tag")) (¥198)"
+        case IAPProductID.proLifetime.rawValue: return "\(LocalizationManager.shared.t("product_pro_lifetime_title")) (¥298)"
+        case IAPProductID.floorplanSingle.rawValue: return "\(LocalizationManager.shared.t("product_floorplan_single_tag")) (¥19.9)"
+        case IAPProductID.tianjiSingle.rawValue: return "\(LocalizationManager.shared.t("product_tianji_single_tag")) (¥9.9)"
+        default: return LocalizationManager.shared.t("vip_badge_title")
         }
     }
     

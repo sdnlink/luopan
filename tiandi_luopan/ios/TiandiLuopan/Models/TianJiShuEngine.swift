@@ -98,16 +98,18 @@ public class TianJiShuEngine {
             ])
             curY += 250
             
-            // 5. 第二部：下元九运玄空飞星九宫方阵
-            drawSectionHeader(ctx: cg, title: "第二卷 · 下元九运玄空飞星气运方阵", atY: curY, vermilion: vermilion)
+            // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
+            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, date: Date())
+            let meta = xkChart.periodMeta
+            
+            drawSectionHeader(ctx: cg, title: "第二卷 · \(meta.yuan)\(meta.period)运玄空飞星气运方阵", atY: curY, vermilion: vermilion)
             curY += 65
             
             let p2Text = """
-            • 当前地运：下元九运 (2024 - 2043 甲辰至癸亥廿载)
-            • 玄空格局判定：【\(mSitting.name)山\(mFacing.name)向】正针飞星下卦盘
-            • 当令旺星气场：九紫右弼当令火星入首向星，财气明朗；二黑病符星入坤宫需化泄。
-            • 核心吉方：正南方(九紫当令)、正北方(一白远旺水)、正东方(一白贪狼生发)。
-            • 忌犯凶位：正西方(七赤破军交剑煞)、正西北(五黄大煞)，切勿在此二方动土开工。
+            • 当前地运：\(meta.label)
+            • 玄空格局判定：【\(mSitting.name)山\(mFacing.name)向】\(xkChart.patternType)
+            • 当令旺星气场：\(meta.starName)\(meta.element)星入中当运，主星临照向首明堂。
+            • 综合理气研判：\(xkChart.summaryAnalysis)
             """
             p2Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 240), withAttributes: [
                 .font: bodyFont,

@@ -9,7 +9,9 @@ public struct SettingsView: View {
     @State private var showCalibrationGuide: Bool = false
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     
-    public init() {}
+    public init() {
+        UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+    }
     
     private var isProUnlocked: Bool {
         return iap.isLifetimeUser || iap.isVIPUser
@@ -26,7 +28,7 @@ public struct SettingsView: View {
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Text(lang.t("vip_member_center"))
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
+                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Spacer()
                             Text(isProUnlocked ? lang.t("vip_user") : lang.t("standard_user"))
                                 .font(.system(size: 11, weight: .bold))
@@ -178,10 +180,12 @@ public struct SettingsView: View {
             }
             .listStyle(InsetGroupedListStyle())
             .navigationBarTitle(lang.t("tab_settings"), displayMode: .inline)
+            .preferredColorScheme(.dark)
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet()
             }
         }
+        .preferredColorScheme(.dark)
     }
     
     private func productRow(id: IAPProductID, tag: String) -> some View {
@@ -191,35 +195,35 @@ public struct SettingsView: View {
             selectedProductId = id.rawValue
         }) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(id.title)
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
                         Text(tag)
                             .font(.system(size: 9, weight: .bold))
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.yellow.opacity(0.2))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1.5)
+                            .background(Color.yellow.opacity(0.25))
                             .foregroundColor(Color.yellow)
                             .cornerRadius(3)
                     }
                     Text(id.desc)
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.65))
-                        .lineLimit(1)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(2)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 Text(id.priceText)
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
-            .padding(8)
-            .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.15) : Color.white.opacity(0.04))
+            .padding(10)
+            .background(isSelected ? Color(red: 0.22, green: 0.19, blue: 0.12) : Color(red: 0.12, green: 0.13, blue: 0.17))
             .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear, lineWidth: 1.5)
+                    .stroke(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12), lineWidth: isSelected ? 1.5 : 1)
             )
         }
         .buttonStyle(PlainButtonStyle())

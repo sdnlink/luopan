@@ -90,32 +90,49 @@ public class QimenEngine {
         } else {
             isYangDun = true
         }
-        let dunType = isYangDun ? "阳遁" : "阴遁"
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
+        let dunType: String
+        if isEn {
+            dunType = isYangDun ? "Yang Dun" : "Yin Dun"
+        } else if isHant {
+            dunType = isYangDun ? "陽遁" : "陰遁"
+        } else {
+            dunType = isYangDun ? "阳遁" : "阴遁"
+        }
         
         // 2. 局数推算 (拆补定局 1..9 局)
         let seed = month * 2 + day
         let rawJu = isYangDun ? (seed % 9 == 0 ? 9 : seed % 9) : ((18 - (seed % 9)) % 9 == 0 ? 9 : (18 - (seed % 9)) % 9)
         let juNumber = max(1, min(9, rawJu))
-        let title = "【\(dunType)\(juNumber)局 · 拆补上元】"
+        let title: String
+        if isEn {
+            title = "【\(dunType) Bureau \(juNumber)】"
+        } else if isHant {
+            title = "【\(dunType)\(juNumber)局 · 拆補上元】"
+        } else {
+            title = "【\(dunType)\(juNumber)局 · 拆补上元】"
+        }
         
         // 3. 计算八门排布偏移 (结合局数与时支)
         let shift = (juNumber + hour / 2) % 8
         
         var cells: [QimenPalaceCell] = []
-        var bestDirection = "西北方 (乾宫开门)"
-        var bestReason = "开门乘吉神值符，天地德合"
+        var bestDirection = isEn ? "Northwest (Qian - Open Gate)" : "西北方 (乾宫开门)"
+        var bestReason = isEn ? "Auspicious Open Gate with Chief Deity" : "开门乘吉神值符，天地德合"
         var tabooDirs: [String] = []
         
         for (idx, p) in displayPalaceDefs.enumerated() {
             if p.id == 5 {
                 cells.append(QimenPalaceCell(
                     palaceId: 5,
-                    palaceName: "中宫",
-                    trigram: "太极",
-                    doorName: "中宫",
-                    doorLuck: "平",
-                    starName: "天禽星",
-                    godName: "元极",
+                    palaceName: isEn ? "Center" : (isHant ? "中宮" : "中宫"),
+                    trigram: isEn ? "TaiJi" : "太极",
+                    doorName: isEn ? "Center" : (isHant ? "中宮" : "中宫"),
+                    doorLuck: isEn ? "Fair" : "平",
+                    starName: isEn ? "TianQin" : "天禽星",
+                    godName: isEn ? "Center" : "元极",
                     tianStem: "戊",
                     diStem: "戊",
                     isTaiJiCenter: true,
@@ -130,8 +147,16 @@ public class QimenEngine {
                 let diStem = sixYiStems[(idx + 3) % 9]
                 
                 if door.name == "生门" || door.name == "开门" {
-                    bestDirection = "\(p.name)方 (\(p.trigram)宫\(door.name))"
-                    bestReason = "临\(star)星与\(god)神，\(door.lore)"
+                    if isEn {
+                        bestDirection = "\(p.name) (\(p.trigram) - \(door.name))"
+                        bestReason = "Protected by \(star) & \(god), \(door.lore)"
+                    } else if isHant {
+                        bestDirection = "\(p.name)方 (\(p.trigram)宮\(door.name))"
+                        bestReason = "臨\(star)星與\(god)神，\(door.lore)"
+                    } else {
+                        bestDirection = "\(p.name)方 (\(p.trigram)宫\(door.name))"
+                        bestReason = "临\(star)星与\(god)神，\(door.lore)"
+                    }
                 }
                 if door.name == "死门" || door.name == "惊门" {
                     tabooDirs.append("\(p.name)\(door.name)")

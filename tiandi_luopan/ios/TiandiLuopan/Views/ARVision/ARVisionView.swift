@@ -6,9 +6,11 @@ import UIKit
 
 public struct CameraPreviewView: UIViewRepresentable {
     public var cameraPosition: AVCaptureDevice.Position
+    public var isActive: Bool
     
-    public init(cameraPosition: AVCaptureDevice.Position = .back) {
+    public init(cameraPosition: AVCaptureDevice.Position = .back, isActive: Bool = true) {
         self.cameraPosition = cameraPosition
+        self.isActive = isActive
     }
     
     public class CameraUIView: UIView {
@@ -55,6 +57,13 @@ public struct CameraPreviewView: UIViewRepresentable {
             }
         }
         
+        public func resumeSessionIfNeeded(position: AVCaptureDevice.Position) {
+            if let session = captureSession, session.isRunning {
+                return
+            }
+            setupSession(position: position)
+        }
+        
         public func stopSession() {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 if let s = self?.captureSession, s.isRunning {
@@ -67,26 +76,36 @@ public struct CameraPreviewView: UIViewRepresentable {
     public func makeUIView(context: Context) -> CameraUIView {
         let view = CameraUIView()
         view.backgroundColor = .black
-        view.setupSession(position: cameraPosition)
+        if isActive {
+            view.setupSession(position: cameraPosition)
+        }
         return view
     }
     
     public func updateUIView(_ uiView: CameraUIView, context: Context) {
-        // 当镜头切换时重新配置
-        if context.coordinator.lastPosition != cameraPosition {
+        if !isActive {
+            uiView.stopSession()
+            return
+        }
+        
+        // 当镜头切换时或重新激活时配置
+        if context.coordinator.lastPosition != cameraPosition || context.coordinator.lastActive != isActive {
             context.coordinator.lastPosition = cameraPosition
-            uiView.setupSession(position: cameraPosition)
+            context.coordinator.lastActive = isActive
+            uiView.resumeSessionIfNeeded(position: cameraPosition)
         }
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(position: cameraPosition)
+        Coordinator(position: cameraPosition, active: isActive)
     }
     
     public class Coordinator {
         var lastPosition: AVCaptureDevice.Position
-        init(position: AVCaptureDevice.Position) {
+        var lastActive: Bool
+        init(position: AVCaptureDevice.Position, active: Bool) {
             self.lastPosition = position
+            self.lastActive = active
         }
     }
     
@@ -102,9 +121,12 @@ public struct ARVisionView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     
+    public var isActive: Bool = true
+    
     // 激光扫描线动画
     @State private var scanOffset: CGFloat = -180
     @State private var selectedShaIndex: Int = 0
+    @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
     @State private var targetOffset: CGSize = .zero
     @State private var showRemedySheet: Bool = false
     @State private var showPaywall: Bool = false
@@ -114,7 +136,9 @@ public struct ARVisionView: View {
     
     private let shaList = ExteriorShaEngine.shared.database
     
-    public init() {}
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     // 计算靶心拖拽后的相对目标偏角与二十四山
     private var targetCalculatedHeading: Double {
@@ -127,11 +151,40 @@ public struct ARVisionView: View {
         return Mountain24Data.shared.mountain(for: targetCalculatedHeading)
     }
     
+    // 八宫方位与主应形煞对应模型 (随镜头旋转自动联动推演)
+    private func resolvedShaIndex(for heading: Double) -> Int {
+        let norm = (heading.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        if norm >= 337.5 || norm < 22.5 {
+            return 4 // 正北 坎水: 穿心煞 (玄武失靠/地下贯通)
+        } else if norm >= 22.5 && norm < 67.5 {
+            return 7 // 东北 艮土: 割脚煞 (急流贴足/鬼门阴煞)
+        } else if norm >= 67.5 && norm < 112.5 {
+            return 1 // 正东 震木: 路冲煞 (直枪冲射/青龙折损)
+        } else if norm >= 112.5 && norm < 157.5 {
+            return 2 // 东南 巽木: 反弓水 (弯刀割脚/甩气破财)
+        } else if norm >= 157.5 && norm < 202.5 {
+            return 5 // 正南 离火: 火形煞 (尖峰燥角/火曜克金)
+        } else if norm >= 202.5 && norm < 247.5 {
+            return 0 // 西南 坤土: 天斩煞 (坤为死门/两楼天堑穿心)
+        } else if norm >= 247.5 && norm < 292.5 {
+            return 6 // 正西 兑金: 白虎煞 (白虎探头/虎强龙弱)
+        } else {
+            return 3 // 西北 乾金: 探头煞 (火烧天门/暗室窥视)
+        }
+    }
+    
+    private var activeShaIndex: Int {
+        if isAutoFollowingDirection {
+            return resolvedShaIndex(for: targetCalculatedHeading)
+        }
+        return min(max(selectedShaIndex, 0), shaList.count - 1)
+    }
+    
     public var body: some View {
         ZStack {
-            // 1. 真机摄像头实时预览 / 模拟器仿真画板
-            if hasCameraPermission {
-                CameraPreviewView(cameraPosition: cameraPosition)
+            // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
+            if hasCameraPermission && isActive {
+                CameraPreviewView(cameraPosition: cameraPosition, isActive: isActive)
                     .ignoresSafeArea()
             } else {
                 simulationCanvasLayer()
@@ -195,7 +248,7 @@ public struct ARVisionView: View {
             }
         }
         .sheet(isPresented: $showRemedySheet) {
-            ShaRemedyDetailSheet(sha: shaList[selectedShaIndex])
+            ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
@@ -276,7 +329,7 @@ public struct ARVisionView: View {
     
     // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角与对应二十四山)
     private func targetBoundingBoxLayer() -> some View {
-        let currentSha = shaList[selectedShaIndex]
+        let currentSha = shaList[activeShaIndex]
         let m = targetMountain
         
         return ZStack {
@@ -380,24 +433,51 @@ public struct ARVisionView: View {
         .cornerRadius(10)
     }
     
-    // MARK: - 底部形煞研判卡
+    // MARK: - 底部形煞研判卡 (支持朝向智能跟随与手动点选)
     private func bottomShaControlPanel() -> some View {
-        let sha = shaList[selectedShaIndex]
+        let currentIdx = activeShaIndex
+        let sha = shaList[currentIdx]
         
         return VStack(spacing: 8) {
+            HStack {
+                Button(action: {
+                    isAutoFollowingDirection.toggle()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: isAutoFollowingDirection ? "location.fill" : "lock.fill")
+                        Text(isAutoFollowingDirection ? "实景朝向跟随" : "手动锁定形煞")
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(isAutoFollowingDirection ? Color.green.opacity(0.3) : Color.orange.opacity(0.3))
+                    .foregroundColor(isAutoFollowingDirection ? .green : .orange)
+                    .cornerRadius(6)
+                }
+                
+                Spacer()
+                
+                Text("当前主应：\(targetMountain.palace) · \(targetMountain.name)山")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+            }
+            .padding(.horizontal, 4)
+            
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(0..<shaList.count, id: \.self) { idx in
                         let item = shaList[idx]
+                        let isSelected = (idx == currentIdx)
                         Button(action: {
+                            isAutoFollowingDirection = false
                             selectedShaIndex = idx
                         }) {
                             Text(item.name)
-                                .font(.system(size: 11, weight: idx == selectedShaIndex ? .bold : .medium))
+                                .font(.system(size: 11, weight: isSelected ? .bold : .medium))
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
-                                .background(idx == selectedShaIndex ? Color.yanCyan.opacity(0.85) : Color.white.opacity(0.15))
-                                .foregroundColor(idx == selectedShaIndex ? .black : .white)
+                                .background(isSelected ? Color.yanCyan.opacity(0.85) : Color.white.opacity(0.15))
+                                .foregroundColor(isSelected ? .black : .white)
                                 .cornerRadius(10)
                         }
                     }
@@ -430,7 +510,7 @@ public struct ARVisionView: View {
         let size = CGSize(width: 1080, height: 1920)
         let renderer = UIGraphicsImageRenderer(size: size)
         
-        let currentSha = shaList[selectedShaIndex]
+        let currentSha = shaList[activeShaIndex]
         let currentHeading = motion.headingState.facingAngle
         let mFacing = motion.headingState.facingMountain
         let coordsStr = motion.coordsDesc

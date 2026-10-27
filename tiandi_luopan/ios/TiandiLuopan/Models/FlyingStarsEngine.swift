@@ -47,8 +47,20 @@ public struct PalaceCell: Identifiable {
 
 public typealias XuanKongPalace = PalaceCell
 
+public struct PeriodMeta {
+    public let period: Int
+    public let yuan: String
+    public let trigram: String
+    public let starName: String
+    public let element: String
+    public let startYear: Int
+    public let endYear: Int
+    public let isCurrent: Bool
+    public let label: String
+}
+
 public struct XuanKongChart {
-    public let period: Int                // 当前元运 (1..9, 现为九运 2024-2043)
+    public let period: Int                // 所选排盘元运 (1..9)
     public let sittingMountain: String   // 坐山
     public let facingMountain: String    // 向山
     public let patternType: String       // 到山到向 / 上山下水 / 双星到向 / 双星到坐
@@ -57,10 +69,116 @@ public struct XuanKongChart {
     public let palaces: [PalaceCell]     // 九宫格数据
     public let summaryAnalysis: String   // 综合格局断语
     public var patternDesc: String { summaryAnalysis }
+    public let periodMeta: PeriodMeta    // 动态历法元信息
 }
 
 public final class FlyingStarsEngine {
     public static let shared = FlyingStarsEngine()
+    
+    // 历法推算当前所处三元九运 (以公元1864年甲子上元一运为基准，180年为一大元，20年为一运)
+    public func currentPeriod(for date: Date = Date()) -> Int {
+        let calendar = Calendar(identifier: .gregorian)
+        let year = calendar.component(.year, from: date)
+        let offset = year - 1864
+        let cycleYear = (offset % 180 + 180) % 180
+        return (cycleYear / 20) + 1
+    }
+    
+    // 获取指定运数的完整天文学与干支历法信息 (根据给定日期所属的180年大周期推导对应年限区间)
+    public func periodMeta(period: Int, for date: Date = Date()) -> PeriodMeta {
+        let calendar = Calendar(identifier: .gregorian)
+        let year = calendar.component(.year, from: date)
+        let curPeriod = currentPeriod(for: date)
+        
+        let p = max(1, min(9, period))
+        let offset = year - 1864
+        let currentCycleStart = 1864 + (offset >= 0 ? (offset / 180) * 180 : ((offset - 179) / 180) * 180)
+        let startY = currentCycleStart + (p - 1) * 20
+        let endY = startY + 19
+        
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
+        let yuan: String
+        let trigram: String
+        let starName: String
+        let element: String
+        
+        switch p {
+        case 1:
+            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
+            trigram = isEn ? "Kan" : "坎"
+            starName = isEn ? "1 White TanLang" : (isHant ? "一白貪狼" : "一白贪狼")
+            element = isEn ? "Water" : "水"
+        case 2:
+            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
+            trigram = isEn ? "Kun" : "坤"
+            starName = isEn ? "2 Black JuMen" : (isHant ? "二黑巨門" : "二黑巨门")
+            element = isEn ? "Earth" : "土"
+        case 3:
+            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
+            trigram = isEn ? "Zhen" : "震"
+            starName = isEn ? "3 Jade LuCun" : (isHant ? "三碧祿存" : "三碧禄存")
+            element = isEn ? "Wood" : "木"
+        case 4:
+            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
+            trigram = isEn ? "Xun" : "巽"
+            starName = isEn ? "4 Green WenQu" : (isHant ? "四綠文曲" : "四绿文曲")
+            element = isEn ? "Wood" : "木"
+        case 5:
+            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
+            trigram = isEn ? "Center" : "中"
+            starName = isEn ? "5 Yellow LianZhen" : (isHant ? "五黃廉貞" : "五黄廉贞")
+            element = isEn ? "Earth" : "土"
+        case 6:
+            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
+            trigram = isEn ? "Qian" : "乾"
+            starName = isEn ? "6 White WuQu" : (isHant ? "六白武曲" : "六白武曲")
+            element = isEn ? "Metal" : "金"
+        case 7:
+            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
+            trigram = isEn ? "Dui" : "兑"
+            starName = isEn ? "7 Red PoJun" : (isHant ? "七赤破軍" : "七赤破军")
+            element = isEn ? "Metal" : "金"
+        case 8:
+            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
+            trigram = isEn ? "Gen" : "艮"
+            starName = isEn ? "8 White ZuoFu" : (isHant ? "八白左輔" : "八白左辅")
+            element = isEn ? "Earth" : "土"
+        case 9:
+            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
+            trigram = isEn ? "Li" : "离"
+            starName = isEn ? "9 Purple YouBi" : (isHant ? "九紫右弼" : "九紫右弼")
+            element = isEn ? "Fire" : "火"
+        default:
+            yuan = ""
+            trigram = ""
+            starName = ""
+            element = ""
+        }
+        
+        let isCur = (p == curPeriod)
+        let label: String
+        if isEn {
+            label = isCur ? "Current Period \(p) (\(startY)–\(endY), \(yuan) · \(element))" : "Period \(p) (\(startY)–\(endY), \(yuan) · \(element))"
+        } else if isHant {
+            label = isCur ? "當前\(yuan)\(p)運（\(startY)—\(endY)年，\(starName)\(element)星當令）" : "\(yuan)\(p)運（\(startY)—\(endY)年，\(starName)\(element)星當令）"
+        } else {
+            label = isCur ? "当前\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）" : "\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）"
+        }
+        
+        return PeriodMeta(
+            period: p,
+            yuan: yuan,
+            trigram: trigram,
+            starName: starName,
+            element: element,
+            startYear: startY,
+            endYear: endY,
+            isCurrent: isCur,
+            label: label
+        )
+    }
     
     // 九宫罗书飞布轨迹顺飞步进 (中5 -> 乾6 -> 兑7 -> 艮8 -> 离9 -> 坎1 -> 坤2 -> 震3 -> 巽4)
     private let luoShuOrder = [4, 5, 6, 7, 8, 0, 1, 2, 3]
@@ -70,13 +188,19 @@ public final class FlyingStarsEngine {
     private let palaceNames = ["坎一宫 (正北)", "坤二宫 (西南)", "震三宫 (正东)", "巽四宫 (东南)", "天心五 (中宫)", "乾六宫 (西北)", "兑七宫 (正西)", "艮八宫 (东北)", "离九宫 (正南)"]
     private let palaceDirections = ["正北", "西南", "正东", "东南", "中宫", "西北", "正西", "东北", "正南"]
     
-    public func calculateChart(period: Int = 9, sitting: Mountain24Item, facing: Mountain24Item) -> XuanKongChart {
+    public func calculateChart(period: Int? = nil, sitting: Mountain24Item, facing: Mountain24Item, date: Date = Date()) -> XuanKongChart {
+        let activePeriod = period ?? currentPeriod(for: date)
+        let meta = periodMeta(period: activePeriod, for: date)
+        
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
         // 1. 排运盘：将当运数字入中顺飞九宫
         var basePeriod = [Int](repeating: 0, count: 9)
-        basePeriod[4] = period
+        basePeriod[4] = activePeriod
         for step in 1...8 {
             let nextPalace = luoShuOrder[step]
-            var star = (period + step) % 9
+            var star = (activePeriod + step) % 9
             if star == 0 { star = 9 }
             basePeriod[nextPalace] = star
         }
@@ -111,8 +235,7 @@ public final class FlyingStarsEngine {
             facingStars[pIdx] = fStar
         }
         
-        // 4. 判定四大经典格局
-        // 查找当运旺星(如九运中为9)落在向方和坐方的分布
+        // 4. 判定四大经典格局 (根据当运星分布，完全动态推导)
         let sittingFacingIdx = facingPalaceIdx
         let sittingMountIdx = sittingPalaceIdx
         
@@ -121,29 +244,60 @@ public final class FlyingStarsEngine {
         let mountainStarAtFacing = mountainStars[sittingFacingIdx]
         let facingStarAtMount = facingStars[sittingMountIdx]
         
-        var pattern = "吉凶平和局"
-        if facingStarAtFacing == period && mountainStarAtMount == period {
-            pattern = "到山到向 (旺丁旺财最吉)"
-        } else if facingStarAtFacing == period && mountainStarAtFacing == period {
-            pattern = "双星到向 (旺财不旺丁 · 宜向前有水后有山)"
-        } else if facingStarAtMount == period && mountainStarAtMount == period {
-            pattern = "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)"
-        } else if facingStarAtMount == period && mountainStarAtFacing == period {
-            pattern = "上山下水 (败财损丁凶局 · 需借势颠倒用法)"
+        let pattern: String
+        if isEn {
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Wang Shan Wang Xiang (Supreme Wealth & Health)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Double Stars at Facing (Auspicious Wealth)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Double Stars at Sitting (Auspicious Health)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Shang Shan Xia Shui (Reverse Chart)"
+            } else {
+                pattern = "Balanced Harmony Chart"
+            }
+        } else if isHant {
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "到山到向 (旺丁旺財最吉)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "雙星到向 (旺財不旺丁 · 宜向前有水後有山)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "雙星到坐 (旺丁不旺財 · 宜向後有水水後有山)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "上山下水 (敗財損丁凶局 · 需借勢顛倒用法)"
+            } else {
+                pattern = "吉凶平和局"
+            }
+        } else {
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "到山到向 (旺丁旺财最吉)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "双星到向 (旺财不旺丁 · 宜向前有水后有山)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "上山下水 (败财损丁凶局 · 需借势颠倒用法)"
+            } else {
+                pattern = "吉凶平和局"
+            }
         }
         
         // 5. 组合九宫格模型
         var cells: [PalaceCell] = []
         for i in 0..<9 {
-            let isWangM = mountainStars[i] == period
-            let isWangF = facingStars[i] == period
+            let isWangM = mountainStars[i] == activePeriod
+            let isWangF = facingStars[i] == activePeriod
             let isWuHuang = mountainStars[i] == 5 || facingStars[i] == 5
             let isErHei = mountainStars[i] == 2 || facingStars[i] == 2
             
+            let pName = isEn ? "Palace \(i + 1) (\(palaceDirections[i]))" : (isHant ? palaceNames[i].replacingOccurrences(of: "宫", with: "宮") : palaceNames[i])
+            let trigramStr = isEn ? "Palace \(i + 1)" : palaceNames[i].prefix(1).description
+            
             let cell = PalaceCell(
                 id: i,
-                palaceName: palaceNames[i],
-                trigram: palaceNames[i].prefix(1).description,
+                palaceName: pName,
+                trigram: trigramStr,
                 direction: palaceDirections[i],
                 periodStar: basePeriod[i],
                 mountainStar: mountainStars[i],
@@ -157,17 +311,26 @@ public final class FlyingStarsEngine {
             cells.append(cell)
         }
         
-        let summary = "当前正值下元九运（2024—2043年，九紫离火当令）。\(sitting.name)山\(facing.name)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳九紫吉气，坐后稳实以固人丁。"
+        // 6. 综合格局断语：完全根据当前历法元信息动态生成，杜绝任何硬编码
+        let summary: String
+        if isEn {
+            summary = "\(meta.label). Sitting \(sitting.pinyin) Facing \(facing.pinyin) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
+        } else if isHant {
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sitting.name)山\(facing.name)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
+        } else {
+            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sitting.name)山\(facing.name)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
+        }
         
         return XuanKongChart(
-            period: period,
-            sittingMountain: sitting.name,
-            facingMountain: facing.name,
+            period: activePeriod,
+            sittingMountain: isEn ? sitting.pinyin : sitting.name,
+            facingMountain: isEn ? facing.pinyin : facing.name,
             patternType: pattern,
             isSanBanGua: false,
             isQiXingDaJie: false,
             palaces: cells,
-            summaryAnalysis: summary
+            summaryAnalysis: summary,
+            periodMeta: meta
         )
     }
     

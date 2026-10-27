@@ -182,13 +182,38 @@ public final class Mountain24Data {
         let jianDeg = abs(diff)
         let isJian = jianDeg > 3.0
         
-        var fenJin = "\(sittingM.name)山\(facingM.name)向"
-        if isJian {
-            let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
-            let neighborM = mountain(for: neighborAngle)
-            fenJin += " 兼 \(neighborM.name) (偏\(String(format: "%.1f", jianDeg))°)"
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        
+        let fenJin: String
+        if isEn {
+            if isJian {
+                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
+                let neighborM = mountain(for: neighborAngle)
+                fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Sub \(neighborM.pinyin) (offset \(String(format: "%.1f", jianDeg))°)"
+            } else {
+                fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Direct Alignment"
+            }
+        } else if isHant {
+            var s = "\(sittingM.name)山\(facingM.name)向"
+            if isJian {
+                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
+                let neighborM = mountain(for: neighborAngle)
+                s += " 兼 \(neighborM.name) (偏\(String(format: "%.1f", jianDeg))°)"
+            } else {
+                s += " 正針下卦"
+            }
+            fenJin = s
         } else {
-            fenJin += " 正针下卦"
+            var s = "\(sittingM.name)山\(facingM.name)向"
+            if isJian {
+                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
+                let neighborM = mountain(for: neighborAngle)
+                s += " 兼 \(neighborM.name) (偏\(String(format: "%.1f", jianDeg))°)"
+            } else {
+                s += " 正针下卦"
+            }
+            fenJin = s
         }
         
         let isLevel = abs(pitch) < 2.5 && abs(roll) < 2.5

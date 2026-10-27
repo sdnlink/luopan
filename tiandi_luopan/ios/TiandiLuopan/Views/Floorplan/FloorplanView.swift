@@ -15,11 +15,17 @@ public struct FloorplanView: View {
     @State private var userFloorplanImage: UIImage? = nil
     @State private var showImagePicker: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var smoothedFacing: Double = 0.0
     
     public init() {}
     
     private var effectiveHeading: Double {
-        return isSyncWithCompass ? motion.headingState.facingAngle : compassRotation
+        if !isSyncWithCompass {
+            return compassRotation
+        }
+        // 增加 0.25° 死区与防抖阻尼
+        let raw = motion.headingState.facingAngle
+        return (round(raw * 2.0) / 2.0) // 0.5度一级阶梯消抖
     }
     
     public var body: some View {

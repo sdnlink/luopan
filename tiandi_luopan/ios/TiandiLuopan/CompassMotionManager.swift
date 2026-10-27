@@ -59,6 +59,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastTiltTime: TimeInterval = 0
     private var lastMountainIndex: Int = -1
     private var wasLevel: Bool = false
+    private var lastSolarCalcTime: TimeInterval = 0
+    private var lastResolvedHeading: Double = -999.0
+    private var lastResolvedTime: TimeInterval = 0
     
     override public init() {
         super.init()
@@ -69,9 +72,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     private func setupLocationManager() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = kCLDistanceFilterNone
-        locationManager.headingFilter = kCLHeadingFilterNone
+        // 降低 GPS 天线高发热射频功耗：罗盘仅需十米/百米级经度计算太阳时，无需高耗能Best硬件
+        locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        locationManager.distanceFilter = 20.0
+        locationManager.headingFilter = 0.3
         locationManager.headingOrientation = .portrait
     }
     
@@ -126,16 +130,22 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
     }
     
-    // MARK: - 连续无跳跃角度平滑算法 (解决 359° 与 0° 之间的跳跃突变)
+    // MARK: - 连续无跳跃角度平滑算法与自适应滤波 (彻底消除高频微抖与360°突变)
+    private var smoothedHeading: Double = 0.0
+    private var hasInitializedFilter: Bool = false
+    
     private func updateContinuousHeading(newHeading: Double) {
-        if lastRawHeading == 0.0 {
+        if !hasInitializedFilter {
+            hasInitializedFilter = true
             lastRawHeading = newHeading
+            smoothedHeading = newHeading
             continuousHeading = newHeading
+            heading = newHeading
             return
         }
         
         var diff = newHeading - lastRawHeading
-        // 处理环形回绕
+        // 处理环形 360 度回绕
         if diff > 180.0 {
             diff -= 360.0
         } else if diff < -180.0 {
@@ -143,38 +153,73 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
         
         lastRawHeading = newHeading
-        continuousHeading += diff
+        
+        // 自适应非线性阻尼滤波 (Adaptive Deadband & EMA Filter):
+        // 1. 微小手颤 ( < 0.2°): 极强阻尼抑制抖动，稳定视盘
+        // 2. 中速转动 ( 0.2° ~ 2.0°): 适度平滑跟手
+        // 3. 快速转动 ( > 2.0°): 快速响应无延迟
+        let absDiff = abs(diff)
+        let alpha: Double
+        if absDiff < 0.12 {
+            // 手部生理微颤死区直接滤除
+            alpha = 0.04
+        } else if absDiff < 0.5 {
+            alpha = 0.15
+        } else if absDiff < 2.0 {
+            alpha = 0.35
+        } else {
+            alpha = 0.75
+        }
+        
+        continuousHeading += diff * alpha
+        let normalized = (continuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+        heading = normalized
     }
     
-    private func updateResolvedState() {
+    private func updateResolvedState(force: Bool = false) {
+        let now = CACurrentMediaTime()
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
-        let resolved = Mountain24Data.shared.resolveHeadingState(heading: effective, pitch: pitch, roll: roll)
-        self.headingState = resolved
         
-        // 跨越二十四山边界时触发微触觉反馈
-        if resolved.facingMountain.id != lastMountainIndex {
-            if lastMountainIndex != -1 && isHapticEnabled {
-                hapticTick.impactOccurred()
+        // 节流 headingState 广播：防止一秒数十次全量 TabView 深度重绘风暴引发手机发烫
+        let angleDelta = abs(effective - lastResolvedHeading)
+        if force || angleDelta >= 0.25 || (now - lastResolvedTime >= 0.1) {
+            lastResolvedHeading = effective
+            lastResolvedTime = now
+            let resolved = Mountain24Data.shared.resolveHeadingState(heading: effective, pitch: pitch, roll: roll)
+            self.headingState = resolved
+            
+            // 跨越二十四山边界时触发微触觉反馈
+            if resolved.facingMountain.id != lastMountainIndex {
+                if lastMountainIndex != -1 && isHapticEnabled {
+                    hapticTick.impactOccurred()
+                }
+                lastMountainIndex = resolved.facingMountain.id
             }
-            lastMountainIndex = resolved.facingMountain.id
+            
+            // 当达到完全水平状态 (<1.5°) 时触发一次沉浸式对准震感
+            if resolved.isLevel && !wasLevel && isHapticEnabled {
+                hapticLevel.impactOccurred()
+            }
+            wasLevel = resolved.isLevel
         }
         
-        // 当达到完全水平状态 (<1.5°) 时触发一次沉浸式对准震感
-        if resolved.isLevel && !wasLevel && isHapticEnabled {
-            hapticLevel.impactOccurred()
+        // 节流真太阳时历法计算：真太阳时以秒为单位，每 1.0 秒最多计算一次球面三角，大幅减低 CPU 负荷
+        if force || (now - lastSolarCalcTime >= 1.0) {
+            lastSolarCalcTime = now
+            let solarResult = SolarTimeCalculator.shared.calculate(date: Date(), longitude: self.longitude)
+            self.trueSolarTimeStr = solarResult.trueSolarTimeString
+            let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
+            let eqLabel = LocalizationManager.shared.t("solar_eq_time")
+            let minUnit = LocalizationManager.shared.t("minute_unit")
+            self.solarTimeDesc = "\(solarResult.baziGanzhi) (\(eqLabel) \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))\(minUnit))"
         }
-        wasLevel = resolved.isLevel
-        
-        let solarResult = SolarTimeCalculator.shared.calculate(date: Date(), longitude: self.longitude)
-        self.trueSolarTimeStr = solarResult.trueSolarTimeString
-        let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
-        let eqLabel = LocalizationManager.shared.t("solar_eq_time"); let minUnit = LocalizationManager.shared.t("minute_unit"); self.solarTimeDesc = "\(solarResult.baziGanzhi) (\(eqLabel) \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))\(minUnit))"
     }
     
     private func startMotionUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
         
-        motionManager.deviceMotionUpdateInterval = 1.0 / 60.0 // 60 FPS
+        // 调整采样频率为 30Hz (平滑且大幅降低主线程压力与设备功耗)
+        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
         let referenceFrame: CMAttitudeReferenceFrame = CMMotionManager.availableAttitudeReferenceFrames().contains(.xMagneticNorthZVertical) ? .xMagneticNorthZVertical : .xArbitraryZVertical
         
         motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motion, error in
@@ -184,15 +229,18 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let rollDeg = motion.attitude.roll * 180.0 / .pi
             
             DispatchQueue.main.async {
-                self.pitch = pitchDeg
-                self.roll = rollDeg
-                self.isLevel = abs(pitchDeg) < 2.0 && abs(rollDeg) < 2.0
+                // 水准仪倾角应用低通平滑，消除水平气泡剧烈颤动
+                self.pitch = self.pitch * 0.82 + pitchDeg * 0.18
+                self.roll = self.roll * 0.82 + rollDeg * 0.18
+                self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
                 
                 let now = CACurrentMediaTime()
-                if now - self.lastTiltTime >= 0.033 {
+                if now - self.lastTiltTime >= 0.08 {
                     self.lastTiltTime = now
-                    self.delegate?.didUpdateTilt(pitch: pitchDeg, roll: rollDeg)
-                    self.updateResolvedState()
+                    self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
+                    if self.isLocked {
+                        self.updateResolvedState()
+                    }
                 }
                 
                 let field = motion.magneticField.field
@@ -236,12 +284,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             }
             
             if !self.isLocked {
-                self.heading = mag
                 self.updateContinuousHeading(newHeading: mag)
                 self.updateResolvedState()
             }
             
-            if now - self.lastHeadingTime >= 0.016 {
+            if now - self.lastHeadingTime >= 0.033 {
                 self.lastHeadingTime = now
                 self.delegate?.didUpdateHeading(magneticHeading: newHeading.magneticHeading, trueHeading: newHeading.trueHeading, accuracy: newHeading.headingAccuracy)
             }
@@ -264,9 +311,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.longitude = loc.coordinate.longitude
             self.altitude = loc.altitude
             
-            let latStr = String(format: "%.5f°", abs(loc.coordinate.latitude)) + (loc.coordinate.latitude >= 0 ? "N" : "S")
-            let lonStr = String(format: "%.5f°", abs(loc.coordinate.longitude)) + (loc.coordinate.longitude >= 0 ? "E" : "W")
-            let altStr = " · " + LocalizationManager.shared.t("altitude_label") + String(format: " %.0fm", loc.altitude)
+            let isEn = LocalizationManager.shared.effectiveLanguage == .en
+            let latLabel = loc.coordinate.latitude >= 0 ? LocalizationManager.shared.t("lat_north") : LocalizationManager.shared.t("lat_south")
+            let lonLabel = loc.coordinate.longitude >= 0 ? LocalizationManager.shared.t("lon_east") : LocalizationManager.shared.t("lon_west")
+            let altUnit = LocalizationManager.shared.t("altitude_unit")
+            
+            let latStr = isEn ? "\(String(format: "%.5f°", abs(loc.coordinate.latitude)))\(latLabel)" : "\(latLabel) \(String(format: "%.5f°", abs(loc.coordinate.latitude)))"
+            let lonStr = isEn ? "\(String(format: "%.5f°", abs(loc.coordinate.longitude)))\(lonLabel)" : "\(lonLabel) \(String(format: "%.5f°", abs(loc.coordinate.longitude)))"
+            let altStr = " · " + LocalizationManager.shared.t("altitude_label") + " " + String(format: "%.0f\(altUnit)", loc.altitude)
             self.coordsDesc = "\(latStr), \(lonStr)\(altStr)"
             
             if loc.speed >= 0 {
@@ -275,7 +327,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.speedKmH = 0.0
             }
             
-            self.updateResolvedState()
+            self.updateResolvedState(force: true)
             
             self.delegate?.didUpdateLocation(
                 latitude: loc.coordinate.latitude,
@@ -284,6 +336,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 speedKmH: self.speedKmH,
                 accuracy: loc.horizontalAccuracy
             )
+            
+            // 获得有效定位后及时挂起 GPS，切断手机真机高功耗持续发热源
+            if loc.horizontalAccuracy > 0 && loc.horizontalAccuracy < 100 {
+                self.locationManager.stopUpdatingLocation()
+            }
         }
     }
 }

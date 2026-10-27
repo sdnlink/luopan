@@ -44,7 +44,7 @@ public struct RootContentView: View {
                 .tag(0)
             
             // Tab 2: AR 实景天心透视与形煞智能标注 (前后镜头翻转、靶心动态测角、水印快照存证)
-            ARVisionView()
+            ARVisionView(isActive: selectedTab == 1)
                 .tabItem {
                     Image(systemName: "camera.viewfinder")
                     Text(lang.t("tab_ar"))
@@ -76,6 +76,7 @@ public struct RootContentView: View {
                 .tag(4)
         }
         .accentColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+        .preferredColorScheme(.dark)
         .onAppear {
             motion.start()
         }

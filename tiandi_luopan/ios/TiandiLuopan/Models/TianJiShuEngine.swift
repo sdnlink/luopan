@@ -124,11 +124,12 @@ public class TianJiShuEngine {
             let hq = SanHeWaterEngine.shared.resolveHuangQuanWater(facing: mFacing)
             let basha = SanHeWaterEngine.shared.resolveBaSha(sitting: mSitting)
             let sanHeItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: mSitting)
+            let lang = LocalizationManager.shared
             var p3Text = "• 向首八路黄泉判据：\(hq.badgeText) · \(hq.waterDesc)\n"
-            p3Text += "• 坐山八煞曜位辨识：煞在【\(basha.shaDir)\(basha.shaZhi)位】· \(basha.remedy)\n"
+            p3Text += "• 坐山八煞曜位辨识：煞在【\(basha.localizedShaDir)】· \(basha.remedy)\n"
             p3Text += "• 十二长生纳水吉凶：\n"
             for item in sanHeItems.prefix(3) {
-                p3Text += "  - \(item.palace)【\(item.stage)】：\(item.isAuspicious ? "吉 · 宜来水纳气" : "忌 · 防破局流破")，\(item.lore)\n"
+                p3Text += "  - \(item.localizedMountainName)\(lang.t("mountain_suffix"))【\(item.stage)】：\(item.isAuspicious ? "吉 · 宜来水纳气" : "忌 · 防破局流破")，\(item.lore)\n"
             }
             p3Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 230), withAttributes: [
                 .font: bodyFont,
@@ -146,8 +147,8 @@ public class TianJiShuEngine {
             let p4Text = """
             • 时家奇门时空：\(qm.title)
             • 当前天时最优动身方：\(qm.bestNavDirection) (\(qm.bestNavReason))
-            • 住宅宅卦归属：【\(bz.houseGua)】 · 向首开门方：\(bz.gateDirection)方纳【\(bz.gateStar.rawValue)】
-            • 生气大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.direction ?? "生气")方，宜作主卧或安奉神位。
+            • 住宅宅卦归属：【\(bz.localizedHouseGua)】 · 向首开门方：\(bz.localizedGateDirection)方纳【\(bz.gateStar.localizedName)】
+            • 生气大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生气")方，宜作主卧或安奉神位。
             """
             p4Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
                 .font: bodyFont,
@@ -185,10 +186,23 @@ public class TianJiShuEngine {
             ]
             sealText.draw(in: sealRect.insetBy(dx: 24, dy: 24), withAttributes: sealAttr)
             
+            // 岁次干支天文学立春动态推导
+            let calendar = Calendar.current
+            let now = Date()
+            let y = calendar.component(.year, from: now)
+            let m = calendar.component(.month, from: now)
+            let d = calendar.component(.day, from: now)
+            let isBeforeLichun = (m < 2 || (m == 2 && d < 4))
+            let gzYear = isBeforeLichun ? (y - 1) : y
+            let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+            let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+            let yOffset = ((gzYear - 4) % 60 + 60) % 60
+            let curGzYear = "\(stems[yOffset % 10])\(branches[yOffset % 12])"
+            
             let signText = """
             大 师 堪 舆 亲 订
             演 象 时 空 罗 盘 院
-            岁 次 丙 午 谨 启
+            岁 次 \(curGzYear) 谨 启
             """
             signText.draw(at: CGPoint(x: 540, y: curY + 45), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 22, weight: .bold),

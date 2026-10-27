@@ -80,6 +80,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     private let kVIPExpireDate = "yx_iap_vip_expire_date"
     private let kFloorplanCredits = "yx_iap_floorplan_credits"
     private let kTianjiCredits = "yx_iap_tianji_credits"
+    private let kProcessedTransactionIDs = "yx_iap_processed_transaction_ids"
     
     private override init() {
         super.init()
@@ -132,15 +133,16 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             return
         }
         
-        if let product = availableProducts[id] {
-            let payment = SKPayment(product: product)
-            SKPaymentQueue.default().add(payment)
-        } else {
-            // 如果未能从 StoreKit 缓存，尝试通过 ID 构造
-            let payment = SKMutablePayment()
-            payment.productIdentifier = id
-            SKPaymentQueue.default().add(payment)
+        guard let product = availableProducts[id] else {
+            delegate?.iapManagerDidFailPurchase(
+                productId: id,
+                errorMsg: LocalizationManager.shared.t("iap_err_product_unavailable")
+            )
+            fetchProducts()
+            return
         }
+
+        SKPaymentQueue.default().add(SKPayment(product: product))
     }
     
     // MARK: - 恢复购买 (App Store 审核必备)
@@ -170,10 +172,16 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     private func handlePurchased(_ transaction: SKPaymentTransaction) {
         let pid = transaction.payment.productIdentifier
-        unlockEntitlement(for: pid)
+        let txId = transaction.transactionIdentifier ?? "\(pid)-\(transaction.transactionDate?.timeIntervalSince1970 ?? 0)"
+        if hasProcessedTransaction(txId) {
+            SKPaymentQueue.default().finishTransaction(transaction)
+            return
+        }
+
+        unlockEntitlement(for: pid, transactionDate: transaction.transactionDate)
+        markTransactionProcessed(txId)
         SKPaymentQueue.default().finishTransaction(transaction)
         
-        let txId = transaction.transactionIdentifier ?? UUID().uuidString
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.iapManagerDidCompletePurchase(productId: pid, transactionId: txId)
         }
@@ -181,8 +189,27 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     private func handleRestored(_ transaction: SKPaymentTransaction) {
         let pid = transaction.payment.productIdentifier
-        unlockEntitlement(for: pid)
+        let txId = transaction.transactionIdentifier ?? "\(pid)-restored"
+        if !hasProcessedTransaction(txId) {
+            unlockEntitlement(for: pid, transactionDate: transaction.transactionDate)
+            markTransactionProcessed(txId)
+        }
         SKPaymentQueue.default().finishTransaction(transaction)
+    }
+
+    private func hasProcessedTransaction(_ transactionID: String) -> Bool {
+        UserDefaults.standard.stringArray(forKey: kProcessedTransactionIDs)?.contains(transactionID) ?? false
+    }
+
+    private func markTransactionProcessed(_ transactionID: String) {
+        var ids = UserDefaults.standard.stringArray(forKey: kProcessedTransactionIDs) ?? []
+        guard !ids.contains(transactionID) else { return }
+        ids.append(transactionID)
+        // 只保留最近交易，避免长期运行不断增长本地状态。
+        if ids.count > 100 {
+            ids.removeFirst(ids.count - 100)
+        }
+        UserDefaults.standard.set(ids, forKey: kProcessedTransactionIDs)
     }
     
     public func paymentQueueRestoreCompletedTransactionsFinished(_ queue: SKPaymentQueue) {
@@ -228,15 +255,17 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     // MARK: - 权益本地管理
     
-    private func unlockEntitlement(for pid: String) {
+    private func unlockEntitlement(for pid: String, transactionDate: Date? = nil) {
         let defaults = UserDefaults.standard
         if pid == IAPProductID.proLifetime.rawValue {
             defaults.set(true, forKey: kIsLifetime)
             defaults.set(true, forKey: kIsVIP)
         } else if pid == IAPProductID.vipYearly.rawValue {
             defaults.set(true, forKey: kIsVIP)
-            let oneYearLater = Date().addingTimeInterval(365 * 24 * 3600)
-            defaults.set(oneYearLater.timeIntervalSince1970, forKey: kVIPExpireDate)
+            // 使用 StoreKit 交易时间计算订阅周期，恢复旧交易时不会从“恢复当天”凭空续期。
+            let purchaseDate = transactionDate ?? Date()
+            let expireDate = purchaseDate.addingTimeInterval(365 * 24 * 3600)
+            defaults.set(expireDate.timeIntervalSince1970, forKey: kVIPExpireDate)
         } else if pid == IAPProductID.floorplanSingle.rawValue {
             let current = defaults.integer(forKey: kFloorplanCredits)
             defaults.set(current + 1, forKey: kFloorplanCredits)

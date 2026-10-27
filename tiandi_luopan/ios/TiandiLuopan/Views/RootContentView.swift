@@ -67,7 +67,7 @@ public struct RootContentView: View {
                 }
                 .tag(3)
             
-            // Tab 5: 系统设置与会员中心 (四档Apple Pay内购收银台、特权矩阵、8字传感器校准)
+            // Tab 5: 系统设置与会员中心 (四档 StoreKit 内购、特权矩阵、8字传感器校准)
             SettingsView()
                 .tabItem {
                     Image(systemName: "gearshape.fill")

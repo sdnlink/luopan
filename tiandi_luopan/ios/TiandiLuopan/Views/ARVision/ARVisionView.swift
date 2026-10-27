@@ -550,12 +550,36 @@ public struct ARVisionView: View {
                 .foregroundColor: UIColor.white
             ]
             
-            let infoText = """
-            向首方位: \(mFacing.name)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
-            识别形煞: 【\(currentSha.name)】(\(currentSha.aliases)) · \(currentSha.severity.rawValue)
-            现场经纬: \(coordsStr)
-            勘察时间: \(Date().description) · 防伪鉴真: YX-AR-\(Int(Date().timeIntervalSince1970))
-            """
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            let timeStr = dateFormatter.string(from: Date())
+            
+            let isEn = LocalizationManager.shared.effectiveLanguage == .en
+            let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+            
+            let infoText: String
+            if isEn {
+                infoText = """
+                Facing Orientation: Mountain \(mFacing.pinyin) (Measured \(String(format: "%.1f", currentHeading))°)
+                Identified Sha: [\(currentSha.name)] (\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                Coordinates: \(coordsStr)
+                Audit Time: \(timeStr) · SN: YX-AR-\(Int(Date().timeIntervalSince1970))
+                """
+            } else if isHant {
+                infoText = """
+                向首方位: \(mFacing.name)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
+                識別形煞: 【\(currentSha.name)】(\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                現場經緯: \(coordsStr)
+                勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(Date().timeIntervalSince1970))
+                """
+            } else {
+                infoText = """
+                向首方位: \(mFacing.name)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
+                识别形煞: 【\(currentSha.name)】(\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                现场经纬: \(coordsStr)
+                勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(Date().timeIntervalSince1970))
+                """
+            }
             infoText.draw(in: CGRect(x: 70, y: size.height - 290, width: size.width - 260, height: 210), withAttributes: bodyAttr)
             
             // 朱砂印鉴

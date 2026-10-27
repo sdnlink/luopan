@@ -400,7 +400,7 @@ public struct RoomAuditDetailSheet: View {
                             
                             Spacer()
                             
-                            Text(room.inspectionLevel)
+                            Text(localizedLevel)
                                 .font(.system(size: 12, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -478,5 +478,23 @@ public struct RoomAuditDetailSheet: View {
         if room.isSevere { return .red }
         if room.isWarning { return .orange }
         return Color.yanCyan
+    }
+    
+    private var localizedLevel: String {
+        let isEn = LocalizationManager.shared.effectiveLanguage == .en
+        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        if isEn {
+            if room.isGood { return "Auspicious" }
+            if room.isSevere { return "Severe Taboo" }
+            if room.isWarning { return "Warning" }
+            return "Neutral"
+        } else if isHant {
+            if room.isGood { return "吉" }
+            if room.isSevere { return "嚴重煞氣" }
+            if room.isWarning { return "預警" }
+            return "平"
+        } else {
+            return room.inspectionLevel
+        }
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 
 public struct CompassMainView: View {
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     
     // 弹窗状态
     @State private var showFenjinSheet = false
@@ -88,7 +89,7 @@ public struct CompassMainView: View {
     private func compassToolBar() -> some View {
         let m = motion.headingState.facingMountain
         let delta = abs(motion.headingState.facingAngle - m.centerAngle)
-        let kwStatus = delta < 1.5 ? "正针纯清" : (delta < 4.5 ? "兼针替卦" : "出卦小空亡")
+        let kwStatus = delta < 1.5 ? lang.t("pure_alignment") : (delta < 4.5 ? lang.t("sub_mountain") : lang.t("small_void"))
         let kwColor = delta < 1.5 ? Color.green : (delta < 4.5 ? Color.yellow : Color.orange)
         
         return HStack(spacing: 8) {
@@ -100,7 +101,7 @@ public struct CompassMainView: View {
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
-                    Text(motion.isLocked ? "已锁定朝向" : "锁定朝向")
+                    Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 8)

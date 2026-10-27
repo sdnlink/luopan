@@ -224,8 +224,8 @@ public struct VIPPaywallSheet: View {
                     }
                 }
             }
-            .navigationBarTitle("会员特权与收银台", displayMode: .inline)
-            .navigationBarItems(trailing: Button("关闭") {
+            .navigationBarTitle(LocalizationManager.shared.t("vip_member_center"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("close")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }

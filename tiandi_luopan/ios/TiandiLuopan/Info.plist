@@ -57,6 +57,8 @@
 	<string>演象时空罗盘需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>演象时空罗盘需要将实景勘测长图与水印存证快照保存至您的相册。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>演象时空罗盘需要访问相册以保存实景勘测长图与水印存证相片。</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

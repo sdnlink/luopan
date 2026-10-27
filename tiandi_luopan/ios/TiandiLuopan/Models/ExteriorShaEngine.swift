@@ -102,6 +102,19 @@ public struct ExteriorShaItem: Identifiable, Codable {
             default: return visualFeature
             }
         }
+        if lang == .zhHant {
+            switch id {
+            case "tianzhan": return "兩棟高樓間隙極度狹窄，如巨斧凌空劈裂，正對向首或坐山。"
+            case "luchong": return "筆直道路或長廊直刺明堂大門、陽台或主臥窗戶，車流直逼。"
+            case "fangong": return "高架橋、河流或弧形道路如拉滿之弓箭，弧頂凸面正對房屋。"
+            case "tantou": return "前方建築物後方隱隱露出一角或圓頂，如有人探首窺視宅內。"
+            case "chuanxin": return "樓宇下方有地鐵、隧道、車道貫穿，或正門正對直通後窗。"
+            case "huoxing": return "對面大廈屋角、三角形頂棚、加油站、變電站或紅色尖塔直刺。"
+            case "baihu": return "住宅右側建築物明顯高過左側青龍方，或右側有大型動土施工。"
+            case "gejiao": return "高架橋、貼身快速車道或洶湧急流緊挨樓腳，沒有明堂緩衝地帶。"
+            default: return visualFeature
+            }
+        }
         return visualFeature
     }
     
@@ -120,7 +133,75 @@ public struct ExteriorShaItem: Identifiable, Codable {
             default: return remedySolution
             }
         }
+        if lang == .zhHant {
+            switch id {
+            case "tianzhan": return "1. 懸掛正品開光純銅山海鎮或九宮八卦凸鏡；\n2. 陽台密植闊葉盆栽形成擋風屏障；\n3. 玄關設山水屏風阻隔直衝煞氣。"
+            case "luchong": return "1. 門前安置泰山石敢當；\n2. 設曲折玄關使直氣轉緩；\n3. 窗內安放開光麒麟朝向路衝。"
+            case "fangong": return "1. 擺放黑曜石八卦龍龜；\n2. 窗台以弧形綠植緩衝；\n3. 室內懸掛五帝錢金剛杵。"
+            case "tantou": return "1. 掛凸面銅八卦鏡反彈窺視；\n2. 擺放昂首純銅公雞；\n3. 白天關閉百葉窗簾。"
+            case "chuanxin": return "1. 地面鋪黃玉七星陣聚土氣；\n2. 大門設真銅門檻；\n3. 玄關擺厚重實木櫃藏風聚氣。"
+            case "huoxing": return "1. 安放白水晶球或黑曜石陣；\n2. 窗邊懸掛六帝古錢；\n3. 以藍色水波紋織物調和五行。"
+            case "baihu": return "1. 左側擺純銅祥龍吐珠；\n2. 右方白虎位安置青玉泰山石；\n3. 增強左側燈光與家具高度。"
+            case "gejiao": return "1. 陽台築高盆花壇與灌木；\n2. 向急流方供放銅貔貅；\n3. 安裝厚質隔音 Low-E 玻璃。"
+            default: return remedySolution
+            }
+        }
         return remedySolution
+    }
+
+    /// Localized explanation shown in the AR result card.  The source data is
+    /// intentionally kept in Simplified Chinese for the knowledge base, while
+    /// these computed values keep the UI language consistent.
+    public var localizedMetaphysicsHarm: String {
+        guard LocalizationManager.shared.effectiveLanguage != .zhHans else { return metaphysicsHarm }
+        let en: [String: String] = [
+            "tianzhan": "Venturi acceleration turns the gap into a high-speed wind blade, associated with accidents, disputes, financial loss and sudden cardiovascular strain.",
+            "luchong": "A straight road behaves like a spear: traffic momentum rushes into the home, bringing repeated loss, accidents and family unrest.",
+            "fangong": "Centrifugal force pulls wealth and support outward, creating an unfeeling collision associated with rebellion, major loss and litigation.",
+            "tantou": "A hidden gaze invites back-room trouble, theft, deceit, secret affairs and sudden damage to reputation.",
+            "chuanxin": "Unstable ground qi leaks rapidly, weakening wealth retention, digestion and the occupants' sense of security.",
+            "huoxing": "Fire clashes with Metal, bringing arguments, legal trouble, eye and skin complaints, and an irritable temper.",
+            "baihu": "A weakened Azure Dragon and dominant White Tiger can suppress yang energy, authority and the family's progress.",
+            "gejiao": "Fast moving qi strips the foundation, causing volatile finances, a weak base and a tendency for later decline."
+        ]
+        let hant: [String: String] = [
+            "tianzhan": "氣流受文丘裏效應加速形成高速風刃，主血光之災、官非破財及心腦血管突發疾厄。",
+            "luchong": "直路如槍，車流動能直衝宅氣，主破耗連連、意外傷災及人丁不安。",
+            "fangong": "離心力將財氣與貴人運向外甩離，形成無情衝撞，主子孫叛逆、破大財及官訟纏身。",
+            "tantou": "暗中窺測，主招引暗室小人、盜竊欺詐、婚外暗昧或突發名譽受損。",
+            "chuanxin": "地氣空洞不穩定，洩氣極速，主財氣不聚、脾胃虛寒及居者缺乏安全感。",
+            "huoxing": "火金相克、火燥生煞，主口舌官非、視力疾厄、皮膚炎腫及脾氣暴躁。",
+            "baihu": "青龍委靡、白虎張狂，主陰盛陽衰、男丁運勢受壓抑阻滯。",
+            "gejiao": "氣流疾走拔除地氣，財運大起大落、根基虛浮，青年得志而晚運易傾頹。"
+        ]
+        let values = LocalizationManager.shared.effectiveLanguage == .zhHant ? hant : en
+        return values[id] ?? metaphysicsHarm
+    }
+
+    public var localizedClassicalText: String {
+        guard LocalizationManager.shared.effectiveLanguage != .zhHans else { return classicalText }
+        let en: [String: String] = [
+            "tianzhan": "The Snow Heart Ode says: A sky-cleaving gap before the house splits the qi; two towers leave a cleft like a sword descending.",
+            "luchong": "The Essentials of Form says: A direct road before the gate is hardest to withstand; a hidden arrow wounds without warning.",
+            "fangong": "The Five Geographic Secrets says: An unfeeling reverse-bow stream cuts like a curved blade; wealth follows the water away.",
+            "tantou": "The Dragon Classic says: A lowered head peering from behind stirs hidden trouble; even great wealth must guard against secret schemes.",
+            "chuanxin": "The Green Satchel Classic says: When the earth vein is not gathered, house qi rises and escapes through the heart, leaving poverty and insecurity.",
+            "huoxing": "The Doubting Dragon Classic says: A sharp corner strikes like a flying fire star; calamity reaches the door and people fail to return.",
+            "baihu": "The Water Dragon Classic says: Let the Azure Dragon rise ten thousand yards; never let the White Tiger lift its head even half an inch.",
+            "gejiao": "The Orthodox Geography says: When water presses urgently at the building's feet, shallow roots cannot stand against the wind."
+        ]
+        let hant: [String: String] = [
+            "tianzhan": "《雪心賦》云：天斬迎面立，屋裂氣難聚。兩樓夾一罅，形同劍下劈。",
+            "luchong": "《堪輿指要》云：直衝門前最難當，暗箭傷人人莫詳。",
+            "fangong": "《地理五訣》云：反弓無情水，猶如彎刀割。居者難安泰，錢財隨水折。",
+            "tantou": "《撼龍經》云：頭低窺視探，小人暗中亂。縱有萬貫財，亦防暗中算。",
+            "chuanxin": "《青囊經》云：地脈不凝，宅氣空騰。穿心走氣，貧困無依。",
+            "huoxing": "《疑龍經》云：尖角衝克火星飛，災殃臨門人不歸。",
+            "baihu": "《水龍經》云：寧叫青龍高萬丈，莫教白虎昂半寸。",
+            "gejiao": "《地理正宗》云：水逼樓腳急，根淺風難立。"
+        ]
+        let values = LocalizationManager.shared.effectiveLanguage == .zhHant ? hant : en
+        return values[id] ?? classicalText
     }
 }
 

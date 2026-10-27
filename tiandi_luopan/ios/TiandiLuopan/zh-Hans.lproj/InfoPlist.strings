@@ -1,11 +1,11 @@
 /* App Display Name */
-"CFBundleDisplayName" = "演象罗盘";
-"CFBundleName" = "演象罗盘";
+"CFBundleDisplayName" = "天机演象";
+"CFBundleName" = "天机演象";
 
 /* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "演象时空罗盘需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "演象时空罗盘需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。";
-"NSMotionUsageDescription" = "演象时空罗盘需要使用高精度运动传感器以驱动双轴太极水准仪与指南针。";
-"NSCameraUsageDescription" = "演象时空罗盘需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。";
-"NSPhotoLibraryAddUsageDescription" = "演象时空罗盘需要将实景勘测长图与水印存证快照保存至您的相册。";
-"NSPhotoLibraryUsageDescription" = "演象时空罗盘需要访问相册以保存实景勘测长图与水印存证相片。";
+"NSLocationWhenInUseUsageDescription" = "天机演象需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "天机演象需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。";
+"NSMotionUsageDescription" = "天机演象需要使用高精度运动传感器以驱动双轴太极水准仪与指南针。";
+"NSCameraUsageDescription" = "天机演象需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。";
+"NSPhotoLibraryAddUsageDescription" = "天机演象需要将实景勘测长图与水印存证快照保存至您的相册。";
+"NSPhotoLibraryUsageDescription" = "天机演象需要访问相册以保存实景勘测长图与水印存证相片。";

@@ -244,11 +244,11 @@ public struct XuanKongGridView: View {
                 .padding(.vertical, 2)
             
             HStack {
-                Text(cell.palaceName)
+                Text(cell.localizedPalaceName)
                     .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.5))
                 Spacer()
-                Text(cell.element)
+                Text(cell.localizedElement)
                     .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.5))
             }

@@ -1,9 +1,11 @@
 import SwiftUI
 import StoreKit
+import Combine
 
 // MARK: - VIP 权限拦截遮罩卡片 (VIP Lock Card View)
 
 public struct VIPLockCardView: View {
+    @ObservedObject private var iap = StoreKitIAPManager.shared
     public let title: String
     public let featureDesc: String
     public var badge: String = LocalizationManager.shared.t("vip_badge_title")
@@ -53,7 +55,7 @@ public struct VIPLockCardView: View {
                 Button(action: onUnlockTap) {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
-                        Text("\(LocalizationManager.shared.t("unlock_vip_now")) (\(targetProductId.priceText))")
+                        Text("\(LocalizationManager.shared.t("unlock_vip_now")) (\(iap.localizedPrice(for: targetProductId)))")
                     }
                     .font(.system(size: 12, weight: .bold))
                     .frame(maxWidth: .infinity)
@@ -200,6 +202,7 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(.black)
                                 .cornerRadius(10)
                             }
+                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts)
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -242,27 +245,44 @@ public struct VIPPaywallSheet: View {
             }
         }
         .onReceive(iap.$floorplanCreditsCount) { count in
-            if count > 0 && selectedProductId == IAPProductID.floorplanSingle.rawValue {
+            if isPurchasing && count > 0 && selectedProductId == IAPProductID.floorplanSingle.rawValue {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }
         }
         .onReceive(iap.$tianjiCreditsCount) { count in
-            if count > 0 && selectedProductId == IAPProductID.tianjiSingle.rawValue {
+            if isPurchasing && count > 0 && selectedProductId == IAPProductID.tianjiSingle.rawValue {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }
         }
+        .onReceive(iap.$isProcessingPurchase) { processing in
+            isPurchasing = processing
+        }
+        .onReceive(iap.$lastErrorMessage.compactMap { $0 }) { message in
+            isPurchasing = false
+            alertMsg = message
+            showAlert = true
+        }
+        .onReceive(iap.$lastStatusMessage.compactMap { $0 }) { message in
+            isPurchasing = false
+            alertMsg = message
+            showAlert = true
+        }
+        .alert(isPresented: $showAlert) {
+            Alert(title: Text(iap.lastErrorMessage == nil
+                              ? LocalizationManager.shared.t("payment_status_title")
+                              : LocalizationManager.shared.t("payment_failed_title")),
+                  message: Text(alertMsg),
+                  dismissButton: .default(Text(LocalizationManager.shared.t("done"))))
+        }
     }
     
     private func getSelectedProductTitle() -> String {
-        switch selectedProductId {
-        case IAPProductID.vipYearly.rawValue: return "\(LocalizationManager.shared.t("product_vip_yearly_tag")) (¥198)"
-        case IAPProductID.proLifetime.rawValue: return "\(LocalizationManager.shared.t("product_pro_lifetime_title")) (¥298)"
-        case IAPProductID.floorplanSingle.rawValue: return "\(LocalizationManager.shared.t("product_floorplan_single_tag")) (¥19.9)"
-        case IAPProductID.tianjiSingle.rawValue: return "\(LocalizationManager.shared.t("product_tianji_single_tag")) (¥9.9)"
-        default: return LocalizationManager.shared.t("vip_badge_title")
+        guard let id = IAPProductID(rawValue: selectedProductId) else {
+            return LocalizationManager.shared.t("vip_badge_title")
         }
+        return "\(id.title) (\(iap.localizedPrice(for: id)))"
     }
     
     private func privilegeItem(icon: String, title: String, desc: String) -> some View {
@@ -311,7 +331,7 @@ public struct VIPPaywallSheet: View {
                 
                 Spacer()
                 
-                Text(id.priceText)
+                Text(iap.localizedPrice(for: id))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }

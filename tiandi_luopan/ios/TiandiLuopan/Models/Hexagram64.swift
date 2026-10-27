@@ -25,6 +25,77 @@ public struct HexagramItem: Identifiable, Codable {
         self.fenJinDetail = fenJinDetail
     }
     public var isGreatAuspicious: Bool { luckDegree == "大吉" }
+
+    public var localizedName: String {
+        let language = LocalizationManager.shared.effectiveLanguage
+        if language == .en { return "Hexagram \(id + 1)" }
+        if language == .zhHant {
+            return name
+                .replacingOccurrences(of: "剥", with: "剝")
+                .replacingOccurrences(of: "风", with: "風")
+                .replacingOccurrences(of: "观", with: "觀")
+                .replacingOccurrences(of: "晋", with: "晉")
+                .replacingOccurrences(of: "泽", with: "澤")
+                .replacingOccurrences(of: "谦", with: "謙")
+                .replacingOccurrences(of: "渐", with: "漸")
+                .replacingOccurrences(of: "过", with: "過")
+                .replacingOccurrences(of: "遁", with: "遯")
+                .replacingOccurrences(of: "师", with: "師")
+                .replacingOccurrences(of: "涣", with: "渙")
+                .replacingOccurrences(of: "讼", with: "訟")
+                .replacingOccurrences(of: "蛊", with: "蠱")
+                .replacingOccurrences(of: "恒", with: "恆")
+                .replacingOccurrences(of: "复", with: "復")
+                .replacingOccurrences(of: "颐", with: "頤")
+                .replacingOccurrences(of: "随", with: "隨")
+                .replacingOccurrences(of: "无", with: "無")
+                .replacingOccurrences(of: "贲", with: "賁")
+                .replacingOccurrences(of: "既济", with: "既濟")
+                .replacingOccurrences(of: "离", with: "離")
+                .replacingOccurrences(of: "临", with: "臨")
+                .replacingOccurrences(of: "损", with: "損")
+                .replacingOccurrences(of: "节", with: "節")
+                .replacingOccurrences(of: "归妹", with: "歸妹")
+                .replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "壮", with: "壯")
+        }
+        return name
+    }
+
+    public var localizedLuckDegree: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch luckDegree {
+            case "大吉": return "Great Auspicious"
+            case "中吉": return "Auspicious"
+            case "慎用": return "Use with Care"
+            default: return "Neutral"
+            }
+        case .zhHant:
+            return luckDegree.replacingOccurrences(of: "慎用", with: "慎用")
+        default: return luckDegree
+        }
+    }
+
+    public var localizedUpperTrigram: String {
+        if LocalizationManager.shared.effectiveLanguage == .en {
+            return ["坤": "Kun", "艮": "Gen", "坎": "Kan", "巽": "Xun", "震": "Zhen", "离": "Li", "兑": "Dui", "乾": "Qian"][upperTrigram] ?? upperTrigram
+        }
+        if LocalizationManager.shared.effectiveLanguage == .zhHant {
+            return upperTrigram.replacingOccurrences(of: "离", with: "離").replacingOccurrences(of: "兑", with: "兌")
+        }
+        return upperTrigram
+    }
+
+    public var localizedLowerTrigram: String {
+        if LocalizationManager.shared.effectiveLanguage == .en {
+            return ["坤": "Kun", "艮": "Gen", "坎": "Kan", "巽": "Xun", "震": "Zhen", "离": "Li", "兑": "Dui", "乾": "Qian"][lowerTrigram] ?? lowerTrigram
+        }
+        if LocalizationManager.shared.effectiveLanguage == .zhHant {
+            return lowerTrigram.replacingOccurrences(of: "离", with: "離").replacingOccurrences(of: "兑", with: "兌")
+        }
+        return lowerTrigram
+    }
 }
 
 public final class Hexagram64Data {
@@ -48,6 +119,7 @@ public final class Hexagram64Data {
         var list: [HexagramItem] = []
         let step = 360.0 / 64.0 // 5.625°
         
+        let trigrams = ["坤", "艮", "坎", "巽", "震", "离", "兑", "乾"]
         for i in 0..<64 {
             let angle = Double(i) * step
             let name = names[i % names.count]
@@ -73,9 +145,9 @@ public final class Hexagram64Data {
             let item = HexagramItem(
                 id: i,
                 name: name,
-                upperTrigram: "卦\(i / 8 + 1)",
-                lowerTrigram: "卦\(i % 8 + 1)",
-                binaryCode: String(i, radix: 2),
+                upperTrigram: trigrams[i % 8],
+                lowerTrigram: trigrams[i / 8],
+                binaryCode: String(repeating: "0", count: max(0, 6 - String(i, radix: 2).count)) + String(i, radix: 2),
                 angleCenter: angle,
                 elementNumber: (i % 9) + 1,
                 luckDegree: luck,

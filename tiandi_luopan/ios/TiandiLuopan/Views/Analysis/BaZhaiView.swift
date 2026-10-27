@@ -244,7 +244,7 @@ public struct BaZhaiView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .lineSpacing(3)
                     
-                    Text("\(lang.t("song_quote"))：“\(hq.quote)”")
+                    Text("\(lang.t("song_quote"))：“\(hq.localizedQuote)”")
                         .font(.system(size: 10, design: .serif))
                         .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 }
@@ -283,7 +283,7 @@ public struct BaZhaiView: View {
                         .foregroundColor(Color.yellow.opacity(0.9))
                         .lineSpacing(2)
                     
-                    Text("\(lang.t("song_quote"))：“\(basha.song)”\n\(basha.xiaoShaRule)")
+                    Text("\(lang.t("song_quote"))：“\(basha.localizedSong)”\n\(basha.localizedXiaoShaRule)")
                         .font(.system(size: 10, design: .serif))
                         .foregroundColor(.white.opacity(0.6))
                         .lineSpacing(2)

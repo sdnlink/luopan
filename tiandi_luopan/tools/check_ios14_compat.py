@@ -1,7 +1,8 @@
 import os
 import re
+from pathlib import Path
 
-root_dir = "tiandi_luopan/ios/TiandiLuopan"
+root_dir = Path(__file__).resolve().parents[1] / "ios" / "TiandiLuopan"
 
 ios15_patterns = [
     (r'\bColor\.(cyan|brown|mint|teal|indigo)\b', "iOS 15+ exclusive Color"),

@@ -121,6 +121,14 @@ public struct HuangQuanWaterResult {
     public let isDanger: Bool
     public let badgeText: String
     public let quote: String = "庚丁坤上是黄泉，乙丙须防巽水先。甲癸向中休见艮，辛壬水路怕当乾。"
+
+    public var localizedQuote: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en: return "Geng and Ding fear Huangquan in Kun; Yi and Bing guard against Xun water. Jia and Gui avoid Gen; Xin and Ren fear Qian water."
+        case .zhHant: return "庚丁坤上是黃泉，乙丙須防巽水先。甲癸向中休見艮，辛壬水路怕當乾。"
+        default: return quote
+        }
+    }
 }
 
 // MARK: - 坐山八煞曜位模型
@@ -133,6 +141,22 @@ public struct BaShaResult {
     public let remedy: String
     public let song: String = "坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜。"
     public let xiaoShaRule: String = "生我为生砂（催贵），同我为旺砂（旺丁财），克我为煞砂（大凶血光），我克为奴砂（得财帛），我生为泄砂（虚耗脱白）。"
+
+    public var localizedSong: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en: return "Kan Dragon, Kun Rabbit, Zhen Monkey; Xun Rooster, Qian Horse, Dui Snake; Gen Tiger and Li Pig mark the Sha stars."
+        case .zhHant: return "坎龍坤兔震山猴，巽雞乾馬兌蛇頭，艮虎離豬為煞曜。"
+        default: return song
+        }
+    }
+
+    public var localizedXiaoShaRule: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en: return "Generating me is Sheng Sha (noble aid); same as me is Wang Sha (people and wealth); overcoming me is Sha (major harm); I overcome is Slave Sha (wealth); I generate is Draining Sha (waste)."
+        case .zhHant: return "生我為生砂（催貴），同我為旺砂（旺丁財），克我為煞砂（大凶血光），我克為奴砂（得財帛），我生為洩砂（虛耗脫白）。"
+        default: return xiaoShaRule
+        }
+    }
     
     public var localizedShaDir: String {
         let lang = LocalizationManager.shared.effectiveLanguage
@@ -335,10 +359,48 @@ public final class SanHeWaterEngine {
     public func resolveWaterMethod(sitting: Mountain24Item) -> [SanHeWaterItem] {
         let phases = ChangShengPhase.allCases
         var list: [SanHeWaterItem] = []
-        
+
+        // The twelve phases are anchored by the four San-He bureaus rather
+        // than by the array index of a mountain.  The bureau of the sitting
+        // mountain follows the project's double-mountain rule:
+        // 火局 = 艮丙辛, 水局 = 坤壬乙, 金局 = 巽庚癸,
+        // 木局 = 乾甲丁 (with their corresponding earthly branches).
+        // This is different from simply assigning every mountain to its
+        // nearest earthly branch; doing that misclassifies 乙、辛、癸、丁.
+        let branchByMountain: [String: Int] = [
+            "壬": 0, "子": 0, "癸": 0,
+            "丑": 1, "艮": 2, "寅": 2,
+            "甲": 3, "卯": 3, "乙": 3,
+            "辰": 4, "巽": 5, "巳": 5,
+            "丙": 6, "午": 6, "丁": 6,
+            "未": 7, "坤": 8, "申": 8,
+            "庚": 9, "酉": 9, "辛": 9,
+            "戌": 10, "乾": 11, "亥": 11
+        ]
+        let branchIndexForMountain: (Mountain24Item) -> Int = { mountain in
+            branchByMountain[mountain.name] ?? 0
+        }
+        let bureauStart: Int
+        switch sitting.name {
+        case "申", "子", "辰", "坤", "壬", "乙":
+            // 申子辰水局，长生在申
+            bureauStart = 8
+        case "亥", "卯", "未", "乾", "甲", "丁":
+            // 亥卯未木局，长生在亥
+            bureauStart = 11
+        case "寅", "午", "戌", "艮", "丙", "辛":
+            // 寅午戌火局，长生在寅
+            bureauStart = 2
+        default:
+            // 巳酉丑金局，长生在巳
+            bureauStart = 5
+        }
+
         let mData = Mountain24Data.shared.mountains
         for (idx, m) in mData.enumerated() {
-            let p = phases[(idx + sitting.id) % 12]
+            let targetBranch = branchIndexForMountain(m)
+            let phaseOffset = (targetBranch - bureauStart + 12) % 12
+            let p = phases[phaseOffset]
             let isHQ = (sitting.name == "庚" && m.name == "坤") || (sitting.name == "丁" && m.name == "坤") ||
                        (sitting.name == "乙" && m.name == "巽") || (sitting.name == "丙" && m.name == "巽") ||
                        (sitting.name == "甲" && m.name == "艮") || (sitting.name == "癸" && m.name == "艮") ||

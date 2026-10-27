@@ -8,7 +8,8 @@ public struct KongWangDetailSheet: View {
     
     public var body: some View {
         let m = Mountain24Data.shared.mountain(for: heading)
-        let delta = abs(heading - m.centerAngle)
+        let rawDelta = abs(heading - m.centerAngle)
+        let delta = min(rawDelta, 360.0 - rawDelta)
         let isLargeKW = delta >= 6.8 && [1, 3, 5, 7].contains(m.subIndex)
         let isSmallKW = delta >= 6.5 && !isLargeKW
         let isJianXiang = delta >= 1.5 && delta < 6.5
@@ -56,7 +57,7 @@ public struct KongWangDetailSheet: View {
                             Text(kwStatusText)
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(kwColor)
-                            Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", heading))° · \(m.name) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
+                            Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", heading))° · \(m.localizedName) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }

@@ -155,8 +155,18 @@ public class FloorplanEngine {
             var geoAngle = (screenAngle + heading).truncatingRemainder(dividingBy: 360)
             if geoAngle < 0 { geoAngle += 360 }
             
-            // 解算八卦宫位: 坎(0°/北), 艮(45°/东北), 震(90°/东), 巽(135°/东南), 离(180°/南), 坤(225°/西南), 兑(270°/西), 乾(315°/西北)
-            let palace = resolvePalace(geoAngle: geoAngle)
+            // A room containing the user-selected Tai Ji point belongs to the
+            // central palace.  The previous angle-only resolver could never
+            // produce 中宫, so a bathroom or stairwell at the home's center
+            // was silently reported as one of the eight outer palaces.
+            let palace: (dir: String, gua: String)
+            if room.rect.contains(centroid) {
+                let language = LocalizationManager.shared.effectiveLanguage
+                palace = language == .en ? ("Center", "Center") : (language == .zhHant ? ("中央", "中") : ("中央", "中"))
+            } else {
+                // 解算八卦宫位: 坎(0°/北), 艮(45°/东北), 震(90°/东), 巽(135°/东南), 离(180°/南), 坤(225°/西南), 兑(270°/西), 乾(315°/西北)
+                palace = resolvePalace(geoAngle: geoAngle)
+            }
             if isEn {
                 r.palaceName = "\(palace.dir) (\(palace.gua) Palace)"
             } else if isHant {
@@ -186,12 +196,17 @@ public class FloorplanEngine {
         
         // 增加穿堂煞与中宫检测
         if auditReport.isEmpty {
+            let language = LocalizationManager.shared.effectiveLanguage
+            let title = language == .en ? "Balanced Whole-Home Qi" : (language == .zhHant ? "全屋空間氣場中和純清" : "全屋空间气场中和纯清")
+            let palace = language == .en ? "Whole Home" : "全局"
+            let lore = language == .en ? "Every functional area is well positioned, with activity separated and yin-yang in harmony." : (language == .zhHant ? "各功能區方位得所，動靜分離，陰陽調和。" : "各功能区方位得所，动静分离，阴阳调和。")
+            let solution = language == .en ? "Keep the home bright and ventilated, with living plants to support steady family fortune." : (language == .zhHant ? "保持居室明亮通風，綠植點綴，可常保家運昌隆。" : "保持居室内明亮通风，绿植点缀，可常保家运昌隆。")
             auditReport.append(FloorplanAuditItem(
-                title: "全屋空间气场中和纯清",
-                palace: "全局",
+                title: title,
+                palace: palace,
                 severity: "吉",
-                lore: "各功能区方位得所，动静分离，阴阳调和。",
-                solution: "保持居室内明亮通风，绿植点缀，可常保家运昌隆。"
+                lore: lore,
+                solution: solution
             ))
         }
         
@@ -233,76 +248,84 @@ public class FloorplanEngine {
     }
     
     private func evaluateRoom(type: FloorplanRoomType, palaceGua: String, palaceDir: String) -> (title: String, level: String, lore: String, advice: String) {
+        let language = LocalizationManager.shared.effectiveLanguage
+        func tr(_ hans: String, _ hant: String, _ en: String) -> String {
+            switch language {
+            case .en: return en
+            case .zhHant: return hant
+            default: return hans
+            }
+        }
         switch (type, palaceGua) {
-        case (.kitchen, "乾"):
+        case (.kitchen, "乾"), (.kitchen, "Qian"):
             return (
-                "火烧天门大煞",
+                tr("火烧天门大煞", "火燒天門大煞", "Heaven Gate Fire Sha"),
                 "严重煞气",
-                "乾为天为父为首，灶火克乾金，极不利男主人头部、血压及事业运。",
-                "灶台旁安放天然黄色陶瓷罐，或悬挂真品六帝铜钱以土泄火生金。"
+                tr("乾为天为父为首，灶火克乾金，极不利男主人头部、血压及事业运。", "乾為天為父為首，灶火克乾金，極不利男主人頭部、血壓及事業運。", "Qian represents Heaven and the father; stove fire overcomes Qian Metal, stressing the male head, blood pressure and career."),
+                tr("灶台旁安放天然黄色陶瓷罐，或悬挂真品六帝铜钱以土泄火生金。", "灶台旁安放天然黃色陶瓷罐，或懸掛真品六帝銅錢，以土洩火生金。", "Place a natural yellow ceramic vessel beside the stove, or hang Six Emperor coins so Earth can drain Fire and generate Metal.")
             )
-        case (.bathroom, "乾"):
+        case (.bathroom, "乾"), (.bathroom, "Qian"):
             return (
-                "水浸天门污秽大煞",
+                tr("水浸天门污秽大煞", "水浸天門污穢大煞", "Heaven Gate Water Pollution Sha"),
                 "严重煞气",
-                "乾为天为父，卫浴设于西北，金水相寒污浊天门，主男主人事业阻滞、脑血管与呼吸道隐患。",
-                "卫生间门常闭，门槛下安放真品五帝古钱，内置纯铜金蟾或粗盐陶罐吸纳湿浊。"
+                tr("乾为天为父，卫浴设于西北，金水相寒污浊天门，主男主人事业阻滞、脑血管与呼吸道隐患。", "乾為天為父，衛浴設於西北，金水相寒污濁天門，主男主人事業阻滯、腦血管與呼吸道隱患。", "Qian is the father position; a northwest bathroom makes Metal and Water cold and polluted, burdening career, circulation and breathing.") ,
+                tr("卫生间门常闭，门槛下安放真品五帝古钱，内置纯铜金蟾或粗盐陶罐吸纳湿浊。", "衛生間門常閉，門檻下安放真品五帝古錢，內置純銅金蟾或粗鹽陶罐吸納濕濁。", "Keep the bathroom door closed; place Five Emperor coins under the threshold and a brass toad or salt vessel inside to absorb damp qi.")
             )
-        case (.kitchen, "坎"):
+        case (.kitchen, "坎"), (.kitchen, "Kan"):
             return (
-                "水火相战未济煞",
+                tr("水火相战未济煞", "水火相戰未濟煞", "Water–Fire Clash"),
                 "预警",
-                "北方坎水见烈火，水火不相容，主心肾不交、情绪烦躁与血液循环受损。",
-                "以木通关，厨房内增添绿植或实木厨具，令水生木、木生火，化克为生。"
+                tr("北方坎水见烈火，水火不相容，主心肾不交、情绪烦躁与血液循环受损。", "北方坎水見烈火，水火不相容，主心腎不交、情緒煩躁與血液循環受損。", "Kan Water meets strong stove Fire in the north, disturbing balance, mood and circulation."),
+                tr("以木通关，厨房内增添绿植或实木厨具，令水生木、木生火，化克为生。", "以木通關，廚房內增添綠植或實木廚具，令水生木、木生火，化克為生。", "Use Wood as a bridge: add plants or wooden utensils so Water feeds Wood and Wood feeds Fire.")
             )
-        case (.kitchen, "艮"), (.kitchen, "坤"):
+        case (.kitchen, "艮"), (.kitchen, "坤"), (.kitchen, "Gen"), (.kitchen, "Kun"):
             return (
-                "火燥鬼门伤脾土",
+                tr("火燥鬼门伤脾土", "火燥鬼門傷脾土", "Dry Fire in the Ghost Gate"),
                 "预警",
-                "艮坤属土为鬼门，烈火燥土，易致家人口腔上火、脾胃虚热及皮肤过敏。",
-                "台面摆放白水晶球或黄色陶瓷葫芦化泄烈火，增厚中和地气。"
+                tr("艮坤属土为鬼门，烈火燥土，易致家人口腔上火、脾胃虚热及皮肤过敏。", "艮坤屬土為鬼門，烈火燥土，易致家人口腔上火、脾胃虛熱及皮膚過敏。", "Gen and Kun are Earth Ghost Gates; dry Fire may bring irritability, digestive heat and skin sensitivity."),
+                tr("台面摆放白水晶球或黄色陶瓷葫芦化泄烈火，增厚中和地气。", "台面擺放白水晶球或黃色陶瓷葫蘆化洩烈火，增厚中和地氣。", "Place a white crystal sphere or yellow ceramic gourd on the counter to diffuse Fire and steady Earth qi.")
             )
-        case (.bathroom, "艮"), (.bathroom, "坤"):
+        case (.bathroom, "艮"), (.bathroom, "坤"), (.bathroom, "Gen"), (.bathroom, "Kun"):
             return (
-                "鬼门卫浴秽气冲射",
+                tr("鬼门卫浴秽气冲射", "鬼門衛浴穢氣衝射", "Ghost Gate Bathroom Sha"),
                 "预警",
-                "东北艮为表鬼门，西南坤为里鬼门，卫浴见水污地气，易损脾胃与人丁健康。",
-                "卫浴常开排风保持干燥，门槛下安放真品五帝钱或粗盐陶罐净化。"
+                tr("东北艮为表鬼门，西南坤为里鬼门，卫浴见水污地气，易损脾胃与人丁健康。", "東北艮為表鬼門，西南坤為裏鬼門，衛浴見水污地氣，易損脾胃與人丁健康。", "Bathrooms in the northeast or southwest pollute Earth qi and may affect digestion and family wellbeing."),
+                tr("卫浴常开排风保持干燥，门槛下安放真品五帝钱或粗盐陶罐净化。", "衛浴常開排風保持乾燥，門檻下安放真品五帝錢或粗鹽陶罐淨化。", "Keep ventilation running and the room dry; place Five Emperor coins or a salt vessel under the threshold.")
             )
-        case (.bathroom, "中"):
+        case (.bathroom, "中"), (.bathroom, "Center"):
             return (
-                "水浸中宫大忌",
+                tr("水浸中宫大忌", "水浸中宮大忌", "Central Palace Water Sha"),
                 "严重煞气",
-                "房屋心脏太极受污，病气弥漫全屋，主宅运反复、家人腰腹疾厄。",
-                "门头安放纯铜八卦凸镜，卫浴内常亮暖黄长明灯排浊。"
+                tr("房屋心脏太极受污，病气弥漫全屋，主宅运反复、家人腰腹疾厄。", "房屋心臟太極受污，病氣瀰漫全屋，主宅運反覆、家人腰腹疾厄。", "Water pollutes the home's central Tai Ji, spreading stagnant qi and affecting fortune and abdominal wellbeing."),
+                tr("门头安放纯铜八卦凸镜，卫浴内常亮暖黄长明灯排浊。", "門頭安放純銅八卦凸鏡，衛浴內常亮暖黃長明燈排濁。", "Mount a brass convex Bagua mirror above the door and keep a warm light on to clear damp qi.")
             )
-        case (.study, "巽"), (.study, "坎"):
+        case (.study, "巽"), (.study, "坎"), (.study, "Xun"), (.study, "Kan"):
             return (
-                "文昌生旺大吉位",
+                tr("文昌生旺大吉位", "文昌生旺大吉位", "Wenchang Scholarly Auspicious Position"),
                 "吉",
-                "巽为四绿文曲木，坎水生文昌，大利考学、升职与名誉构思。",
-                "书桌宜设于此方，书架摆放四支水养富贵竹或天然白水晶文昌塔。"
+                tr("巽为四绿文曲木，坎水生文昌，大利考学、升职与名誉构思。", "巽為四綠文曲木，坎水生文昌，大利考學、升職與名譽構思。", "Xun's Wenchang Wood and Kan Water nourish study, promotion and creative reputation."),
+                tr("书桌宜设于此方，书架摆放四支水养富贵竹或天然白水晶文昌塔。", "書桌宜設於此方，書架擺放四支水養富貴竹或天然白水晶文昌塔。", "Place the desk here; add four water-grown lucky bamboos or a natural white-crystal Wenchang tower.")
             )
-        case (.masterBedroom, "坤"), (.masterBedroom, "延年"):
+        case (.masterBedroom, "坤"), (.masterBedroom, "延年"), (.masterBedroom, "Kun"), (.masterBedroom, "Yan Nian"):
             return (
-                "主卧得位气场稳固",
+                tr("主卧得位气场稳固", "主臥得位氣場穩固", "Master Bedroom in a Stable Position"),
                 "吉",
-                "居于生旺方，身心放松，夫妻和睦，睡眠充盈利于事业蓄力。",
-                "床头宜靠实墙，忌上方横梁压顶或正冲镜面。"
+                tr("居于生旺方，身心放松，夫妻和睦，睡眠充盈利于事业蓄力。", "居於生旺方，身心放鬆，夫妻和睦，睡眠充盈利於事業蓄力。", "A prosperous position supports rest, harmony, sleep and renewed career energy."),
+                tr("床头宜靠实墙，忌上方横梁压顶或正冲镜面。", "床頭宜靠實牆，忌上方橫梁壓頂或正衝鏡面。", "Keep the headboard against a solid wall; avoid overhead beams and mirrors facing the bed.")
             )
-        case (.door, "离"):
+        case (.door, "离"), (.door, "Li"):
             return (
-                "南向明堂纳阳吉向",
+                tr("南向明堂纳阳吉向", "南向明堂納陽吉向", "South-Facing Bright Hall"),
                 "吉",
-                "离火纳气，采光充沛，主热情光明与远见名望。",
-                "玄关保持整洁开阔，点亮暖金射灯迎祥纳福。"
+                tr("离火纳气，采光充沛，主热情光明与远见名望。", "離火納氣，採光充沛，主熱情光明與遠見名望。", "Li Fire gathers bright qi and daylight, supporting warmth, vision and reputation."),
+                tr("玄关保持整洁开阔，点亮暖金射灯迎祥纳福。", "玄關保持整潔開闊，點亮暖金射燈迎祥納福。", "Keep the entry clean and open, with warm lighting to welcome auspicious qi.")
             )
         default:
             return (
-                "方位得所气场安和",
+                tr("方位得所气场安和", "方位得所氣場安和", "Balanced Spatial Qi"),
                 "平",
-                "空间阴阳协调，无明显形理相克。",
-                "按日常居住动线与洁净要求维护即可。"
+                tr("空间阴阳协调，无明显形理相克。", "空間陰陽協調，無明顯形理相克。", "Yin and yang are balanced with no obvious form or element conflict."),
+                tr("按日常居住动线与洁净要求维护即可。", "按日常居住動線與潔淨要求維護即可。", "Maintain normal circulation, cleanliness and ventilation.")
             )
         }
     }

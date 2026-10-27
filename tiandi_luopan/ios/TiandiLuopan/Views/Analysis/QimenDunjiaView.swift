@@ -5,7 +5,6 @@ import SwiftUI
 public struct QimenDunjiaView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
-    @State private var selectedCell: QimenPalaceCell? = nil
     @State private var showPaywall: Bool = false
     
     public init() {}
@@ -98,24 +97,24 @@ public struct QimenDunjiaView: View {
         return VStack(spacing: 3) {
             // 顶行: 八神 / 九星
             HStack {
-                Text(cell.godName)
+                Text(cell.localizedGodName)
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(Color.yellow)
                 Spacer()
-                Text(cell.starName)
+                Text(cell.localizedStarName)
                     .font(.system(size: 9))
                     .foregroundColor(Color.yanCyan)
             }
             
             // 中行: 八门 (大字显影)
-            Text(cell.doorName)
+            Text(cell.localizedDoorName)
                 .font(.system(size: 15, weight: .bold, design: .serif))
                 .foregroundColor(isJi ? Color.green : (isXiong ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45)))
                 .padding(.vertical, 2)
             
             // 底行: 宫名 / 天地三奇六仪
             HStack {
-                Text(cell.palaceName)
+                Text(cell.localizedPalaceName)
                     .font(.system(size: 8))
                     .foregroundColor(.white.opacity(0.6))
                 Spacer()

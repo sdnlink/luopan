@@ -67,7 +67,15 @@ public struct CalibrationSheet: View {
                         Divider().background(Color.white.opacity(0.1))
                         
                         let decl = motion.currentDeclination
-                        let declStr = motion.hasDeclination ? String(format: "%@%.2f°", decl >= 0 ? lang.t("calib_decl_east") : lang.t("calib_decl_west"), abs(decl)) : lang.t("calib_decl_calculating")
+                        let locationDenied = motion.locationAuthorizationStatus == .denied || motion.locationAuthorizationStatus == .restricted
+                        let declStr: String
+                        if motion.hasDeclination {
+                            declStr = String(format: "%@%.2f°", decl >= 0 ? lang.t("calib_decl_east") : lang.t("calib_decl_west"), abs(decl))
+                        } else if locationDenied {
+                            declStr = lang.t("location_unavailable")
+                        } else {
+                            declStr = lang.t("calib_decl_calculating")
+                        }
                         statusRow(
                             title: lang.t("calib_declination_title"),
                             value: declStr,

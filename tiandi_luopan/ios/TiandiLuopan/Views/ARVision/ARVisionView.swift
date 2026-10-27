@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import UIKit
+import Photos
 
 // MARK: - 原生高清相机预览层 (AVCaptureSession Representable)
 
@@ -28,6 +29,15 @@ public struct CameraPreviewView: UIViewRepresentable {
         private var photoCaptureOutput: AVCapturePhotoOutput?
         private var photoCompletion: ((UIImage?) -> Void)?
         private var currentPosition: AVCaptureDevice.Position = .back
+        private var isCapturingPhoto = false
+        private var sessionObservers: [NSObjectProtocol] = []
+        private let sessionQueue = DispatchQueue(label: "com.yanxiang.compass.camera-session")
+        private var wantsRunning = true
+
+        deinit {
+            sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            sessionObservers.removeAll()
+        }
         
         override public func layoutSubviews() {
             super.layoutSubviews()
@@ -36,9 +46,22 @@ public struct CameraPreviewView: UIViewRepresentable {
         
         public func setupSession(position: AVCaptureDevice.Position) {
             currentPosition = position
+            wantsRunning = true
+
+            // Reconfiguring the lens cancels any pending still capture.  Make
+            // the cancellation observable so an AI scan or snapshot request
+            // can leave its loading state instead of waiting forever.
+            let pendingCompletion = photoCompletion
+            photoCompletion = nil
+            isCapturingPhoto = false
+            if let pendingCompletion = pendingCompletion {
+                DispatchQueue.main.async { pendingCompletion(nil) }
+            }
             
             if let session = captureSession {
-                session.stopRunning()
+                sessionQueue.sync {
+                    if session.isRunning { session.stopRunning() }
+                }
                 captureSession = nil
                 previewLayer?.removeFromSuperlayer()
                 previewLayer = nil
@@ -72,8 +95,71 @@ public struct CameraPreviewView: UIViewRepresentable {
             
             self.captureSession = session
             self.previewLayer = preview
+
+            // A phone call, Control Center camera, or another app can interrupt
+            // capture without destroying the preview view. Resume the same
+            // session when the interruption ends and rebuild after media-service
+            // resets so the AR tab does not remain on a black frame.
+            sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            sessionObservers.removeAll()
+            let center = NotificationCenter.default
+            sessionObservers.append(center.addObserver(
+                forName: AVCaptureSession.wasInterruptedNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] _ in
+                // Keep the session object alive while iOS owns the interruption.
+                _ = self
+            })
+            sessionObservers.append(center.addObserver(
+                forName: AVCaptureSession.interruptionEndedNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self = self else { return }
+                guard self.wantsRunning else { return }
+                self.sessionQueue.async {
+                    guard let current = self.captureSession, current === session,
+                          !current.isRunning else { return }
+                    current.startRunning()
+                }
+            })
+            sessionObservers.append(center.addObserver(
+                forName: AVCaptureSession.runtimeErrorNotification,
+                object: session,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self = self else { return }
+                let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
+                if error != nil, self.wantsRunning {
+                    self.sessionQueue.async {
+                        guard let current = self.captureSession, current === session else { return }
+                        if !current.isRunning { current.startRunning() }
+                    }
+                }
+            })
+            sessionObservers.append(center.addObserver(
+                forName: UIApplication.didEnterBackgroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.pauseSessionForBackground()
+            })
+            sessionObservers.append(center.addObserver(
+                forName: UIApplication.willEnterForegroundNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self = self else { return }
+                guard self.wantsRunning else { return }
+                self.sessionQueue.async {
+                    guard let current = self.captureSession, current === session,
+                          !current.isRunning else { return }
+                    current.startRunning()
+                }
+            })
             
-            DispatchQueue.global(qos: .userInitiated).async {
+            sessionQueue.async {
                 session.startRunning()
             }
         }
@@ -84,6 +170,16 @@ public struct CameraPreviewView: UIViewRepresentable {
                 return
             }
 
+            // Always complete a rejected request.  An AI scan sets its
+            // pending flag before requesting a frame; dropping the callback
+            // while another exposure is in flight would leave the UI stuck in
+            // the scanning state forever.
+            guard !isCapturingPhoto else {
+                completion(nil)
+                return
+            }
+
+            isCapturingPhoto = true
             photoCompletion = completion
             let settings = AVCapturePhotoSettings()
             settings.flashMode = .off
@@ -104,12 +200,20 @@ public struct CameraPreviewView: UIViewRepresentable {
 
             let completion = photoCompletion
             photoCompletion = nil
+            isCapturingPhoto = false
             DispatchQueue.main.async {
                 completion?(image)
             }
         }
         
         public func resumeSessionIfNeeded(position: AVCaptureDevice.Position) {
+            wantsRunning = true
+            // A running session cannot change cameras by itself. Rebuild it when
+            // the user switches between the front and rear lens.
+            if currentPosition != position {
+                setupSession(position: position)
+                return
+            }
             if let session = captureSession, session.isRunning {
                 return
             }
@@ -117,10 +221,32 @@ public struct CameraPreviewView: UIViewRepresentable {
         }
         
         public func stopSession() {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                if let s = self?.captureSession, s.isRunning {
-                    s.stopRunning()
+            wantsRunning = false
+            let pendingCompletion = photoCompletion
+            photoCompletion = nil
+            isCapturingPhoto = false
+            if let pendingCompletion = pendingCompletion {
+                DispatchQueue.main.async { pendingCompletion(nil) }
+            }
+            let sessionToStop = captureSession
+            sessionQueue.async { [weak self] in
+                guard let self = self,
+                      let session = sessionToStop,
+                      self.captureSession === session else { return }
+                if session.isRunning {
+                    session.stopRunning()
                 }
+            }
+        }
+
+        private func pauseSessionForBackground() {
+            let sessionToPause = captureSession
+            sessionQueue.async { [weak self] in
+                guard let self = self,
+                      let session = sessionToPause,
+                      self.captureSession === session,
+                      session.isRunning else { return }
+                session.stopRunning()
             }
         }
     }
@@ -136,6 +262,7 @@ public struct CameraPreviewView: UIViewRepresentable {
     
     public func updateUIView(_ uiView: CameraUIView, context: Context) {
         if !isActive {
+            context.coordinator.lastActive = false
             uiView.stopSession()
             return
         }
@@ -190,12 +317,18 @@ public struct ARVisionView: View {
     @State private var selectedShaIndex: Int = 0
     @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
     @State private var targetOffset: CGSize = .zero
+    @State private var targetDragStart: CGSize?
     @State private var showRemedySheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var hasCameraPermission: Bool = false
     @State private var showSnapshotToast: Bool = false
     @State private var cameraPosition: AVCaptureDevice.Position = .back
     @State private var captureTrigger: Int = 0
+    @State private var isAIScanning: Bool = false
+    @State private var pendingAIFrame: Bool = false
+    @State private var aiResult: ShaAnalysisResult?
+    @State private var aiError: String?
+    @State private var photoPermissionDenied: Bool = false
     
     private let shaList = ExteriorShaEngine.shared.database
     
@@ -252,7 +385,16 @@ public struct ARVisionView: View {
                     isActive: isActive,
                     captureTrigger: captureTrigger,
                     onPhotoCaptured: { image in
-                        captureAndSaveSnapshot(baseImage: image)
+                        if pendingAIFrame {
+                            pendingAIFrame = false
+                            analyzeFrame(image)
+                        } else {
+                            guard let image = image else {
+                                aiError = lang.t("ar_ai_no_frame")
+                                return
+                            }
+                            captureAndSaveSnapshot(baseImage: image)
+                        }
                     }
                 )
                     .ignoresSafeArea()
@@ -317,6 +459,17 @@ public struct ARVisionView: View {
                 scanOffset = 180
             }
         }
+        .onChange(of: isActive) { active in
+            if active {
+                checkCameraPermission()
+            } else {
+                pendingAIFrame = false
+                isAIScanning = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if isActive { checkCameraPermission() }
+        }
         .sheet(isPresented: $showRemedySheet) {
             ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
         }
@@ -328,11 +481,11 @@ public struct ARVisionView: View {
     private func checkCameraPermission() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            hasCameraPermission = true
+            hasCameraPermission = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition) != nil
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
-                    self.hasCameraPermission = granted
+                    self.hasCameraPermission = granted && AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: self.cameraPosition) != nil
                 }
             }
         default:
@@ -360,12 +513,29 @@ public struct ARVisionView: View {
                 Image(systemName: "viewfinder")
                     .font(.system(size: 40))
                     .foregroundColor(Color.yanCyan.opacity(0.5))
-                Text(lang.t("simulation_mode"))
+                let cameraDenied = AVCaptureDevice.authorizationStatus(for: .video) == .denied ||
+                    AVCaptureDevice.authorizationStatus(for: .video) == .restricted
+                Text(cameraDenied ? lang.t("camera_permission_denied") : lang.t("simulation_mode"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white.opacity(0.7))
-                Text(lang.t("ar_drag_hint"))
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.4))
+                if cameraDenied {
+                    Button {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Text(lang.t("open_system_settings"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.yanCyan.opacity(0.25))
+                            .foregroundColor(.yanCyan)
+                            .cornerRadius(8)
+                    }
+                } else {
+                    Text(lang.t("ar_drag_hint"))
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                }
             }
         }
     }
@@ -413,17 +583,17 @@ public struct ARVisionView: View {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 6, height: 6)
-                    Text("\(lang.t("ar_target_center")) · \(m.name)\(lang.t("mountain_suffix"))")
+                Text("\(lang.t("ar_target_center")) · \(m.localizedName)\(lang.t("mountain_suffix"))")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.yellow)
                 }
-                Text(currentSha.name)
+                Text(currentSha.localizedName)
                     .font(.system(size: 15, weight: .bold, design: .serif))
                     .foregroundColor(.white)
-                Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.palace))")
+                Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text(currentSha.aliases)
+                Text(currentSha.localizedAliases)
                     .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -432,7 +602,15 @@ public struct ARVisionView: View {
         .gesture(
             DragGesture()
                 .onChanged { gesture in
-                    targetOffset = gesture.translation
+                    if targetDragStart == nil {
+                        targetDragStart = targetOffset
+                    }
+                    let start = targetDragStart ?? .zero
+                    targetOffset = CGSize(width: start.width + gesture.translation.width,
+                                          height: start.height + gesture.translation.height)
+                }
+                .onEnded { _ in
+                    targetDragStart = nil
                 }
         )
     }
@@ -444,15 +622,34 @@ public struct ARVisionView: View {
                 Text(lang.t("ar_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.name)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
+                Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.8))
             }
             Spacer()
+
+            Button(action: runAIScan) {
+                HStack(spacing: 4) {
+                    Image(systemName: isAIScanning ? "hourglass" : "sparkles")
+                    Text(isAIScanning ? lang.t("ar_ai_scanning") : lang.t("ar_ai_scan"))
+                }
+                .font(.system(size: 11, weight: .bold))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.yanCyan.opacity(0.85))
+                .foregroundColor(.black)
+                .cornerRadius(14)
+            }
+            .disabled(isAIScanning)
             
             // 翻转镜头按钮
             Button(action: {
-                cameraPosition = (cameraPosition == .back) ? .front : .back
+                let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
+                guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) != nil else {
+                    aiError = lang.t("ar_ai_camera_required")
+                    return
+                }
+                cameraPosition = nextPosition
             }) {
                 Image(systemName: "camera.rotate.fill")
                     .font(.system(size: 13))
@@ -470,7 +667,10 @@ public struct ARVisionView: View {
                     if hasCameraPermission && isActive {
                         captureTrigger += 1
                     } else {
-                        captureAndSaveSnapshot(baseImage: nil)
+                        // A dark fallback image must never be presented as an
+                        // on-site proof. Ask the user to restore camera access
+                        // and only save a snapshot after a real frame arrives.
+                        aiError = lang.t("ar_ai_camera_required")
                     }
                 }
             }) {
@@ -558,17 +758,45 @@ public struct ARVisionView: View {
                 }
             }
             
+            if let aiResult = aiResult {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                    Text("\(lang.t("ar_ai_result")): \(String(format: "%.0f", aiResult.confidence * 100))% · \(aiResult.detectedRegions)")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+            } else if let aiError = aiError {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(aiError)
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                    if photoPermissionDenied {
+                        Button(lang.t("open_system_settings")) {
+                            guard let url = URL(string: UIApplication.openSettingsURLString),
+                                  UIApplication.shared.canOpenURL(url) else { return }
+                            UIApplication.shared.open(url)
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.yanCyan)
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("【\(sha.name)】\(lang.t("ar_sha_analysis_prefix")):")
+                    Text("【\(sha.localizedName)】\(lang.t("ar_sha_analysis_prefix")):")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
-                    Text(sha.severity.rawValue)
+                    Text(sha.severity.localizedTitle)
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(sha.severity == .critical ? Color.red : Color.orange)
                 }
-                Text(sha.metaphysicsHarm)
+                Text(sha.localizedMetaphysicsHarm)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.9))
                     .lineLimit(2)
@@ -578,9 +806,52 @@ public struct ARVisionView: View {
             .cornerRadius(8)
         }
     }
+
+    private func runAIScan() {
+        guard hasCameraPermission && isActive else {
+            aiError = lang.t("ar_ai_camera_required")
+            return
+        }
+        aiError = nil
+        photoPermissionDenied = false
+        aiResult = nil
+        isAIScanning = true
+        pendingAIFrame = true
+        captureTrigger += 1
+    }
+
+    private func analyzeFrame(_ image: UIImage?) {
+        guard let image = image else {
+            isAIScanning = false
+            aiError = lang.t("ar_ai_no_frame")
+            return
+        }
+        OnDeviceShaAnalyzer.shared.analyze(image: image) { result in
+            isAIScanning = false
+            switch result {
+            case .success(let analysis):
+                aiResult = analysis
+                if let index = shaList.firstIndex(where: { $0.id == analysis.shaID }) {
+                    selectedShaIndex = index
+                    isAutoFollowingDirection = false
+                    // Vision coordinates are normalized to the captured frame;
+                    // map the selected region into the draggable target overlay.
+                    targetOffset = CGSize(width: (analysis.targetX - 0.5) * 400.0,
+                                          height: (analysis.targetY - 0.5) * 250.0)
+                }
+            case .failure(let error):
+                if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,
+                   case .noDetectableRegion = analysisError {
+                    aiError = lang.t("ar_ai_no_region")
+                } else {
+                    aiError = lang.t("ar_ai_failed")
+                }
+            }
+        }
+    }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
-    private func captureAndSaveSnapshot(baseImage: UIImage?) {
+    private func captureAndSaveSnapshot(baseImage: UIImage) {
         let size = CGSize(width: 1080, height: 1920)
         let renderer = UIGraphicsImageRenderer(size: size)
         
@@ -592,22 +863,17 @@ public struct ARVisionView: View {
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
             
-            // 相机帧作为底图；无相机权限或模拟器中使用可辨识的深色回退底图。
-            if let baseImage = baseImage {
-                let imageSize = baseImage.size
-                let fillScale = max(size.width / imageSize.width, size.height / imageSize.height)
-                let drawSize = CGSize(width: imageSize.width * fillScale, height: imageSize.height * fillScale)
-                let drawRect = CGRect(
-                    x: (size.width - drawSize.width) / 2,
-                    y: (size.height - drawSize.height) / 2,
-                    width: drawSize.width,
-                    height: drawSize.height
-                )
-                baseImage.draw(in: drawRect)
-            } else {
-                cg.setFillColor(UIColor(red: 18/255.0, green: 18/255.0, blue: 24/255.0, alpha: 1.0).cgColor)
-                cg.fill(CGRect(origin: .zero, size: size))
-            }
+            // Only a real camera frame can become an on-site proof image.
+            let imageSize = baseImage.size
+            let fillScale = max(size.width / imageSize.width, size.height / imageSize.height)
+            let drawSize = CGSize(width: imageSize.width * fillScale, height: imageSize.height * fillScale)
+            let drawRect = CGRect(
+                x: (size.width - drawSize.width) / 2,
+                y: (size.height - drawSize.height) / 2,
+                width: drawSize.width,
+                height: drawSize.height
+            )
+            baseImage.draw(in: drawRect)
 
             // HUD 在相机帧上保持可读性。
             cg.setFillColor(UIColor.black.withAlphaComponent(0.12).cgColor)
@@ -684,14 +950,46 @@ public struct ARVisionView: View {
             ])
         }
         
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        withAnimation {
-            showSnapshotToast = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            withAnimation {
-                showSnapshotToast = false
+        saveSnapshotToPhotoLibrary(image)
+    }
+
+    private func saveSnapshotToPhotoLibrary(_ image: UIImage) {
+        photoPermissionDenied = false
+        let save: () -> Void = {
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                DispatchQueue.main.async {
+                    if !success {
+                        aiError = error?.localizedDescription ?? lang.t("save_failed")
+                        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+                        photoPermissionDenied = status == .denied || status == .restricted
+                    }
+                    withAnimation { showSnapshotToast = success }
+                    if success {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                            withAnimation { showSnapshotToast = false }
+                        }
+                    }
+                }
             }
+        }
+        switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+        case .authorized, .limited:
+            save()
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                if status == .authorized || status == .limited { save() }
+                else {
+                    DispatchQueue.main.async {
+                        aiError = lang.t("save_failed")
+                        photoPermissionDenied = true
+                    }
+                }
+            }
+        default:
+            aiError = lang.t("save_failed")
+            photoPermissionDenied = true
         }
     }
 }
@@ -736,7 +1034,7 @@ public struct ShaRemedyDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(LocalizationManager.shared.t("ar_classic_lore"))
                             .font(.system(size: 15, weight: .bold))
-                        Text(sha.classicalText)
+                        Text(sha.localizedClassicalText)
                             .font(.system(size: 13, weight: .medium, design: .serif))
                             .foregroundColor(.yanBrown)
                             .padding(10)

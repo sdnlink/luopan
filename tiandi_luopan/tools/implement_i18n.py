@@ -91,7 +91,7 @@ def implement():
         const I18N_RESOURCES = {
             'zh-Hans': {
                 langName: '简体中文',
-                title: '演象 · 时空罗盘',
+                title: '天机演象',
                 crosshairHint: '🎯 十字天心瞄准 · 坐向同论 (正前▲向 · 正后▼坐)',
                 tabPost: '后天八卦',
                 tabPre: '先天八卦',
@@ -168,7 +168,7 @@ def implement():
             },
             'zh-Hant': {
                 langName: '繁體中文',
-                title: '演象 · 時空羅盤',
+                title: '天機演象',
                 crosshairHint: '🎯 十字天心瞄準 · 坐向同論 (正前▲向 · 正後▼坐)',
                 tabPost: '後天八卦',
                 tabPre: '先天八卦',
@@ -245,7 +245,7 @@ def implement():
             },
             'en': {
                 langName: 'English',
-                title: 'YanXiang · Space-Time Compass',
+                title: 'TianJi YanXiang',
                 crosshairHint: '🎯 Crosshair Align · Front▲ Facing · Back▼ Sitting',
                 tabPost: 'Later Bagua',
                 tabPre: 'Earlier Bagua',

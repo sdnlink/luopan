@@ -21,11 +21,11 @@ public struct LayerSettingsSheet: View {
                                     layers.applyPreset(preset)
                                 }) {
                                     Text(preset.localizedTitle)
-                                        .font(.system(size: 13, weight: layers.currentPreset == preset ? .bold : .medium))
+                                        .font(.system(size: 13, weight: layers.activePreset == preset ? .bold : .medium))
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
-                                        .background(layers.currentPreset == preset ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.08))
-                                        .foregroundColor(layers.currentPreset == preset ? .black : .white)
+                                        .background(layers.activePreset == preset ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.08))
+                                        .foregroundColor(layers.activePreset == preset ? .black : .white)
                                         .cornerRadius(8)
                                 }
                             }

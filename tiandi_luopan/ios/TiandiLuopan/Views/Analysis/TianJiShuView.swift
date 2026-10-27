@@ -1,4 +1,6 @@
 import SwiftUI
+import Photos
+import UIKit
 
 // MARK: - 福宅天机宣纸勘测长卷预览与导出视图 (TianJiShu View - PRD 第14章)
 
@@ -11,8 +13,12 @@ public struct TianJiShuView: View {
     @State private var scrollImage: UIImage? = nil
     @State private var isGenerating: Bool = true
     @State private var showSavedToast: Bool = false
+    @State private var saveErrorMessage: String?
+    @State private var showSaveError: Bool = false
+    @State private var showPhotoSettings: Bool = false
     @State private var showShareSheet: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var isExporting: Bool = false
     
     public init() {}
     
@@ -65,7 +71,7 @@ public struct TianJiShuView: View {
                                 VIPLockCardView(
                                     title: lang.t("tianji_vip_card_title"),
                                     featureDesc: lang.t("tianji_vip_card_desc"),
-                                    badge: lang.t("tianji_vip_badge"),
+                                    badge: "\(lang.t("tianji_vip_badge")) · \(iap.localizedPrice(for: .tianjiSingle))",
                                     targetProductId: .tianjiSingle,
                                     onUnlockTap: { showPaywall = true }
                                 )
@@ -73,23 +79,36 @@ public struct TianJiShuView: View {
                             
                             HStack(spacing: 12) {
                                 Button(action: {
+                                    guard !isExporting else { return }
                                     if !iap.canUseTianji {
                                         showPaywall = true
                                         return
                                     }
-                                    _ = iap.consumeTianjiCredit()
-                                    TianJiShuEngine.shared.saveToPhotoLibrary(image: img) { success, _ in
+                                    isExporting = true
+                                    TianJiShuEngine.shared.saveToPhotoLibrary(image: img) { success, message in
+                                        isExporting = false
                                         if success {
+                                            _ = iap.consumeTianjiCredit()
                                             withAnimation { showSavedToast = true }
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                                                 withAnimation { showSavedToast = false }
                                             }
+                                        } else {
+                                            saveErrorMessage = message ?? lang.t("save_failed")
+                                            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+                                            showPhotoSettings = status == .denied || status == .restricted
+                                            showSaveError = true
                                         }
                                     }
                                 }) {
                                     HStack {
-                                        Image(systemName: "square.and.arrow.down.fill")
-                                        Text(lang.t("save_to_photos"))
+                                        if isExporting {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                        } else {
+                                            Image(systemName: "square.and.arrow.down.fill")
+                                        }
+                                        Text(isExporting ? lang.t("exporting") : lang.t("save_to_photos"))
                                     }
                                     .font(.system(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
@@ -104,13 +123,15 @@ public struct TianJiShuView: View {
                                     .foregroundColor(.black)
                                     .cornerRadius(10)
                                 }
+                                .disabled(isExporting)
                                 
                                 Button(action: {
+                                    guard !isExporting else { return }
                                     if !iap.canUseTianji {
                                         showPaywall = true
                                         return
                                     }
-                                    _ = iap.consumeTianjiCredit()
+                                    isExporting = true
                                     showShareSheet = true
                                 }) {
                                     HStack {
@@ -124,6 +145,7 @@ public struct TianJiShuView: View {
                                     .foregroundColor(.white)
                                     .cornerRadius(10)
                                 }
+                                .disabled(isExporting)
                             }
                         }
                         .padding(.horizontal, 16)
@@ -166,11 +188,35 @@ public struct TianJiShuView: View {
             }
             .sheet(isPresented: $showShareSheet) {
                 if let img = scrollImage {
-                    TianJiActivityViewController(activityItems: [img])
+                    TianJiActivityViewController(activityItems: [img]) { completed in
+                        isExporting = false
+                        if completed {
+                            _ = iap.consumeTianjiCredit()
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $showPaywall) {
                 VIPPaywallSheet(defaultProductId: .tianjiSingle)
+            }
+            .alert(isPresented: $showSaveError) {
+                if showPhotoSettings {
+                    return Alert(
+                        title: Text(lang.t("save_failed")),
+                        message: Text(saveErrorMessage ?? lang.t("save_failed")),
+                        primaryButton: .default(Text(lang.t("open_system_settings"))) {
+                            guard let url = URL(string: UIApplication.openSettingsURLString),
+                                  UIApplication.shared.canOpenURL(url) else { return }
+                            UIApplication.shared.open(url)
+                        },
+                        secondaryButton: .cancel(Text(lang.t("done")))
+                    )
+                }
+                return Alert(
+                    title: Text(lang.t("save_failed")),
+                    message: Text(saveErrorMessage ?? lang.t("save_failed")),
+                    dismissButton: .default(Text(lang.t("done")))
+                )
             }
         }
     }
@@ -180,9 +226,24 @@ public struct TianJiShuView: View {
 public struct TianJiActivityViewController: UIViewControllerRepresentable {
     public var activityItems: [Any]
     public var applicationActivities: [UIActivity]? = nil
+    public var onCompletion: ((Bool) -> Void)? = nil
 
     public func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+        // UIActivityViewController is a popover on iPad. Supplying an anchor
+        // prevents a presentation exception when the report is shared there.
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(x: controller.view.bounds.midX,
+                                        y: controller.view.bounds.midY,
+                                        width: 1,
+                                        height: 1)
+            popover.permittedArrowDirections = []
+        }
+        controller.completionWithItemsHandler = { _, completed, _, _ in
+            onCompletion?(completed)
+        }
+        return controller
     }
 
     public func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

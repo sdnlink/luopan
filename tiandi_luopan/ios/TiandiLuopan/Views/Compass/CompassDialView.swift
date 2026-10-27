@@ -9,6 +9,7 @@ public struct CompassDialView: View {
     
     // 手势与缩放状态
     @State private var dragStartAngle: Double = 0.0
+    @State private var hasDragStart: Bool = false
     @State private var currentDragDelta: Double = 0.0
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
@@ -71,12 +72,16 @@ public struct CompassDialView: View {
                 crosshairLayer(size: size)
                 
                 // 3. 地理真北金针 (根据当地磁偏角偏转，双指针系统)
-                if layers.showTrueNorthNeedle {
+                if layers.showTrueNorthNeedle && motion.hasDeclination {
                     trueNorthNeedleLayer(radius: radius * 0.28)
                 }
                 
                 // 4. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
                 magneticNeedleLayer(radius: radius * 0.26)
+                    // The needle is drawn in the fixed screen coordinate
+                    // space, so it must follow the physical magnetic-north
+                    // bearing while the dial card rotates underneath it.
+                    .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset))
                 
                 // 5. 天池中央水平仪双轴气泡 (Level Bubble)
                 if layers.showLevelBubble {
@@ -93,15 +98,22 @@ public struct CompassDialView: View {
                     .onChanged { value in
                         let location = value.location
                         let angle = atan2(location.y - center.y, location.x - center.x) * 180 / .pi
-                        if dragStartAngle == 0 {
+                        if !hasDragStart {
                             dragStartAngle = angle
+                            hasDragStart = true
                         } else {
-                            currentDragDelta = (angle - dragStartAngle)
+                            var delta = angle - dragStartAngle
+                            if delta > 180 { delta -= 360 }
+                            if delta < -180 { delta += 360 }
+                            currentDragDelta = delta
                         }
                     }
                     .onEnded { _ in
-                        motion.applyManualDragDelta(degrees: currentDragDelta)
+                        if hasDragStart {
+                            motion.applyManualDragDelta(degrees: currentDragDelta)
+                        }
                         dragStartAngle = 0
+                        hasDragStart = false
                         currentDragDelta = 0
                     }
             )
@@ -184,11 +196,11 @@ public struct CompassDialView: View {
     private func solarTermsLayer(radius: CGFloat) -> some View {
         ForEach(SolarTermsData.shared.terms) { term in
             VStack(spacing: 0) {
-                Text(term.name)
+                Text(term.localizedName)
                     .font(.system(size: 7, weight: term.isMajorTerm ? .bold : .regular))
                     .foregroundColor(term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65))
-                if let hex = term.hexagramName {
-                    Text(hex.prefix(1))
+                if let hex = term.localizedHexagramLabel {
+                    Text(hex)
                         .font(.system(size: 6, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
@@ -201,7 +213,7 @@ public struct CompassDialView: View {
     // MARK: - 六十四卦分金环
     private func hexagramsLayer(radius: CGFloat) -> some View {
         ForEach(hexagrams) { hex in
-            Text(hex.name.prefix(2))
+            Text(hex.localizedName.prefix(2))
                 .font(.system(size: 7, weight: .semibold, design: .serif))
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
                 .offset(y: -radius + 8)
@@ -226,10 +238,10 @@ public struct CompassDialView: View {
             let isMainBranch = m.isCardinalOrCorner
             
             VStack(spacing: 1) {
-                Text(m.name)
+                Text(m.localizedName)
                     .font(.system(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif))
                     .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
-                Text(m.element)
+                Text(m.localizedElement)
                     .font(.system(size: 7, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.5))
             }
@@ -363,7 +375,10 @@ public struct CompassDialView: View {
                 .foregroundColor(Color.black)
                 .offset(y: -radius * 0.72)
         }
-        .rotationEffect(.degrees(motion.currentDeclination))
+        // True north is the magnetic bearing corrected by east-positive
+        // declination.  In screen coordinates that correction is clockwise
+        // negative, matching the web compass and Core Location's trueHeading.
+        .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - motion.currentDeclination))
         .allowsHitTesting(false)
     }
     

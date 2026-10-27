@@ -27,11 +27,11 @@ public struct CompassHeaderView: View {
                 // 坐向与二十四山
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("\(state.sittingMountain.name)\(lang.t("mountain_suffix"))\(state.facingMountain.name)\(lang.t("facing_suffix"))")
+                    Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix"))")
                             .font(.system(size: 18, weight: .bold, design: .serif))
                             .foregroundColor(.white)
                         
-                        Text(state.facingMountain.palace + lang.t("palace_suffix"))
+                        Text(state.facingMountain.localizedPalace + lang.t("palace_suffix"))
                             .font(.system(size: 11, weight: .semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)

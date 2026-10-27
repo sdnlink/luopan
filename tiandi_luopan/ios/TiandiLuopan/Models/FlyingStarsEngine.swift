@@ -8,6 +8,7 @@ public struct PalaceCell: Identifiable {
     public let trigram: String
     public let direction: String
     public let periodStar: Int    // 当运星
+    public let activePeriod: Int  // 当前排盘所选元运，用于动态判断当令星
     public let mountainStar: Int  // 山星 (坐星)
     public let facingStar: Int    // 向星 (向星)
     public let isCenter: Bool     // 是否中宫
@@ -27,13 +28,59 @@ public struct PalaceCell: Identifiable {
         default: return "土"
         }
     }
+
+    public var localizedElement: String {
+        guard LocalizationManager.shared.effectiveLanguage == .en else { return element }
+        switch element {
+        case "水": return "Water"
+        case "木": return "Wood"
+        case "火": return "Fire"
+        case "土": return "Earth"
+        case "金": return "Metal"
+        default: return element
+        }
+    }
+
+    public var localizedEvaluation: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            if mountainStar == activePeriod && facingStar == activePeriod { return "Double Current Stars · Wealth and people prosper" }
+            if facingStar == activePeriod { return "Current Wealth Star at Facing · Open and receive qi" }
+            if mountainStar == activePeriod { return "Current Mountain Star returns · People prosper" }
+            if isShaWuHuang || isShaErHei { return "Five Yellow and Two Black clash · Calm and use Metal remedy" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "One–Six harmony · Clear Water and Wood nourish Wenchang" }
+            return "Mixed fortune · Balanced position"
+        }
+        if lang == .zhHant {
+            if mountainStar == activePeriod && facingStar == activePeriod { return "當運雙星會聚 · 財丁兩旺" }
+            if facingStar == activePeriod { return "當旺財星照臨 · 宜開門納氣" }
+            if mountainStar == activePeriod { return "當運丁星歸位 · 人丁興旺" }
+            if isShaWuHuang || isShaErHei { return "五黃二黑交加 · 宜靜安銅化解" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "一六共宗 · 水清木秀催文昌" }
+            return "吉凶相參 · 平和之位"
+        }
+        return evaluation
+    }
+
+    public var localizedPalaceName: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en { return palaceName }
+        if lang == .zhHant {
+            return palaceName
+                .replacingOccurrences(of: "东", with: "東")
+                .replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "离", with: "離")
+                .replacingOccurrences(of: "宫", with: "宮")
+        }
+        return palaceName
+    }
     
     public var evaluation: String {
-        if mountainStar == 9 && facingStar == 9 {
-            return "九运双星会向 · 财源广聚"
-        } else if facingStar == 9 {
+        if mountainStar == activePeriod && facingStar == activePeriod {
+            return "当运双星会聚 · 财丁两旺"
+        } else if facingStar == activePeriod {
             return "当旺财星照临 · 宜开门纳气"
-        } else if mountainStar == 9 {
+        } else if mountainStar == activePeriod {
             return "当运丁星归位 · 人丁兴旺"
         } else if isShaWuHuang || isShaErHei {
             return "五黄二黑交加 · 宜静安铜化解"
@@ -77,17 +124,14 @@ public final class FlyingStarsEngine {
     
     // 历法推算当前所处三元九运 (以公元1864年甲子上元一运为基准，180年为一大元，20年为一运)
     public func currentPeriod(for date: Date = Date()) -> Int {
-        let calendar = Calendar(identifier: .gregorian)
-        let year = calendar.component(.year, from: date)
-        let offset = year - 1864
+        let offset = effectiveSolarYear(for: date) - 1864
         let cycleYear = (offset % 180 + 180) % 180
         return (cycleYear / 20) + 1
     }
     
     // 获取指定运数的完整天文学与干支历法信息 (根据给定日期所属的180年大周期推导对应年限区间)
     public func periodMeta(period: Int, for date: Date = Date()) -> PeriodMeta {
-        let calendar = Calendar(identifier: .gregorian)
-        let year = calendar.component(.year, from: date)
+        let year = effectiveSolarYear(for: date)
         let curPeriod = currentPeriod(for: date)
         
         let p = max(1, min(9, period))
@@ -178,6 +222,19 @@ public final class FlyingStarsEngine {
             isCurrent: isCur,
             label: label
         )
+    }
+
+    /// The Xuan Kong period changes at Li Chun, rather than on January 1.
+    private func effectiveSolarYear(for date: Date) -> Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
+        // January always belongs to the previous Xuan Kong year. In February
+        // use the astronomical Li Chun bucket, avoiding a fixed Feb 4 cutoff.
+        let beforeLiChun = month < 2 || (month == 2 && termIndex < 2)
+        return beforeLiChun ? year - 1 : year
     }
     
     // 九宫罗书飞布轨迹顺飞步进 (中5 -> 乾6 -> 兑7 -> 艮8 -> 离9 -> 坎1 -> 坤2 -> 震3 -> 巽4)
@@ -300,6 +357,7 @@ public final class FlyingStarsEngine {
                 trigram: trigramStr,
                 direction: palaceDirections[i],
                 periodStar: basePeriod[i],
+                activePeriod: activePeriod,
                 mountainStar: mountainStars[i],
                 facingStar: facingStars[i],
                 isCenter: i == 4,

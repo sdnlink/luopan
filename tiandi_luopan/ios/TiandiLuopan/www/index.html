@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="演象罗盘">
+    <meta name="apple-mobile-web-app-title" content="天机演象">
     <meta name="format-detection" content="telephone=no">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <link rel="manifest" href="manifest.json">
-    <title>易学天地综合时空罗盘</title>
+    <title>天机演象</title>
     <style>
         * {
             box-sizing: border-box;
@@ -2323,7 +2323,7 @@
                                 showGoldToast('🧭 iPhone 硬件罗盘传感器已成功激活！');
                             }
                         } else {
-                            alert('未能获得方向传感器权限。您可直接在屏幕上单指触控划动盘面立向！');
+                            localizedAlert('未能获得方向传感器权限。您可直接在屏幕上单指触控划动盘面立向！','未能取得方向感測器權限。您可直接在螢幕上單指觸控滑動盤面立向！','Heading sensor permission was not granted. You can drag the dial with one finger to set a facing.');
                         }
                     })
                     .catch(function(err) {
@@ -2399,7 +2399,7 @@
     </script>
 
     <div class="header-section">
-        <h1 class="main-title">演象 · 时空罗盘</h1>
+        <h1 class="main-title">天机演象</h1>
         <div class="subtitle" id="header-status-line">
             <span id="now-time" style="color:#e74c3c;font-weight:bold">--:--</span>
             <span class="status-sep">·</span>
@@ -2556,7 +2556,7 @@
                 <div class="pay-channel-item selected" id="pay-ch-applepay" onclick="selectPayChannel('applepay')">
                     <div class="pay-channel-icon" style="background:rgba(255,255,255,0.15); color:#fff; font-size: 20px;"></div>
                     <div class="pay-channel-info">
-                        <div class="pay-channel-name">Apple Pay / App Store 官方内购 <span class="channel-badge-hot">官方保障</span></div>
+                        <div class="pay-channel-name">App Store 官方内购 <span class="channel-badge-hot">官方保障</span></div>
                         <div class="pay-channel-sub">通过您的 Apple ID 账户进行安全扣款，支持面容/指纹极速确认</div>
                     </div>
                 </div>
@@ -2565,7 +2565,7 @@
             <!-- Apple 官方安全支付大按钮 -->
             <button class="iap-btn-applepay" id="btn-iap-submit" onclick="executeApplePurchase()">
                 <span id="iap-btn-icon"></span>
-                <span id="iap-btn-label">立即通过 Apple Pay 安全支付</span>
+                <span id="iap-btn-label">立即通过 App Store 安全支付</span>
                 <span id="iap-btn-price">¥198</span>
             </button>
 
@@ -4098,7 +4098,7 @@
             if (btn) {
                 btn.disabled = true;
                 btn.style.opacity = '0.7';
-                btn.innerHTML = '<span> 正在呼起 Apple 安全支付…</span>';
+                btn.innerHTML = '<span> 正在呼起 App Store 安全支付…</span>';
             }
 
             if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
@@ -4108,15 +4108,13 @@
                     productId: pid
                 });
             } else {
-                // Web 调试 / 本机体验环境 (友好模拟 Apple Pay 成功)
-                setTimeout(() => {
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.style.opacity = '1';
-                        btn.innerHTML = '<span> 立即通过 Apple 安全支付</span> <span id="iap-btn-price">¥198</span>';
-                    }
-                    simulateWebPurchaseSuccess(pid);
-                }, 800);
+                // 数字商品必须经过 Apple StoreKit；网页环境不得伪造购买成功。
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    btn.innerHTML = '<span> 立即通过 App Store 安全支付</span> <span id="iap-btn-price">¥198</span>';
+                }
+                localizedAlert('请在 iOS 原生 App 中完成 App Store 内购。','請在 iOS 原生 App 中完成 App Store 內購。','Complete the purchase through the App Store in the native iOS app.');
             }
         }
 
@@ -4125,34 +4123,7 @@
             if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
                 window.webkit.messageHandlers.iOSCompass.postMessage({ action: "iap_restore" });
             } else {
-                alert('已成功同步并恢复您的 App Store 购买记录！');
-            }
-        }
-
-        // Web 模拟购买成功 (开发调试便利)
-        function simulateWebPurchaseSuccess(pid) {
-            if (pid === 'com.yanxiang.luopan.pro.lifetime') {
-                userIAPStatus.isLifetime = true;
-                userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.luopan.vip.yearly') {
-                userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.luopan.floorplan.single') {
-                userIAPStatus.floorplanCredits = (userIAPStatus.floorplanCredits || 0) + 1;
-            } else if (pid === 'com.yanxiang.luopan.tianji.single') {
-                userIAPStatus.tianjiCredits = (userIAPStatus.tianjiCredits || 0) + 1;
-            }
-            try {
-                localStorage.setItem('yx_iap_status', JSON.stringify(userIAPStatus));
-            } catch(e) {}
-            
-            closeIAPModal();
-            refreshIAPUI();
-            alert('🎉 恭喜！Apple In-App Purchase 支付成功，尊享权益已立即生效！');
-
-            if (pendingActionAfterPurchase) {
-                const action = pendingActionAfterPurchase;
-                pendingActionAfterPurchase = null;
-                action();
+                localizedAlert('请在 iOS 原生 App 中恢复 App Store 购买记录。','請在 iOS 原生 App 中恢復 App Store 購買記錄。','Restore App Store purchases in the native iOS app.');
             }
         }
 
@@ -4175,7 +4146,7 @@
             if (btn) {
                 btn.disabled = false;
                 btn.style.opacity = '1';
-                btn.innerHTML = '<span> 立即通过 Apple 安全支付</span> <span id="iap-btn-price">¥198</span>';
+                btn.innerHTML = '<span> 立即通过 App Store 安全支付</span> <span id="iap-btn-price">¥198</span>';
             }
             if (pid === 'com.yanxiang.luopan.pro.lifetime') {
                 userIAPStatus.isLifetime = true;
@@ -4193,7 +4164,7 @@
             
             closeIAPModal();
             refreshIAPUI();
-            alert('🎉 感谢开通！Apple In-App Purchase 交易成功，尊享权益已激活！');
+            localizedAlert('🎉 感谢开通！Apple In-App Purchase 交易成功，尊享权益已激活！','🎉 感謝開通！Apple In-App Purchase 交易成功，尊享權益已啟用！','🎉 Purchase complete! Your Apple In-App Purchase entitlements are active.');
 
             if (pendingActionAfterPurchase) {
                 const action = pendingActionAfterPurchase;
@@ -4207,15 +4178,15 @@
             if (btn) {
                 btn.disabled = false;
                 btn.style.opacity = '1';
-                btn.innerHTML = '<span> 立即通过 Apple 安全支付</span> <span id="iap-btn-price">¥198</span>';
+                btn.innerHTML = '<span> 立即通过 App Store 安全支付</span> <span id="iap-btn-price">¥198</span>';
             }
             if (errorMsg && !errorMsg.includes('取消')) {
-                alert('支付未完成: ' + errorMsg);
+                localizedAlert('支付未完成: ' + errorMsg, '支付未完成：' + errorMsg, 'Payment incomplete: ' + errorMsg);
             }
         };
 
         window.onNativeIAPRestoreSuccess = function(productIds) {
-            alert('🎉 恢复购买成功！已找回您绑定的 Apple 权益。');
+            localizedAlert('🎉 恢复购买成功！已找回您绑定的 Apple 权益。','🎉 恢復購買成功！已找回您綁定的 Apple 權益。','🎉 Purchases restored. Your Apple entitlements have been recovered.');
             refreshIAPUI();
         };
 
@@ -4229,7 +4200,7 @@
 
         
         // =======================================================
-        // 官方收银台：仅采用 Apple StoreKit / Apple Pay 官方支付
+        // 官方收银台：仅采用 Apple StoreKit 官方支付
         // 严格遵循 App Store 审核准则 3.1.1，杜绝任何第三方支付渠道
         // =======================================================
         let selectedPayChannel = 'applepay';
@@ -4245,7 +4216,7 @@
             const currencyHint = document.getElementById('iap-currency-hint');
 
             if (btnIcon) btnIcon.innerText = '';
-            if (btnLabel) btnLabel.innerText = '立即通过 Apple Pay 安全支付';
+            if (btnLabel) btnLabel.innerText = '立即通过 App Store 安全支付';
             if (currencyHint) currencyHint.innerText = '通过 Apple ID 官方内购扣款';
         }
 
@@ -4266,7 +4237,7 @@
         const I18N_RESOURCES = {
             'zh-Hans': {
                 langName: '简体中文',
-                title: '演象 · 时空罗盘',
+                title: '天机演象',
                 crosshairHint: '🎯 十字天心瞄准 · 坐向同论 (正前▲向 · 正后▼坐)',
                 tabPost: '后天八卦',
                 tabPre: '先天八卦',
@@ -4349,7 +4320,7 @@
             },
             'zh-Hant': {
                 langName: '繁體中文',
-                title: '演象 · 時空羅盤',
+                title: '天機演象',
                 crosshairHint: '🎯 十字天心瞄準 · 坐向同論 (正前▲向 · 正後▼坐)',
                 tabPost: '後天八卦',
                 tabPre: '先天八卦',
@@ -4432,7 +4403,7 @@
             },
             'en': {
                 langName: 'English',
-                title: 'YanXiang · Space-Time Compass',
+                title: 'TianJi YanXiang',
                 crosshairHint: '🎯 Crosshair Align · Front▲ Facing · Back▼ Sitting',
                 tabPost: 'Later Bagua',
                 tabPre: 'Earlier Bagua',
@@ -4518,6 +4489,11 @@
         // 当前应用语言配置
         let appLanguageSetting = 'auto'; // 'auto' | 'zh-Hans' | 'zh-Hant' | 'en'
         let currentEffectiveLang = 'zh-Hans';
+
+        function localizedAlert(zhHans, zhHant, en) {
+            const lang = typeof currentEffectiveLang === 'string' ? currentEffectiveLang : 'zh-Hans';
+            alert(lang === 'en' ? en : (lang === 'zh-Hant' ? zhHant : zhHans));
+        }
         window.__nativeSystemLanguage = '';
 
         try {
@@ -6511,6 +6487,7 @@
         let arFacingMode = 'environment';
         let fpImage = null;
         let fpCentroid = { x: 300, y: 300 };
+        let floorplanAccessGranted = false;
         let isDraggingCentroid = false;
         let userBirthYear = 1990;
         let userGender = 'male';
@@ -6531,6 +6508,7 @@
 
         function switchAppTab(tabName) {
             if (activeTab === tabName) return;
+            if (tabName === 'floorplan' && !ensureFloorplanAccess()) return;
             activeTab = tabName;
             document.querySelectorAll('.app-view').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -6983,7 +6961,7 @@
                 if (typeof showGoldToast === 'function') {
                     showGoldToast('⚡ AI形煞扫描完毕：向首右前 22° 锁定火形壁刀煞 (置信度 96.8%)');
                 } else {
-                    alert('AI形煞扫描完毕：向首右前方 22° 锁定火形壁刀煞');
+                    localizedAlert('AI形煞扫描完毕：向首右前方 22° 锁定火形壁刀煞','AI形煞掃描完畢：向首右前方 22° 鎖定火形壁刀煞','AI scan complete: Fire-Shape Wall Blade Sha locked 22° to the right of the facing.');
                 }
             }, 1800);
         }
@@ -7170,7 +7148,25 @@
     
 
         // ========== 户型空间立极模块 ==========
+        function ensureFloorplanAccess() {
+            if (userIAPStatus.isVIP || userIAPStatus.isLifetime || floorplanAccessGranted) return true;
+            if (userIAPStatus.floorplanCredits > 0) {
+                userIAPStatus.floorplanCredits -= 1;
+                floorplanAccessGranted = true;
+                try { localStorage.setItem('yx_iap_status', JSON.stringify(userIAPStatus)); } catch(e) {}
+                refreshIAPUI();
+                return true;
+            }
+            pendingActionAfterPurchase = function() {
+                floorplanAccessGranted = false;
+                switchAppTab('floorplan');
+            };
+            openIAPModal('com.yanxiang.luopan.floorplan.single');
+            return false;
+        }
+
         function initFloorPlan() {
+            if (!ensureFloorplanAccess()) return;
             if (!fpImage) {
                 loadSampleFloorPlan();
             } else {
@@ -7227,6 +7223,7 @@
         }
 
         function handleFloorPlanUpload(event) {
+            if (!ensureFloorplanAccess()) return;
             const file = event.target.files && event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -7248,7 +7245,7 @@
 
         function syncFloorPlanWithCompass() {
             drawFloorPlan();
-            alert(`已同步罗盘当前坐向 (${Math.round(currentHeading)}°) 至户型空间！`);
+            localizedAlert(`已同步罗盘当前坐向 (${Math.round(currentHeading)}°) 至户型空间！`,`已同步羅盤當前坐向 (${Math.round(currentHeading)}°) 至戶型空間！`,`Compass facing (${Math.round(currentHeading)}°) synced to the floor plan.`);
         }
 
         function drawFloorPlan() {
@@ -8062,6 +8059,14 @@ ${lore}`);
         // ========== PRD 第14章：“福宅天机书”古典宣纸风排版出图引擎 ==========
         let lastGeneratedTianJiDataUrl = null;
 
+        function consumeTianJiExportCredit() {
+            if (!userIAPStatus.isVIP && userIAPStatus.tianjiCredits > 0) {
+                userIAPStatus.tianjiCredits -= 1;
+                try { localStorage.setItem('yx_iap_status', JSON.stringify(userIAPStatus)); } catch(e) {}
+                refreshIAPUI();
+            }
+        }
+
         function toggleTianJiModal(show) {
             const modal = document.getElementById('tianji-modal');
             if (modal) modal.style.display = show ? 'flex' : 'none';
@@ -8069,11 +8074,19 @@ ${lore}`);
 
         function saveTianJiShuToDevice() {
             if (!lastGeneratedTianJiDataUrl) return;
+            if (!userIAPStatus.isVIP && (!userIAPStatus.tianjiCredits || userIAPStatus.tianjiCredits <= 0)) {
+                openIAPModal('com.yanxiang.luopan.tianji.single');
+                return;
+            }
 
             // 1. 若运行在 Android 原生端，调用 Native 接口存入系统相册
             if (window.AndroidCompass && typeof window.AndroidCompass.saveImageToGallery === 'function') {
                 const ok = window.AndroidCompass.saveImageToGallery(lastGeneratedTianJiDataUrl);
-                if (ok) return;
+                if (ok) {
+                    consumeTianJiExportCredit();
+                    return;
+                }
+                return;
             }
 
             // 2. 浏览器与 iOS 环境下通过 <a> 标签下载或提示长按保存
@@ -8084,8 +8097,9 @@ ${lore}`);
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
+                consumeTianJiExportCredit();
             } catch(e) {
-                alert('长按图片即可保存至手机相册！');
+                localizedAlert('长按图片即可保存至手机相册！','長按圖片即可保存至手機相簿！','Long-press the image to save it to Photos.');
             }
         }
 
@@ -8138,13 +8152,6 @@ ${lore}`);
                 openIAPModal('com.yanxiang.luopan.tianji.single');
                 return;
             }
-            // 若使用单次额度，扣减 1 点
-            if (!userIAPStatus.isVIP && userIAPStatus.tianjiCredits > 0) {
-                userIAPStatus.tianjiCredits -= 1;
-                try { localStorage.setItem('yx_iap_status', JSON.stringify(userIAPStatus)); } catch(e) {}
-                refreshIAPUI();
-            }
-
             const heading = currentHeading;
             const m = getMountainFromHeading(heading);
             const sitDeg = (m.deg + 180) % 360;
@@ -8377,7 +8384,7 @@ ${lore}`);
                 toggleTianJiModal(true);
             } catch(e) {
                 console.error('generateTianJiShu error:', e);
-                alert('出图失败，请检查浏览器内存');
+                localizedAlert('出图失败，请检查浏览器内存','出圖失敗，請檢查瀏覽器記憶體','Export failed. Please check available browser memory.');
             }
         }
     

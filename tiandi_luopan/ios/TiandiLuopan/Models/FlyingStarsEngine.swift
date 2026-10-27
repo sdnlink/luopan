@@ -64,7 +64,17 @@ public struct PalaceCell: Identifiable {
 
     public var localizedPalaceName: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        if lang == .en { return palaceName }
+        if lang == .en {
+            let directionMap = [
+                "正北": "North", "西南": "Southwest", "正东": "East", "东南": "Southeast",
+                "中宫": "Center", "西北": "Northwest", "正西": "West", "东北": "Northeast", "正南": "South"
+            ]
+            var result = palaceName
+            for (source, localized) in directionMap {
+                result = result.replacingOccurrences(of: source, with: localized)
+            }
+            return result
+        }
         if lang == .zhHant {
             return palaceName
                 .replacingOccurrences(of: "东", with: "東")

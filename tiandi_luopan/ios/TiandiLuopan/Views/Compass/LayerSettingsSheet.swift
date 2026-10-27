@@ -50,8 +50,8 @@ public struct LayerSettingsSheet: View {
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationBarTitle("罗盘图层管理", displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarTitle(LocalizationManager.shared.t("layers_settings"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }

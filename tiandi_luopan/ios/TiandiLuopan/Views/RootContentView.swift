@@ -10,6 +10,7 @@ extension Color {
 
 public struct RootContentView: View {
     @StateObject private var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedTab: Int = 0
     
     public init() {
@@ -38,7 +39,7 @@ public struct RootContentView: View {
             CompassMainView()
                 .tabItem {
                     Image(systemName: "safari.fill")
-                    Text("时空罗盘")
+                    Text(lang.t("tab_compass"))
                 }
                 .tag(0)
             
@@ -46,7 +47,7 @@ public struct RootContentView: View {
             ARVisionView()
                 .tabItem {
                     Image(systemName: "camera.viewfinder")
-                    Text("全景形煞")
+                    Text(lang.t("tab_ar"))
                 }
                 .tag(1)
             
@@ -54,7 +55,7 @@ public struct RootContentView: View {
             FloorplanView()
                 .tabItem {
                     Image(systemName: "house.fill")
-                    Text("户型立极")
+                    Text(lang.t("tab_floorplan"))
                 }
                 .tag(2)
             
@@ -62,7 +63,7 @@ public struct RootContentView: View {
             XuanKongGridView()
                 .tabItem {
                     Image(systemName: "square.grid.3x3.fill")
-                    Text("玄空理气")
+                    Text(lang.t("tab_analysis"))
                 }
                 .tag(3)
             
@@ -70,7 +71,7 @@ public struct RootContentView: View {
             SettingsView()
                 .tabItem {
                     Image(systemName: "gearshape.fill")
-                    Text("系统设置")
+                    Text(lang.t("tab_settings"))
                 }
                 .tag(4)
         }

@@ -5,9 +5,9 @@ import SwiftUI
 public struct SettingsView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     @State private var showCalibrationGuide: Bool = false
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
-    @AppStorage("app_language") private var appLanguage: String = "zh-Hans"
     
     public init() {}
     
@@ -24,11 +24,11 @@ public struct SettingsView: View {
                         HStack {
                             Image(systemName: "crown.fill")
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                            Text("演象·时空罗盘 会员中心")
+                            Text(lang.t("vip_member_center"))
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.white)
                             Spacer()
-                            Text(isProUnlocked ? "VIP 尊享用户" : "标准用户")
+                            Text(isProUnlocked ? lang.t("vip_user") : lang.t("standard_user"))
                                 .font(.system(size: 11, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -97,13 +97,13 @@ public struct SettingsView: View {
                 }
                 
                 // 3. 专业罗盘与偏好设置
-                Section(header: Text("专业罗盘与偏好设置")) {
-                    Toggle("二十四山过界微触觉震感", isOn: $motion.isHapticEnabled)
+                Section(header: Text(lang.t("app_language"))) {
+                    Toggle(lang.t("haptic_feedback"), isOn: $motion.isHapticEnabled)
                     
-                    Picker("界面语言 (Language)", selection: $appLanguage) {
-                        Text("简体中文").tag("zh-Hans")
-                        Text("繁體中文").tag("zh-Hant")
-                        Text("English").tag("en")
+                    Picker(lang.t("app_language"), selection: $lang.currentSetting) {
+                        ForEach(AppLanguage.allCases) { item in
+                            Text(item.displayName).tag(item)
+                        }
                     }
                     
                     HStack {

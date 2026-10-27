@@ -53,6 +53,7 @@
 		1066 /* ZeRiEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2066 /* ZeRiEngine.swift */; };
 		1067 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2067 /* CalibrationSheet.swift */; };
 		1068 /* VIPPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2068 /* VIPPaywallSheet.swift */; };
+		1069 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2069 /* LocalizationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -104,6 +105,7 @@
 		2066 /* ZeRiEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ZeRiEngine.swift"; sourceTree = "<group>"; };
 		2067 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CalibrationSheet.swift"; sourceTree = "<group>"; };
 		2068 /* VIPPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/VIPPaywallSheet.swift"; sourceTree = "<group>"; };
+		2069 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/LocalizationManager.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -176,6 +178,7 @@
 				2066 /* ZeRiEngine.swift */,
 				2067 /* CalibrationSheet.swift */,
 				2068 /* VIPPaywallSheet.swift */,
+				2069 /* LocalizationManager.swift */,
 
 
 
@@ -312,6 +315,7 @@
 				1066 /* ZeRiEngine.swift in Sources */,
 				1067 /* CalibrationSheet.swift in Sources */,
 				1068 /* VIPPaywallSheet.swift in Sources */,
+				1069 /* LocalizationManager.swift in Sources */,
 
 
 

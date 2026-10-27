@@ -2301,8 +2301,7 @@
             const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost';
             if (!isSecure && window.location.hostname !== 'localhost') {
                 const targetHttps = 'https://' + window.location.hostname + ':8443' + window.location.pathname;
-                if (confirm('iOS Safari 苹果安全规范：
-硬件陀螺仪随向旋转与真实相机必须在 HTTPS 环境下运行。\n\n已为你启动了 HTTPS 安全模式，是否立即切换？\n\n（提示：切换后若提示证书未受信任，点击【显示详细信息】->【访问此网站】即可解锁真机硬件罗盘）')) {
+                if (confirm('iOS Safari 苹果安全规范：\\n硬件陀螺仪随向旋转与真实相机必须在 HTTPS 环境下运行。\\n\\n已为你启动了 HTTPS 安全模式，是否立即切换？\\n\\n（提示：切换后若提示证书未受信任，点击【显示详细信息】->【访问此网站】即可解锁真机硬件罗盘）')) {
                     window.location.href = targetHttps;
                     return;
                 }

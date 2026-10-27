@@ -31,6 +31,7 @@ public struct QimenPalaceCell: Identifiable {
     public let diStem: String        // 地盘天干
     public let isTaiJiCenter: Bool
     public let isDoorAuspicious: Bool
+    public var isDoorInauspicious: Bool { doorLuck.contains("凶") }
 }
 
 public struct QimenChart {

@@ -12,7 +12,8 @@ public struct CalibrationSheet: View {
     public init() {}
     
     public var body: some View {
-        ZStack {
+        let lang = LocalizationManager.shared
+        return ZStack {
             Color(red: 0.08, green: 0.08, blue: 0.11)
                 .ignoresSafeArea()
             
@@ -22,7 +23,7 @@ public struct CalibrationSheet: View {
                     HStack {
                         Image(systemName: "safari.fill")
                             .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                        Text("罗盘双针与地磁偏角校准")
+                        Text(lang.t("calib_sheet_title"))
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                         
@@ -41,23 +42,23 @@ public struct CalibrationSheet: View {
                     // 2. 传感器实时健康度指标卡
                     VStack(spacing: 10) {
                         statusRow(
-                            title: "传感器测量精度",
-                            value: motion.accuracyLevel >= 2 ? "✓ 极高 (已自动校准)" : "需轻晃校准",
+                            title: lang.t("calib_precision_title"),
+                            value: motion.accuracyLevel >= 2 ? lang.t("calib_precision_high") : lang.t("calib_precision_need"),
                             isOk: motion.accuracyLevel >= 2
                         )
                         
                         Divider().background(Color.white.opacity(0.1))
                         
                         statusRow(
-                            title: "环境磁场状态",
-                            value: motion.isDistorted ? "⚠️ 强磁干扰 (\(String(format: "%.1f", motion.magneticStrengthUT)) μT)" : "✓ 均匀正常 (\(String(format: "%.1f", motion.magneticStrengthUT)) μT)",
+                            title: lang.t("calib_env_mag_title"),
+                            value: motion.isDistorted ? "\(lang.t("calib_mag_distorted")) (\(String(format: "%.1f", motion.magneticStrengthUT)) μT)" : "\(lang.t("calib_mag_normal")) (\(String(format: "%.1f", motion.magneticStrengthUT)) μT)",
                             isOk: !motion.isDistorted
                         )
                         
                         Divider().background(Color.white.opacity(0.1))
                         
                         statusRow(
-                            title: "当前经纬坐标",
+                            title: lang.t("calib_coords_title"),
                             value: String(format: "%.4f°N, %.4f°E", motion.latitude, motion.longitude),
                             isOk: true,
                             customColor: Color.yanCyan
@@ -66,9 +67,9 @@ public struct CalibrationSheet: View {
                         Divider().background(Color.white.opacity(0.1))
                         
                         let decl = motion.currentDeclination
-                        let declStr = motion.hasDeclination ? String(format: "%@%.2f°", decl >= 0 ? "东偏 " : "西偏 ", abs(decl)) : "GPS测算中…"
+                        let declStr = motion.hasDeclination ? String(format: "%@%.2f°", decl >= 0 ? lang.t("calib_decl_east") : lang.t("calib_decl_west"), abs(decl)) : lang.t("calib_decl_calculating")
                         statusRow(
-                            title: "当地地磁偏角",
+                            title: lang.t("calib_declination_title"),
                             value: declStr,
                             isOk: true,
                             customColor: Color(red: 0.95, green: 0.82, blue: 0.4)
@@ -82,7 +83,7 @@ public struct CalibrationSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Text("🧭")
-                            Text("双针系统与易学考据")
+                            Text(lang.t("calib_dual_needle_section"))
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         }
@@ -90,7 +91,7 @@ public struct CalibrationSheet: View {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color.green).frame(width: 6, height: 6).padding(.top, 4)
-                                Text("绿色“磁”针：地磁北（地盘正针），物理磁场实测，传统立向格龙之准绳。")
+                                Text(lang.t("calib_magnetic_needle_desc"))
                                     .font(.system(size: 12))
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
@@ -98,7 +99,7 @@ public struct CalibrationSheet: View {
                             
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color(red: 0.95, green: 0.82, blue: 0.4)).frame(width: 6, height: 6).padding(.top, 4)
-                                Text("金色“真”针：地理真北（对应现代地图北向），经全球地磁模型(WMM)与GPS精确实时校正。")
+                                Text(lang.t("calib_true_needle_desc"))
                                     .font(.system(size: 12))
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
@@ -106,7 +107,7 @@ public struct CalibrationSheet: View {
                             
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color.yanCyan).frame(width: 6, height: 6).padding(.top, 4)
-                                Text("两针夹角：即为您所在地的真实地磁偏角。")
+                                Text(lang.t("calib_angle_desc"))
                                     .font(.system(size: 12))
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
@@ -126,10 +127,10 @@ public struct CalibrationSheet: View {
                                 .rotationEffect(.degrees(rotateDegree))
                             
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("传感器快速“8”字校准")
+                                Text(lang.t("calib_eight_quick"))
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(.white)
-                                Text("若遇指针微抖或强磁干扰，拿起手机在空中按“8”字形翻转挥动 2~3 次，内置地磁传感器将自动完成多轴空间偏移校正并恢复最佳精度。")
+                                Text(lang.t("calib_eight_desc"))
                                     .font(.system(size: 11))
                                     .foregroundColor(.white.opacity(0.75))
                                     .lineSpacing(2)
@@ -158,7 +159,7 @@ public struct CalibrationSheet: View {
                         }) {
                             HStack {
                                 Image(systemName: isCalibrating ? "arrow.2.circlepath" : "arrow.triangle.2.circlepath")
-                                Text(isCalibrating ? "正在校准地磁传感器…" : "重新校准传感器")
+                                Text(isCalibrating ? lang.t("calibrating_now") : lang.t("recalibrate_btn"))
                             }
                             .font(.system(size: 14, weight: .bold))
                             .frame(maxWidth: .infinity)
@@ -177,7 +178,7 @@ public struct CalibrationSheet: View {
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()
                         }) {
-                            Text("我知道了")
+                            Text(lang.t("i_know"))
                                 .font(.system(size: 13))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)

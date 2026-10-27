@@ -13,13 +13,14 @@ public struct QimenDunjiaView: View {
     public var body: some View {
         let chart = QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
         
-        VStack(spacing: 12) {
+        let lang = LocalizationManager.shared
+        return VStack(spacing: 12) {
             // 局数标题栏
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text("三式绝学 · 时家奇门遁甲全息排盘")
+                    Text(lang.t("qimen_header_title"))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
@@ -32,9 +33,9 @@ public struct QimenDunjiaView: View {
             
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
-                    title: "时家奇门全息排盘 · VIP 专享",
-                    featureDesc: "时家拆补定局、天心十道、九星八门八神三奇六仪转盘与大吉出行动身导航方向，属于高级风水师 VIP 专享绝学。",
-                    badge: "👑 VIP 绝学特权",
+                    title: lang.t("privilege_qimen_title"),
+                    featureDesc: lang.t("privilege_qimen_desc"),
+                    badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
                     onUnlockTap: { showPaywall = true }
                 )
@@ -55,22 +56,22 @@ public struct QimenDunjiaView: View {
                     HStack {
                         Image(systemName: "location.north.circle.fill")
                             .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                        Text("实地踏勘与出行吉方")
+                        Text(lang.t("qimen_travel_best"))
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                         Spacer()
-                        Text("玉女反闭局合德")
+                        Text(lang.t("qimen_pattern_best"))
                             .font(.system(size: 10))
                             .foregroundColor(.green)
                     }
                     
-                    Text("• 最佳动身方：大旺【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
+                    Text("\(lang.t("qimen_best_nav"))【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
                         .font(.system(size: 11))
                         .foregroundColor(Color.green)
                         .lineLimit(2)
                     
                     if !chart.tabooDirections.isEmpty {
-                        Text("• 避忌凶方：逢【\(chart.tabooDirections)】防阻滞惊恐，踏勘宜避开对冲。")
+                        Text("\(lang.t("qimen_taboo_nav"))【\(chart.tabooDirections)】\(lang.t("qimen_taboo_suffix"))")
                             .font(.system(size: 11))
                             .foregroundColor(Color.orange)
                             .lineLimit(2)
@@ -89,8 +90,8 @@ public struct QimenDunjiaView: View {
     }
     
     private func qimenCellView(cell: QimenPalaceCell) -> some View {
-        let isJi = cell.doorLuck == "吉" || cell.doorLuck == "大吉"
-        let isXiong = cell.doorLuck == "凶" || cell.doorLuck == "大凶"
+        let isJi = cell.isDoorAuspicious
+        let isXiong = cell.isDoorInauspicious
         let borderColor = isJi ? Color.green.opacity(0.5) : (isXiong ? Color.red.opacity(0.4) : Color.white.opacity(0.12))
         let bgColor = isJi ? Color.green.opacity(0.08) : (isXiong ? Color.red.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         

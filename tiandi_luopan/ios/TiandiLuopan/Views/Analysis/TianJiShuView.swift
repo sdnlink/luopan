@@ -28,7 +28,7 @@ public struct TianJiShuView: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.95, green: 0.85, blue: 0.45)))
                                 .scaleEffect(1.5)
-                            Text("正统古法宣纸长卷渲染中...")
+                            Text(lang.t("tianji_rendering"))
                                 .font(.system(size: 14))
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -46,7 +46,7 @@ public struct TianJiShuView: View {
                                 if !iap.canUseTianji {
                                     VStack(spacing: 60) {
                                         ForEach(0..<8, id: \.self) { _ in
-                                            Text("演象·天机秘卷 VIP专享预览")
+                                            Text(lang.t("tianji_vip_preview_watermark"))
                                                 .font(.system(size: 22, weight: .bold, design: .serif))
                                                 .foregroundColor(Color.red.opacity(0.2))
                                                 .rotationEffect(.degrees(-25))
@@ -63,9 +63,9 @@ public struct TianJiShuView: View {
                         VStack(spacing: 8) {
                             if !iap.canUseTianji {
                                 VIPLockCardView(
-                                    title: "宣纸长卷高清导出 · VIP 专享",
-                                    featureDesc: "一键汇总实测坐向、玄空飞星、八路黄泉、时家奇门与八宅命卦，出具古典宣纸朱丝栏大师全案无水印长卷。",
-                                    badge: "👑 VIP / 单次 ¥9.9",
+                                    title: lang.t("tianji_vip_card_title"),
+                                    featureDesc: lang.t("tianji_vip_card_desc"),
+                                    badge: lang.t("tianji_vip_badge"),
                                     targetProductId: .tianjiSingle,
                                     onUnlockTap: { showPaywall = true }
                                 )

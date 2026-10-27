@@ -33,7 +33,7 @@ public struct CompassMainView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(Color.orange)
-                            Text("监测到环境强磁干扰 (\(String(format: "%.0f", motion.magneticStrengthUT)) μT) · 点击校准")
+                            Text("\(lang.t("mag_warning_tap")) (\(String(format: "%.0f", motion.magneticStrengthUT)) μT) · \(lang.t("tap_to_calib"))")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             Spacer()
@@ -135,7 +135,7 @@ public struct CompassMainView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "safari.fill")
-                    Text("校准")
+                    Text(lang.t("btn_calib"))
                 }
                 .font(.system(size: 11, weight: .medium))
                 .padding(.horizontal, 6)
@@ -151,7 +151,7 @@ public struct CompassMainView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "square.3.layers.3d")
-                    Text("图层")
+                    Text(lang.t("btn_layers"))
                 }
                 .font(.system(size: 11, weight: .medium))
                 .padding(.horizontal, 8)
@@ -167,7 +167,7 @@ public struct CompassMainView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "square.grid.2x2")
-                    Text("八方全鉴")
+                    Text(lang.t("btn_palace_all"))
                 }
                 .font(.system(size: 11, weight: .medium))
                 .padding(.horizontal, 8)
@@ -208,7 +208,7 @@ public struct CompassMainView: View {
                     Spacer()
                     
                     HStack(spacing: 2) {
-                        Text("分金详勘")
+                        Text(lang.t("btn_fenjin_detail"))
                             .font(.system(size: 11))
                             .foregroundColor(Color.yanCyan)
                         Image(systemName: "chevron.right")

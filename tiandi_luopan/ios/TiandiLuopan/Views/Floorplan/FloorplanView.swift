@@ -64,7 +64,7 @@ public struct FloorplanView: View {
                 Text(lang.t("floorplan_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("当前立向: \(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.name)山\(motion.headingState.facingMountain.name)向)")
+                Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.name)\(lang.t("mountain_suffix"))\(motion.headingState.facingMountain.name)\(lang.t("facing_suffix")))")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -114,7 +114,7 @@ public struct FloorplanView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: isSyncWithCompass ? "location.fill" : "hand.draw.fill")
-                    Text(isSyncWithCompass ? "联动" : "微调")
+                    Text(isSyncWithCompass ? lang.t("floorplan_sync_compass") : lang.t("floorplan_manual_tune"))
                 }
                 .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 7)
@@ -185,8 +185,8 @@ public struct FloorplanView: View {
         let rw = room.rect.size.width * w
         let rh = room.rect.size.height * h
         
-        let isBad = room.inspectionLevel == "严重煞气" || room.inspectionLevel == "凶"
-        let isGood = room.inspectionLevel == "吉"
+        let isBad = room.isBad
+        let isGood = room.isGood
         let strokeColor = isBad ? Color.red : (isGood ? Color.green : Color.white.opacity(0.25))
         let bgColor = isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05))
         
@@ -265,7 +265,7 @@ public struct FloorplanView: View {
             Circle()
                 .stroke(Color.red, lineWidth: 2)
                 .frame(width: 24, height: 24)
-            Text("立极点")
+            Text(lang.t("floorplan_center_point"))
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.black)
         }
@@ -288,7 +288,7 @@ public struct FloorplanView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Spacer()
-                Text("拖动金圈微调中宫")
+                Text(lang.t("drag_center_hint"))
                     .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.5))
             }
@@ -298,9 +298,9 @@ public struct FloorplanView: View {
                 VStack(spacing: 8) {
                     if !iap.canUseFloorplan {
                         VIPLockCardView(
-                            title: "空间立极全屋体检 · VIP 专享",
-                            featureDesc: "全屋空间几何立极、大门/主卧/厨房/卫浴火烧天门、水浸中宫、鬼门水污深度诊断报告，需开通 VIP 或单套解锁。",
-                            badge: "👑 VIP / 单套 ¥19.9",
+                            title: lang.t("privilege_floorplan_title"),
+                            featureDesc: lang.t("privilege_floorplan_desc"),
+                            badge: lang.t("vip_badge_title"),
                             targetProductId: .floorplanSingle,
                             onUnlockTap: { showPaywall = true }
                         )
@@ -324,7 +324,7 @@ public struct FloorplanView: View {
     private func auditItemRow(item: FloorplanAuditItem) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Circle()
-                .fill(item.severity == "严重煞气" ? Color.red : (item.severity == "吉" ? Color.green : Color.orange))
+                .fill(item.isSevere ? Color.red : (item.isGood ? Color.green : Color.orange))
                 .frame(width: 8, height: 8)
                 .padding(.top, 4)
             
@@ -334,18 +334,18 @@ public struct FloorplanView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                     Spacer()
-                    Text(item.severity)
+                    Text(item.isSevere ? lang.t("floorplan_severe_sha") : (item.isGood ? lang.t("grade_auspicious") : lang.t("floorplan_warn_sha")))
                         .font(.system(size: 10, weight: .bold))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(item.severity == "严重煞气" ? Color.red.opacity(0.2) : (item.severity == "吉" ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))
-                        .foregroundColor(item.severity == "严重煞气" ? .red : (item.severity == "吉" ? .green : .orange))
+                        .background(item.isSevere ? Color.red.opacity(0.2) : (item.isGood ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))
+                        .foregroundColor(item.isSevere ? .red : (item.isGood ? .green : .orange))
                         .cornerRadius(4)
                 }
                 Text(item.lore)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.75))
-                Text("💡 化解: \(item.solution)")
+                Text("\(lang.t("floorplan_solution_prefix")) \(item.solution)")
                     .font(.system(size: 10))
                     .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
             }
@@ -386,7 +386,7 @@ public struct RoomAuditDetailSheet: View {
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundColor(.white)
                                 
-                                Text(room.palaceName.isEmpty ? "中宫立极分析中" : "立极方位：\(room.palaceName)")
+                                Text(room.palaceName.isEmpty ? lang.t("floorplan_analyzing_center") : "\(lang.t("floorplan_palace_prefix"))\(room.palaceName)")
                                     .font(.system(size: 12))
                                     .foregroundColor(Color.yanCyan)
                             }
@@ -410,7 +410,7 @@ public struct RoomAuditDetailSheet: View {
                             HStack {
                                 Image(systemName: "sparkles")
                                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                                Text("格局诊断：\(room.inspectionTitle)")
+                                Text("\(lang.t("floorplan_diag_prefix"))\(room.inspectionTitle)")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundColor(.white)
                             }
@@ -426,11 +426,11 @@ public struct RoomAuditDetailSheet: View {
                         
                         // 3. 经典堪舆古籍与现代环境机理
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("📜 古籍渊源与环境机理")
+                            Text(lang.t("floorplan_classic_origin"))
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(Color(red: 0.95, green: 0.82, blue: 0.4))
                             
-                            Text("《阳宅三要》云：“大门、主卧、灶堂为阳宅三大核心纲领。”方位各司其职，相克则生浊滞，相生则聚福禄。")
+                            Text(lang.t("floorplan_yangzhai_quote"))
                                 .font(.system(size: 12, design: .serif))
                                 .foregroundColor(.white.opacity(0.75))
                                 .lineSpacing(2)
@@ -441,11 +441,11 @@ public struct RoomAuditDetailSheet: View {
                         
                         // 4. 生旺化煞秘笈
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("💡 杨公秘传调理与生旺指南")
+                            Text(lang.t("floorplan_master_remedy"))
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(Color.green)
                             
-                            Text(room.inspectionAdvice.isEmpty ? "保持室内光线明朗，适度开窗通风，摆放生机绿植以迎祥纳福。" : room.inspectionAdvice)
+                            Text(room.inspectionAdvice.isEmpty ? lang.t("floorplan_room_advice") : room.inspectionAdvice)
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.85))
                                 .lineSpacing(2)
@@ -459,19 +459,17 @@ public struct RoomAuditDetailSheet: View {
                     .padding(16)
                 }
             }
-            .navigationBarTitle("空间立极详勘", displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarTitle(lang.t("floorplan_detail_title"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(lang.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }
     }
     
     private var badgeColor: Color {
-        switch room.inspectionLevel {
-        case "吉": return .green
-        case "严重煞气": return .red
-        case "预警": return .orange
-        default: return Color.yanCyan
-        }
+        if room.isGood { return .green }
+        if room.isSevere { return .red }
+        if room.isWarning { return .orange }
+        return Color.yanCyan
     }
 }

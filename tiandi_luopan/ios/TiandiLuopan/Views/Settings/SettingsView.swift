@@ -39,10 +39,10 @@ public struct SettingsView: View {
                         
                         // 四档商品卡片选择
                         VStack(spacing: 8) {
-                            productRow(id: .vipYearly, tag: "超值推荐")
-                            productRow(id: .proLifetime, tag: "一次买断")
-                            productRow(id: .floorplanSingle, tag: "单套全案")
-                            productRow(id: .tianjiSingle, tag: "单次导出")
+                            productRow(id: .vipYearly, tag: lang.t("product_vip_yearly_tag"))
+                            productRow(id: .proLifetime, tag: lang.t("product_pro_lifetime_tag"))
+                            productRow(id: .floorplanSingle, tag: lang.t("product_floorplan_single_tag"))
+                            productRow(id: .tianjiSingle, tag: lang.t("product_tianji_single_tag"))
                         }
                         .padding(.vertical, 4)
                         
@@ -54,7 +54,7 @@ public struct SettingsView: View {
                                 HStack {
                                     Spacer()
                                     Image(systemName: "applelogo")
-                                    Text("Apple Pay 一键开通所选服务")
+                                    Text(lang.t("pay_securely"))
                                     Spacer()
                                 }
                                 .font(.system(size: 13, weight: .bold))
@@ -75,7 +75,7 @@ public struct SettingsView: View {
                             }) {
                                 HStack {
                                     Spacer()
-                                    Text("恢复已有购买 (Restore Purchases)")
+                                    Text(lang.t("restore_purchases"))
                                         .font(.system(size: 11))
                                         .foregroundColor(Color.yanCyan)
                                     Spacer()
@@ -88,12 +88,12 @@ public struct SettingsView: View {
                 }
                 
                 // 2. VIP 尊享特权矩阵
-                Section(header: Text("VIP 尊享专业特权清单")) {
-                    privilegeRow(icon: "sparkles", title: "三式绝学 · 时家奇门遁甲全息排盘与出行导航")
-                    privilegeRow(icon: "calendar.badge.clock", title: "紫白飞星 · 流年流月动态气运布防与太岁三煞自检")
-                    privilegeRow(icon: "house.fill", title: "户型空间立极 · 户型图布盘与全屋火烧天门风水体检")
-                    privilegeRow(icon: "scroll.fill", title: "福宅天机书 · 古典宣纸朱丝栏大师勘测长卷导出")
-                    privilegeRow(icon: "camera.viewfinder", title: "AR 实景天心透视与八大经典形煞智能研判")
+                Section(header: Text(lang.t("vip_privilege_header"))) {
+                    privilegeRow(icon: "sparkles", title: lang.t("privilege_qimen_title"))
+                    privilegeRow(icon: "calendar.badge.clock", title: lang.t("privilege_purplewhite_title"))
+                    privilegeRow(icon: "house.fill", title: lang.t("privilege_floorplan_title"))
+                    privilegeRow(icon: "scroll.fill", title: lang.t("privilege_tianji_title"))
+                    privilegeRow(icon: "camera.viewfinder", title: lang.t("ar_title"))
                 }
                 
                 // 3. 专业罗盘与偏好设置
@@ -107,7 +107,7 @@ public struct SettingsView: View {
                     }
                     
                     HStack {
-                        Text("GPS 实时经纬坐标")
+                        Text(lang.t("gps_coords"))
                         Spacer()
                         Text(motion.coordsDesc)
                             .foregroundColor(.secondary)
@@ -116,7 +116,7 @@ public struct SettingsView: View {
                     }
                     
                     HStack {
-                        Text("真太阳时 Spencer 均时差")
+                        Text(lang.t("true_solar_time"))
                         Spacer()
                         Text(motion.solarTimeDesc)
                             .foregroundColor(.secondary)
@@ -125,17 +125,17 @@ public struct SettingsView: View {
                 }
                 
                 // 4. 硬件传感器与校准
-                Section(header: Text("硬件传感器与指南针校准")) {
+                Section(header: Text(lang.t("settings_calib_title"))) {
                     HStack {
-                        Text("磁场干扰状态")
+                        Text(lang.t("mag_distortion"))
                         Spacer()
-                        Text(motion.isDistorted ? "检测到强磁干扰 ⚠️" : "磁场正常 (无干扰)")
+                        Text(motion.isDistorted ? lang.t("settings_mag_field_warning") : lang.t("settings_mag_field_normal"))
                             .foregroundColor(motion.isDistorted ? .red : .green)
                             .font(.system(size: 13))
                     }
                     
                     HStack {
-                        Text("磁场感应强度")
+                        Text(lang.t("settings_mag_intensity"))
                         Spacer()
                         Text(String(format: "%.1f μT", motion.magneticStrengthUT))
                             .foregroundColor(.secondary)
@@ -146,9 +146,9 @@ public struct SettingsView: View {
                         showCalibrationGuide = true
                     }) {
                         HStack {
-                            Text("罗盘双针与地磁偏角校准")
+                            Text(lang.t("compass_calib"))
                             Spacer()
-                            Text(motion.isDistorted ? "需校准 ⚠️" : "极高 ✓")
+                            Text(motion.isDistorted ? lang.t("settings_calib_status_need") : lang.t("settings_calib_status_high"))
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(motion.isDistorted ? .orange : .green)
                             Image(systemName: "chevron.right")
@@ -159,25 +159,25 @@ public struct SettingsView: View {
                 }
                 
                 // 5. 关于与版本信息
-                Section(header: Text("关于演象")) {
+                Section(header: Text(lang.t("settings_about_title"))) {
                     HStack {
-                        Text("软件版本")
+                        Text(lang.t("settings_app_version"))
                         Spacer()
                         Text("v1.3.0 (SwiftUI Native 2.0)")
                             .foregroundColor(.secondary)
                             .font(.system(size: 13))
                     }
                     HStack {
-                        Text("易学理论基础")
+                        Text(lang.t("settings_theory_base"))
                         Spacer()
-                        Text("沈氏玄空 · 杨公水法 · 时家奇门")
+                        Text(lang.t("settings_theory_desc"))
                             .foregroundColor(.secondary)
                             .font(.system(size: 12))
                     }
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationBarTitle("系统设置与会员", displayMode: .inline)
+            .navigationBarTitle(lang.t("tab_settings"), displayMode: .inline)
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet()
             }
@@ -254,13 +254,13 @@ public struct CalibrationGuideSheet: View {
                     .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                     .padding(.top, 30)
                 
-                Text("指南针与磁场 8 字校准法")
+                Text(lang.t("settings_calib_guide_title"))
                     .font(.system(size: 18, weight: .bold))
                 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("1. 请远离强磁性金属、电脑主机、音箱及大型变压设备；")
-                    Text("2. 手握手机，在空中沿空间三维方向划出流畅的「∞」字形轨迹；")
-                    Text("3. 重复划动 3 至 5 次，直至罗盘顶部磁场状态恢复为绿色正常状态。")
+                    Text(lang.t("settings_calib_guide_1"))
+                    Text(lang.t("settings_calib_guide_2"))
+                    Text(lang.t("settings_calib_guide_3"))
                 }
                 .font(.system(size: 14))
                 .foregroundColor(.secondary)
@@ -268,8 +268,8 @@ public struct CalibrationGuideSheet: View {
                 
                 Spacer()
             }
-            .navigationBarTitle("校准指引", displayMode: .inline)
-            .navigationBarItems(trailing: Button("知道了") {
+            .navigationBarTitle(lang.t("settings_calib_guide_title"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(lang.t("i_know")) {
                 presentationMode.wrappedValue.dismiss()
             })
         }

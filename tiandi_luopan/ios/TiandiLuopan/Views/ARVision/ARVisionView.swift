@@ -237,10 +237,10 @@ public struct ARVisionView: View {
                 Image(systemName: "viewfinder")
                     .font(.system(size: 40))
                     .foregroundColor(Color.yanCyan.opacity(0.5))
-                Text("室内 / 模拟实景演练模式")
+                Text(lang.t("simulation_mode"))
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white.opacity(0.7))
-                Text("拖动金黄色锁定框可模拟测煞")
+                Text(lang.t("ar_drag_hint"))
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -290,14 +290,14 @@ public struct ARVisionView: View {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 6, height: 6)
-                    Text("AI 测煞靶心 · \(m.name)山")
+                    Text("\(lang.t("ar_target_center")) · \(m.name)\(lang.t("mountain_suffix"))")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.yellow)
                 }
                 Text(currentSha.name)
                     .font(.system(size: 15, weight: .bold, design: .serif))
                     .foregroundColor(.white)
-                Text("靶向方位: \(String(format: "%.1f", targetCalculatedHeading))° (\(m.palace))")
+                Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.palace))")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text(currentSha.aliases)
@@ -321,7 +321,7 @@ public struct ARVisionView: View {
                 Text(lang.t("ar_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("物理向首: \(motion.headingState.facingMountain.name)山 (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
+                Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.name)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.8))
             }
@@ -406,7 +406,7 @@ public struct ARVisionView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("【\(sha.name)】形煞研判:")
+                    Text("【\(sha.name)】\(lang.t("ar_sha_analysis_prefix")):")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
@@ -463,7 +463,7 @@ public struct ARVisionView: View {
                 .font: UIFont.boldSystemFont(ofSize: 36),
                 .foregroundColor: UIColor(red: 242/255.0, green: 217/255.0, blue: 115/255.0, alpha: 1.0)
             ]
-            "演象时空罗盘 · AR实地勘测全案存证".draw(at: CGPoint(x: 70, y: size.height - 350), withAttributes: titleAttr)
+            lang.t("ar_watermark_title").draw(at: CGPoint(x: 70, y: size.height - 350), withAttributes: titleAttr)
             
             let bodyAttr: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 24),
@@ -483,7 +483,7 @@ public struct ARVisionView: View {
             cg.setStrokeColor(UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0).cgColor)
             cg.setLineWidth(3)
             cg.stroke(sealRect)
-            "演象\n鉴真".draw(in: sealRect.insetBy(dx: 18, dy: 18), withAttributes: [
+            lang.t("ar_watermark_stamp").draw(in: sealRect.insetBy(dx: 18, dy: 18), withAttributes: [
                 .font: UIFont.boldSystemFont(ofSize: 26),
                 .foregroundColor: UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0)
             ])
@@ -531,7 +531,7 @@ public struct ShaRemedyDetailSheet: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("📐 现场环境辨识特征")
+                        Text(LocalizationManager.shared.t("ar_env_features"))
                             .font(.system(size: 15, weight: .bold))
                         Text(sha.visualFeature)
                             .font(.system(size: 13))
@@ -539,7 +539,7 @@ public struct ShaRemedyDetailSheet: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("📜 经典古籍赋文")
+                        Text(LocalizationManager.shared.t("ar_classic_lore"))
                             .font(.system(size: 15, weight: .bold))
                         Text(sha.classicalText)
                             .font(.system(size: 13, weight: .medium, design: .serif))
@@ -550,14 +550,14 @@ public struct ShaRemedyDetailSheet: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("🛡️ 开光法器与空间调理化解锦囊")
+                        Text(LocalizationManager.shared.t("ar_remedy_title"))
                             .font(.system(size: 15, weight: .bold))
                         
                         if !iap.hasUnlockedVIP {
                             VIPLockCardView(
-                                title: "杨公化煞绝学锦囊 · VIP 专享",
-                                featureDesc: "形峦煞气本物相克生克制化真传、开光法器安放禁忌、鲁班真尺定寸与镇煞秘方，需解锁 VIP 尊享特权。",
-                                badge: "👑 VIP 绝学特权",
+                                title: LocalizationManager.shared.t("ar_vip_remedy_title"),
+                                featureDesc: LocalizationManager.shared.t("ar_vip_remedy_desc"),
+                                badge: LocalizationManager.shared.t("vip_badge_title"),
                                 targetProductId: .vipYearly,
                                 onUnlockTap: { showPaywall = true }
                             )
@@ -573,8 +573,8 @@ public struct ShaRemedyDetailSheet: View {
                 }
                 .padding()
             }
-            .navigationBarTitle("形煞诊断报告", displayMode: .inline)
-            .navigationBarItems(trailing: Button("完成") {
+            .navigationBarTitle(LocalizationManager.shared.t("sha_report"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
             .sheet(isPresented: $showPaywall) {

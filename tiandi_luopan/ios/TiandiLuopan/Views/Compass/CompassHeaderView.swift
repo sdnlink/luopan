@@ -4,6 +4,7 @@ import SwiftUI
 
 public struct CompassHeaderView: View {
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
     
     public init() {}
     
@@ -26,11 +27,11 @@ public struct CompassHeaderView: View {
                 // 坐向与二十四山
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("\(state.sittingMountain.name)山\(state.facingMountain.name)向")
+                        Text("\(state.sittingMountain.name)\(lang.t("mountain_suffix"))\(state.facingMountain.name)\(lang.t("facing_suffix"))")
                             .font(.system(size: 18, weight: .bold, design: .serif))
                             .foregroundColor(.white)
                         
-                        Text(state.facingMountain.palace + "宫")
+                        Text(state.facingMountain.palace + lang.t("palace_suffix"))
                             .font(.system(size: 11, weight: .semibold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -80,7 +81,7 @@ public struct CompassHeaderView: View {
                     Image(systemName: "sun.max.fill")
                         .font(.system(size: 11))
                         .foregroundColor(Color.orange)
-                    Text("真太阳时 \(motion.trueSolarTimeStr)")
+                    Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
                 }
@@ -92,7 +93,7 @@ public struct CompassHeaderView: View {
                     Circle()
                         .fill(motion.isLevel ? Color.green : Color.orange)
                         .frame(width: 6, height: 6)
-                    Text("俯仰 \(String(format: "%.1f", motion.pitch))° / 横滚 \(String(format: "%.1f", motion.roll))°")
+                    Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundColor(.white.opacity(0.75))
                 }

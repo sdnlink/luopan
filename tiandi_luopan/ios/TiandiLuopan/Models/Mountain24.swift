@@ -63,6 +63,9 @@ public struct Mountain24Item: Identifiable, Codable {
         self.yuan = yuan
         self.polarity = polarity
     }
+    public var isCardinalOrCorner: Bool {
+        return angleCenter.truncatingRemainder(dividingBy: 45.0) == 0.0
+    }
 }
 
 // MARK: - 坐向全景分析结果

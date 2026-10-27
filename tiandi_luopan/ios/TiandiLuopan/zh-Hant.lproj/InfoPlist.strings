@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "演象羅盤";
+"CFBundleName" = "演象羅盤";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "演象時空羅盤需要使用您的位置資訊以計算當地精確經緯度、海拔高程與地磁偏角。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "演象時空羅盤需要使用您的位置資訊以計算當地精確經緯度、海拔高程與地磁偏角。";
+"NSMotionUsageDescription" = "演象時空羅盤需要使用高精度運動感測器以驅動雙軸太極水準儀與指南針。";
+"NSCameraUsageDescription" = "演象時空羅盤需要使用相機以提供AR實景天心透視、形煞測量與實地立向功能。";
+"NSPhotoLibraryAddUsageDescription" = "演象時空羅盤需要將實景勘測長圖與水印存證快照保存至您的相簿。";
+"NSPhotoLibraryUsageDescription" = "演象時空羅盤需要存取相簿以保存實景勘測長圖與水印存證相片。";

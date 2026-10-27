@@ -10,6 +10,15 @@ public enum CompassPreset: String, CaseIterable, Identifiable {
     case minimalist = "极简勘测盘"
     
     public var id: String { self.rawValue }
+    
+    public var localizedTitle: String {
+        switch self {
+        case .comprehensive: return LocalizationManager.shared.t("preset_comprehensive")
+        case .sanYuan: return LocalizationManager.shared.t("preset_sanyuan")
+        case .sanHe: return LocalizationManager.shared.t("preset_sanhe")
+        case .minimalist: return LocalizationManager.shared.t("preset_minimalist")
+        }
+    }
 }
 
 public class CompassLayerManager: ObservableObject {

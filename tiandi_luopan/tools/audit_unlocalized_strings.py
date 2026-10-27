@@ -4,15 +4,15 @@ import sys
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-views_dir = r"e:\code\android\tiandi_luopan\ios\TiandiLuopan\Views"
+ios_root = r"e:\code\android\tiandi_luopan\ios\TiandiLuopan"
 chinese_re = re.compile(r"[\u4e00-\u9fff]")
 string_re = re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"')
 
 file_data = {}
 
-for root, dirs, files in os.walk(views_dir):
+for root, dirs, files in os.walk(ios_root):
     for f in sorted(files):
-        if f.endswith(".swift"):
+        if f.endswith(".swift") and f != "LocalizationManager.swift":
             fpath = os.path.join(root, f)
             with open(fpath, "r", encoding="utf-8") as fp:
                 lines = fp.readlines()
@@ -28,7 +28,7 @@ for root, dirs, files in os.walk(views_dir):
                         if f'lang.t("{m}")' not in line:
                             unlocalized.append((i, m, stripped))
             
-            rel = os.path.relpath(fpath, views_dir)
+            rel = os.path.relpath(fpath, ios_root)
             if unlocalized:
                 file_data[rel] = unlocalized
 

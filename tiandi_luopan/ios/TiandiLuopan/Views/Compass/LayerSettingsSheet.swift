@@ -20,7 +20,7 @@ public struct LayerSettingsSheet: View {
                                 Button(action: {
                                     layers.applyPreset(preset)
                                 }) {
-                                    Text(preset.rawValue)
+                                    Text(preset.localizedTitle)
                                         .font(.system(size: 13, weight: layers.currentPreset == preset ? .bold : .medium))
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)

@@ -60,6 +60,15 @@ def package_ipa():
     # Also copy index.html to app root for fallback
     shutil.copy2(os.path.join(src_www, "index.html"), os.path.join(app_dir, "index.html"))
 
+    # 4.5 Copy localized resources (*.lproj)
+    src_tiandi = os.path.join(root_dir, "ios/TiandiLuopan")
+    for item in os.listdir(src_tiandi):
+        if item.endswith(".lproj"):
+            src_lp = os.path.join(src_tiandi, item)
+            dest_lp = os.path.join(app_dir, item)
+            if os.path.isdir(src_lp):
+                shutil.copytree(src_lp, dest_lp, dirs_exist_ok=True)
+
     # 5. Copy icons from AppIcon.appiconset
     src_icons = os.path.join(root_dir, "ios/TiandiLuopan/Assets.xcassets/AppIcon.appiconset")
     if os.path.exists(src_icons):

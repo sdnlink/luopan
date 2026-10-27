@@ -1,11 +1,13 @@
 import SwiftUI
 
-// MARK: - 系统设置与专业版激活视图 (Settings View)
+// MARK: - 系统设置与专业版会员中心视图 (Settings & Member Center View)
 
 public struct SettingsView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @State private var showCalibrationGuide: Bool = false
+    @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
+    @AppStorage("app_language") private var appLanguage: String = "zh-Hans"
     
     public init() {}
     
@@ -16,17 +18,17 @@ public struct SettingsView: View {
     public var body: some View {
         NavigationView {
             List {
-                // 会员尊享卡
+                // 1. 会员中心与多档位收银台
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         HStack {
                             Image(systemName: "crown.fill")
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                            Text("演象·时空罗盘 专业版")
+                            Text("演象·时空罗盘 会员中心")
                                 .font(.system(size: 16, weight: .bold))
                                 .foregroundColor(.white)
                             Spacer()
-                            Text(isProUnlocked ? "已激活" : "永久买断")
+                            Text(isProUnlocked ? "VIP 尊享用户" : "标准用户")
                                 .font(.system(size: 11, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -35,29 +37,38 @@ public struct SettingsView: View {
                                 .cornerRadius(6)
                         }
                         
-                        Text("解锁全套玄空飞星高级兼向排盘、七星打劫局、AR形煞智能测定与大师化解锦囊。")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.75))
+                        // 四档商品卡片选择
+                        VStack(spacing: 8) {
+                            productRow(id: .vipYearly, tag: "超值推荐")
+                            productRow(id: .proLifetime, tag: "一次买断")
+                            productRow(id: .floorplanSingle, tag: "单套全案")
+                            productRow(id: .tianjiSingle, tag: "单次导出")
+                        }
+                        .padding(.vertical, 4)
                         
+                        // 购买与恢复按钮
                         if !isProUnlocked {
                             Button(action: {
-                                iap.purchase(productId: IAPProductID.proLifetime.rawValue)
+                                iap.purchase(productId: selectedProductId)
                             }) {
-                                Text("立即激活大师终身版 (一次买断)")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [Color(red: 0.95, green: 0.8, blue: 0.35), Color(red: 0.75, green: 0.55, blue: 0.2)],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "applelogo")
+                                    Text("Apple Pay 一键开通所选服务")
+                                    Spacer()
+                                }
+                                .font(.system(size: 13, weight: .bold))
+                                .padding(.vertical, 10)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(red: 0.95, green: 0.8, blue: 0.35), Color(red: 0.75, green: 0.55, blue: 0.2)],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
                                     )
-                                    .foregroundColor(.black)
-                                    .cornerRadius(8)
+                                )
+                                .foregroundColor(.black)
+                                .cornerRadius(8)
                             }
-                            .padding(.top, 4)
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -76,7 +87,44 @@ public struct SettingsView: View {
                     .padding(.vertical, 4)
                 }
                 
-                // 硬件传感器与校准
+                // 2. VIP 尊享特权矩阵
+                Section(header: Text("VIP 尊享专业特权清单")) {
+                    privilegeRow(icon: "sparkles", title: "三式绝学 · 时家奇门遁甲全息排盘与出行导航")
+                    privilegeRow(icon: "calendar.badge.clock", title: "紫白飞星 · 流年流月动态气运布防与太岁三煞自检")
+                    privilegeRow(icon: "house.fill", title: "户型空间立极 · 户型图布盘与全屋火烧天门风水体检")
+                    privilegeRow(icon: "scroll.fill", title: "福宅天机书 · 古典宣纸朱丝栏大师勘测长卷导出")
+                    privilegeRow(icon: "camera.viewfinder", title: "AR 实景天心透视与八大经典形煞智能研判")
+                }
+                
+                // 3. 专业罗盘与偏好设置
+                Section(header: Text("专业罗盘与偏好设置")) {
+                    Toggle("二十四山过界微触觉震感", isOn: $motion.isHapticEnabled)
+                    
+                    Picker("界面语言 (Language)", selection: $appLanguage) {
+                        Text("简体中文").tag("zh-Hans")
+                        Text("繁體中文").tag("zh-Hant")
+                        Text("English").tag("en")
+                    }
+                    
+                    HStack {
+                        Text("GPS 实时经纬坐标")
+                        Spacer()
+                        Text(motion.coordsDesc)
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                    }
+                    
+                    HStack {
+                        Text("真太阳时 Spencer 均时差")
+                        Spacer()
+                        Text(motion.solarTimeDesc)
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 11))
+                    }
+                }
+                
+                // 4. 硬件传感器与校准
                 Section(header: Text("硬件传感器与指南针校准")) {
                     HStack {
                         Text("磁场干扰状态")
@@ -98,98 +146,130 @@ public struct SettingsView: View {
                         showCalibrationGuide = true
                     }) {
                         HStack {
-                            Image(systemName: "gyroscope")
-                                .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                            Text("传感器 8 字绕环校准指引")
-                                .foregroundColor(.primary)
+                            Text("罗盘双针与地磁偏角校准")
+                            Spacer()
+                            Text(motion.isDistorted ? "需校准 ⚠️" : "极高 ✓")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(motion.isDistorted ? .orange : .green)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
                 
-                // 空间与坐标
-                Section(header: Text("地理信息与真太阳时")) {
+                // 5. 关于与版本信息
+                Section(header: Text("关于演象")) {
                     HStack {
-                        Text("当前定位")
+                        Text("软件版本")
                         Spacer()
-                        Text(motion.coordsDesc)
+                        Text("v1.3.0 (SwiftUI Native 2.0)")
                             .foregroundColor(.secondary)
-                            .font(.system(size: 12))
-                    }
-                    
-                    HStack {
-                        Text("视太阳时状态")
-                        Spacer()
-                        Text("经度视太阳时毫秒级自动同步")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 12))
-                    }
-                }
-                
-                // 关于与版本
-                Section(header: Text("关于演象堪舆")) {
-                    HStack {
-                        Text("应用架构")
-                        Spacer()
-                        Text("100% 纯原生 Swift / SwiftUI 现代引擎")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 12))
+                            .font(.system(size: 13))
                     }
                     HStack {
-                        Text("版本号")
+                        Text("易学理论基础")
                         Spacer()
-                        Text("v1.3.0 (Pure Swift Pro Edition)")
+                        Text("沈氏玄空 · 杨公水法 · 时家奇门")
                             .foregroundColor(.secondary)
                             .font(.system(size: 12))
                     }
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationBarTitle("系统设置", displayMode: .inline)
+            .navigationBarTitle("系统设置与会员", displayMode: .inline)
             .sheet(isPresented: $showCalibrationGuide) {
-                CalibrationGuideSheet()
+                CalibrationSheet()
             }
+        }
+    }
+    
+    private func productRow(id: IAPProductID, tag: String) -> some View {
+        let isSelected = selectedProductId == id.rawValue
+        
+        return Button(action: {
+            selectedProductId = id.rawValue
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(id.title)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                        Text(tag)
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.yellow.opacity(0.2))
+                            .foregroundColor(Color.yellow)
+                            .cornerRadius(3)
+                    }
+                    Text(id.desc)
+                        .font(.system(size: 10))
+                        .foregroundColor(.white.opacity(0.65))
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text(id.priceText)
+                    .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+            }
+            .padding(8)
+            .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.15) : Color.white.opacity(0.04))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func privilegeRow(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
+                .frame(width: 20)
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.85))
+            Spacer()
+            Text("VIP")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.yellow)
         }
     }
 }
 
-// MARK: - 8字校准指引弹窗
+// MARK: - 8字校准指南弹窗
 public struct CalibrationGuideSheet: View {
     @Environment(\.presentationMode) var presentationMode
     
     public var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                Image(systemName: "figure.walk")
+                Image(systemName: "figure.walk.motion")
                     .font(.system(size: 60))
                     .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                    .padding(.top, 40)
+                    .padding(.top, 30)
                 
-                Text("罗盘磁场水平校准")
-                    .font(.system(size: 20, weight: .bold))
+                Text("指南针与磁场 8 字校准法")
+                    .font(.system(size: 18, weight: .bold))
                 
-                Text("请手持 iPhone，在空中平稳画大「8」字轨迹三次。\n\n避开高压电线、铁质金属护栏与大功率音箱，即可完成地磁传感器高精度校正。")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 30)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("1. 请远离强磁性金属、电脑主机、音箱及大型变压设备；")
+                    Text("2. 手握手机，在空中沿空间三维方向划出流畅的「∞」字形轨迹；")
+                    Text("3. 重复划动 3 至 5 次，直至罗盘顶部磁场状态恢复为绿色正常状态。")
+                }
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 24)
                 
                 Spacer()
-                
-                Button(action: {
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    Text("我已完成校准")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.83, green: 0.68, blue: 0.21))
-                        .foregroundColor(.black)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal, 30)
-                .padding(.bottom, 30)
             }
-            .navigationBarItems(trailing: Button("关闭") {
+            .navigationBarTitle("校准指引", displayMode: .inline)
+            .navigationBarItems(trailing: Button("知道了") {
                 presentationMode.wrappedValue.dismiss()
             })
         }

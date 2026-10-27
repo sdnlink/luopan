@@ -4,6 +4,7 @@ import SwiftUI
 
 public struct CompassDialView: View {
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject var layers = CompassLayerManager.shared
     
     // 手势与缩放状态
     @State private var dragStartAngle: Double = 0.0
@@ -29,16 +30,34 @@ public struct CompassDialView: View {
                     dialBackground(radius: radius)
                     
                     // 360 度外圈主刻度
-                    degreeTicksLayer(radius: radius)
+                    if layers.showDegreeTicks {
+                        degreeTicksLayer(radius: radius)
+                    }
+                    
+                    // 二十四节气与十二消息卦环
+                    if layers.showSolarTerms {
+                        solarTermsLayer(radius: radius * 0.91)
+                    }
                     
                     // 六十四卦分金环
-                    hexagramsLayer(radius: radius * 0.86)
+                    if layers.showHexagrams64 {
+                        hexagramsLayer(radius: radius * 0.83)
+                    }
+                    
+                    // 一百二十分金环
+                    if layers.showFenjin120 {
+                        fenjinLayer(radius: radius * 0.75)
+                    }
                     
                     // 二十四山正针环
-                    mountain24Layer(radius: radius * 0.68)
+                    if layers.showMountain24 {
+                        mountain24Layer(radius: radius * 0.66)
+                    }
                     
                     // 八卦八方环
-                    eightGuaLayer(radius: radius * 0.46)
+                    if layers.showEightGua {
+                        eightGuaLayer(radius: radius * 0.46)
+                    }
                     
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
@@ -49,19 +68,25 @@ public struct CompassDialView: View {
                 // 2. 固定不动的十字天心线 (Crosshair)
                 crosshairLayer(size: size)
                 
-                // 3. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
+                // 3. 地理真北金针 (根据当地磁偏角偏转，双指针系统)
+                if layers.showTrueNorthNeedle {
+                    trueNorthNeedleLayer(radius: radius * 0.28)
+                }
+                
+                // 4. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
                 magneticNeedleLayer(radius: radius * 0.26)
                 
-                // 4. 天池中央水平仪双轴气泡 (Level Bubble)
-                levelBubbleLayer(center: center, maxRadius: radius * 0.22)
+                // 5. 天池中央水平仪双轴气泡 (Level Bubble)
+                if layers.showLevelBubble {
+                    levelBubbleLayer(center: center, maxRadius: radius * 0.22)
+                }
                 
-                // 5. 正北红三角顶针与正南对准刻度
+                // 6. 正北红三角顶针与正南对准刻度
                 northSouthIndexLayer(radius: radius)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .scaleEffect(scale)
             .gesture(
-                // 单指拖拽旋转手势
                 DragGesture()
                     .onChanged { value in
                         let location = value.location
@@ -79,7 +104,6 @@ public struct CompassDialView: View {
                     }
             )
             .simultaneousGesture(
-                // 双指捏合缩放手势
                 MagnificationGesture()
                     .onChanged { val in
                         scale = min(max(lastScale * val, 0.85), 2.2)
@@ -94,54 +118,81 @@ public struct CompassDialView: View {
     // MARK: - 盘面背景
     private func dialBackground(radius: CGFloat) -> some View {
         ZStack {
-            // 黑金玄武岩多阶渐变底
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color(red: 0.15, green: 0.14, blue: 0.12), Color(red: 0.08, green: 0.08, blue: 0.09), Color(red: 0.03, green: 0.03, blue: 0.04)],
+                        colors: [
+                            Color(red: 0.14, green: 0.14, blue: 0.18),
+                            Color(red: 0.08, green: 0.08, blue: 0.11),
+                            Color(red: 0.03, green: 0.03, blue: 0.04)
+                        ],
                         center: .center,
-                        startRadius: 0,
+                        startRadius: radius * 0.2,
                         endRadius: radius
                     )
                 )
                 .frame(width: radius * 2, height: radius * 2)
-                .shadow(color: Color.black.opacity(0.85), radius: 18, x: 0, y: 10)
             
-            // 外圈金边
+            // 外圈金圈装饰
             Circle()
                 .stroke(
                     LinearGradient(
-                        colors: [Color(red: 0.95, green: 0.8, blue: 0.4), Color(red: 0.6, green: 0.45, blue: 0.15), Color(red: 0.95, green: 0.85, blue: 0.45)],
+                        colors: [
+                            Color(red: 0.95, green: 0.85, blue: 0.45),
+                            Color(red: 0.65, green: 0.45, blue: 0.2),
+                            Color(red: 0.95, green: 0.85, blue: 0.45)
+                        ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 3.5
+                    lineWidth: 3
                 )
                 .frame(width: radius * 2, height: radius * 2)
             
-            // 同心分隔金线
-            ForEach([0.86, 0.68, 0.46, 0.28], id: \.self) { rRatio in
-                Circle()
-                    .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.35), lineWidth: 1)
-                    .frame(width: radius * CGFloat(rRatio) * 2, height: radius * CGFloat(rRatio) * 2)
-            }
+            Circle()
+                .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.35), lineWidth: 1)
+                .frame(width: radius * 1.82, height: radius * 1.82)
+            
+            Circle()
+                .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
+                .frame(width: radius * 1.5, height: radius * 1.5)
+            
+            Circle()
+                .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
+                .frame(width: radius * 0.92, height: radius * 0.92)
         }
     }
     
-    // MARK: - 360 度圆周刻度
+    // MARK: - 360 度外圈主刻度
     private func degreeTicksLayer(radius: CGFloat) -> some View {
-        ForEach(0..<120, id: \.self) { i in
-            let deg = Double(i) * 3.0
-            let isMajor = (i % 10 == 0) // 30°
-            let isMid = (i % 5 == 0)   // 15°
-            let tickLen: CGFloat = isMajor ? 11 : (isMid ? 7 : 4)
-            let color = isMajor ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.45)
+        ForEach(0..<120) { i in
+            let angle = Double(i) * 3.0
+            let is10 = (i % 10 == 0)
+            let is30 = (i % 30 == 0)
             
             Rectangle()
-                .fill(color)
-                .frame(width: isMajor ? 1.8 : 1.0, height: tickLen)
-                .offset(y: -radius + tickLen / 2 + 3)
-                .rotationEffect(.degrees(deg))
+                .fill(is30 ? Color(red: 0.95, green: 0.85, blue: 0.45) : (is10 ? Color.white.opacity(0.8) : Color.white.opacity(0.35)))
+                .frame(width: is30 ? 1.5 : (is10 ? 1.0 : 0.6), height: is30 ? 9 : (is10 ? 6 : 4))
+                .offset(y: -radius + (is30 ? 4.5 : (is10 ? 3 : 2)))
+                .rotationEffect(.degrees(angle))
+        }
+    }
+    
+    // MARK: - 二十四节气与十二消息卦环
+    private func solarTermsLayer(radius: CGFloat) -> some View {
+        ForEach(SolarTermsData.shared.terms) { term in
+            VStack(spacing: 0) {
+                Text(term.name)
+                    .font(.system(size: 7, weight: term.isMajorTerm ? .bold : .regular))
+                    .foregroundColor(term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65))
+                if let hex = term.hexagramName {
+                    Text(hex.prefix(1))
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+            }
+            .offset(y: -radius + 6)
+            .rotationEffect(.degrees(term.angleCenter))
         }
     }
     
@@ -149,10 +200,21 @@ public struct CompassDialView: View {
     private func hexagramsLayer(radius: CGFloat) -> some View {
         ForEach(hexagrams) { hex in
             Text(hex.name.prefix(2))
-                .font(.system(size: 8, weight: .semibold, design: .serif))
-                .foregroundColor(hex.luckDegree == "大吉" ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.7))
-                .offset(y: -radius + 12)
+                .font(.system(size: 7, weight: .semibold, design: .serif))
+                .foregroundColor(hex.luckDegree == "大吉" ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
+                .offset(y: -radius + 8)
                 .rotationEffect(.degrees(hex.angleCenter))
+        }
+    }
+    
+    // MARK: - 一百二十分金环 (每山5分金, 旺相红金/孤虚白灰)
+    private func fenjinLayer(radius: CGFloat) -> some View {
+        ForEach(Fenjin120Data.shared.allFenjin) { f in
+            Rectangle()
+                .fill(f.isAuspicious ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.2))
+                .frame(width: 1, height: f.isAuspicious ? 6 : 4)
+                .offset(y: -radius)
+                .rotationEffect(.degrees(f.centerAngle))
         }
     }
     
@@ -161,15 +223,15 @@ public struct CompassDialView: View {
         ForEach(mountains) { m in
             let isMainBranch = ["子", "午", "卯", "酉", "乾", "坤", "艮", "巽"].contains(m.name)
             
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Text(m.name)
-                    .font(.system(size: isMainBranch ? 16 : 13, weight: .bold, design: .serif))
+                    .font(.system(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif))
                     .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
                 Text(m.element)
-                    .font(.system(size: 8, weight: .medium))
+                    .font(.system(size: 7, weight: .medium))
                     .foregroundColor(Color.white.opacity(0.5))
             }
-            .offset(y: -radius + 18)
+            .offset(y: -radius + 14)
             .rotationEffect(.degrees(m.angleCenter))
         }
     }
@@ -189,9 +251,9 @@ public struct CompassDialView: View {
         ]
         return ForEach(guas) { item in
             Text(item.id)
-                .font(.system(size: 15, weight: .black, design: .serif))
+                .font(.system(size: 14, weight: .black, design: .serif))
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
-                .offset(y: -radius + 14)
+                .offset(y: -radius + 12)
                 .rotationEffect(.degrees(item.angle))
         }
     }
@@ -203,17 +265,14 @@ public struct CompassDialView: View {
                 .fill(Color(red: 0.04, green: 0.04, blue: 0.05))
                 .frame(width: radius * 2, height: radius * 2)
             
-            // 天池外金环
             Circle()
                 .stroke(Color(red: 0.9, green: 0.75, blue: 0.35), lineWidth: 2)
                 .frame(width: radius * 2, height: radius * 2)
             
-            // 海底红线 (子午基准线)
             Rectangle()
                 .fill(Color.red.opacity(0.85))
                 .frame(width: 1.5, height: radius * 1.85)
             
-            // 南北红点
             Circle()
                 .fill(Color.red)
                 .frame(width: 5, height: 5)
@@ -228,7 +287,6 @@ public struct CompassDialView: View {
     // MARK: - 传统红蓝双色红宝石磁针 (Magnetic Needle)
     private func magneticNeedleLayer(radius: CGFloat) -> some View {
         ZStack {
-            // 南针 (赤红朱雀尖端)
             Path { path in
                 path.move(to: CGPoint(x: 0, y: 0))
                 path.addLine(to: CGPoint(x: -3.5, y: -radius * 0.8))
@@ -244,7 +302,6 @@ public struct CompassDialView: View {
                 )
             )
             
-            // 北针 (青蓝玄武尖端)
             Path { path in
                 path.move(to: CGPoint(x: 0, y: 0))
                 path.addLine(to: CGPoint(x: -3.5, y: radius * 0.8))
@@ -260,7 +317,6 @@ public struct CompassDialView: View {
                 )
             )
             
-            // 针轴黄铜顶心
             Circle()
                 .fill(
                     RadialGradient(
@@ -275,61 +331,78 @@ public struct CompassDialView: View {
         .allowsHitTesting(false)
     }
     
-    // MARK: - 固定十字天心红线 (Crosshair)
+    // MARK: - 地理真北金针 (根据当地磁偏角偏转，双指针系统)
+    private func trueNorthNeedleLayer(radius: CGFloat) -> some View {
+        ZStack {
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: -2.0, y: -radius * 0.85))
+                path.addLine(to: CGPoint(x: 0, y: -radius * 1.05))
+                path.addLine(to: CGPoint(x: 2.0, y: -radius * 0.85))
+                path.closeSubpath()
+            }
+            .fill(
+                LinearGradient(
+                    colors: [Color(red: 1.0, green: 0.85, blue: 0.35), Color(red: 0.8, green: 0.6, blue: 0.15)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .shadow(color: Color.yellow.opacity(0.4), radius: 2)
+            
+            Text("真")
+                .font(.system(size: 7, weight: .bold))
+                .foregroundColor(Color.black)
+                .offset(y: -radius * 0.72)
+        }
+        .rotationEffect(.degrees(motion.currentDeclination))
+        .allowsHitTesting(false)
+    }
+    
+    // MARK: - 十字天心线
     private func crosshairLayer(size: CGFloat) -> some View {
         ZStack {
-            // 垂直天心线
             Rectangle()
-                .fill(Color.red.opacity(0.7))
-                .frame(width: 1.2, height: size * 0.96)
-            
-            // 水平天心线
+                .fill(Color.red.opacity(0.75))
+                .frame(width: 1, height: size * 0.96)
             Rectangle()
-                .fill(Color.red.opacity(0.7))
-                .frame(width: size * 0.96, height: 1.2)
-            
-            // 中心准星微圆环
-            Circle()
-                .stroke(Color.red.opacity(0.8), lineWidth: 1.5)
-                .frame(width: 16, height: 16)
+                .fill(Color.red.opacity(0.75))
+                .frame(width: size * 0.96, height: 1)
         }
         .allowsHitTesting(false)
     }
     
-    // MARK: - 真实双轴水平仪气泡
+    // MARK: - 水平仪双轴水泡
     private func levelBubbleLayer(center: CGPoint, maxRadius: CGFloat) -> some View {
-        let maxOffset: CGFloat = maxRadius * 0.65
-        let xOffset = CGFloat(-motion.roll / 15.0) * maxOffset
-        let yOffset = CGFloat(motion.pitch / 15.0) * maxOffset
-        
-        let clampedX = min(max(xOffset, -maxOffset), maxOffset)
-        let clampedY = min(max(yOffset, -maxOffset), maxOffset)
+        let maxOffset: CGFloat = maxRadius * 0.75
+        let offsetX = max(-maxOffset, min(maxOffset, CGFloat(motion.roll) * 3.5))
+        let offsetY = max(-maxOffset, min(maxOffset, CGFloat(-motion.pitch) * 3.5))
+        let isLevel = motion.isLevel
         
         return ZStack {
-            // 水平基准绿圈
             Circle()
-                .stroke(motion.isLevel ? Color.green.opacity(0.85) : Color.white.opacity(0.35), lineWidth: 1.5)
-                .frame(width: 22, height: 22)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                .frame(width: maxRadius * 1.2, height: maxRadius * 1.2)
             
-            // 游动水平气泡
             Circle()
-                .fill(motion.isLevel ? Color.green.opacity(0.9) : Color.yellow.opacity(0.85))
-                .frame(width: 10, height: 10)
-                .offset(x: clampedX, y: clampedY)
-                .animation(.interactiveSpring(response: 0.1, dampingFraction: 0.7), value: motion.pitch)
+                .fill(isLevel ? Color.green.opacity(0.65) : Color.orange.opacity(0.65))
+                .frame(width: 14, height: 14)
+                .offset(x: offsetX, y: offsetY)
+                .animation(.interactiveSpring(response: 0.1, dampingFraction: 0.8), value: offsetX)
         }
         .allowsHitTesting(false)
     }
     
-    // MARK: - 顶部正北与坐向标记
+    // MARK: - 正北与正南顶针
     private func northSouthIndexLayer(radius: CGFloat) -> some View {
-        VStack {
-            Image(systemName: "triangle.fill")
-                .font(.system(size: 14))
-                .foregroundColor(Color.red)
-                .rotationEffect(.degrees(180))
-                .offset(y: -radius - 12)
-            Spacer()
+        ZStack {
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: -radius - 1))
+                path.addLine(to: CGPoint(x: -7, y: -radius - 12))
+                path.addLine(to: CGPoint(x: 7, y: -radius - 12))
+                path.closeSubpath()
+            }
+            .fill(Color.red)
         }
         .allowsHitTesting(false)
     }

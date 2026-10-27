@@ -1,13 +1,16 @@
 import SwiftUI
 
-// MARK: - 原生玄空九宫飞星排盘与三元九运视图 (XuanKong Flying Stars View)
+// MARK: - 原生玄空理气与三式绝学全景视图 (XuanKong, BaZhai, PurpleWhite & QiMen View)
 
 public struct XuanKongGridView: View {
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject var iap = StoreKitIAPManager.shared
+    @State private var selectedSubTab: Int = 0 // 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门
     @State private var selectedPeriod: Int = 9
+    @State private var showTianJiShuSheet: Bool = false
+    @State private var showPaywall: Bool = false
     
     // 九宫格九个方位的标准九宫排布对应 (从左到右，从上到下：东南4、正南9、西南2；正东3、中宫5、正西7；东北8、正北1、西北6)
-    // 洛书标准顺序索引：[3, 8, 1, 2, 4, 6, 7, 0, 5]
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
     
     public init() {}
@@ -20,25 +23,123 @@ public struct XuanKongGridView: View {
         )
         
         ScrollView {
-            VStack(spacing: 16) {
-                // 1. 元运选择器 (一运 ~ 九运)
-                periodPickerBar()
+            VStack(spacing: 14) {
+                // 1. 四大学派理气子 Tab 切换条
+                subTabBar()
                 
-                // 2. 当前坐向格局徽章
-                patternBadgeView(chart: chart)
-                
-                // 3. 经典玄空九宫格 (3x3 矩阵)
-                ninePalacesGrid(chart: chart)
+                // 2. 天机书长卷一键生成入口 Banner
+                tianJiShuBanner()
                     .padding(.horizontal, 16)
                 
-                // 4. 深度格局断语卡
-                analysisCard(chart: chart)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
+                if selectedSubTab == 0 {
+                    // 板块 1: 玄空九星三元九运排盘
+                    xuanKongContent(chart: chart)
+                } else if selectedSubTab == 1 {
+                    // 板块 2: 八宅明镜与三合水法
+                    BaZhaiView(isEmbedded: true)
+                } else if selectedSubTab == 2 {
+                    // 板块 3: 紫白飞星流年流月客星与太岁三煞
+                    PurpleWhiteView()
+                } else {
+                    // 板块 4: 三式绝学时家奇门遁甲全息排盘
+                    QimenDunjiaView()
+                }
             }
-            .padding(.top, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
         }
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
+        .sheet(isPresented: $showTianJiShuSheet) {
+            TianJiShuView()
+        }
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+    }
+    
+    // MARK: - 子 Tab 切换栏
+    private func subTabBar() -> some View {
+        HStack(spacing: 0) {
+            tabButton(title: "玄空九星", index: 0)
+            tabButton(title: "八宅三合", index: 1)
+            tabButton(title: "紫白客星", index: 2)
+            tabButton(title: "时家奇门", index: 3)
+        }
+        .background(Color.white.opacity(0.08))
+        .cornerRadius(8)
+        .padding(.horizontal, 16)
+    }
+    
+    private func tabButton(title: String, index: Int) -> some View {
+        Button(action: {
+            selectedSubTab = index
+        }) {
+            Text(title)
+                .font(.system(size: 12, weight: selectedSubTab == index ? .bold : .medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
+                .foregroundColor(selectedSubTab == index ? .black : .white.opacity(0.75))
+        }
+    }
+    
+    // MARK: - 天机书宣纸长卷 Banner
+    private func tianJiShuBanner() -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Image(systemName: "scroll.fill")
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text("福宅天机堪舆全案长卷")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                Text("集成坐向立极、玄空九星、八路黄泉与奇门命卦")
+                    .font(.system(size: 10))
+                    .foregroundColor(.white.opacity(0.65))
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                showTianJiShuSheet = true
+            }) {
+                Text("一键出图")
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(red: 0.95, green: 0.8, blue: 0.35), Color(red: 0.75, green: 0.55, blue: 0.2)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .foregroundColor(.black)
+                    .cornerRadius(12)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(red: 0.14, green: 0.12, blue: 0.11))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    // MARK: - 玄空九星排盘内容
+    private func xuanKongContent(chart: XuanKongChart) -> some View {
+        VStack(spacing: 14) {
+            periodPickerBar()
+            patternBadgeView(chart: chart)
+            ninePalacesGrid(chart: chart)
+                .padding(.horizontal, 16)
+            analysisCard(chart: chart)
+                .padding(.horizontal, 16)
+        }
     }
     
     // MARK: - 元运切换栏
@@ -52,14 +153,24 @@ public struct XuanKongGridView: View {
                 HStack(spacing: 6) {
                     ForEach(1...9, id: \.self) { p in
                         Button(action: {
-                            selectedPeriod = p
+                            if p != 9 && !iap.hasUnlockedVIP {
+                                showPaywall = true
+                            } else {
+                                selectedPeriod = p
+                            }
                         }) {
-                            Text("\(p)运")
-                                .font(.system(size: 13, weight: p == selectedPeriod ? .bold : .medium))
-                                .frame(width: 44, height: 32)
-                                .background(p == selectedPeriod ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
-                                .foregroundColor(p == selectedPeriod ? .black : .white)
-                                .cornerRadius(8)
+                            HStack(spacing: 2) {
+                                Text("\(p)运")
+                                if p != 9 && !iap.hasUnlockedVIP {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 8))
+                                }
+                            }
+                            .font(.system(size: 13, weight: p == selectedPeriod ? .bold : .medium))
+                            .frame(width: p != 9 && !iap.hasUnlockedVIP ? 52 : 44, height: 32)
+                            .background(p == selectedPeriod ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
+                            .foregroundColor(p == selectedPeriod ? .black : .white)
+                            .cornerRadius(8)
                         }
                     }
                 }
@@ -103,92 +214,76 @@ public struct XuanKongGridView: View {
         }
     }
     
-    private func palaceCellView(cell: PalaceCell) -> some View {
-        VStack(spacing: 4) {
-            // 方位与宫位名
+    private func palaceCellView(cell: XuanKongPalace) -> some View {
+        let isDanger25 = (cell.sittingStar == 2 && cell.facingStar == 5) || (cell.sittingStar == 5 && cell.facingStar == 2)
+        let isDouble9 = cell.sittingStar == 9 && cell.facingStar == 9
+        let borderColor = isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12))
+        let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
+        
+        return VStack(spacing: 4) {
             HStack {
-                Text(cell.direction)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Spacer()
-                Text(cell.trigram)
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.5))
-            }
-            
-            Spacer()
-            
-            // 核心飞星：山星 (左上) · 向星 (右上) · 运星 (下中)
-            HStack(alignment: .center) {
-                // 山星 (丁星)
-                Text("\(cell.mountainStar)")
-                    .font(.system(size: 22, weight: .black, design: .serif))
-                    .foregroundColor(cell.isWangMountain ? Color.green : (cell.mountainStar == 5 ? Color.red : .white))
-                
-                Spacer()
-                
-                // 向星 (财星)
-                Text("\(cell.facingStar)")
-                    .font(.system(size: 22, weight: .black, design: .serif))
-                    .foregroundColor(cell.isWangFacing ? Color(red: 0.95, green: 0.85, blue: 0.45) : (cell.facingStar == 5 ? Color.red : .white))
-            }
-            .padding(.horizontal, 4)
-            
-            Spacer()
-            
-            // 底栏运星与当位评价
-            HStack {
-                Text("运\(cell.periodStar)")
-                    .font(.system(size: 10, weight: .bold))
+                Text("\(cell.sittingStar)")
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(Color.yanCyan)
                 Spacer()
-                if cell.isShaWuHuang || cell.isShaErHei {
-                    Text("煞")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.red)
-                } else if cell.isWangFacing {
-                    Text("旺财")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.green)
-                }
+                Text("\(cell.facingStar)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(Color.orange)
+            }
+            
+            Text("\(cell.periodStar)")
+                .font(.system(size: 22, weight: .bold, design: .serif))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .padding(.vertical, 2)
+            
+            HStack {
+                Text(cell.palaceName)
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.5))
+                Spacer()
+                Text(cell.element)
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.5))
             }
         }
         .padding(8)
-        .frame(height: 105)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(cell.isCenter ? Color(red: 0.16, green: 0.15, blue: 0.18) : Color(red: 0.11, green: 0.11, blue: 0.14))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(cell.isWangFacing ? Color.yellow.opacity(0.4) : Color.white.opacity(0.1), lineWidth: 1)
-                )
+        .frame(minHeight: 74)
+        .background(bgColor)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(borderColor, lineWidth: (isDanger25 || isDouble9) ? 1.5 : 1)
         )
     }
     
-    // MARK: - 深度格局断语卡
+    // MARK: - 深度分析卡
     private func analysisCard(chart: XuanKongChart) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("三元玄空深度堪舆研判")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-            }
+            Text("📜 格局深研分析")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
-            Text(chart.summaryAnalysis)
+            Text(chart.patternDesc)
                 .font(.system(size: 13))
-                .foregroundColor(.white.opacity(0.9))
+                .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(4)
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("• 旺财布局：向星当令之方宜开门见水，动水催财；")
+                Text("• 旺丁布局：山星当令之方宜设主卧、安床有靠；")
+                Text("• 二五化煞：二黑五黄交叠之宫位，悬挂六帝钱以金泄土。")
+            }
+            .font(.system(size: 11))
+            .foregroundColor(.white.opacity(0.7))
         }
         .padding(14)
-        .background(
+        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+        .cornerRadius(12)
+        .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(red: 0.12, green: 0.12, blue: 0.16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.25), lineWidth: 1)
-                )
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
 }

@@ -56,6 +56,20 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     @Published public var isVIPUser: Bool = false
     @Published public var isLifetimeUser: Bool = false
+    @Published public var floorplanCreditsCount: Int = 0
+    @Published public var tianjiCreditsCount: Int = 0
+    
+    public var hasUnlockedVIP: Bool {
+        return isVIPUser || isLifetimeUser
+    }
+    
+    public var canUseFloorplan: Bool {
+        return hasUnlockedVIP || floorplanCreditsCount > 0
+    }
+    
+    public var canUseTianji: Bool {
+        return hasUnlockedVIP || tianjiCreditsCount > 0
+    }
     
     private var productsRequest: SKProductsRequest?
     private var availableProducts: [String: SKProduct] = [:]
@@ -71,6 +85,8 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         super.init()
         self.isVIPUser = isVIP()
         self.isLifetimeUser = isLifetime()
+        self.floorplanCreditsCount = floorplanCredits()
+        self.tianjiCreditsCount = tianjiCredits()
         SKPaymentQueue.default().add(self)
         fetchProducts()
     }
@@ -232,6 +248,8 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             guard let self = self else { return }
             self.isVIPUser = self.isVIP()
             self.isLifetimeUser = self.isLifetime()
+            self.floorplanCreditsCount = self.floorplanCredits()
+            self.tianjiCreditsCount = self.tianjiCredits()
         }
     }
     
@@ -263,8 +281,12 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         if isVIP() { return true }
         let credits = floorplanCredits()
         if credits > 0 {
-            UserDefaults.standard.set(credits - 1, forKey: kFloorplanCredits)
+            let remain = credits - 1
+            UserDefaults.standard.set(remain, forKey: kFloorplanCredits)
             UserDefaults.standard.synchronize()
+            DispatchQueue.main.async { [weak self] in
+                self?.floorplanCreditsCount = remain
+            }
             return true
         }
         return false
@@ -274,8 +296,12 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         if isVIP() { return true }
         let credits = tianjiCredits()
         if credits > 0 {
-            UserDefaults.standard.set(credits - 1, forKey: kTianjiCredits)
+            let remain = credits - 1
+            UserDefaults.standard.set(remain, forKey: kTianjiCredits)
             UserDefaults.standard.synchronize()
+            DispatchQueue.main.async { [weak self] in
+                self?.tianjiCreditsCount = remain
+            }
             return true
         }
         return false

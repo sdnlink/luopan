@@ -41,6 +41,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public var speedKmH: Double = 0.0
     @Published public var coordsDesc: String = "39.90420°N, 116.40740°E · 海拔 45m"
     @Published public var trueSolarTimeStr: String = "12:00:00"
+    @Published public var solarTimeDesc: String = "真太阳时校准 · 均时差 +0.0分"
     
     @Published public var isDistorted: Bool = false
     @Published public var magneticStrengthUT: Double = 48.0
@@ -49,6 +50,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     // 手动触控拨盘与锁盘
     @Published public var isLocked: Bool = false
     @Published public var manualOffset: Double = 0.0
+    @Published public var isHapticEnabled: Bool = true
     
     @Published public var headingState: CompassHeadingState = Mountain24Data.shared.resolveHeadingState(heading: 0.0)
     
@@ -151,20 +153,22 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         
         // 跨越二十四山边界时触发微触觉反馈
         if resolved.facingMountain.id != lastMountainIndex {
-            if lastMountainIndex != -1 {
+            if lastMountainIndex != -1 && isHapticEnabled {
                 hapticTick.impactOccurred()
             }
             lastMountainIndex = resolved.facingMountain.id
         }
         
         // 当达到完全水平状态 (<1.5°) 时触发一次沉浸式对准震感
-        if resolved.isLevel && !wasLevel {
+        if resolved.isLevel && !wasLevel && isHapticEnabled {
             hapticLevel.impactOccurred()
         }
         wasLevel = resolved.isLevel
         
         let solarResult = SolarTimeCalculator.shared.calculate(date: Date(), longitude: self.longitude)
         self.trueSolarTimeStr = solarResult.trueSolarTimeString
+        let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
+        self.solarTimeDesc = "\(solarResult.baziGanzhi) (均时差 \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))分)"
     }
     
     private func startMotionUpdates() {

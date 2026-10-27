@@ -59,7 +59,7 @@ public struct CalibrationSheet: View {
                         
                         statusRow(
                             title: lang.t("calib_coords_title"),
-                            value: String(format: "%.4f°N, %.4f°E", motion.latitude, motion.longitude),
+                            value: motion.coordsDesc,
                             isOk: true,
                             customColor: Color.yanCyan
                         )

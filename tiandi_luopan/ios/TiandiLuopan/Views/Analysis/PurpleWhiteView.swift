@@ -25,7 +25,9 @@ public struct PurpleWhiteView: View {
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
-                Text("\(chart.year) · \(chart.month)")
+                let isEn = LocalizationManager.shared.effectiveLanguage == .en
+                let dateLabel = isEn ? "\(chart.year) / \(chart.month)" : "\(chart.year)年 · \(chart.month)月"
+                Text(dateLabel)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
             }

@@ -7,6 +7,7 @@
 - 修复 `tools/generate_pbxproj.py` 会用只包含四个旧 Swift 文件的模板覆盖现有工程的问题；现在检测到已存在的工程会保留其完整 Sources/Frameworks 配置，缺失工程时直接报错，避免生成不可编译的 iOS 项目。
 - 将 `InfoPlist.strings` 的简体、繁体和英文资源加入 Xcode 的 `PBXVariantGroup` 与 Resources 构建阶段；隐私授权提示和系统应用名称现在会随系统语言正确本地化。
 - 修正 Swift 符号审计脚本的工作目录依赖，并识别 `private(set)` 的已发布状态；从仓库根目录或 `tiandi_luopan` 目录运行时都能得到一致结果，缺失成员会让检查失败。
+- 修复年度购买交易延迟到达时的权益边界：如果 StoreKit 在网络恢复后才回调一个已完成但很早的交易，会员周期从当前时间或现有未过期周期开始，不会出现“购买成功后立即过期”。
 
 ## 运行链路
 

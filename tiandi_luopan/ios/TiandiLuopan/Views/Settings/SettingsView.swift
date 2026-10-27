@@ -16,7 +16,7 @@ public struct SettingsView: View {
     }
     
     private var isProUnlocked: Bool {
-        return iap.isLifetimeUser || iap.isVIPUser
+        return iap.hasUnlockedVIP
     }
     
     public var body: some View {

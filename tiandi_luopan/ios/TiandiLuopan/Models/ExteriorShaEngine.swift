@@ -16,6 +16,20 @@ public enum ShaSeverity: String, Codable {
         case .notice:   return "#10b981"
         }
     }
+    
+    public var localizedTitle: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch self {
+        case .critical:
+            return lang == .en ? "Critical (Major Harm)" : (lang == .zhHant ? "極凶 (大煞破局)" : "极凶 (大煞破局)")
+        case .warning:
+            return lang == .en ? "Warning (Severe Harm)" : (lang == .zhHant ? "中凶 (損丁耗財)" : "中凶 (损丁耗财)")
+        case .minor:
+            return lang == .en ? "Minor (Disturbed Qi)" : (lang == .zhHant ? "輕微 (氣場受擾)" : "轻微 (气场受扰)")
+        case .notice:
+            return lang == .en ? "Auspicious (Bright Hall)" : (lang == .zhHant ? "吉象 (明堂清秀)" : "吉象 (明堂清秀)")
+        }
+    }
 }
 
 public struct ExteriorShaItem: Identifiable, Codable {
@@ -27,6 +41,87 @@ public struct ExteriorShaItem: Identifiable, Codable {
     public let severity: ShaSeverity     // 严重等级
     public let classicalText: String     // 古籍赋文
     public let remedySolution: String    // 大师化解方案与开光法器建议
+    
+    public var localizedName: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch id {
+        case "tianzhan": return lang == .en ? "Sky Severing Sha" : (lang == .zhHant ? "天斬煞" : name)
+        case "luchong":  return lang == .en ? "Road Rush Sha" : (lang == .zhHant ? "路衝煞" : name)
+        case "fangong":  return lang == .en ? "Reverse Bow Water" : (lang == .zhHant ? "反弓水" : name)
+        case "tantou":   return lang == .en ? "Peeking Sha" : (lang == .zhHant ? "探頭煞" : name)
+        case "chuanxin": return lang == .en ? "Heart Piercing Sha" : (lang == .zhHant ? "穿心煞" : name)
+        case "huoxing":  return lang == .en ? "Fire Shape Sha" : (lang == .zhHant ? "火形煞" : name)
+        case "baihu":    return lang == .en ? "White Tiger Sha" : (lang == .zhHant ? "白虎煞" : name)
+        case "gejiao":   return lang == .en ? "Feet Cutting Sha" : (lang == .zhHant ? "割腳煞" : name)
+        default: return name
+        }
+    }
+    
+    public var localizedAliases: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            switch id {
+            case "tianzhan": return "Wind Blade Gap · Split House"
+            case "luchong":  return "Spear Sha · Arrow Sha"
+            case "fangong":  return "Sickle Sha · Curved Knife"
+            case "tantou":   return "Peeping Tom Sha · Hidden Observer"
+            case "chuanxin": return "Hanging Needle · Hollow Qi"
+            case "huoxing":  return "Sharp Angle · Transformer Sha"
+            case "baihu":    return "Dominant Right · Tiger Head"
+            case "gejiao":   return "Foot Scraper · Rapid Stream"
+            default: return aliases
+            }
+        } else if lang == .zhHant {
+            switch id {
+            case "tianzhan": return "天塹煞 · 穿心風"
+            case "luchong":  return "槍煞 · 箭煞"
+            case "fangong":  return "割腳鐮 · 彎刀煞"
+            case "tantou":   return "窺視煞 · 偷窺小人"
+            case "chuanxin": return "懸針煞 · 地底貫通"
+            case "huoxing":  return "尖角煞 · 尖峰衝煞"
+            case "baihu":    return "虎強龍弱 · 白虎抬頭"
+            case "gejiao":   return "割腳水 · 貼足急流"
+            default: return aliases
+            }
+        }
+        return aliases
+    }
+    
+    public var localizedVisualFeature: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            switch id {
+            case "tianzhan": return "Extremely narrow gap between two high-rise buildings directly facing the property."
+            case "luchong":  return "A straight road, alley, or corridor pointing directly at the main entrance or window."
+            case "fangong":  return "An elevated bridge, highway, or curved road bending outward like an arched bow."
+            case "tantou":   return "A roof corner, dome, or structure peering from behind a frontal building."
+            case "chuanxin": return "Subway, tunnel, or busy roadway passing directly underneath the building."
+            case "huoxing":  return "Sharp roof corners, triangular towers, gas stations, or electrical substations."
+            case "baihu":    return "Right-side building is noticeably taller than the left (Azure Dragon) side."
+            case "gejiao":   return "High-speed road or turbulent waterway running directly against building foundations."
+            default: return visualFeature
+            }
+        }
+        return visualFeature
+    }
+    
+    public var localizedRemedySolution: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            switch id {
+            case "tianzhan": return "1. Hang an authentic Mountain-Sea Mirror or convex Bagua mirror;\n2. Plant broad-leaved evergreen plants on the balcony as a wind buffer;\n3. Install an opaque porch screen to break direct incoming wind."
+            case "luchong":  return "1. Place a Taishan Stone Shi Gandang monument at the entrance;\n2. Design a winding entryway to slow and harmonize incoming qi flow;\n3. Position a pair of consecrated pure brass Qilin facing the road."
+            case "fangong":  return "1. Position an Obsidian Dragon Turtle facing outward;\n2. Place curved lush greenery along window ledges as an energetic buffer;\n3. Hang Five Emperor Coins with Vajra pestle indoors."
+            case "tantou":   return "1. Hang a convex brass Bagua mirror to reflect peering energy;\n2. Place a pure brass rooster facing the corner to dispel stealth disturbance;\n3. Keep translucent venetian blinds closed during daylight."
+            case "chuanxin": return "1. Lay yellow jade Seven-Star array on the floor to ground Earth qi;\n2. Install a sunken solid brass threshold at the entrance;\n3. Place a heavy solid-wood cabinet at the foyer to retain qi."
+            case "huoxing":  return "1. Place natural white quartz crystal sphere or obsidian array to counter Fire;\n2. Hang two strings of Six Emperor brass coins near the window;\n3. Integrate ocean blue decorative textiles to balance Five Elements."
+            case "baihu":    return "1. Place a consecrated pure brass Dragon holding a pearl on the left side;\n2. Position a heavy green jade Taishan stone on the right to subdue the Tiger;\n3. Increase lighting intensity and tall furniture placement on the left."
+            case "gejiao":   return "1. Build tall planter boxes and shrubs on the balcony as a buffer;\n2. Place a pair of brass Pixiu facing the waterway to guard wealth;\n3. Install thick soundproofing laminated Low-E double glazing."
+            default: return remedySolution
+            }
+        }
+        return remedySolution
+    }
 }
 
 public final class ExteriorShaEngine {

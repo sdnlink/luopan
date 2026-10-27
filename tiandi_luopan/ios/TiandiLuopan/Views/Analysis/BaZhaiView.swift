@@ -84,10 +84,10 @@ public struct BaZhaiView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(bz.houseGua)
+                        Text(bz.localizedHouseGua)
                             .font(.system(size: 20, weight: .bold, design: .serif))
                             .foregroundColor(.white)
-                        Text(bz.houseType)
+                        Text(bz.localizedHouseType)
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -95,7 +95,7 @@ public struct BaZhaiView: View {
                             .foregroundColor(Color.orange)
                             .cornerRadius(4)
                     }
-                    Text("\(lang.t("gate_facing_prefix"))：\(bz.gateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.rawValue)】")
+                    Text("\(lang.t("gate_facing_prefix"))：\(bz.localizedGateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.localizedName)】")
                         .font(.system(size: 13))
                         .foregroundColor(bz.gateStar.isAuspicious ? Color.green : Color.red)
                 }
@@ -111,16 +111,16 @@ public struct BaZhaiView: View {
                 ForEach(bz.items) { item in
                     HStack(alignment: .top, spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(item.direction)
+                            Text(item.localizedDirection)
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.white)
-                            Text(item.star.rawValue)
+                            Text(item.star.localizedName)
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(item.star.isAuspicious ? Color(red: 0.4, green: 0.85, blue: 0.4) : Color(red: 0.95, green: 0.4, blue: 0.4))
                         }
                         .frame(width: 120, alignment: .leading)
                         
-                        Text(item.star.actionSuggestion)
+                        Text(item.star.localizedSuggestion)
                             .font(.system(size: 12))
                             .foregroundColor(.white.opacity(0.85))
                             .lineSpacing(2)

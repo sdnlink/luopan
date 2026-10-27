@@ -84,7 +84,10 @@ public struct PurpleWhiteView: View {
     }
     
     private func palaceCellView(item: PurpleWhitePalaceItem) -> some View {
-        let isDanger = item.isDanger25 || item.yearGuestStar == 5
+        // Both annual and monthly Five Yellow can affect the current palace;
+        // the chart's advice uses the same rule so the visual warning cannot
+        // disagree with the detail text.
+        let isDanger = item.isDanger25 || item.yearGuestStar == 5 || item.monthGuestStar == 5
         let isJi = [1, 4, 6, 8, 9].contains(item.yearGuestStar)
         let strokeColor = isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12))
         let bgColor = isDanger ? Color.red.opacity(0.12) : (isJi ? Color.green.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))

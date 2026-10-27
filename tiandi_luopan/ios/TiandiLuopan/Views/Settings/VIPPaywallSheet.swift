@@ -235,6 +235,24 @@ public struct VIPPaywallSheet: View {
                 presentationMode.wrappedValue.dismiss()
             }
         }
+        .onReceive(iap.$isLifetimeUser) { isLifetime in
+            if isLifetime {
+                isPurchasing = false
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+        .onReceive(iap.$floorplanCreditsCount) { count in
+            if count > 0 && selectedProductId == IAPProductID.floorplanSingle.rawValue {
+                isPurchasing = false
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
+        .onReceive(iap.$tianjiCreditsCount) { count in
+            if count > 0 && selectedProductId == IAPProductID.tianjiSingle.rawValue {
+                isPurchasing = false
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
     }
     
     private func getSelectedProductTitle() -> String {

@@ -156,6 +156,9 @@ public class LocalizationManager: ObservableObject {
             "remedy_guide": "化解锦囊",
             "simulation_mode": "室内 / 模拟实景演练模式",
             "sha_report": "形煞诊断报告",
+            "ar_auto_follow": "实景朝向跟随",
+            "ar_manual_lock": "手动锁定形煞",
+            "ar_current_facing": "当前主应",
             
             // 会员与设置
             "vip_member_center": "演象·时空罗盘 会员中心",
@@ -520,6 +523,9 @@ public class LocalizationManager: ObservableObject {
             "remedy_guide": "化解錦囊",
             "simulation_mode": "室內 / 模擬實景演練模式",
             "sha_report": "形煞診斷報告",
+            "ar_auto_follow": "實景朝向跟隨",
+            "ar_manual_lock": "手動鎖定形煞",
+            "ar_current_facing": "當前主應",
             
             // 會員與設置
             "vip_member_center": "演象·時空羅盤 會員中心",
@@ -883,6 +889,9 @@ public class LocalizationManager: ObservableObject {
             "remedy_guide": "Remedy Guide",
             "simulation_mode": "Indoor Simulation Mode",
             "sha_report": "Sha Diagnostic Report",
+            "ar_auto_follow": "Auto Facing",
+            "ar_manual_lock": "Manual Lock",
+            "ar_current_facing": "Target Facing",
             
             // Membership & Settings
             "vip_member_center": "YanXiang VIP Sanctuary",

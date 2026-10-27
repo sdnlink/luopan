@@ -71,6 +71,19 @@ public struct Mountain24Item: Identifiable, Codable {
     public var endAngle: Double { angleEnd }
     public var subIndex: Int { id }
     public var post: String { palace }
+    
+    public var localizedName: String {
+        return LocalizationManager.shared.effectiveLanguage == .en ? pinyin : name
+    }
+    
+    public var localizedPalace: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        if lang == .en {
+            let enPalaces = ["坎": "Kan", "坤": "Kun", "震": "Zhen", "巽": "Xun", "乾": "Qian", "兑": "Dui", "艮": "Gen", "离": "Li"]
+            return enPalaces[palace] ?? palace
+        }
+        return palace
+    }
 }
 
 public typealias Mountain24 = Mountain24Item

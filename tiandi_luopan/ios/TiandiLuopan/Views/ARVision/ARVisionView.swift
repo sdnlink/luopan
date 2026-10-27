@@ -445,7 +445,7 @@ public struct ARVisionView: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: isAutoFollowingDirection ? "location.fill" : "lock.fill")
-                        Text(isAutoFollowingDirection ? "实景朝向跟随" : "手动锁定形煞")
+                        Text(isAutoFollowingDirection ? lang.t("ar_auto_follow") : lang.t("ar_manual_lock"))
                     }
                     .font(.system(size: 10, weight: .bold))
                     .padding(.horizontal, 8)
@@ -457,7 +457,7 @@ public struct ARVisionView: View {
                 
                 Spacer()
                 
-                Text("当前主应：\(targetMountain.palace) · \(targetMountain.name)山")
+                Text("\(lang.t("ar_current_facing")): \(targetMountain.localizedPalace) · \(targetMountain.localizedName)\(lang.t("mountain_suffix"))")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
@@ -472,7 +472,7 @@ public struct ARVisionView: View {
                             isAutoFollowingDirection = false
                             selectedShaIndex = idx
                         }) {
-                            Text(item.name)
+                            Text(item.localizedName)
                                 .font(.system(size: 11, weight: isSelected ? .bold : .medium))
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
@@ -561,21 +561,21 @@ public struct ARVisionView: View {
             if isEn {
                 infoText = """
                 Facing Orientation: Mountain \(mFacing.pinyin) (Measured \(String(format: "%.1f", currentHeading))°)
-                Identified Sha: [\(currentSha.name)] (\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                Identified Sha: [\(currentSha.localizedName)] (\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
                 Coordinates: \(coordsStr)
                 Audit Time: \(timeStr) · SN: YX-AR-\(Int(Date().timeIntervalSince1970))
                 """
             } else if isHant {
                 infoText = """
                 向首方位: \(mFacing.name)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
-                識別形煞: 【\(currentSha.name)】(\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                識別形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
                 現場經緯: \(coordsStr)
                 勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(Date().timeIntervalSince1970))
                 """
             } else {
                 infoText = """
                 向首方位: \(mFacing.name)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.palace)
-                识别形煞: 【\(currentSha.name)】(\(currentSha.aliases)) · \(currentSha.severity.rawValue)
+                识别形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
                 现场经纬: \(coordsStr)
                 勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(Date().timeIntervalSince1970))
                 """
@@ -618,14 +618,14 @@ public struct ShaRemedyDetailSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(sha.name)
+                            Text(sha.localizedName)
                                 .font(.system(size: 24, weight: .bold, design: .serif))
-                            Text(sha.aliases)
+                            Text(sha.localizedAliases)
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Text(sha.severity.rawValue)
+                        Text(sha.severity.localizedTitle)
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -637,7 +637,7 @@ public struct ShaRemedyDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(LocalizationManager.shared.t("ar_env_features"))
                             .font(.system(size: 15, weight: .bold))
-                        Text(sha.visualFeature)
+                        Text(sha.localizedVisualFeature)
                             .font(.system(size: 13))
                             .foregroundColor(.primary)
                     }
@@ -666,7 +666,7 @@ public struct ShaRemedyDetailSheet: View {
                                 onUnlockTap: { showPaywall = true }
                             )
                         } else {
-                            Text(sha.remedySolution)
+                            Text(sha.localizedRemedySolution)
                                 .font(.system(size: 13))
                                 .foregroundColor(.primary)
                                 .padding(10)

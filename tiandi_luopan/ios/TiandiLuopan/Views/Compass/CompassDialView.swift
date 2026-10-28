@@ -1,4 +1,5 @@
 import SwiftUI
+import Darwin
 
 // MARK: - 原生高性能矢量罗盘盘面视图 (Pure SwiftUI Compass Dial - 120Hz ProMotion)
 
@@ -242,8 +243,8 @@ public struct CompassDialView: View {
             func point(angle: Double, radius: CGFloat) -> CGPoint {
                 let radians = angle * .pi / 180.0
                 return CGPoint(
-                    x: center.x + sin(radians) * radius,
-                    y: center.y - cos(radians) * radius
+                    x: center.x + CGFloat(Darwin.sin(radians)) * radius,
+                    y: center.y - CGFloat(Darwin.cos(radians)) * radius
                 )
             }
 
@@ -264,8 +265,8 @@ public struct CompassDialView: View {
                 func point(angle: Double, radius: CGFloat) -> CGPoint {
                     let radians = angle * .pi / 180.0
                     return CGPoint(
-                        x: center.x + sin(radians) * radius,
-                        y: center.y - cos(radians) * radius
+                        x: center.x + CGFloat(Darwin.sin(radians)) * radius,
+                        y: center.y - CGFloat(Darwin.cos(radians)) * radius
                     )
                 }
                 path.move(to: point(angle: startAngle, radius: outerRadius))
@@ -386,7 +387,7 @@ public struct CompassDialView: View {
     private func magneticNeedleLayer(radius: CGFloat) -> some View {
         let center = radius
 
-        ZStack {
+        return ZStack {
             Path { path in
                 path.move(to: CGPoint(x: center, y: center))
                 path.addLine(to: CGPoint(x: center - 3.5, y: center - radius * 0.8))
@@ -438,7 +439,7 @@ public struct CompassDialView: View {
     private func trueNorthNeedleLayer(radius: CGFloat) -> some View {
         let center = radius
 
-        ZStack {
+        return ZStack {
             Path { path in
                 path.move(to: CGPoint(x: center, y: center))
                 path.addLine(to: CGPoint(x: center - 2.0, y: center - radius * 0.85))
@@ -508,7 +509,7 @@ public struct CompassDialView: View {
         let canvasSize = radius * 2 + 32
         let center = canvasSize / 2
 
-        ZStack {
+        return ZStack {
             Path { path in
                 path.move(to: CGPoint(x: center, y: center - radius - 1))
                 path.addLine(to: CGPoint(x: center - 7, y: center - radius - 12))

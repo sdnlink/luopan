@@ -129,7 +129,7 @@ public struct CameraPreviewView: UIViewRepresentable {
             sessionObservers.removeAll()
             let center = NotificationCenter.default
             sessionObservers.append(center.addObserver(
-                forName: AVCaptureSession.wasInterruptedNotification,
+                forName: .AVCaptureSessionWasInterrupted,
                 object: session,
                 queue: .main
             ) { [weak self] _ in
@@ -139,7 +139,7 @@ public struct CameraPreviewView: UIViewRepresentable {
                 self?.cancelPendingCapture()
             })
             sessionObservers.append(center.addObserver(
-                forName: AVCaptureSession.interruptionEndedNotification,
+                forName: .AVCaptureSessionInterruptionEnded,
                 object: session,
                 queue: .main
             ) { [weak self] _ in
@@ -152,7 +152,7 @@ public struct CameraPreviewView: UIViewRepresentable {
                 }
             })
             sessionObservers.append(center.addObserver(
-                forName: AVCaptureSession.runtimeErrorNotification,
+                forName: .AVCaptureSessionRuntimeError,
                 object: session,
                 queue: .main
             ) { [weak self] notification in
@@ -274,6 +274,16 @@ public struct CameraPreviewView: UIViewRepresentable {
                       self.captureSession === session,
                       session.isRunning else { return }
                 session.stopRunning()
+            }
+        }
+
+        private func cancelPendingCapture() {
+            let pendingCompletion = photoCompletion
+            photoCompletion = nil
+            isCapturingPhoto = false
+            guard let pendingCompletion = pendingCompletion else { return }
+            DispatchQueue.main.async {
+                pendingCompletion(nil)
             }
         }
     }
@@ -605,15 +615,6 @@ public struct ARVisionView: View {
             }
         }
 
-        private func cancelPendingCapture() {
-            let pendingCompletion = photoCompletion
-            photoCompletion = nil
-            isCapturingPhoto = false
-            guard let pendingCompletion = pendingCompletion else { return }
-            DispatchQueue.main.async {
-                pendingCompletion(nil)
-            }
-        }
     }
     
     // MARK: - 十字天心准星

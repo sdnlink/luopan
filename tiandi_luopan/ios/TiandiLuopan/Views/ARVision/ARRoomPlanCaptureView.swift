@@ -36,6 +36,30 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         isCapturing = false
     }
 
+    public func saveSemanticReport() -> Result<URL, Error> {
+        guard didFinish else {
+            return .failure(ARRoomPlanExportError.captureNotFinished)
+        }
+        let payload: [String: Any] = [
+            "source": "RoomPlan",
+            "createdAt": ISO8601DateFormatter().string(from: Date()),
+            "walls": wallCount,
+            "doors": doorCount,
+            "windows": windowCount,
+            "openings": openingCount,
+            "objects": objectCount
+        ]
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("TianJiYanXiang-RoomPlan-\(Int(Date().timeIntervalSince1970)).json")
+            try data.write(to: url, options: .atomic)
+            return .success(url)
+        } catch {
+            return .failure(error)
+        }
+    }
+
     public func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
         let wallCount = room.walls.count
         let doorCount = room.doors.count
@@ -60,6 +84,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             self.errorMessage = error?.localizedDescription
         }
     }
+}
+
+@available(iOS 16.0, *)
+private enum ARRoomPlanExportError: Error {
+    case captureNotFinished
 }
 
 @available(iOS 16.0, *)
@@ -88,6 +117,8 @@ public struct ARRoomPlanSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @StateObject private var model = ARRoomPlanModel()
     @Environment(\.presentationMode) private var presentationMode
+    @State private var shareItem: ARRoomPlanShareItem?
+    @State private var reportMessage: String?
 
     public init() {}
 
@@ -117,6 +148,16 @@ public struct ARRoomPlanSurveyView: View {
                                 .clipShape(Circle())
                         }
                         .accessibilityLabel(lang.t("ar_roomplan_finish"))
+                    } else if model.didFinish {
+                        Button(action: shareReport) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(9)
+                                .background(Color.blue.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel(lang.t("ar_roomplan_share"))
                     }
                     Button(action: {
                         model.stop()
@@ -155,6 +196,11 @@ public struct ARRoomPlanSurveyView: View {
                             .font(.system(size: 10))
                             .foregroundColor(.orange)
                     }
+                    if let reportMessage = reportMessage {
+                        Text(reportMessage)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.yanCyan)
+                    }
                 }
                 .padding(12)
                 .background(Color.black.opacity(0.8))
@@ -165,6 +211,19 @@ public struct ARRoomPlanSurveyView: View {
         }
         .background(Color.black.ignoresSafeArea())
         .onDisappear { model.stop() }
+        .sheet(item: $shareItem) { item in
+            ARRoomPlanShareSheet(items: [item.url])
+        }
+    }
+
+    private func shareReport() {
+        switch model.saveSemanticReport() {
+        case .success(let url):
+            reportMessage = lang.t("ar_roomplan_report_ready")
+            shareItem = ARRoomPlanShareItem(url: url)
+        case .failure:
+            reportMessage = lang.t("ar_roomplan_report_unavailable")
+        }
     }
 
     private func semanticCount(_ key: String, value: Int, icon: String) -> some View {
@@ -173,6 +232,34 @@ public struct ARRoomPlanSurveyView: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+@available(iOS 16.0, *)
+private struct ARRoomPlanShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+@available(iOS 16.0, *)
+private struct ARRoomPlanShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(
+                x: controller.view.bounds.midX,
+                y: controller.view.bounds.midY,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #endif

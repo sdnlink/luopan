@@ -87,6 +87,13 @@ public struct CameraPreviewView: UIViewRepresentable {
             let photoOutput = AVCapturePhotoOutput()
             if session.canAddOutput(photoOutput) {
                 session.addOutput(photoOutput)
+                if #available(iOS 13.0, *) {
+                    // AI rectangle detection and the 1080px proof renderer
+                    // do not need maximum computational photography quality.
+                    // Prefer a faster capture to reduce shutter latency and
+                    // the short-lived CPU/ISP power spike.
+                    photoOutput.maxPhotoQualityPrioritization = .speed
+                }
                 self.photoCaptureOutput = photoOutput
             } else {
                 self.photoCaptureOutput = nil
@@ -190,6 +197,9 @@ public struct CameraPreviewView: UIViewRepresentable {
             photoCompletion = completion
             let settings = AVCapturePhotoSettings()
             settings.flashMode = .off
+            if #available(iOS 13.0, *) {
+                settings.photoQualityPrioritization = .speed
+            }
             photoOutput.capturePhoto(with: settings, delegate: self)
         }
 

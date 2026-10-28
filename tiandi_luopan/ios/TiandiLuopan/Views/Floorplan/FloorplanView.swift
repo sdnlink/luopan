@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 户型空间立极与全屋风水体检视图 (Floorplan View - PRD 5.3)
 
 public struct FloorplanView: View {
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -21,7 +22,9 @@ public struct FloorplanView: View {
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
     
-    public init() {}
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     private var effectiveHeading: Double {
         if !isSyncWithCompass {
@@ -33,11 +36,13 @@ public struct FloorplanView: View {
     }
     
     public var body: some View {
-        let auditResult = FloorplanEngine.shared.auditFloorplan(
-            rooms: rooms,
-            centroid: centroid,
-            heading: effectiveHeading
-        )
+        let auditResult: (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) = isActive
+            ? FloorplanEngine.shared.auditFloorplan(
+                rooms: rooms,
+                centroid: centroid,
+                heading: effectiveHeading
+            )
+            : (rooms, [])
         
         return ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea()

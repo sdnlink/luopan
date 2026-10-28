@@ -44,6 +44,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
+    private var activeConfiguration: ARWorldTrackingConfiguration?
 
     public func attach(to sceneView: ARSCNView) {
         self.sceneView = sceneView
@@ -84,10 +85,20 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         distance = nil
         semanticCounts = [:]
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+        activeConfiguration = configuration
     }
 
     public func resetSurvey() {
         start()
+    }
+
+    public func pause() {
+        sceneView?.session.pause()
+    }
+
+    public func resume() {
+        guard let sceneView = sceneView, let configuration = activeConfiguration else { return }
+        sceneView.session.run(configuration)
     }
 
     public func saveWorldMap(completion: @escaping (Result<URL, Error>) -> Void) {
@@ -127,6 +138,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView?.session.delegate = nil
         sceneView?.delegate = nil
         sceneView = nil
+        activeConfiguration = nil
         lastMeshGeometryUpdate.removeAll()
         distance = nil
         mappingState = .unavailable
@@ -421,6 +433,7 @@ public struct ARSpatialSurveyView: View {
     @State private var isSavingMap = false
     @State private var shareItem: ARSpatialShareItem?
     @State private var saveMessage: String?
+    @State private var showRoomPlan = false
 
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [
         (.wall, "ar_spatial_wall", "rectangle.portrait"),
@@ -457,6 +470,22 @@ public struct ARSpatialSurveyView: View {
         }
         .background(Color.black.ignoresSafeArea())
         .onDisappear { model.stop() }
+#if canImport(RoomPlan)
+        .onChange(of: showRoomPlan) { isPresented in
+            if isPresented {
+                model.pause()
+            } else {
+                model.resume()
+            }
+        }
+#endif
+#if canImport(RoomPlan)
+        .fullScreenCover(isPresented: $showRoomPlan) {
+            if #available(iOS 16.0, *) {
+                ARRoomPlanSurveyView()
+            }
+        }
+#endif
     }
 
     private var header: some View {
@@ -470,6 +499,23 @@ public struct ARSpatialSurveyView: View {
                     .foregroundColor(model.lidarAvailable ? .green : .orange)
             }
             Spacer()
+#if canImport(RoomPlan)
+            if #available(iOS 16.0, *),
+               ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+                Button(action: {
+                    model.pause()
+                    showRoomPlan = true
+                }) {
+                    Image(systemName: "house.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(9)
+                        .background(Color.blue.opacity(0.8))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel(lang.t("ar_roomplan_title"))
+            }
+#endif
             Button(action: {
                 saveMessage = nil
                 model.resetSurvey()

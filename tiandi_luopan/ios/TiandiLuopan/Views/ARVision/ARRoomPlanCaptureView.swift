@@ -8,6 +8,15 @@ import RoomPlan
 #if canImport(RoomPlan)
 
 @available(iOS 16.0, *)
+private func stopRoomCaptureSession(_ session: RoomCaptureSession) {
+    if #available(iOS 17.0, *) {
+        session.stop(pauseARSession: true)
+    } else {
+        session.stop()
+    }
+}
+
+@available(iOS 16.0, *)
 public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessionDelegate {
     @Published public private(set) var wallCount = 0
     @Published public private(set) var doorCount = 0
@@ -31,7 +40,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
     public func stop() {
         guard let session = captureView?.captureSession else { return }
-        session.stop(pauseARSession: true)
+        stopRoomCaptureSession(session)
         captureView = nil
         isCapturing = false
     }
@@ -108,7 +117,7 @@ public struct ARRoomPlanPreviewView: UIViewRepresentable {
     public func updateUIView(_ uiView: RoomCaptureView, context: Context) {}
 
     public static func dismantleUIView(_ uiView: RoomCaptureView, coordinator: ()) {
-        uiView.captureSession.stop(pauseARSession: true)
+        stopRoomCaptureSession(uiView.captureSession)
     }
 }
 
@@ -192,7 +201,7 @@ public struct ARRoomPlanSurveyView: View {
                         semanticCount("ar_roomplan_object", value: model.objectCount, icon: "cube")
                     }
                     if let error = model.errorMessage {
-                        Text("\(lang.t(\"ar_roomplan_failed\")): \(error)")
+                        Text("\(lang.t("ar_roomplan_failed")): \(error)")
                             .font(.system(size: 10))
                             .foregroundColor(.orange)
                     }

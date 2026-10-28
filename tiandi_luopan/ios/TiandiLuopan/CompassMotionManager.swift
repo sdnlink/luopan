@@ -101,7 +101,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         // 降低 GPS 天线高发热射频功耗：罗盘仅需十米/百米级经度计算太阳时，无需高耗能Best硬件
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         locationManager.distanceFilter = 20.0
-        locationManager.headingFilter = 0.3
+        // Core Location emits a new heading once this many degrees have
+        // changed. A 0.3° gate made slow turns feel unresponsive on devices
+        // whose sensor already applies its own internal smoothing.
+        locationManager.headingFilter = 0.05
         locationManager.headingOrientation = .portrait
     }
     
@@ -234,20 +237,19 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         lastRawHeading = newHeading
         
         // 自适应非线性阻尼滤波 (Adaptive Deadband & EMA Filter):
-        // 1. 微小手颤 ( < 0.2°): 极强阻尼抑制抖动，稳定视盘
-        // 2. 中速转动 ( 0.2° ~ 2.0°): 适度平滑跟手
-        // 3. 快速转动 ( > 2.0°): 快速响应无延迟
+        // 1. 微小手颤 ( < 0.12°): 轻度阻尼抑制抖动，同时保留慢速转动
+        // 2. 中速转动 ( 0.12° ~ 2.0°): 快速跟手
+        // 3. 快速转动 ( > 2.0°): 几乎直接跟随传感器
         let absDiff = abs(diff)
         let alpha: Double
         if absDiff < 0.12 {
-            // 手部生理微颤死区直接滤除
-            alpha = 0.04
+            alpha = 0.12
         } else if absDiff < 0.5 {
-            alpha = 0.15
+            alpha = 0.4
         } else if absDiff < 2.0 {
-            alpha = 0.35
+            alpha = 0.7
         } else {
-            alpha = 0.75
+            alpha = 0.95
         }
         
         // Keep accumulating the filtered value even when the published
@@ -356,10 +358,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private func startMotionUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
         
-        // 20 Hz is sufficient for a handheld level bubble.  The filter below
-        // still smooths every sample, while published SwiftUI state is limited
-        // to 10 Hz so all tabs do not redraw on every sensor callback.
-        motionManager.deviceMotionUpdateInterval = 1.0 / 20.0
+        // A 30 Hz sample stream keeps the level bubble responsive while the
+        // publication gate below still bounds SwiftUI redraws to 20 Hz.
+        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        motionManager.showsDeviceMovementDisplay = true
         let referenceFrame: CMAttitudeReferenceFrame = CMMotionManager.availableAttitudeReferenceFrames().contains(.xMagneticNorthZVertical) ? .xMagneticNorthZVertical : .xArbitraryZVertical
         
         motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motion, error in
@@ -375,10 +377,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let now = CACurrentMediaTime()
             // Apply the low-pass filter to every sensor sample without
             // publishing each intermediate value to SwiftUI.
-            self.filteredPitch = self.filteredPitch * 0.82 + pitchDeg * 0.18
-            self.filteredRoll = self.filteredRoll * 0.82 + rollDeg * 0.18
+            self.filteredPitch = self.filteredPitch * 0.68 + pitchDeg * 0.32
+            self.filteredRoll = self.filteredRoll * 0.68 + rollDeg * 0.32
 
-            let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.1
+            let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.05
             if shouldPublishTilt {
                 self.lastPublishedMotionTime = now
                 let nextPitch = self.filteredPitch

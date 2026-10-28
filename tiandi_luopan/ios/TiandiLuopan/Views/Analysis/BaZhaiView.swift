@@ -8,6 +8,9 @@ public struct BaZhaiView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedSubTab: Int = 0 // 0: 八宅明镜, 1: 三合水法
     @State private var showPaywall: Bool = false
+    @State private var cachedAnalysis: BaZhaiAnalysis?
+    @State private var cachedWaterItems: [SanHeWaterItem]?
+    @State private var cachedZeRi: ZeRiAnalysis?
     public var isEmbedded: Bool = false
     
     public init(isEmbedded: Bool = false) {
@@ -16,11 +19,15 @@ public struct BaZhaiView: View {
     
     public var body: some View {
         let state = motion.headingState
-        let bz = BaZhaiEngine.shared.analyze(
+        // Tilt and magnetic-field samples do not alter these calculations.
+        // Keep the expensive calendar and water-method results until the
+        // sitting/facing mountain or language actually changes.
+        let bz = cachedAnalysis ?? BaZhaiEngine.shared.analyze(
             sittingPalace: state.sittingMountain.palace,
             facingPalace: state.facingMountain.palace
         )
-        let shItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        let zeri = cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
         
         let content = VStack(spacing: 16) {
             // 1. 子 Tab 切换条
@@ -28,7 +35,7 @@ public struct BaZhaiView: View {
             
             if selectedSubTab == 0 {
                 // 八宅明镜板块
-                baZhaiContent(bz: bz, state: state)
+                baZhaiContent(bz: bz, zeri: zeri, state: state)
             } else {
                 // 三合水法板块
                 sanHeContent(shItems: shItems, state: state)
@@ -48,6 +55,29 @@ public struct BaZhaiView: View {
             }
             .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         }
+
+        .onAppear {
+            refreshAnalysis()
+        }
+        .onChange(of: state.sittingMountain.id) { _ in
+            refreshAnalysis()
+        }
+        .onChange(of: state.facingMountain.id) { _ in
+            refreshAnalysis()
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshAnalysis()
+        }
+    }
+
+    private func refreshAnalysis() {
+        let state = motion.headingState
+        cachedAnalysis = BaZhaiEngine.shared.analyze(
+            sittingPalace: state.sittingMountain.palace,
+            facingPalace: state.facingMountain.palace
+        )
+        cachedWaterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        cachedZeRi = ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
     }
     
     // MARK: - 子 Tab 切换栏
@@ -78,7 +108,7 @@ public struct BaZhaiView: View {
     }
     
     // MARK: - 八宅明镜内容
-    private func baZhaiContent(bz: BaZhaiAnalysis, state: CompassHeadingState) -> some View {
+    private func baZhaiContent(bz: BaZhaiAnalysis, zeri: ZeRiAnalysis, state: CompassHeadingState) -> some View {
         VStack(spacing: 12) {
             // 宅型概览卡
             HStack {
@@ -135,7 +165,6 @@ public struct BaZhaiView: View {
             .padding(.horizontal, 16)
             
             // 天星择日 · 动土安门日课自检卡
-            let zeri = ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     HStack(spacing: 5) {

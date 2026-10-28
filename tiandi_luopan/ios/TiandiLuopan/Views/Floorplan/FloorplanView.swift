@@ -22,6 +22,7 @@ public struct FloorplanView: View {
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
     @State private var activeRoomStartRect: CGRect? = nil
+    @State private var roomWasDragged = false
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
     @State private var auditedRooms: [FloorplanRoom] = []
@@ -31,6 +32,7 @@ public struct FloorplanView: View {
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
     @State private var showNewRoomTypePicker = false
+    @State private var floorplanImageBeforePicker: UIImage?
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -103,15 +105,19 @@ public struct FloorplanView: View {
                 roomsBeforeDetection = nil
                 centroidBeforeDetection = nil
                 roomDetectionMessage = nil
-                if !iap.hasUnlockedVIP && !didConsumeFloorplanCredit {
-                    if iap.consumeFloorplanCredit() {
-                        didConsumeFloorplanCredit = true
-                    } else {
-                        userFloorplanImage = nil
+                if !iap.hasUnlockedVIP {
+                    guard iap.consumeFloorplanCredit() else {
+                        // UIImagePickerController updates the binding before
+                        // this callback. Restore the previous plan when the
+                        // user tries to switch without another entitlement.
+                        userFloorplanImage = floorplanImageBeforePicker
                         showPaywall = true
+                        return
                     }
+                    didConsumeFloorplanCredit = true
                 }
-                }
+                floorplanImageBeforePicker = nil
+            }
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .floorplanSingle)
@@ -120,16 +126,12 @@ public struct FloorplanView: View {
             // Keep the user's room geometry while refreshing language-dependent
             // sample labels and diagnostics.
             let previousRooms = rooms
-            let rects = rooms.map(\.rect)
-            let refreshed = FloorplanEngine.shared.generateSampleRooms()
-            rooms = refreshed.enumerated().map { index, room in
-                var updated = room
-                if index < previousRooms.count {
-                    // Preserve identity so an open detail sheet and report
-                    // rows update their text instead of being replaced.
-                    updated.id = previousRooms[index].id
-                    updated.rect = rects[index]
-                }
+            // Preserve every custom room, including rooms added by the user.
+            // Rebuilding from the eight-room demo layout here used to delete
+            // custom rooms whenever the app language changed.
+            rooms = previousRooms.map { previousRoom in
+                var updated = previousRoom
+                updated.name = previousRoom.type.localizedName
                 return updated
             }
             if let selectedID = selectedRoom?.id,
@@ -202,7 +204,8 @@ public struct FloorplanView: View {
             
             // 导入真实户型图纸
             Button(action: {
-                if iap.hasUnlockedVIP || didConsumeFloorplanCredit || iap.floorplanCreditsCount > 0 {
+                if iap.hasUnlockedVIP || iap.floorplanCreditsCount > 0 {
+                    floorplanImageBeforePicker = userFloorplanImage
                     showImagePicker = true
                 } else {
                     showPaywall = true
@@ -220,31 +223,30 @@ public struct FloorplanView: View {
                 .cornerRadius(6)
             }
             
-            if userFloorplanImage != nil {
-                Button(action: {
-                    userFloorplanImage = nil
-                    // "Reset sample" must also restore the editable demo
-                    // layout. Previously it removed only the background image,
-                    // leaving dragged room rectangles and the centroid in the
-                    // imported plan's state.
-                    rooms = FloorplanEngine.shared.generateSampleRooms()
-                    centroid = CGPoint(x: 0.5, y: 0.5)
-                    roomsBeforeDetection = nil
-                    centroidBeforeDetection = nil
-                    roomDetectionMessage = nil
-                    isEditingRooms = false
-                    activeRoomDragID = nil
-                    activeRoomStartRect = nil
-                    refreshAudit()
-                }) {
-                    Text(lang.t("reset_sample"))
-                        .font(.system(size: 10))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.1))
-                        .foregroundColor(.white)
-                        .cornerRadius(6)
-                }
+            Button(action: {
+                userFloorplanImage = nil
+                // Reset both the imported background and any custom room edits
+                // so a demo layout can always be restored, even when the user
+                // started from the built-in sample without importing an image.
+                rooms = FloorplanEngine.shared.generateSampleRooms()
+                centroid = CGPoint(x: 0.5, y: 0.5)
+                roomsBeforeDetection = nil
+                centroidBeforeDetection = nil
+                roomDetectionMessage = nil
+                didConsumeFloorplanCredit = false
+                isEditingRooms = false
+                activeRoomDragID = nil
+                activeRoomStartRect = nil
+                roomWasDragged = false
+                refreshAudit()
+            }) {
+                Text(lang.t("reset_sample"))
+                    .font(.system(size: 10))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 5)
+                    .background(Color.white.opacity(0.1))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
             }
             
             // 罗盘联动 / 手动微调
@@ -274,6 +276,7 @@ public struct FloorplanView: View {
                 isEditingRooms.toggle()
                 activeRoomDragID = nil
                 activeRoomStartRect = nil
+                roomWasDragged = false
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: isEditingRooms ? "checkmark.circle.fill" : "rectangle.3.group")
@@ -657,6 +660,10 @@ public struct FloorplanView: View {
             // Tapping always opens the diagnostic sheet. Room placement still
             // uses the drag gesture while editing, and type changes are
             // available from a dedicated action inside the diagnostic sheet.
+            if roomWasDragged {
+                roomWasDragged = false
+                return
+            }
             // Layout editing is available before purchase, but room-level
             // diagnosis remains protected by the same entitlement check as
             // the report list. Do not let edit mode bypass the paywall.
@@ -693,6 +700,10 @@ public struct FloorplanView: View {
                 .onChanged { value in
                     guard isEditingRooms else { return }
 
+                    if abs(value.translation.width) > 3 || abs(value.translation.height) > 3 {
+                        roomWasDragged = true
+                    }
+
                     if activeRoomDragID != room.id {
                         activeRoomDragID = room.id
                         activeRoomStartRect = room.rect
@@ -721,6 +732,11 @@ public struct FloorplanView: View {
                 .onEnded { _ in
                     activeRoomDragID = nil
                     activeRoomStartRect = nil
+                    // Let a Button action from the same touch cycle observe
+                    // the drag marker, then clear it for the next gesture.
+                    DispatchQueue.main.async {
+                        roomWasDragged = false
+                    }
                     refreshAudit()
                 }
         )

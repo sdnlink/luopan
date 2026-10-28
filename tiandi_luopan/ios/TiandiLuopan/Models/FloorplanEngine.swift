@@ -87,10 +87,21 @@ public struct FloorplanRoom: Identifiable {
         self.inspectionLevel = inspectionLevel
         self.inspectionAdvice = inspectionAdvice
     }
-    public var isSevere: Bool { inspectionLevel.contains("严重") || inspectionLevel.contains("大凶") }
-    public var isBad: Bool { isSevere || inspectionLevel.contains("凶") }
-    public var isGood: Bool { inspectionLevel.contains("吉") }
-    public var isWarning: Bool { inspectionLevel.contains("预警") }
+    public var isSevere: Bool {
+        inspectionLevel.contains("严重") || inspectionLevel.contains("大凶") ||
+        inspectionLevel.localizedCaseInsensitiveContains("severe") ||
+        inspectionLevel.localizedCaseInsensitiveContains("critical")
+    }
+    public var isBad: Bool {
+        isSevere || inspectionLevel.contains("凶") ||
+        inspectionLevel.localizedCaseInsensitiveContains("harm")
+    }
+    public var isGood: Bool {
+        inspectionLevel.contains("吉") || inspectionLevel.localizedCaseInsensitiveContains("auspicious")
+    }
+    public var isWarning: Bool {
+        inspectionLevel.contains("预警") || inspectionLevel.localizedCaseInsensitiveContains("warning")
+    }
 }
 
 public struct FloorplanAuditItem: Identifiable {
@@ -114,9 +125,17 @@ public struct FloorplanAuditItem: Identifiable {
         self.solution = solution
     }
 
-    public var isSevere: Bool { severity.contains("严重") }
-    public var isGood: Bool { severity.contains("吉") }
-    public var isWarning: Bool { severity.contains("预警") }
+    public var isSevere: Bool {
+        severity.contains("严重") || severity.contains("大凶") ||
+        severity.localizedCaseInsensitiveContains("severe") ||
+        severity.localizedCaseInsensitiveContains("critical")
+    }
+    public var isGood: Bool {
+        severity.contains("吉") || severity.localizedCaseInsensitiveContains("auspicious")
+    }
+    public var isWarning: Bool {
+        severity.contains("预警") || severity.localizedCaseInsensitiveContains("warning")
+    }
 }
 
 public class FloorplanEngine {
@@ -190,6 +209,11 @@ public class FloorplanEngine {
         let degPerRad = 180.0 / Double.pi
         let isEn = LocalizationManager.shared.effectiveLanguage == .en
         let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        let centralRoomID = rooms
+            .filter { $0.rect.contains(centroid) }
+            .min {
+                ($0.rect.width * $0.rect.height) < ($1.rect.width * $1.rect.height)
+            }?.id
         
         for room in rooms {
             var r = room
@@ -212,7 +236,7 @@ public class FloorplanEngine {
             // produce 中宫, so a bathroom or stairwell at the home's center
             // was silently reported as one of the eight outer palaces.
             let palace: (dir: String, gua: String)
-            if room.rect.contains(centroid) {
+            if room.id == centralRoomID {
                 let language = LocalizationManager.shared.effectiveLanguage
                 palace = language == .en ? ("Center", "Center") : (language == .zhHant ? ("中央", "中") : ("中央", "中"))
             } else {

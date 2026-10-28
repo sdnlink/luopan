@@ -52,7 +52,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
             case .study: return "書房"
             case .balcony: return "陽台"
             }
-        case .zhHans:
+        case .zhHans, .auto:
             switch self {
             case .door: return "入户大门"
             case .livingRoom: return "客厅"

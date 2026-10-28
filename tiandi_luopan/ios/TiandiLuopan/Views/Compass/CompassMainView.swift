@@ -96,9 +96,7 @@ public struct CompassMainView: View {
         return HStack(spacing: 8) {
             // 锁定朝向按钮
             Button(action: {
-                withAnimation {
-                    motion.isLocked.toggle()
-                }
+                motion.toggleLock()
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")

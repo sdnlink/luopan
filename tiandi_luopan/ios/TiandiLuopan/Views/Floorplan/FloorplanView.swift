@@ -95,6 +95,26 @@ public struct FloorplanView: View {
                 selectedRoom = refreshedRoom
             }
         }
+        .onChange(of: effectiveHeading) { _ in
+            refreshSelectedRoom()
+        }
+        .onChange(of: centroid) { _ in
+            refreshSelectedRoom()
+        }
+    }
+
+    /// Keep an already-presented room sheet aligned with the same audit input
+    /// used by the canvas and report list. Without this, rotating the compass
+    /// or dragging the Tai Ji point updated the page behind the sheet while
+    /// the detail card continued to show stale palace/severity text.
+    private func refreshSelectedRoom() {
+        guard let selectedID = selectedRoom?.id else { return }
+        let result = FloorplanEngine.shared.auditFloorplan(
+            rooms: rooms,
+            centroid: centroid,
+            heading: effectiveHeading
+        )
+        selectedRoom = result.auditedRooms.first(where: { $0.id == selectedID })
     }
 
     private var hasFloorplanAccess: Bool {

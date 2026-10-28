@@ -85,9 +85,14 @@ public struct RootContentView: View {
             updateResourceUsage()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            // Re-enable sensors only after the app is visible again. Keeping
+            // Core Location/Core Motion streams alive while the app is
+            // backgrounded wastes battery and can keep the device warm.
+            motion.start()
             updateResourceUsage()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            motion.stop()
             UIApplication.shared.isIdleTimerDisabled = false
         }
     }

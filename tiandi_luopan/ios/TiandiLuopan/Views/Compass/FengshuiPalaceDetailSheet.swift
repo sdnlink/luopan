@@ -4,6 +4,7 @@ import SwiftUI
 
 public struct FengshuiPalaceDetailSheet: View {
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     
     private var palaces: [(gua: String, dir: String, elem: String, member: String, body: String, bestRoom: String, taboo: String, desc: String)] {
@@ -21,7 +22,6 @@ public struct FengshuiPalaceDetailSheet: View {
     }
     
     public var body: some View {
-        let lang = LocalizationManager.shared
         return NavigationView {
             ScrollView {
                 VStack(spacing: 12) {

@@ -264,12 +264,12 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         var inspectedFaces = 0
         for meshAnchor in meshAnchors {
             let geometry = meshAnchor.geometry
-            for faceIndex in 0..<geometry.faceCount {
+            for faceIndex in 0..<geometry.faces.count {
                 // A dense room mesh can contain tens of thousands of faces.
                 // A bounded sample is sufficient for a stable category summary.
                 if inspectedFaces >= 4000 { break }
-                let classification = geometry.classificationOf(faceWithIndex: faceIndex)
-                if classification != .none {
+                if let classification = classification(in: geometry, faceIndex: faceIndex),
+                   classification != .none {
                     counts[classification.rawValue, default: 0] += 1
                 }
                 inspectedFaces += 1
@@ -352,8 +352,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         )
 
         let faces = mesh.faces
-        let facePointer = faces.buffer.contents().advanced(by: faces.offset)
-        let faceData = Data(bytes: facePointer, count: faces.count * faces.bytesPerIndex)
+        let faceData = Data(bytes: faces.buffer.contents(), count: faces.count * faces.bytesPerIndex)
         let element = SCNGeometryElement(
             data: faceData,
             primitiveType: .triangles,
@@ -372,10 +371,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private func semanticColor(for geometry: ARMeshGeometry) -> UIColor {
         var classCounts: [Int: Int] = [:]
-        let sampleCount = min(geometry.faceCount, 240)
+        let sampleCount = min(geometry.faces.count, 240)
         for index in 0..<sampleCount {
-            let classification = geometry.classificationOf(faceWithIndex: index)
-            if classification != .none {
+            if let classification = classification(in: geometry, faceIndex: index),
+               classification != .none {
                 classCounts[classification.rawValue, default: 0] += 1
             }
         }
@@ -387,11 +386,30 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         case .wall: return UIColor.systemBlue.withAlphaComponent(0.7)
         case .floor: return UIColor.systemGreen.withAlphaComponent(0.7)
         case .ceiling: return UIColor.systemPurple.withAlphaComponent(0.7)
-        case .window: return UIColor.systemCyan.withAlphaComponent(0.8)
+        case .window: return UIColor(red: 0.0, green: 0.75, blue: 0.85, alpha: 0.8)
         case .door: return UIColor.systemOrange.withAlphaComponent(0.8)
         case .table, .seat: return UIColor.systemYellow.withAlphaComponent(0.8)
         default: return UIColor.systemTeal.withAlphaComponent(0.55)
         }
+    }
+
+    /// Reads one byte from ARKit's per-face classification source. The source
+    /// uses its own offset and stride, so indexing it as a tightly packed
+    /// array would produce incorrect labels on SDK/device combinations that
+    /// add padding between entries.
+    private func classification(in geometry: ARMeshGeometry, faceIndex: Int) -> ARMeshClassification? {
+        guard faceIndex >= 0,
+              faceIndex < geometry.faces.count,
+              let source = geometry.classification else {
+            return nil
+        }
+        let byteOffset = source.offset + faceIndex * source.stride
+        guard byteOffset >= 0,
+              byteOffset < source.buffer.length else {
+            return nil
+        }
+        let pointer = source.buffer.contents().advanced(by: byteOffset)
+        return ARMeshClassification(rawValue: Int(pointer.load(as: UInt8.self)))
     }
 }
 

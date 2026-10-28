@@ -281,7 +281,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 }
                 lastMountainIndex = resolved.facingMountain.id
             }
-            
+
             // 当达到完全水平状态 (<1.5°) 时触发一次沉浸式对准震感
             if resolved.isLevel && !wasLevel && isHapticEnabled {
                 hapticLevel.impactOccurred()
@@ -332,43 +332,45 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let pitchDeg = motion.attitude.pitch * 180.0 / .pi
             let rollDeg = motion.attitude.roll * 180.0 / .pi
             
-            DispatchQueue.main.async {
-                let now = CACurrentMediaTime()
-                // Apply the low-pass filter to every sensor sample without
-                // publishing each intermediate value to SwiftUI.
-                self.filteredPitch = self.filteredPitch * 0.82 + pitchDeg * 0.18
-                self.filteredRoll = self.filteredRoll * 0.82 + rollDeg * 0.18
+            // The callback is already delivered on `.main`; processing it
+            // inline avoids an extra async hop for every 20 Hz sample, which
+            // otherwise adds latency and can queue stale samples while the UI
+            // is busy.
+            let now = CACurrentMediaTime()
+            // Apply the low-pass filter to every sensor sample without
+            // publishing each intermediate value to SwiftUI.
+            self.filteredPitch = self.filteredPitch * 0.82 + pitchDeg * 0.18
+            self.filteredRoll = self.filteredRoll * 0.82 + rollDeg * 0.18
 
-                let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.1
-                if shouldPublishTilt {
-                    self.lastPublishedMotionTime = now
-                    self.pitch = self.filteredPitch
-                    self.roll = self.filteredRoll
-                    self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
-                    self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
-                    if self.isLocked {
-                        self.updateResolvedState(force: true)
-                    }
+            let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.1
+            if shouldPublishTilt {
+                self.lastPublishedMotionTime = now
+                self.pitch = self.filteredPitch
+                self.roll = self.filteredRoll
+                self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
+                self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
+                if self.isLocked {
+                    self.updateResolvedState(force: true)
                 }
-                
-                let field = motion.magneticField.field
-                let totalMag = sqrt(field.x * field.x + field.y * field.y + field.z * field.z)
-                if totalMag > 0 {
-                    let distorted = totalMag < 20.0 || totalMag > 75.0
-                    let shouldPublishMagnetic = now - self.lastPublishedMagneticTime >= 0.2 || distorted != self.isDistorted
-                    if shouldPublishMagnetic {
-                        self.lastPublishedMagneticTime = now
-                        self.magneticStrengthUT = totalMag
-                        self.isDistorted = distorted
-                        self.delegate?.didUpdateMagneticField(isDistorted: distorted, strengthUT: totalMag)
-                    }
-                }
+            }
 
-                // Keep the clock/solar-term readout fresh without forcing a
-                // new headingState publication when the device is stationary.
-                if now - self.lastSolarCalcTime >= 1.0 {
-                    self.updateResolvedState()
+            let field = motion.magneticField.field
+            let totalMag = sqrt(field.x * field.x + field.y * field.y + field.z * field.z)
+            if totalMag > 0 {
+                let distorted = totalMag < 20.0 || totalMag > 75.0
+                let shouldPublishMagnetic = now - self.lastPublishedMagneticTime >= 0.2 || distorted != self.isDistorted
+                if shouldPublishMagnetic {
+                    self.lastPublishedMagneticTime = now
+                    self.magneticStrengthUT = totalMag
+                    self.isDistorted = distorted
+                    self.delegate?.didUpdateMagneticField(isDistorted: distorted, strengthUT: totalMag)
                 }
+            }
+
+            // Keep the clock/solar-term readout fresh without forcing a
+            // new headingState publication when the device is stationary.
+            if now - self.lastSolarCalcTime >= 1.0 {
+                self.updateResolvedState()
             }
         }
     }

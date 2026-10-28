@@ -60,6 +60,8 @@ public struct FloorplanView: View {
                 // 1. 顶部控制栏
                 topControlBar()
 
+                headingQualityNotice()
+
                 if userFloorplanImage != nil {
                     roomDetectionBar()
                 }
@@ -332,6 +334,30 @@ public struct FloorplanView: View {
         .padding(.horizontal, 16)
     }
 
+    @ViewBuilder
+    private func headingQualityNotice() -> some View {
+        let referenceText = activeNorthReference == .trueNorth
+            ? lang.t("heading_reference_true")
+            : lang.t("heading_reference_magnetic")
+        VStack(alignment: .leading, spacing: 3) {
+            Text("\(lang.t("floorplan_heading_reference")): \(referenceText)")
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.white.opacity(0.65))
+            if motion.isDistorted || motion.accuracyLevel < 2 {
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(motion.isDistorted
+                         ? lang.t("settings_mag_field_warning")
+                         : lang.t("calib_precision_need"))
+                }
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.orange)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+    }
+
     private func manualHeadingControl() -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
@@ -509,6 +535,13 @@ public struct FloorplanView: View {
         compassRotation = (compassRotation + delta).truncatingRemainder(dividingBy: 360)
         if compassRotation < 0 { compassRotation += 360 }
         refreshAudit()
+    }
+
+    private var activeNorthReference: CompassNorthReference {
+        if motion.northReference == .trueNorth && motion.hasDeclination {
+            return .trueNorth
+        }
+        return .magneticNorth
     }
     
     // MARK: - 户型交互画布

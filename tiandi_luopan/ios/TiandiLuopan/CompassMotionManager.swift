@@ -385,9 +385,18 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.hasLocationFix = false
                 self.hasDeclination = false
                 self.currentDeclination = 0.0
+                self.latitude = 0.0
+                self.longitude = 0.0
+                self.altitude = 0.0
+                self.speedKmH = 0.0
+                // Do not leave a previously calculated WMM correction on the
+                // compass after access is revoked. Magnetic north remains a
+                // valid local fallback until permission is granted again.
+                self.trueHeading = self.magneticHeading
                 self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
                 self.trueSolarTimeStr = "--:--:--"
                 self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+                self.updateResolvedState(force: true)
             }
             guard self.isRunning else { return }
             if status == .authorizedWhenInUse || status == .authorizedAlways {

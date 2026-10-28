@@ -78,7 +78,7 @@ public struct CompassDialView: View {
                 crosshairLayer(size: size)
                 
                 // 3. 地理真北金针 (根据当地磁偏角偏转，双指针系统)
-                if layers.showTrueNorthNeedle && motion.hasDeclination {
+                if layers.showTrueNorthNeedle && motion.hasDeclination && motion.northReference == .trueNorth {
                     trueNorthNeedleLayer(radius: radius * 0.28)
                 }
                 

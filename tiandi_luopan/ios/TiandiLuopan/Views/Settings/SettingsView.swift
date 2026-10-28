@@ -118,6 +118,11 @@ public struct SettingsView: View {
                             Text(item.displayName).tag(item)
                         }
                     }
+
+                    Picker(lang.t("heading_reference"), selection: $motion.northReference) {
+                        Text(lang.t("heading_reference_true")).tag(CompassNorthReference.trueNorth)
+                        Text(lang.t("heading_reference_magnetic")).tag(CompassNorthReference.magneticNorth)
+                    }
                     
                     VStack(alignment: .leading, spacing: 5) {
                         HStack {

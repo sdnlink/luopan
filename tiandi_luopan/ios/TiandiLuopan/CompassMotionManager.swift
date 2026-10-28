@@ -13,6 +13,13 @@ public protocol CompassMotionManagerDelegate: AnyObject {
     func didChangeAccuracy(accuracy: Int)
 }
 
+public enum CompassNorthReference: String, CaseIterable, Identifiable {
+    case trueNorth = "true_north"
+    case magneticNorth = "magnetic_north"
+
+    public var id: String { rawValue }
+}
+
 public final class CompassMotionManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     public static let shared = CompassMotionManager()
     
@@ -57,6 +64,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public var isHapticEnabled: Bool = true
     
     @Published public var headingState: CompassHeadingState = Mountain24Data.shared.resolveHeadingState(heading: 0.0)
+    @Published public var northReference: CompassNorthReference = .trueNorth {
+        didSet {
+            UserDefaults.standard.set(northReference.rawValue, forKey: "compass_north_reference")
+            hasInitializedFilter = false
+            recentHeadingSamples.removeAll(keepingCapacity: true)
+            updateResolvedState(force: true)
+        }
+    }
     
     private var lastHeadingTime: TimeInterval = 0
     private var lastPublishedMotionTime: TimeInterval = 0
@@ -77,6 +92,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     override public init() {
         super.init()
+        if let saved = UserDefaults.standard.string(forKey: "compass_north_reference"),
+           let reference = CompassNorthReference(rawValue: saved) {
+            northReference = reference
+        }
         setupLocationManager()
         locationAuthorizationStatus = locationManager.authorizationStatus
         coordsDesc = LocalizationManager.shared.t("location_unavailable")
@@ -384,7 +403,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 heading: effective,
                 pitch: pitch,
                 roll: roll,
-                trueHeading: hasDeclination ? heading : nil
+                trueHeading: northReference == .trueNorth && hasDeclination ? heading : nil
             )
             self.headingState = resolved
             
@@ -588,7 +607,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 // Use true north for the main dial and all direction-based
                 // calculations once Core Location/WMM has supplied a valid
                 // declination. Before then, magnetic north is the safe fallback.
-                self.updateContinuousHeading(newHeading: self.hasDeclination ? self.trueHeading : mag)
+                let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
+                self.updateContinuousHeading(newHeading: referenceHeading)
                 self.updateResolvedState()
             }
             

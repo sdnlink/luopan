@@ -81,6 +81,20 @@ public struct CameraPreviewView: UIViewRepresentable {
                   session.canAddInput(input) else {
                 return
             }
+
+            // The AR overlay and rectangle scan do not require 30/60 fps.
+            // Capping a supported format at 24 fps reduces continuous sensor
+            // and ISP work while keeping the preview responsive enough for
+            // handheld surveying.
+            if let frameRateRange = camera.activeFormat.videoSupportedFrameRateRanges.first(where: {
+                $0.minFrameRate <= 24.0 && $0.maxFrameRate >= 24.0
+            }), frameRateRange.maxFrameRate >= 24.0,
+               (try? camera.lockForConfiguration()) != nil {
+                let frameDuration = CMTime(value: 1, timescale: 24)
+                camera.activeVideoMinFrameDuration = frameDuration
+                camera.activeVideoMaxFrameDuration = frameDuration
+                camera.unlockForConfiguration()
+            }
             
             session.addInput(input)
 

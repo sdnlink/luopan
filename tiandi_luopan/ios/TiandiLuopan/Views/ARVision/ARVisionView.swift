@@ -51,12 +51,7 @@ public struct CameraPreviewView: UIViewRepresentable {
             // Reconfiguring the lens cancels any pending still capture.  Make
             // the cancellation observable so an AI scan or snapshot request
             // can leave its loading state instead of waiting forever.
-            let pendingCompletion = photoCompletion
-            photoCompletion = nil
-            isCapturingPhoto = false
-            if let pendingCompletion = pendingCompletion {
-                DispatchQueue.main.async { pendingCompletion(nil) }
-            }
+            cancelPendingCapture()
             
             if let session = captureSession {
                 sessionQueue.sync {
@@ -108,8 +103,10 @@ public struct CameraPreviewView: UIViewRepresentable {
                 object: session,
                 queue: .main
             ) { [weak self] _ in
-                // Keep the session object alive while iOS owns the interruption.
-                _ = self
+                // A still capture cannot be completed reliably while another
+                // app owns the camera. Complete it as cancelled so the AR
+                // page does not remain stuck in a loading state.
+                self?.cancelPendingCapture()
             })
             sessionObservers.append(center.addObserver(
                 forName: AVCaptureSession.interruptionEndedNotification,
@@ -130,6 +127,7 @@ public struct CameraPreviewView: UIViewRepresentable {
                 queue: .main
             ) { [weak self] notification in
                 guard let self = self else { return }
+                self.cancelPendingCapture()
                 let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
                 if error != nil, self.wantsRunning {
                     self.sessionQueue.async {
@@ -222,12 +220,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         
         public func stopSession() {
             wantsRunning = false
-            let pendingCompletion = photoCompletion
-            photoCompletion = nil
-            isCapturingPhoto = false
-            if let pendingCompletion = pendingCompletion {
-                DispatchQueue.main.async { pendingCompletion(nil) }
-            }
+            cancelPendingCapture()
             let sessionToStop = captureSession
             sessionQueue.async { [weak self] in
                 guard let self = self,
@@ -240,6 +233,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         }
 
         private func pauseSessionForBackground() {
+            cancelPendingCapture()
             let sessionToPause = captureSession
             sessionQueue.async { [weak self] in
                 guard let self = self,
@@ -574,6 +568,16 @@ public struct ARVisionView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                 }
+            }
+        }
+
+        private func cancelPendingCapture() {
+            let pendingCompletion = photoCompletion
+            photoCompletion = nil
+            isCapturingPhoto = false
+            guard let pendingCompletion = pendingCompletion else { return }
+            DispatchQueue.main.async {
+                pendingCompletion(nil)
             }
         }
     }

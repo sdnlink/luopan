@@ -306,12 +306,14 @@ public struct CompassDialView: View {
     
     // MARK: - 传统红蓝双色红宝石磁针 (Magnetic Needle)
     private func magneticNeedleLayer(radius: CGFloat) -> some View {
+        let center = radius
+
         ZStack {
             Path { path in
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: -3.5, y: -radius * 0.8))
-                path.addLine(to: CGPoint(x: 0, y: -radius * 0.92))
-                path.addLine(to: CGPoint(x: 3.5, y: -radius * 0.8))
+                path.move(to: CGPoint(x: center, y: center))
+                path.addLine(to: CGPoint(x: center - 3.5, y: center - radius * 0.8))
+                path.addLine(to: CGPoint(x: center, y: center - radius * 0.92))
+                path.addLine(to: CGPoint(x: center + 3.5, y: center - radius * 0.8))
                 path.closeSubpath()
             }
             .fill(
@@ -321,12 +323,13 @@ public struct CompassDialView: View {
                     endPoint: .bottom
                 )
             )
+            .frame(width: radius * 2, height: radius * 2)
             
             Path { path in
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: -3.5, y: radius * 0.8))
-                path.addLine(to: CGPoint(x: 0, y: radius * 0.92))
-                path.addLine(to: CGPoint(x: 3.5, y: radius * 0.8))
+                path.move(to: CGPoint(x: center, y: center))
+                path.addLine(to: CGPoint(x: center - 3.5, y: center + radius * 0.8))
+                path.addLine(to: CGPoint(x: center, y: center + radius * 0.92))
+                path.addLine(to: CGPoint(x: center + 3.5, y: center + radius * 0.8))
                 path.closeSubpath()
             }
             .fill(
@@ -336,6 +339,7 @@ public struct CompassDialView: View {
                     endPoint: .top
                 )
             )
+            .frame(width: radius * 2, height: radius * 2)
             
             Circle()
                 .fill(
@@ -348,17 +352,20 @@ public struct CompassDialView: View {
                 )
                 .frame(width: 10, height: 10)
         }
+        .frame(width: radius * 2, height: radius * 2)
         .allowsHitTesting(false)
     }
     
     // MARK: - 地理真北金针 (根据当地磁偏角偏转，双指针系统)
     private func trueNorthNeedleLayer(radius: CGFloat) -> some View {
+        let center = radius
+
         ZStack {
             Path { path in
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: -2.0, y: -radius * 0.85))
-                path.addLine(to: CGPoint(x: 0, y: -radius * 1.05))
-                path.addLine(to: CGPoint(x: 2.0, y: -radius * 0.85))
+                path.move(to: CGPoint(x: center, y: center))
+                path.addLine(to: CGPoint(x: center - 2.0, y: center - radius * 0.85))
+                path.addLine(to: CGPoint(x: center, y: center - radius * 1.05))
+                path.addLine(to: CGPoint(x: center + 2.0, y: center - radius * 0.85))
                 path.closeSubpath()
             }
             .fill(
@@ -369,12 +376,14 @@ public struct CompassDialView: View {
                 )
             )
             .shadow(color: Color.yellow.opacity(0.4), radius: 2)
+            .frame(width: radius * 2, height: radius * 2)
             
             Text(lang.t("true_north_short"))
                 .font(.system(size: 7, weight: .bold))
                 .foregroundColor(Color.black)
                 .offset(y: -radius * 0.72)
         }
+        .frame(width: radius * 2, height: radius * 2)
         // True north is the magnetic bearing corrected by east-positive
         // declination.  In screen coordinates that correction is clockwise
         // negative, matching the web compass and Core Location's trueHeading.

@@ -177,31 +177,13 @@ public struct TianJiShuView: View {
                 presentationMode.wrappedValue.dismiss()
             })
             .onAppear {
-                renderGeneration += 1
-                let generation = renderGeneration
-                // Capture all observable sensor values on the main thread
-                // before moving the expensive renderer to a worker queue.
-                // Reading @Published state from the background closure could
-                // otherwise mix headings, coordinates and solar time from
-                // different updates.
-                let heading = motion.headingState.facingAngle
-                let coordsDesc = motion.coordsDesc
-                let solarTimeDesc = motion.solarTimeDesc
-                let language = lang.effectiveLanguage
-                isGenerating = true
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let img = TianJiShuEngine.shared.generateScrollImage(
-                        heading: heading,
-                        coordsDesc: coordsDesc,
-                        solarTimeDesc: solarTimeDesc,
-                        language: language
-                    )
-                    DispatchQueue.main.async {
-                        guard self.renderGeneration == generation else { return }
-                        self.scrollImage = img
-                        self.isGenerating = false
-                    }
-                }
+                beginRendering()
+            }
+            .onChange(of: lang.effectiveLanguage) { _ in
+                // The report image contains localized text independently of
+                // the surrounding SwiftUI labels. Re-render it after a
+                // language change so the page never mixes two locales.
+                beginRendering()
             }
             .onDisappear {
                 // SwiftUI may dismiss the page while the worker is still
@@ -247,6 +229,34 @@ public struct TianJiShuView: View {
                 )
             }
         }
+    }
+
+    private func beginRendering() {
+                renderGeneration += 1
+                let generation = renderGeneration
+                // Capture all observable sensor values on the main thread
+                // before moving the expensive renderer to a worker queue.
+                // Reading @Published state from the background closure could
+                // otherwise mix headings, coordinates and solar time from
+                // different updates.
+                let heading = motion.headingState.facingAngle
+                let coordsDesc = motion.coordsDesc
+                let solarTimeDesc = motion.solarTimeDesc
+                let language = lang.effectiveLanguage
+                isGenerating = true
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let img = TianJiShuEngine.shared.generateScrollImage(
+                        heading: heading,
+                        coordsDesc: coordsDesc,
+                        solarTimeDesc: solarTimeDesc,
+                        language: language
+                    )
+                    DispatchQueue.main.async {
+                        guard self.renderGeneration == generation else { return }
+                        self.scrollImage = img
+                        self.isGenerating = false
+                    }
+                }
     }
 }
 

@@ -47,7 +47,8 @@ public struct FloorplanView: View {
         return ZStack {
             Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea()
             
-            VStack(spacing: 8) {
+            if isActive {
+                VStack(spacing: 8) {
                 // 1. 顶部控制栏
                 topControlBar()
                 
@@ -60,6 +61,7 @@ public struct FloorplanView: View {
                 auditListSection(report: auditResult.report)
             }
             .padding(.top, 8)
+        }
         }
         .sheet(item: $selectedRoom) { room in
             RoomAuditDetailSheet(room: room)
@@ -74,7 +76,7 @@ public struct FloorplanView: View {
                         showPaywall = true
                     }
                 }
-            }
+                }
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .floorplanSingle)

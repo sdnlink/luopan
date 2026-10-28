@@ -5,6 +5,7 @@ import SwiftUI
 public struct CalibrationSheet: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     
     @State private var isCalibrating = false
     @State private var rotateDegree: Double = 0
@@ -12,7 +13,6 @@ public struct CalibrationSheet: View {
     public init() {}
     
     public var body: some View {
-        let lang = LocalizationManager.shared
         return ZStack {
             Color(red: 0.08, green: 0.08, blue: 0.11)
                 .ignoresSafeArea()

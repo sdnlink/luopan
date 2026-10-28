@@ -5,6 +5,7 @@ import SwiftUI
 public struct QimenDunjiaView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     
     public init() {}
@@ -12,7 +13,6 @@ public struct QimenDunjiaView: View {
     public var body: some View {
         let chart = QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
         
-        let lang = LocalizationManager.shared
         return VStack(spacing: 12) {
             // 局数标题栏
             HStack {

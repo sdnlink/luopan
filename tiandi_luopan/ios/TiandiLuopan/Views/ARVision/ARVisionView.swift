@@ -1043,6 +1043,7 @@ public struct ARVisionView: View {
 public struct ShaRemedyDetailSheet: View {
     public let sha: ExteriorShaItem
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     @State private var showPaywall: Bool = false
     

@@ -56,8 +56,9 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView()
                 }
             }
-            .padding(.top, 10)
-            .padding(.bottom, 24)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
+            }
         }
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         .sheet(isPresented: $showTianJiShuSheet) {
@@ -163,7 +164,6 @@ public struct XuanKongGridView: View {
                     .cornerRadius(12)
                 }
             }
-        }
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 10)

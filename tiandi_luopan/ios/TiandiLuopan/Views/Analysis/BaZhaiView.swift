@@ -47,13 +47,15 @@ public struct BaZhaiView: View {
             VIPPaywallSheet(defaultProductId: .vipYearly)
         }
         
-        if isEmbedded {
-            content
-        } else {
-            ScrollView {
+        return Group {
+            if isEmbedded {
                 content
+            } else {
+                ScrollView {
+                    content
+                }
+                .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
             }
-            .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         }
 
         .onAppear {

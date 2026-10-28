@@ -14,7 +14,8 @@ public class TianJiShuEngine {
         coordsDesc: String,
         solarTimeDesc: String,
         language: AppLanguage? = nil,
-        isPro: Bool = true
+        isPro: Bool = true,
+        reportDate: Date = Date()
     ) -> UIImage {
         let size = CGSize(width: 1080, height: 2400)
         // These dimensions describe the exported pixel size. The default
@@ -85,7 +86,7 @@ public class TianJiShuEngine {
             subTitle.draw(at: CGPoint(x: (size.width - sSize.width) / 2, y: 165), withAttributes: subAttr)
             
             // 防伪编号
-            let sn = "\(tr("防伪鉴真号", "防偽鑒真號", "Verification No.")): YX-\(Int(Date().timeIntervalSince1970))-\(Int.random(in: 1000...9999))"
+            let sn = "\(tr("防伪鉴真号", "防偽鑒真號", "Verification No.")): YX-\(Int(reportDate.timeIntervalSince1970))-\(Int.random(in: 1000...9999))"
             sn.draw(at: CGPoint(x: 100, y: 220), withAttributes: [
                 .font: UIFont.monospacedSystemFont(ofSize: 18, weight: .regular),
                 .foregroundColor: UIColor.gray
@@ -138,7 +139,7 @@ public class TianJiShuEngine {
             curY += 250
             
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
-            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, date: Date())
+            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, date: reportDate)
             let meta = xkChart.periodMeta
             
             drawSectionHeader(ctx: cg, title: renderLanguage == .en ? "II · FLYING STARS & PERIOD \(meta.period)" : (renderLanguage == .zhHant ? "第二卷 · \(meta.yuan)\(meta.period)運玄空飛星氣運方陣" : "第二卷 · \(meta.yuan)\(meta.period)运玄空飞星气运方阵"), atY: curY, vermilion: vermilion)
@@ -191,7 +192,7 @@ public class TianJiShuEngine {
             drawSectionHeader(ctx: cg, title: tr("第四卷 · 时家奇门时空与八宅大游年", "第四卷 · 時家奇門時空與八宅大遊年", "IV · QIMEN TIME-SPACE & EIGHT MANSIONS"), atY: curY, vermilion: vermilion)
             curY += 65
             
-            let qm = QimenEngine.shared.calculateChart(heading: heading)
+            let qm = QimenEngine.shared.calculateChart(date: reportDate, heading: heading)
             let bz = BaZhaiEngine.shared.analyze(sittingPalace: mSitting.palace, facingPalace: mFacing.palace)
             
             let p4Text: String
@@ -258,7 +259,7 @@ public class TianJiShuEngine {
             
             // 岁次干支天文学立春动态推导
             let calendar = Calendar.current
-            let now = Date()
+            let now = reportDate
             let y = calendar.component(.year, from: now)
             let m = calendar.component(.month, from: now)
             let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: now)

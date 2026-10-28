@@ -68,6 +68,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var deviceMotionEnabled: Bool = true
     private var headingUpdatesEnabled: Bool = true
     private var lastSolarCalcTime: TimeInterval = 0
+    private var solarCalculationInFlight: Bool = false
+    private var solarCalculationGeneration: Int = 0
     private var lastResolvedHeading: Double = -999.0
     private var cancellables = Set<AnyCancellable>()
     
@@ -300,6 +302,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         
         // 没有真实经度时不展示基于占位经度计算出的太阳时。
         guard hasLocationFix else {
+            solarCalculationGeneration += 1
+            solarCalculationInFlight = false
             if trueSolarTimeStr != "--:--:--" {
                 trueSolarTimeStr = "--:--:--"
             }
@@ -315,14 +319,31 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
 
         // 节流真太阳时历法计算：真太阳时以秒为单位，每 1.0 秒最多计算一次球面三角，大幅减低 CPU 负荷
-        if force || (now - lastSolarCalcTime >= 1.0) {
+        if (force || (now - lastSolarCalcTime >= 1.0)) && !solarCalculationInFlight {
             lastSolarCalcTime = now
-            let solarResult = SolarTimeCalculator.shared.calculate(date: Date(), longitude: self.longitude)
-            self.trueSolarTimeStr = solarResult.trueSolarTimeString
-            let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
-            let eqLabel = LocalizationManager.shared.t("solar_eq_time")
-            let minUnit = LocalizationManager.shared.t("minute_unit")
-            self.solarTimeDesc = "\(solarResult.baziGanzhi) (\(eqLabel) \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))\(minUnit))"
+            solarCalculationInFlight = true
+            solarCalculationGeneration += 1
+            let generation = solarCalculationGeneration
+            let calculationDate = Date()
+            let calculationLongitude = longitude
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                let solarResult = SolarTimeCalculator.shared.calculate(
+                    date: calculationDate,
+                    longitude: calculationLongitude
+                )
+                DispatchQueue.main.async {
+                    guard let self = self,
+                          self.solarCalculationGeneration == generation else { return }
+                    self.solarCalculationInFlight = false
+                    guard self.hasLocationFix,
+                          abs(self.longitude - calculationLongitude) < 0.0001 else { return }
+                    self.trueSolarTimeStr = solarResult.trueSolarTimeString
+                    let offsetSign = solarResult.timeOffsetMinutes >= 0 ? "+" : ""
+                    let eqLabel = LocalizationManager.shared.t("solar_eq_time")
+                    let minUnit = LocalizationManager.shared.t("minute_unit")
+                    self.solarTimeDesc = "\(solarResult.baziGanzhi) (\(eqLabel) \(offsetSign)\(String(format: "%.1f", solarResult.timeOffsetMinutes))\(minUnit))"
+                }
+            }
         }
     }
     

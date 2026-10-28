@@ -77,12 +77,22 @@ public struct FloorplanView: View {
         .onChange(of: lang.effectiveLanguage) { _ in
             // Keep the user's room geometry while refreshing language-dependent
             // sample labels and diagnostics.
+            let previousRooms = rooms
             let rects = rooms.map(\.rect)
             let refreshed = FloorplanEngine.shared.generateSampleRooms()
             rooms = refreshed.enumerated().map { index, room in
                 var updated = room
-                if index < rects.count { updated.rect = rects[index] }
+                if index < previousRooms.count {
+                    // Preserve identity so an open detail sheet and report
+                    // rows update their text instead of being replaced.
+                    updated.id = previousRooms[index].id
+                    updated.rect = rects[index]
+                }
                 return updated
+            }
+            if let selectedID = selectedRoom?.id,
+               let refreshedRoom = rooms.first(where: { $0.id == selectedID }) {
+                selectedRoom = refreshedRoom
             }
         }
     }

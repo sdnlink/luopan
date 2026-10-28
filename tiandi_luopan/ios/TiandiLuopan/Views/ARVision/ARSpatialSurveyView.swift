@@ -44,6 +44,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
+    private var lastPlaneGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
     private var distanceSamples: [Float] = []
 
@@ -79,6 +80,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         mappingState = .limited
         lastMeasurementTimestamp = 0
         lastMeshGeometryUpdate.removeAll()
+        lastPlaneGeometryUpdate.removeAll()
         planeCount = 0
         meshAnchorCount = 0
         largestPlaneWidth = nil
@@ -142,6 +144,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView = nil
         activeConfiguration = nil
         lastMeshGeometryUpdate.removeAll()
+        lastPlaneGeometryUpdate.removeAll()
         distance = nil
         distanceSamples.removeAll(keepingCapacity: true)
         mappingState = .unavailable
@@ -308,6 +311,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             return
         }
         guard let planeAnchor = anchor as? ARPlaneAnchor else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        if let last = lastPlaneGeometryUpdate[planeAnchor.identifier], now - last < 0.25 {
+            return
+        }
+        lastPlaneGeometryUpdate[planeAnchor.identifier] = now
         node.geometry = planeGeometry(for: planeAnchor)
         if planeAnchor.alignment == .horizontal {
             node.eulerAngles.x = -.pi / 2

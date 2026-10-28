@@ -58,7 +58,6 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     @Published public var headingState: CompassHeadingState = Mountain24Data.shared.resolveHeadingState(heading: 0.0)
     
-    private var lastRawHeading: Double = 0.0
     private var lastHeadingTime: TimeInterval = 0
     private var lastPublishedMotionTime: TimeInterval = 0
     private var lastPublishedMagneticTime: TimeInterval = 0
@@ -106,7 +105,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         // Core Location emits a new heading once this many degrees have
         // changed. A 0.3° gate made slow turns feel unresponsive on devices
         // whose sensor already applies its own internal smoothing.
-        locationManager.headingFilter = 0.05
+        // Core Location already performs sensor fusion. A tiny 0.05° gate
+        // forwards magnetometer noise directly into the UI; 0.2° retains
+        // sub-degree accuracy while giving the software filter stable samples.
+        locationManager.headingFilter = 0.2
         updateHeadingOrientation()
     }
 
@@ -117,7 +119,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private func updateHeadingOrientation() {
         let targetOrientation: CLDeviceOrientation
         guard let interfaceOrientation = UIApplication.shared.connectedScenes
-            .compactMap({ ($0 as? UIWindowScene)?.interfaceOrientation })
+            .compactMap({ $0 as? UIWindowScene })
+            .filter({ $0.activationState == .foregroundActive })
+            .map({ $0.interfaceOrientation })
             .first,
               interfaceOrientation != .unknown else {
             targetOrientation = .portrait
@@ -248,39 +252,50 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     }
     
     // MARK: - 连续无跳跃角度平滑算法与自适应滤波 (彻底消除高频微抖与360°突变)
-    private var smoothedHeading: Double = 0.0
     private var filteredContinuousHeading: Double = 0.0
     private var hasInitializedFilter: Bool = false
-    private var lastRawMagneticHeading: Double = 0.0
+    private var recentHeadingSamples: [Double] = []
     private var filteredContinuousMagneticHeading: Double = 0.0
     private var hasInitializedMagneticFilter: Bool = false
+    private var recentMagneticSamples: [Double] = []
+
+    private static func shortestAngleDelta(from: Double, to: Double) -> Double {
+        var delta = to - from
+        while delta > 180.0 { delta -= 360.0 }
+        while delta < -180.0 { delta += 360.0 }
+        return delta
+    }
     
     private func updateContinuousHeading(newHeading: Double) {
         if !hasInitializedFilter {
             hasInitializedFilter = true
-            lastRawHeading = newHeading
-            smoothedHeading = newHeading
             filteredContinuousHeading = newHeading
+            recentHeadingSamples = [newHeading]
             continuousHeading = newHeading
             heading = newHeading
             return
         }
         
-        var diff = newHeading - lastRawHeading
-        // 处理环形 360 度回绕
-        if diff > 180.0 {
-            diff -= 360.0
-        } else if diff < -180.0 {
-            diff += 360.0
+        // Median pre-filter: a short median window removes isolated spikes
+        // without introducing the large lag of a long moving average. Samples
+        // are unwrapped around the current filtered angle, so north crossing
+        // (359° -> 0°) remains continuous.
+        let unwrappedSample = filteredContinuousHeading + Self.shortestAngleDelta(from: filteredContinuousHeading, to: newHeading)
+        let rawDiff = unwrappedSample - filteredContinuousHeading
+        if abs(rawDiff) > 2.0 {
+            // A deliberate turn must not wait for stale stationary samples to
+            // leave the median window; follow it immediately with high alpha.
+            recentHeadingSamples.removeAll(keepingCapacity: true)
         }
-        
-        lastRawHeading = newHeading
-        
-        // 自适应非线性阻尼滤波 (Adaptive Deadband & EMA Filter):
-        // 1. 微小手颤 ( < 0.12°): 轻度阻尼抑制抖动，同时保留慢速转动
-        // 2. 中速转动 ( 0.12° ~ 2.0°): 快速跟手
-        // 3. 快速转动 ( > 2.0°): 几乎直接跟随传感器
-        let absDiff = abs(diff)
+        recentHeadingSamples.append(unwrappedSample)
+        if recentHeadingSamples.count > 5 { recentHeadingSamples.removeFirst() }
+        let sortedSamples = recentHeadingSamples.sorted()
+        let medianSample = sortedSamples[sortedSamples.count / 2]
+        let medianDiff = medianSample - filteredContinuousHeading
+
+        // Adaptive EMA: stationary readings settle firmly; deliberate turns
+        // remain responsive and do not accumulate a visible angular offset.
+        let absDiff = abs(medianDiff)
         let alpha: Double
         if absDiff < 0.12 {
             alpha = 0.12
@@ -295,8 +310,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         // Keep accumulating the filtered value even when the published
         // heading is inside the deadband. This preserves slow, continuous
         // turns without broadcasting stationary sensor noise every sample.
-        filteredContinuousHeading += diff * alpha
-        if abs(filteredContinuousHeading - continuousHeading) < 0.03 {
+        filteredContinuousHeading += medianDiff * alpha
+        if abs(filteredContinuousHeading - continuousHeading) < 0.05 {
             return
         }
         continuousHeading = filteredContinuousHeading
@@ -310,21 +325,22 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private func updateContinuousMagneticHeading(newHeading: Double) {
         if !hasInitializedMagneticFilter {
             hasInitializedMagneticFilter = true
-            lastRawMagneticHeading = newHeading
             filteredContinuousMagneticHeading = newHeading
+            recentMagneticSamples = [newHeading]
             continuousMagneticHeading = newHeading
             return
         }
 
-        var diff = newHeading - lastRawMagneticHeading
-        if diff > 180.0 {
-            diff -= 360.0
-        } else if diff < -180.0 {
-            diff += 360.0
+        let unwrappedSample = filteredContinuousMagneticHeading + Self.shortestAngleDelta(from: filteredContinuousMagneticHeading, to: newHeading)
+        if abs(unwrappedSample - filteredContinuousMagneticHeading) > 2.0 {
+            recentMagneticSamples.removeAll(keepingCapacity: true)
         }
-        lastRawMagneticHeading = newHeading
-
-        let absDiff = abs(diff)
+        recentMagneticSamples.append(unwrappedSample)
+        if recentMagneticSamples.count > 5 { recentMagneticSamples.removeFirst() }
+        let sortedSamples = recentMagneticSamples.sorted()
+        let medianSample = sortedSamples[sortedSamples.count / 2]
+        let medianDiff = medianSample - filteredContinuousMagneticHeading
+        let absDiff = abs(medianDiff)
         let alpha: Double
         if absDiff < 0.12 {
             alpha = 0.12
@@ -335,8 +351,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         } else {
             alpha = 0.95
         }
-        filteredContinuousMagneticHeading += diff * alpha
-        if abs(filteredContinuousMagneticHeading - continuousMagneticHeading) < 0.03 {
+        filteredContinuousMagneticHeading += medianDiff * alpha
+        if abs(filteredContinuousMagneticHeading - continuousMagneticHeading) < 0.05 {
             return
         }
         continuousMagneticHeading = filteredContinuousMagneticHeading
@@ -368,7 +384,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 heading: effective,
                 pitch: pitch,
                 roll: roll,
-                trueHeading: trueHeading
+                trueHeading: hasDeclination ? heading : nil
             )
             self.headingState = resolved
             

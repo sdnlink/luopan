@@ -908,7 +908,11 @@ public struct ARVisionView: View {
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
     private func captureAndSaveSnapshot(baseImage: UIImage) {
         let size = CGSize(width: 1080, height: 1920)
-        let renderer = UIGraphicsImageRenderer(size: size)
+        // Keep the proof image at its declared pixel dimensions instead of
+        // inheriting a 2x/3x Retina scale and allocating a much larger bitmap.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         
         let currentSha = shaList[activeShaIndex]
         let currentHeading = motion.headingState.facingAngle

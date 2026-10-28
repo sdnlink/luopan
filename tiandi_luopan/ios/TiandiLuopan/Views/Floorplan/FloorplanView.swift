@@ -32,9 +32,9 @@ public struct FloorplanView: View {
         if !isSyncWithCompass {
             return compassRotation
         }
-        // 增加 0.25° 死区与防抖阻尼
-        let raw = motion.headingState.facingAngle
-        return (round(raw * 2.0) / 2.0) // 0.5度一级阶梯消抖
+        // 直接使用统一的实时磁航向；航向管理器已经负责环形滤波，
+        // 这里再按 0.5° 四舍五入会让户型方位和罗盘读数不同步。
+        return motion.headingState.facingAngle
     }
     
     public var body: some View {

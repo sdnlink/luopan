@@ -272,7 +272,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
         
-        // 节流 headingState 广播：防止一秒数十次全量 TabView 深度重绘风暴引发手机发烫
+        // 保留小步长实时广播：罗盘读数、户型、奇门和紫白等功能都依赖
+        // headingState；过大的阈值会让这些页面继续显示旧方位。
         // Headings are circular.  A transition such as 359.9° -> 0.1° is a
         // 0.2° movement and must not be treated as a 359.8° jump; otherwise
         // the throttled state update fires on every north crossing.
@@ -283,7 +284,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let rawAngleDelta = abs(effective - lastResolvedHeading)
             angleDelta = min(rawAngleDelta, 360.0 - rawAngleDelta)
         }
-        if force || angleDelta >= 0.25 {
+        if force || angleDelta >= 0.05 {
             lastResolvedHeading = effective
             let resolved = Mountain24Data.shared.resolveHeadingState(
                 heading: effective,

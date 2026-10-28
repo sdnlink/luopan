@@ -205,6 +205,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     // MARK: - 连续无跳跃角度平滑算法与自适应滤波 (彻底消除高频微抖与360°突变)
     private var smoothedHeading: Double = 0.0
+    private var filteredContinuousHeading: Double = 0.0
     private var hasInitializedFilter: Bool = false
     
     private func updateContinuousHeading(newHeading: Double) {
@@ -212,6 +213,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             hasInitializedFilter = true
             lastRawHeading = newHeading
             smoothedHeading = newHeading
+            filteredContinuousHeading = newHeading
             continuousHeading = newHeading
             heading = newHeading
             return
@@ -244,8 +246,15 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             alpha = 0.75
         }
         
-        continuousHeading += diff * alpha
-        let normalized = (continuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+        // Keep accumulating the filtered value even when the published
+        // heading is inside the deadband. This preserves slow, continuous
+        // turns without broadcasting stationary sensor noise every sample.
+        filteredContinuousHeading += diff * alpha
+        if abs(filteredContinuousHeading - continuousHeading) < 0.03 {
+            return
+        }
+        continuousHeading = filteredContinuousHeading
+        let normalized = (filteredContinuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
         heading = normalized
     }
     

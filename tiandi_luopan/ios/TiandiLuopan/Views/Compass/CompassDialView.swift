@@ -388,6 +388,7 @@ public struct CompassDialView: View {
         let center = radius
 
         return ZStack {
+            // 北端：传统罗盘以青/蓝色端指向地磁北。
             Path { path in
                 path.move(to: CGPoint(x: center, y: center))
                 path.addLine(to: CGPoint(x: center - 3.5, y: center - radius * 0.8))
@@ -397,13 +398,14 @@ public struct CompassDialView: View {
             }
             .fill(
                 LinearGradient(
-                    colors: [Color(red: 0.95, green: 0.25, blue: 0.25), Color(red: 0.7, green: 0.1, blue: 0.1)],
+                    colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.1, green: 0.25, blue: 0.6)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
             .frame(width: radius * 2, height: radius * 2)
             
+            // 南端：红色端与北端相反，避免把磁针读成反向。
             Path { path in
                 path.move(to: CGPoint(x: center, y: center))
                 path.addLine(to: CGPoint(x: center - 3.5, y: center + radius * 0.8))
@@ -413,7 +415,7 @@ public struct CompassDialView: View {
             }
             .fill(
                 LinearGradient(
-                    colors: [Color(red: 0.2, green: 0.5, blue: 0.9), Color(red: 0.1, green: 0.25, blue: 0.6)],
+                    colors: [Color(red: 0.95, green: 0.25, blue: 0.25), Color(red: 0.7, green: 0.1, blue: 0.1)],
                     startPoint: .bottom,
                     endPoint: .top
                 )

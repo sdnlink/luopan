@@ -36,7 +36,7 @@ public struct RootContentView: View {
     public var body: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: 主罗盘与天心十道 (含120分金、64卦、24山、双轴水准仪、空亡详勘)
-            CompassMainView()
+            CompassMainView(isActive: selectedTab == 0)
                 .tabItem {
                     Image(systemName: "safari.fill")
                     Text(lang.t("tab_compass"))

@@ -58,13 +58,16 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     private var lastRawHeading: Double = 0.0
     private var lastHeadingTime: TimeInterval = 0
-    private var lastTiltTime: TimeInterval = 0
+    private var lastPublishedMotionTime: TimeInterval = 0
+    private var lastPublishedMagneticTime: TimeInterval = 0
+    private var filteredPitch: Double = 0.0
+    private var filteredRoll: Double = 0.0
     private var lastMountainIndex: Int = -1
     private var wasLevel: Bool = false
     private var isRunning: Bool = false
+    private var deviceMotionEnabled: Bool = true
     private var lastSolarCalcTime: TimeInterval = 0
     private var lastResolvedHeading: Double = -999.0
-    private var lastResolvedTime: TimeInterval = 0
     private var cancellables = Set<AnyCancellable>()
     
     override public init() {
@@ -113,7 +116,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             locationManager.startUpdatingLocation()
         }
         
-        startMotionUpdates()
+        if deviceMotionEnabled {
+            startMotionUpdates()
+        }
     }
     
     public func stop() {
@@ -122,6 +127,20 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         locationManager.stopUpdatingHeading()
         locationManager.stopUpdatingLocation()
         motionManager.stopDeviceMotionUpdates()
+    }
+
+    /// Core Location heading remains available to every analysis tab, while
+    /// the higher-power attitude/magnetic stream is only needed by the live
+    /// compass and calibration screens.
+    public func setDeviceMotionEnabled(_ enabled: Bool) {
+        guard deviceMotionEnabled != enabled else { return }
+        deviceMotionEnabled = enabled
+        guard isRunning else { return }
+        if enabled {
+            startMotionUpdates()
+        } else {
+            motionManager.stopDeviceMotionUpdates()
+        }
     }
     
     public func requestLocationPermission() {
@@ -157,7 +176,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     public func resetManualOffset() {
         DispatchQueue.main.async {
             self.manualOffset = 0.0
-            self.updateResolvedState()
+            self.updateResolvedState(force: true)
             self.hapticLevel.impactOccurred()
         }
     }
@@ -165,7 +184,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     public func applyManualDragDelta(degrees: Double) {
         DispatchQueue.main.async {
             self.manualOffset = (self.manualOffset + degrees).truncatingRemainder(dividingBy: 360.0)
-            self.updateResolvedState()
+            self.updateResolvedState(force: true)
         }
     }
     
@@ -230,9 +249,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let rawAngleDelta = abs(effective - lastResolvedHeading)
             angleDelta = min(rawAngleDelta, 360.0 - rawAngleDelta)
         }
-        if force || angleDelta >= 0.25 || (now - lastResolvedTime >= 0.1) {
+        if force || angleDelta >= 0.25 {
             lastResolvedHeading = effective
-            lastResolvedTime = now
             let resolved = Mountain24Data.shared.resolveHeadingState(
                 heading: effective,
                 pitch: pitch,
@@ -258,8 +276,17 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         
         // 没有真实经度时不展示基于占位经度计算出的太阳时。
         guard hasLocationFix else {
-            trueSolarTimeStr = "--:--:--"
-            solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+            if trueSolarTimeStr != "--:--:--" {
+                trueSolarTimeStr = "--:--:--"
+            }
+            let unavailable = LocalizationManager.shared.t("location_unavailable")
+            if solarTimeDesc != unavailable {
+                solarTimeDesc = unavailable
+            }
+            // Mark this refresh even without a GPS fix. Otherwise the motion
+            // callback would call updateResolvedState on every sample because
+            // the solar-time timestamp remained at zero.
+            lastSolarCalcTime = now
             return
         }
 
@@ -278,8 +305,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private func startMotionUpdates() {
         guard motionManager.isDeviceMotionAvailable else { return }
         
-        // 调整采样频率为 30Hz (平滑且大幅降低主线程压力与设备功耗)
-        motionManager.deviceMotionUpdateInterval = 1.0 / 30.0
+        // 20 Hz is sufficient for a handheld level bubble.  The filter below
+        // still smooths every sample, while published SwiftUI state is limited
+        // to 10 Hz so all tabs do not redraw on every sensor callback.
+        motionManager.deviceMotionUpdateInterval = 1.0 / 20.0
         let referenceFrame: CMAttitudeReferenceFrame = CMMotionManager.availableAttitudeReferenceFrames().contains(.xMagneticNorthZVertical) ? .xMagneticNorthZVertical : .xArbitraryZVertical
         
         motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motion, error in
@@ -289,26 +318,41 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let rollDeg = motion.attitude.roll * 180.0 / .pi
             
             DispatchQueue.main.async {
-                // 水准仪倾角应用低通平滑，消除水平气泡剧烈颤动
-                self.pitch = self.pitch * 0.82 + pitchDeg * 0.18
-                self.roll = self.roll * 0.82 + rollDeg * 0.18
-                self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
-                
                 let now = CACurrentMediaTime()
-                if now - self.lastTiltTime >= 0.08 {
-                    self.lastTiltTime = now
+                // Apply the low-pass filter to every sensor sample without
+                // publishing each intermediate value to SwiftUI.
+                self.filteredPitch = self.filteredPitch * 0.82 + pitchDeg * 0.18
+                self.filteredRoll = self.filteredRoll * 0.82 + rollDeg * 0.18
+
+                let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.1
+                if shouldPublishTilt {
+                    self.lastPublishedMotionTime = now
+                    self.pitch = self.filteredPitch
+                    self.roll = self.filteredRoll
+                    self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
                     self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
                     if self.isLocked {
-                        self.updateResolvedState()
+                        self.updateResolvedState(force: true)
                     }
                 }
                 
                 let field = motion.magneticField.field
                 let totalMag = sqrt(field.x * field.x + field.y * field.y + field.z * field.z)
                 if totalMag > 0 {
-                    self.magneticStrengthUT = totalMag
-                    self.isDistorted = totalMag < 20.0 || totalMag > 75.0
-                    self.delegate?.didUpdateMagneticField(isDistorted: self.isDistorted, strengthUT: totalMag)
+                    let distorted = totalMag < 20.0 || totalMag > 75.0
+                    let shouldPublishMagnetic = now - self.lastPublishedMagneticTime >= 0.2 || distorted != self.isDistorted
+                    if shouldPublishMagnetic {
+                        self.lastPublishedMagneticTime = now
+                        self.magneticStrengthUT = totalMag
+                        self.isDistorted = distorted
+                        self.delegate?.didUpdateMagneticField(isDistorted: distorted, strengthUT: totalMag)
+                    }
+                }
+
+                // Keep the clock/solar-term readout fresh without forcing a
+                // new headingState publication when the device is stationary.
+                if now - self.lastSolarCalcTime >= 1.0 {
+                    self.updateResolvedState()
                 }
             }
         }
@@ -345,7 +389,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         let now = CACurrentMediaTime()
         
         DispatchQueue.main.async {
-            self.magneticHeading = mag
+            if abs(mag - self.magneticHeading) >= 0.1 {
+                self.magneticHeading = mag
+            }
             
             // Core Location's trueHeading is useful as a first estimate, but its
             // value depends on the OS location cache. Once a WMM result exists,
@@ -360,8 +406,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.hasDeclination = true
             }
             if self.hasDeclination {
-                self.trueHeading = (mag + self.currentDeclination + 360.0)
+                let resolvedTrueHeading = (mag + self.currentDeclination + 360.0)
                     .truncatingRemainder(dividingBy: 360.0)
+                if abs(resolvedTrueHeading - self.trueHeading) >= 0.1 {
+                    self.trueHeading = resolvedTrueHeading
+                }
             }
             
             if !self.isLocked {
@@ -369,7 +418,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.updateResolvedState()
             }
             
-            if now - self.lastHeadingTime >= 0.033 {
+            if now - self.lastHeadingTime >= 0.1 {
                 self.lastHeadingTime = now
                 self.delegate?.didUpdateHeading(magneticHeading: mag, trueHeading: self.trueHeading, accuracy: newHeading.headingAccuracy)
             }
@@ -379,8 +428,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             else if newHeading.headingAccuracy > 25 { accLevel = 1 }
             else if newHeading.headingAccuracy > 10 { accLevel = 2 }
             else { accLevel = 3 }
-            self.accuracyLevel = accLevel
-            self.delegate?.didChangeAccuracy(accuracy: accLevel)
+            if self.accuracyLevel != accLevel {
+                self.accuracyLevel = accLevel
+                self.delegate?.didChangeAccuracy(accuracy: accLevel)
+            }
         }
     }
     

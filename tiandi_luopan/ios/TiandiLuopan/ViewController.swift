@@ -25,9 +25,6 @@ public class ViewController: UIHostingController<RootContentView> {
         super.viewDidLoad()
         view.backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
         
-        // 保持屏幕常亮
-        UIApplication.shared.isIdleTimerDisabled = true
-        
         // 启动高精度传感器
         CompassMotionManager.shared.start()
     }

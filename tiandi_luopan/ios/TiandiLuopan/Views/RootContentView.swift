@@ -52,7 +52,7 @@ public struct RootContentView: View {
                 .tag(1)
             
             // Tab 3: 户型空间立极与全屋风水体检 (中宫重心立极、罗盘半透明叠透、火烧天门/鬼门体检)
-            FloorplanView()
+            FloorplanView(isActive: selectedTab == 2)
                 .tabItem {
                     Image(systemName: "house.fill")
                     Text(lang.t("tab_floorplan"))
@@ -60,7 +60,7 @@ public struct RootContentView: View {
                 .tag(2)
             
             // Tab 4: 玄空理气与三式绝学 (玄空飞星、八宅三合、流年紫白、时家奇门、天机长卷)
-            XuanKongGridView()
+            XuanKongGridView(isActive: selectedTab == 3)
                 .tabItem {
                     Image(systemName: "square.grid.3x3.fill")
                     Text(lang.t("tab_analysis"))

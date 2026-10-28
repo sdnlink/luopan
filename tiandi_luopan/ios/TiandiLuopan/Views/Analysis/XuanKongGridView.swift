@@ -30,7 +30,8 @@ public struct XuanKongGridView: View {
         ) : nil
         
         ScrollView {
-            VStack(spacing: 14) {
+            if isActive {
+                VStack(spacing: 14) {
                 // 1. 四大学派理气子 Tab 切换条
                 subTabBar()
                 
@@ -124,6 +125,7 @@ public struct XuanKongGridView: View {
                     )
                     .foregroundColor(.black)
                     .cornerRadius(12)
+                }
             }
         }
         .padding(10)

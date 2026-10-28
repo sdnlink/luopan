@@ -68,7 +68,7 @@ public struct RootContentView: View {
                 .tag(3)
             
             // Tab 5: 系统设置与会员中心 (四档 StoreKit 内购、特权矩阵、8字传感器校准)
-            SettingsView()
+            SettingsView(isActive: selectedTab == 4)
                 .tabItem {
                     Image(systemName: "gearshape.fill")
                     Text(lang.t("tab_settings"))

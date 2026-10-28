@@ -914,9 +914,20 @@ public struct ARVisionView: View {
         let currentHeading = motion.headingState.facingAngle
         let mFacing = motion.headingState.facingMountain
         let coordsStr = motion.coordsDesc
+        let language = lang.effectiveLanguage
+        let watermarkTitle = lang.t("ar_watermark_title")
+        let watermarkStamp = lang.t("ar_watermark_stamp")
+        let shaName = currentSha.localizedName
+        let shaAliases = currentSha.localizedAliases
+        let shaSeverity = currentSha.severity.localizedTitle
+        let facingPinyin = mFacing.pinyin
+        let facingName = mFacing.localizedName
+        let facingPalace = mFacing.localizedPalace
+        let auditDate = Date()
         
-        let image = renderer.image { ctx in
-            let cg = ctx.cgContext
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = renderer.image { ctx in
+                let cg = ctx.cgContext
             
             // Only a real camera frame can become an on-site proof image.
             let imageSize = baseImage.size
@@ -955,7 +966,7 @@ public struct ARVisionView: View {
                 .font: UIFont.boldSystemFont(ofSize: 36),
                 .foregroundColor: UIColor(red: 242/255.0, green: 217/255.0, blue: 115/255.0, alpha: 1.0)
             ]
-            lang.t("ar_watermark_title").draw(at: CGPoint(x: 70, y: size.height - 350), withAttributes: titleAttr)
+            watermarkTitle.draw(at: CGPoint(x: 70, y: size.height - 350), withAttributes: titleAttr)
             
             let bodyAttr: [NSAttributedString.Key: Any] = [
                 .font: UIFont.systemFont(ofSize: 24),
@@ -964,32 +975,32 @@ public struct ARVisionView: View {
             
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            let timeStr = dateFormatter.string(from: Date())
+            let timeStr = dateFormatter.string(from: auditDate)
             
-            let isEn = LocalizationManager.shared.effectiveLanguage == .en
-            let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+            let isEn = language == .en
+            let isHant = language == .zhHant
             
             let infoText: String
             if isEn {
                 infoText = """
-                Facing Orientation: Mountain \(mFacing.pinyin) (Measured \(String(format: "%.1f", currentHeading))°)
-                Identified Sha: [\(currentSha.localizedName)] (\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
+                Facing Orientation: Mountain \(facingPinyin) (Measured \(String(format: "%.1f", currentHeading))°)
+                Identified Sha: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
                 Coordinates: \(coordsStr)
-                Audit Time: \(timeStr) · SN: YX-AR-\(Int(Date().timeIntervalSince1970))
+                Audit Time: \(timeStr) · SN: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             } else if isHant {
                 infoText = """
-                向首方位: \(mFacing.localizedName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(mFacing.localizedPalace)
-                識別形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
+                向首方位: \(facingName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)
+                識別形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
                 現場經緯: \(coordsStr)
-                勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(Date().timeIntervalSince1970))
+                勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             } else {
                 infoText = """
-                向首方位: \(mFacing.localizedName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(mFacing.localizedPalace)
-                识别形煞: 【\(currentSha.localizedName)】(\(currentSha.localizedAliases)) · \(currentSha.severity.localizedTitle)
+                向首方位: \(facingName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)
+                识别形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
                 现场经纬: \(coordsStr)
-                勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(Date().timeIntervalSince1970))
+                勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             }
             infoText.draw(in: CGRect(x: 70, y: size.height - 290, width: size.width - 260, height: 210), withAttributes: bodyAttr)
@@ -999,13 +1010,16 @@ public struct ARVisionView: View {
             cg.setStrokeColor(UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0).cgColor)
             cg.setLineWidth(3)
             cg.stroke(sealRect)
-            lang.t("ar_watermark_stamp").draw(in: sealRect.insetBy(dx: 18, dy: 18), withAttributes: [
+            watermarkStamp.draw(in: sealRect.insetBy(dx: 18, dy: 18), withAttributes: [
                 .font: UIFont.boldSystemFont(ofSize: 26),
                 .foregroundColor: UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0)
             ])
-        }
+            }
         
-        saveSnapshotToPhotoLibrary(image)
+            DispatchQueue.main.async {
+                self.saveSnapshotToPhotoLibrary(image)
+            }
+        }
     }
 
     private func saveSnapshotToPhotoLibrary(_ image: UIImage) {

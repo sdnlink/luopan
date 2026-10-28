@@ -376,6 +376,7 @@ public struct ARVisionView: View {
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var photoPermissionDenied: Bool = false
+    @State private var showSpatialSurvey: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
     // check a frame captured just before leaving the tab could still be saved
@@ -432,10 +433,10 @@ public struct ARVisionView: View {
         ZStack {
             if isActive {
             // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
-            if hasCameraPermission && isActive {
+            if hasCameraPermission && isActive && !showSpatialSurvey {
                 CameraPreviewView(
                     cameraPosition: cameraPosition,
-                    isActive: isActive,
+                    isActive: isActive && !showSpatialSurvey,
                     captureTrigger: captureTrigger,
                     onPhotoCaptured: { image in
                         switch pendingCapturePurpose {
@@ -525,6 +526,7 @@ public struct ARVisionView: View {
                 startScanAnimation()
             } else {
                 stopScanAnimation()
+                showSpatialSurvey = false
                 pendingCapturePurpose = nil
                 isAIScanning = false
                 snapshotGeneration += 1
@@ -539,7 +541,11 @@ public struct ARVisionView: View {
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
         }
+        .fullScreenCover(isPresented: $showSpatialSurvey) {
+            ARSpatialSurveyView()
+        }
         .onDisappear {
+            showSpatialSurvey = false
             snapshotGeneration += 1
             pendingCapturePurpose = nil
             isAIScanning = false
@@ -734,6 +740,26 @@ public struct ARVisionView: View {
                 .cornerRadius(14)
             }
             .disabled(isAIScanning || pendingCapturePurpose != nil)
+
+            Button(action: {
+                guard hasCameraPermission else {
+                    aiError = lang.t("ar_ai_camera_required")
+                    return
+                }
+                showSpatialSurvey = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "arkit")
+                    Text(lang.t("ar_spatial_survey"))
+                }
+                .font(.system(size: 11, weight: .bold))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(Color.purple.opacity(0.82))
+                .foregroundColor(.white)
+                .cornerRadius(14)
+            }
+            .disabled(pendingCapturePurpose != nil)
             
             // 翻转镜头按钮
             Button(action: {

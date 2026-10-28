@@ -233,6 +233,9 @@ public struct VIPPaywallSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .onAppear {
+            iap.refreshProductsIfNeeded()
+        }
         .onReceive(iap.$isVIPUser) { isVip in
             if isVip {
                 isPurchasing = false

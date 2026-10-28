@@ -22,6 +22,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneDidBecomeActive(_ scene: UIScene) {
         StoreKitIAPManager.shared.refreshEntitlements()
+        StoreKitIAPManager.shared.refreshProductsIfNeeded()
         CompassMotionManager.shared.start()
     }
 

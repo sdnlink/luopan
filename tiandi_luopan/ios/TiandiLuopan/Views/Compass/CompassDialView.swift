@@ -87,7 +87,7 @@ public struct CompassDialView: View {
                     // The needle is drawn in the fixed screen coordinate
                     // space, so it must follow the physical magnetic-north
                     // bearing while the dial card rotates underneath it.
-                    .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset))
+                    .rotationEffect(.degrees(-motion.continuousMagneticHeading - motion.manualOffset))
                 
                 // 5. 天池中央水平仪双轴气泡 (Level Bubble)
                 if layers.showLevelBubble {
@@ -465,10 +465,9 @@ public struct CompassDialView: View {
                 .offset(y: -radius * 0.72)
         }
         .frame(width: radius * 2, height: radius * 2)
-        // True north is the magnetic bearing corrected by east-positive
-        // declination.  In screen coordinates that correction is clockwise
-        // negative, matching the web compass and Core Location's trueHeading.
-        .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - motion.currentDeclination))
+        // The main dial filter already follows Core Location trueHeading (or
+        // WMM fallback), so the true-north needle shares that same bearing.
+        .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset))
         .allowsHitTesting(false)
     }
     

@@ -25,7 +25,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     // MARK: - SwiftUI 响应式主线程状态流 (@Published)
     @Published public var heading: Double = 0.0          // 当前模 360 度数 (0 ~ 359.9°)
-    @Published public var continuousHeading: Double = 0.0// 连续不跳变角度 (彻底解决 359°->0° 旋转倒转飞盘 Bug)
+    @Published public var continuousHeading: Double = 0.0// 连续真北角度 (系统真北可用时与 iOS 指南针一致)
+    @Published public var continuousMagneticHeading: Double = 0.0 // 连续地磁北角度
     @Published public var magneticHeading: Double = 0.0
     @Published public var trueHeading: Double = 0.0
     @Published public var currentDeclination: Double = 0.0
@@ -68,6 +69,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var isRunning: Bool = false
     private var deviceMotionEnabled: Bool = true
     private var headingUpdatesEnabled: Bool = true
+    private var hasCoreLocationTrueHeading: Bool = false
     private var lastSolarCalcTime: TimeInterval = 0
     private var solarCalculationInFlight: Bool = false
     private var solarCalculationGeneration: Int = 0
@@ -214,6 +216,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var smoothedHeading: Double = 0.0
     private var filteredContinuousHeading: Double = 0.0
     private var hasInitializedFilter: Bool = false
+    private var lastRawMagneticHeading: Double = 0.0
+    private var filteredContinuousMagneticHeading: Double = 0.0
+    private var hasInitializedMagneticFilter: Bool = false
     
     private func updateContinuousHeading(newHeading: Double) {
         if !hasInitializedFilter {
@@ -262,6 +267,44 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         continuousHeading = filteredContinuousHeading
         let normalized = (filteredContinuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
         heading = normalized
+    }
+
+    /// Keep an independent smooth magnetic bearing for the red/blue magnetic
+    /// needle. The main dial follows true north when available, so reusing its
+    /// filter would make the physical magnetic needle appear offset twice.
+    private func updateContinuousMagneticHeading(newHeading: Double) {
+        if !hasInitializedMagneticFilter {
+            hasInitializedMagneticFilter = true
+            lastRawMagneticHeading = newHeading
+            filteredContinuousMagneticHeading = newHeading
+            continuousMagneticHeading = newHeading
+            return
+        }
+
+        var diff = newHeading - lastRawMagneticHeading
+        if diff > 180.0 {
+            diff -= 360.0
+        } else if diff < -180.0 {
+            diff += 360.0
+        }
+        lastRawMagneticHeading = newHeading
+
+        let absDiff = abs(diff)
+        let alpha: Double
+        if absDiff < 0.12 {
+            alpha = 0.12
+        } else if absDiff < 0.5 {
+            alpha = 0.4
+        } else if absDiff < 2.0 {
+            alpha = 0.7
+        } else {
+            alpha = 0.95
+        }
+        filteredContinuousMagneticHeading += diff * alpha
+        if abs(filteredContinuousMagneticHeading - continuousMagneticHeading) < 0.03 {
+            return
+        }
+        continuousMagneticHeading = filteredContinuousMagneticHeading
     }
     
     private func updateResolvedState(force: Bool = false) {
@@ -431,6 +474,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             if status == .denied || status == .restricted {
                 self.hasLocationFix = false
                 self.hasDeclination = false
+                self.hasCoreLocationTrueHeading = false
                 self.currentDeclination = 0.0
                 self.latitude = 0.0
                 self.longitude = 0.0
@@ -466,17 +510,18 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.magneticHeading = mag
             }
             
-            // Core Location's trueHeading is useful as a first estimate, but its
-            // value depends on the OS location cache. Once a WMM result exists,
-            // keep the two needles driven by the same offline model everywhere.
-            if newHeading.trueHeading >= 0 && !self.hasDeclination &&
-                (self.locationAuthorizationStatus == .authorizedWhenInUse || self.locationAuthorizationStatus == .authorizedAlways) {
+            // Core Location's trueHeading is the same calibrated reference used
+            // by Apple's Compass app. Prefer it whenever the OS supplies a
+            // valid value; the offline WMM value is only a fallback for devices
+            // that cannot provide a true heading yet.
+            if newHeading.trueHeading >= 0 {
                 self.trueHeading = newHeading.trueHeading
                 var declination = newHeading.trueHeading - newHeading.magneticHeading
                 if declination > 180.0 { declination -= 360.0 }
                 if declination < -180.0 { declination += 360.0 }
                 self.currentDeclination = declination
                 self.hasDeclination = true
+                self.hasCoreLocationTrueHeading = true
             }
             if self.hasDeclination {
                 let resolvedTrueHeading = (mag + self.currentDeclination + 360.0)
@@ -487,7 +532,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             }
             
             if !self.isLocked {
-                self.updateContinuousHeading(newHeading: mag)
+                self.updateContinuousMagneticHeading(newHeading: mag)
+                // Use true north for the main dial and all direction-based
+                // calculations once Core Location/WMM has supplied a valid
+                // declination. Before then, magnetic north is the safe fallback.
+                self.updateContinuousHeading(newHeading: self.hasDeclination ? self.trueHeading : mag)
                 self.updateResolvedState()
             }
             
@@ -521,18 +570,22 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.longitude = loc.coordinate.longitude
             self.altitude = loc.altitude
 
-            let wmm = WorldMagneticModel.shared.field(
-                latitude: loc.coordinate.latitude,
-                longitude: loc.coordinate.longitude,
-                altitudeMeters: loc.altitude,
-                date: Date()
-            )
-            self.currentDeclination = wmm.declination
-            self.hasDeclination = true
-            // East declination rotates a magnetic bearing clockwise toward true
-            // north. Normalize to [0, 360) for consumers and the dial renderer.
-            self.trueHeading = (self.magneticHeading + wmm.declination + 360.0)
-                .truncatingRemainder(dividingBy: 360.0)
+            // Do not overwrite Core Location's calibrated declination with an
+            // offline model when trueHeading is already available. WMM remains
+            // the fallback for devices/locations where Core Location has not
+            // produced a true heading yet.
+            if !self.hasCoreLocationTrueHeading {
+                let wmm = WorldMagneticModel.shared.field(
+                    latitude: loc.coordinate.latitude,
+                    longitude: loc.coordinate.longitude,
+                    altitudeMeters: loc.altitude,
+                    date: Date()
+                )
+                self.currentDeclination = wmm.declination
+                self.hasDeclination = true
+                self.trueHeading = (self.magneticHeading + self.currentDeclination + 360.0)
+                    .truncatingRemainder(dividingBy: 360.0)
+            }
             
             let isEn = LocalizationManager.shared.effectiveLanguage == .en
             let latLabel = loc.coordinate.latitude >= 0 ? LocalizationManager.shared.t("lat_north") : LocalizationManager.shared.t("lat_south")

@@ -4,18 +4,22 @@ import SwiftUI
 
 public struct KongWangDetailSheet: View {
     public let heading: Double
+    @ObservedObject private var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     
     public var body: some View {
-        let m = Mountain24Data.shared.mountain(for: heading)
-        let rawDelta = abs(heading - m.centerAngle)
+        // The heading passed by CompassMainView is the opening snapshot. Read
+        // the live manager here so an open diagnosis follows subsequent
+        // compass movement instead of showing stale void-boundary data.
+        let currentHeading = motion.headingState.facingAngle
+        let m = Mountain24Data.shared.mountain(for: currentHeading)
+        let rawDelta = abs(currentHeading - m.centerAngle)
         let delta = min(rawDelta, 360.0 - rawDelta)
         let isLargeKW = delta >= 6.8 && [1, 3, 5, 7].contains(m.subIndex)
         let isSmallKW = delta >= 6.5 && !isLargeKW
         let isJianXiang = delta >= 1.5 && delta < 6.5
         let isZhengZhen = delta < 1.5
-        let lang = LocalizationManager.shared
-        
         let kwStatusText: String
         let kwGradeText: String
         let kwColor: Color
@@ -57,7 +61,7 @@ public struct KongWangDetailSheet: View {
                             Text(kwStatusText)
                                 .font(.system(size: 20, weight: .bold))
                                 .foregroundColor(kwColor)
-                            Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", heading))° · \(m.localizedName) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
+                            Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", currentHeading))° · \(m.localizedName) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }

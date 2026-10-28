@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import Vision
 
 // MARK: - 户型空间立极与全屋风水体检视图 (Floorplan View - PRD 5.3)
 
@@ -23,6 +25,8 @@ public struct FloorplanView: View {
     @State private var didConsumeFloorplanCredit: Bool = false
     @State private var auditedRooms: [FloorplanRoom] = []
     @State private var auditReport: [FloorplanAuditItem] = []
+    @State private var isDetectingRooms: Bool = false
+    @State private var roomDetectionMessage: String?
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -52,11 +56,20 @@ public struct FloorplanView: View {
                 VStack(spacing: 8) {
                 // 1. 顶部控制栏
                 topControlBar()
+
+                if userFloorplanImage != nil {
+                    roomDetectionBar()
+                }
                 
                 // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
                 floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
                     .frame(height: 340)
                     .padding(.horizontal, 16)
+
+                if !isSyncWithCompass {
+                    manualHeadingControl()
+                        .padding(.horizontal, 16)
+                }
                 
                 // 3. 底部体检报告与房间列表
                 auditListSection(report: auditResult.report)
@@ -212,10 +225,13 @@ public struct FloorplanView: View {
             
             // 罗盘联动 / 手动微调
             Button(action: {
-                isSyncWithCompass.toggle()
+                // Capture the live heading before leaving sync mode so the
+                // manual slider starts at the direction the user is actually
+                // measuring instead of falling back to zero degrees.
                 if isSyncWithCompass {
                     compassRotation = motion.headingState.facingAngle
                 }
+                isSyncWithCompass.toggle()
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: isSyncWithCompass ? "location.fill" : "hand.draw.fill")
@@ -260,6 +276,159 @@ public struct FloorplanView: View {
             }
         }
         .padding(.horizontal, 16)
+    }
+
+    private func roomDetectionBar() -> some View {
+        HStack(spacing: 8) {
+            Button(action: detectRoomLayout) {
+                HStack(spacing: 4) {
+                    Image(systemName: isDetectingRooms ? "hourglass" : "sparkles")
+                    Text(lang.t("floorplan_auto_detect"))
+                }
+                .font(.system(size: 10, weight: .bold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.yanCyan.opacity(0.18))
+                .foregroundColor(Color.yanCyan)
+                .cornerRadius(6)
+            }
+            .disabled(isDetectingRooms)
+
+            if isDetectingRooms {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .yanCyan))
+                    .scaleEffect(0.7)
+            }
+            if let roomDetectionMessage = roomDetectionMessage {
+                Text(roomDetectionMessage)
+                    .font(.system(size: 9))
+                    .foregroundColor(.white.opacity(0.65))
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func manualHeadingControl() -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(lang.t("floorplan_manual_heading"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.orange)
+                Spacer()
+                Text(String(format: "%.1f°", compassRotation))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                Button(action: {
+                    compassRotation = motion.headingState.facingAngle
+                    refreshAudit()
+                }) {
+                    Text(lang.t("floorplan_heading_use_compass"))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.yanCyan)
+                }
+            }
+            Slider(value: $compassRotation, in: 0...359.5, step: 0.5)
+                .accentColor(.orange)
+                .accessibilityValue(String(format: "%.1f°", compassRotation))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.35))
+        .cornerRadius(8)
+    }
+
+    /// Runs a lightweight Vision rectangle pass over the imported plan. Room
+    /// names cannot be inferred reliably from a photograph, so the detected
+    /// boxes are applied as layout suggestions to the existing room labels and
+    /// remain fully editable by the user.
+    private func detectRoomLayout() {
+        guard let image = userFloorplanImage,
+              let cgImage = image.cgImage,
+              !isDetectingRooms else { return }
+
+        isDetectingRooms = true
+        roomDetectionMessage = lang.t("floorplan_detecting")
+        DispatchQueue.global(qos: .userInitiated).async {
+            let request = VNDetectRectanglesRequest()
+            request.minimumConfidence = 0.35
+            request.minimumSize = 0.04
+            request.minimumAspectRatio = 0.15
+            request.maximumAspectRatio = 6.0
+            request.maximumObservations = 32
+
+            do {
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                try handler.perform([request])
+                let candidates = Self.normalizedRoomCandidates(
+                    from: request.results as? [VNRectangleObservation] ?? []
+                )
+                DispatchQueue.main.async { [self] in
+                    isDetectingRooms = false
+                    guard !candidates.isEmpty else {
+                        roomDetectionMessage = lang.t("floorplan_detect_failed")
+                        return
+                    }
+                    applyRoomCandidates(candidates)
+                }
+            } catch {
+                DispatchQueue.main.async { [self] in
+                    isDetectingRooms = false
+                    roomDetectionMessage = lang.t("floorplan_detect_failed")
+                }
+            }
+        }
+    }
+
+    private static func normalizedRoomCandidates(from observations: [VNRectangleObservation]) -> [CGRect] {
+        let candidates = observations.compactMap { observation -> CGRect? in
+            let box = observation.boundingBox
+            let rect = CGRect(
+                x: max(0, min(1, box.minX)),
+                y: max(0, min(1, 1 - box.maxY)),
+                width: max(0, min(1, box.width)),
+                height: max(0, min(1, box.height))
+            )
+            guard rect.width >= 0.08, rect.height >= 0.06,
+                  rect.width * rect.height >= 0.012,
+                  rect.width * rect.height <= 0.78 else { return nil }
+            return rect
+        }
+        .sorted { $0.width * $0.height > $1.width * $1.height }
+
+        // Vision may return the same room at several nested scales. Keep the
+        // first (largest) candidate and discard heavily overlapping boxes.
+        return candidates.reduce(into: []) { result, candidate in
+            let overlaps = result.contains { existing in
+                let intersection = existing.intersection(candidate)
+                guard !intersection.isNull else { return false }
+                let unionArea = existing.union(candidate).width * existing.union(candidate).height
+                return unionArea > 0 && (intersection.width * intersection.height) / unionArea > 0.55
+            }
+            if !overlaps { result.append(candidate) }
+        }
+    }
+
+    private func applyRoomCandidates(_ candidates: [CGRect]) {
+        guard !rooms.isEmpty else { return }
+        let orderedRoomIndices = rooms.indices.sorted {
+            rooms[$0].rect.width * rooms[$0].rect.height > rooms[$1].rect.width * rooms[$1].rect.height
+        }
+        let orderedCandidates = candidates.prefix(rooms.count)
+        var updatedRooms = rooms
+        for (offset, candidate) in orderedCandidates.enumerated() {
+            updatedRooms[orderedRoomIndices[offset]].rect = candidate
+        }
+        rooms = updatedRooms
+        isEditingRooms = true
+
+        let union = orderedCandidates.dropFirst().reduce(orderedCandidates.first ?? .zero) { $0.union($1) }
+        if !union.isNull {
+            centroid = CGPoint(x: union.midX, y: union.midY)
+        }
+        roomDetectionMessage = "\(lang.t("floorplan_detected")) \(orderedCandidates.count)"
+        refreshAudit()
     }
     
     // MARK: - 户型交互画布

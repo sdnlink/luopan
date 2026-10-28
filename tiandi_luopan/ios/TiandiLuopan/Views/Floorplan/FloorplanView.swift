@@ -369,7 +369,9 @@ public struct FloorplanView: View {
     }
 
     private func centerFromRoomLayout() {
-        let validRooms = rooms.filter { $0.rect.width > 0 && $0.rect.height > 0 }
+        let validRooms = rooms.filter {
+            $0.type != .missingCorner && $0.rect.width > 0 && $0.rect.height > 0
+        }
         let totalArea = validRooms.reduce(0.0) { partial, room in
             partial + Double(room.rect.width * room.rect.height)
         }
@@ -546,10 +548,10 @@ public struct FloorplanView: View {
         guard !rooms.isEmpty else { return }
         roomsBeforeDetection = rooms
         centroidBeforeDetection = centroid
-        let orderedRoomIndices = rooms.indices.sorted {
+        let orderedRoomIndices = rooms.indices.filter { rooms[$0].type != .missingCorner }.sorted {
             rooms[$0].rect.width * rooms[$0].rect.height > rooms[$1].rect.width * rooms[$1].rect.height
         }
-        let orderedCandidates = candidates.prefix(rooms.count)
+        let orderedCandidates = candidates.prefix(orderedRoomIndices.count)
         var updatedRooms = rooms
         for (offset, candidate) in orderedCandidates.enumerated() {
             updatedRooms[orderedRoomIndices[offset]].rect = candidate
@@ -677,8 +679,9 @@ public struct FloorplanView: View {
         
         let isBad = room.isBad
         let isGood = room.isGood
-        let strokeColor = isBad ? Color.red : (isGood ? Color.green : Color.white.opacity(0.25))
-        let bgColor = isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05))
+        let isMissingCorner = room.type == .missingCorner
+        let strokeColor = isMissingCorner ? Color.red : (isBad ? Color.red : (isGood ? Color.green : Color.white.opacity(0.25)))
+        let bgColor = isMissingCorner ? Color.red.opacity(0.12) : (isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05)))
         
         return Button(action: {
             // Tapping always opens the diagnostic sheet. Room placement still
@@ -700,7 +703,13 @@ public struct FloorplanView: View {
                     .fill(bgColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(strokeColor, lineWidth: isBad ? 1.5 : 1)
+                            .stroke(
+                                strokeColor,
+                                style: StrokeStyle(
+                                    lineWidth: isMissingCorner || isBad ? 1.5 : 1,
+                                    dash: isMissingCorner ? [5, 3] : []
+                                )
+                            )
                     )
                 
                 VStack(spacing: 2) {

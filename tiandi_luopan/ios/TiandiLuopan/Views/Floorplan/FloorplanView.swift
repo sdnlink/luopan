@@ -233,7 +233,6 @@ public struct FloorplanView: View {
                 roomsBeforeDetection = nil
                 centroidBeforeDetection = nil
                 roomDetectionMessage = nil
-                didConsumeFloorplanCredit = false
                 isEditingRooms = false
                 activeRoomDragID = nil
                 activeRoomStartRect = nil
@@ -346,6 +345,11 @@ public struct FloorplanView: View {
 
     private func roomLayoutTools() -> some View {
         HStack(spacing: 8) {
+            Button(action: centerFromRoomLayout) {
+                Label(lang.t("floorplan_auto_center"), systemImage: "scope")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.yanCyan)
+            }
             Button(action: { showNewRoomTypePicker = true }) {
                 Label(lang.t("floorplan_add_room"), systemImage: "plus.rectangle")
                     .font(.system(size: 10, weight: .bold))
@@ -362,6 +366,26 @@ public struct FloorplanView: View {
                 addRoom(type: type)
             }
         }
+    }
+
+    private func centerFromRoomLayout() {
+        let validRooms = rooms.filter { $0.rect.width > 0 && $0.rect.height > 0 }
+        let totalArea = validRooms.reduce(0.0) { partial, room in
+            partial + Double(room.rect.width * room.rect.height)
+        }
+        guard totalArea > 0 else { return }
+        let weightedX = validRooms.reduce(0.0) { partial, room in
+            let area = Double(room.rect.width * room.rect.height)
+            return partial + Double(room.rect.midX) * area
+        }
+        let weightedY = validRooms.reduce(0.0) { partial, room in
+            let area = Double(room.rect.width * room.rect.height)
+            return partial + Double(room.rect.midY) * area
+        }
+        centroid = CGPoint(
+            x: max(0.05, min(0.95, weightedX / totalArea)),
+            y: max(0.05, min(0.95, weightedY / totalArea))
+        )
     }
 
     @ViewBuilder

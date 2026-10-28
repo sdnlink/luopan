@@ -30,6 +30,7 @@ public struct FloorplanView: View {
     @State private var roomDetectionMessage: String?
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
+    @State private var showNewRoomTypePicker = false
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -65,6 +66,10 @@ public struct FloorplanView: View {
                 if userFloorplanImage != nil {
                     roomDetectionBar()
                 }
+
+                if isEditingRooms {
+                    roomLayoutTools()
+                }
                 
                 // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
                 floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
@@ -87,6 +92,9 @@ public struct FloorplanView: View {
                 room: room,
                 onEditType: isEditingRooms ? { type in
                     updateRoomType(roomID: room.id, type: type)
+                } : nil,
+                onDelete: isEditingRooms ? {
+                    deleteRoom(roomID: room.id)
                 } : nil
             )
         }
@@ -333,6 +341,26 @@ public struct FloorplanView: View {
         .padding(.horizontal, 16)
     }
 
+    private func roomLayoutTools() -> some View {
+        HStack(spacing: 8) {
+            Button(action: { showNewRoomTypePicker = true }) {
+                Label(lang.t("floorplan_add_room"), systemImage: "plus.rectangle")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.green)
+            }
+            Spacer(minLength: 0)
+            Text(lang.t("floorplan_editing_hint"))
+                .font(.system(size: 9))
+                .foregroundColor(.white.opacity(0.55))
+        }
+        .padding(.horizontal, 16)
+        .sheet(isPresented: $showNewRoomTypePicker) {
+            FloorplanRoomTypeEditor(titleKey: "floorplan_add_room", room: nil) { type in
+                addRoom(type: type)
+            }
+        }
+    }
+
     @ViewBuilder
     private func headingQualityNotice() -> some View {
         let referenceText = activeNorthReference == .trueNorth
@@ -526,6 +554,37 @@ public struct FloorplanView: View {
         guard let index = rooms.firstIndex(where: { $0.id == roomID }) else { return }
         rooms[index].type = type
         rooms[index].name = type.localizedName
+        roomsBeforeDetection = nil
+        centroidBeforeDetection = nil
+        refreshAudit()
+        selectedRoom = nil
+    }
+
+    private func addRoom(type: FloorplanRoomType) {
+        let roomWidth: CGFloat = 0.23
+        let roomHeight: CGFloat = 0.18
+        let column = rooms.count % 3
+        let row = (rooms.count / 3) % 4
+        let origin = CGPoint(
+            x: min(1.0 - roomWidth, 0.05 + CGFloat(column) * 0.25),
+            y: min(1.0 - roomHeight, 0.06 + CGFloat(row) * 0.21)
+        )
+        rooms.append(FloorplanRoom(
+            name: type.localizedName,
+            type: type,
+            rect: CGRect(x: origin.x, y: origin.y, width: roomWidth, height: roomHeight)
+        ))
+        roomsBeforeDetection = nil
+        centroidBeforeDetection = nil
+        isEditingRooms = true
+        refreshAudit()
+    }
+
+    private func deleteRoom(roomID: String) {
+        guard rooms.count > 1 else { return }
+        rooms.removeAll { $0.id == roomID }
+        roomsBeforeDetection = nil
+        centroidBeforeDetection = nil
         refreshAudit()
         selectedRoom = nil
     }
@@ -805,9 +864,16 @@ public struct FloorplanView: View {
 }
 
 private struct FloorplanRoomTypeEditor: View {
-    let room: FloorplanRoom
+    let titleKey: String
+    let room: FloorplanRoom?
     let onSelect: (FloorplanRoomType) -> Void
     @Environment(\.presentationMode) private var presentationMode
+
+    init(titleKey: String = "floorplan_room_type", room: FloorplanRoom?, onSelect: @escaping (FloorplanRoomType) -> Void) {
+        self.titleKey = titleKey
+        self.room = room
+        self.onSelect = onSelect
+    }
 
     var body: some View {
         NavigationView {
@@ -825,7 +891,7 @@ private struct FloorplanRoomTypeEditor: View {
                                 Text(type.localizedName)
                                     .foregroundColor(.primary)
                                 Spacer()
-                                if room.type == type {
+                                if room?.type == type {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(.accentColor)
                                 }
@@ -833,10 +899,10 @@ private struct FloorplanRoomTypeEditor: View {
                         }
                     }
                 } header: {
-                    Text(LocalizationManager.shared.t("floorplan_room_type"))
+                    Text(LocalizationManager.shared.t(titleKey))
                 }
             }
-            .navigationBarTitle(LocalizationManager.shared.t("floorplan_room_type"), displayMode: .inline)
+            .navigationBarTitle(LocalizationManager.shared.t(titleKey), displayMode: .inline)
             .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
@@ -848,13 +914,20 @@ private struct FloorplanRoomTypeEditor: View {
 public struct RoomAuditDetailSheet: View {
     public let room: FloorplanRoom
     private let onEditType: ((FloorplanRoomType) -> Void)?
+    private let onDelete: (() -> Void)?
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showTypeEditor = false
+    @State private var showDeleteConfirmation = false
     
-    public init(room: FloorplanRoom, onEditType: ((FloorplanRoomType) -> Void)? = nil) {
+    public init(
+        room: FloorplanRoom,
+        onEditType: ((FloorplanRoomType) -> Void)? = nil,
+        onDelete: (() -> Void)? = nil
+    ) {
         self.room = room
         self.onEditType = onEditType
+        self.onDelete = onDelete
     }
     
     public var body: some View {
@@ -911,6 +984,29 @@ public struct RoomAuditDetailSheet: View {
                                 FloorplanRoomTypeEditor(room: room) { type in
                                     onEditType(type)
                                 }
+                            }
+                        }
+
+                        if let onDelete = onDelete {
+                            Button(action: { showDeleteConfirmation = true }) {
+                                Label(lang.t("floorplan_delete_room"), systemImage: "trash")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.red)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                            .background(Color.red.opacity(0.10))
+                            .cornerRadius(10)
+                            .alert(isPresented: $showDeleteConfirmation) {
+                                Alert(
+                                    title: Text(lang.t("floorplan_delete_room")),
+                                    message: Text(lang.t("floorplan_delete_confirm")),
+                                    primaryButton: .destructive(Text(lang.t("floorplan_delete_room"))) {
+                                        onDelete()
+                                        presentationMode.wrappedValue.dismiss()
+                                    },
+                                    secondaryButton: .cancel()
+                                )
                             }
                         }
                         

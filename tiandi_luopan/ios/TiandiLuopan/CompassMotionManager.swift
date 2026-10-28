@@ -345,12 +345,20 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let shouldPublishTilt = now - self.lastPublishedMotionTime >= 0.1
             if shouldPublishTilt {
                 self.lastPublishedMotionTime = now
-                self.pitch = self.filteredPitch
-                self.roll = self.filteredRoll
-                self.isLevel = abs(self.pitch) < 2.0 && abs(self.roll) < 2.0
-                self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
-                if self.isLocked {
-                    self.updateResolvedState(force: true)
+                let nextPitch = self.filteredPitch
+                let nextRoll = self.filteredRoll
+                let nextIsLevel = abs(nextPitch) < 2.0 && abs(nextRoll) < 2.0
+                let tiltChanged = abs(nextPitch - self.pitch) >= 0.05 ||
+                    abs(nextRoll - self.roll) >= 0.05 ||
+                    nextIsLevel != self.isLevel
+                if tiltChanged {
+                    self.pitch = nextPitch
+                    self.roll = nextRoll
+                    self.isLevel = nextIsLevel
+                    self.delegate?.didUpdateTilt(pitch: self.pitch, roll: self.roll)
+                    if self.isLocked {
+                        self.updateResolvedState(force: true)
+                    }
                 }
             }
 

@@ -12,6 +12,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
     case bathroom = "卫生间"
     case study = "书房"
     case balcony = "阳台"
+    case missingCorner = "户型缺角"
     
     public var id: String { self.rawValue }
     
@@ -25,6 +26,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
         case .bathroom: return "drop.triangle.fill"
         case .study: return "books.vertical.fill"
         case .balcony: return "sun.max.fill"
+        case .missingCorner: return "exclamationmark.triangle.fill"
         }
     }
 
@@ -40,6 +42,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
             case .bathroom: return "Bathroom"
             case .study: return "Study"
             case .balcony: return "Balcony"
+            case .missingCorner: return "Missing Corner"
             }
         case .zhHant:
             switch self {
@@ -51,6 +54,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
             case .bathroom: return "衛生間"
             case .study: return "書房"
             case .balcony: return "陽台"
+            case .missingCorner: return "戶型缺角"
             }
         case .zhHans, .auto:
             switch self {
@@ -62,6 +66,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
             case .bathroom: return "卫生间"
             case .study: return "书房"
             case .balcony: return "阳台"
+            case .missingCorner: return "户型缺角"
             }
         }
     }
@@ -206,42 +211,34 @@ public class FloorplanEngine {
         var updatedRooms: [FloorplanRoom] = []
         var auditReport: [FloorplanAuditItem] = []
         
-        let degPerRad = 180.0 / Double.pi
         let isEn = LocalizationManager.shared.effectiveLanguage == .en
         let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
         let centralRoomID = rooms
-            .filter { $0.rect.contains(centroid) }
+            .filter { $0.type != .missingCorner && $0.rect.contains(centroid) }
             .min {
                 ($0.rect.width * $0.rect.height) < ($1.rect.width * $1.rect.height)
             }?.id
+        let manualMissingGua = Set(rooms.filter { $0.type == .missingCorner }.map {
+            palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading).gua
+        })
         
         for room in rooms {
             var r = room
-            // 计算房间中心相对立极点的极坐标角度
-            let roomCenterX = room.rect.midX
-            let roomCenterY = room.rect.midY
-            let dx = Double(roomCenterX - centroid.x)
-            let dy = Double(roomCenterY - centroid.y) // 屏幕坐标向下为正
-            
-            // 计算屏幕方位角 (以正上为 0 度, 顺时针)
-            var screenAngle = atan2(dx, -dy) * degPerRad
-            if screenAngle < 0 { screenAngle += 360 }
-            
-            // 结合罗盘当前朝向 heading 叠加实际地理方位
-            var geoAngle = (screenAngle + heading).truncatingRemainder(dividingBy: 360)
-            if geoAngle < 0 { geoAngle += 360 }
-            
             // A room containing the user-selected Tai Ji point belongs to the
             // central palace.  The previous angle-only resolver could never
             // produce 中宫, so a bathroom or stairwell at the home's center
             // was silently reported as one of the eight outer palaces.
             let palace: (dir: String, gua: String)
-            if room.id == centralRoomID {
+            if room.type != .missingCorner && room.id == centralRoomID {
                 let language = LocalizationManager.shared.effectiveLanguage
                 palace = language == .en ? ("Center", "Center") : (language == .zhHant ? ("中央", "中") : ("中央", "中"))
             } else {
                 // 解算八卦宫位: 坎(0°/北), 艮(45°/东北), 震(90°/东), 巽(135°/东南), 离(180°/南), 坤(225°/西南), 兑(270°/西), 乾(315°/西北)
-                palace = resolvePalace(geoAngle: geoAngle)
+                palace = palaceForPoint(
+                    CGPoint(x: room.rect.midX, y: room.rect.midY),
+                    centroid: centroid,
+                    heading: heading
+                )
             }
             if isEn {
                 r.palaceName = "\(palace.dir) (\(palace.gua) Palace)"
@@ -251,6 +248,23 @@ public class FloorplanEngine {
                 r.palaceName = "\(palace.dir) \(palace.gua)宫"
             }
             
+            if r.type == .missingCorner {
+                let content = missingCornerContent(gua: palace.gua)
+                r.inspectionTitle = content.title
+                r.inspectionLevel = "预警"
+                r.inspectionAdvice = content.solution
+                updatedRooms.append(r)
+                auditReport.append(FloorplanAuditItem(
+                    id: "manual-missing-corner-\(room.id)",
+                    title: "\(r.name) · \(content.title)",
+                    palace: r.palaceName,
+                    severity: "预警",
+                    lore: content.lore,
+                    solution: content.solution
+                ))
+                continue
+            }
+
             // 风水动态研判
             let audit = evaluateRoom(type: r.type, palaceGua: palace.gua, palaceDir: palace.dir)
             r.inspectionTitle = audit.title
@@ -278,7 +292,8 @@ public class FloorplanEngine {
         auditReport.append(contentsOf: missingCornerAudits(
             rooms: rooms,
             centroid: centroid,
-            heading: heading
+            heading: heading,
+            excludingGua: manualMissingGua
         ))
         
         // 增加穿堂煞与中宫检测
@@ -301,13 +316,24 @@ public class FloorplanEngine {
         return (updatedRooms, auditReport)
     }
 
+    private func palaceForPoint(_ point: CGPoint, centroid: CGPoint, heading: Double) -> (dir: String, gua: String) {
+        let dx = Double(point.x - centroid.x)
+        let dy = Double(point.y - centroid.y)
+        var screenAngle = atan2(dx, -dy) * 180.0 / Double.pi
+        if screenAngle < 0 { screenAngle += 360.0 }
+        let geoAngle = (screenAngle + heading).truncatingRemainder(dividingBy: 360.0)
+        return resolvePalace(geoAngle: geoAngle < 0 ? geoAngle + 360.0 : geoAngle)
+    }
+
     private func missingCornerAudits(
         rooms: [FloorplanRoom],
         centroid: CGPoint,
-        heading: Double
+        heading: Double,
+        excludingGua: Set<String>
     ) -> [FloorplanAuditItem] {
-        guard !rooms.isEmpty else { return [] }
-        let bounds = rooms.reduce(CGRect.null) { partial, room in
+        let footprintRooms = rooms.filter { $0.type != .missingCorner }
+        guard !footprintRooms.isEmpty else { return [] }
+        let bounds = footprintRooms.reduce(CGRect.null) { partial, room in
             partial.union(room.rect)
         }
         guard !bounds.isNull, bounds.width > 0.05, bounds.height > 0.05 else { return [] }
@@ -325,7 +351,7 @@ public class FloorplanEngine {
 
         var results: [FloorplanAuditItem] = []
         for sector in sectors {
-            let occupied = rooms.contains { room in
+            let occupied = footprintRooms.contains { room in
                 let overlap = room.rect.intersection(sector)
                 guard !overlap.isNull else { return false }
                 return (overlap.width * overlap.height) / sectorArea >= 0.18
@@ -333,12 +359,8 @@ public class FloorplanEngine {
             guard !occupied else { continue }
 
             let center = CGPoint(x: sector.midX, y: sector.midY)
-            let dx = Double(center.x - centroid.x)
-            let dy = Double(center.y - centroid.y)
-            var angle = atan2(dx, -dy) * 180.0 / Double.pi
-            if angle < 0 { angle += 360.0 }
-            let geoAngle = (angle + heading).truncatingRemainder(dividingBy: 360.0)
-            let palace = resolvePalace(geoAngle: geoAngle)
+            let palace = palaceForPoint(center, centroid: centroid, heading: heading)
+            guard !excludingGua.contains(palace.gua) else { continue }
             let content = missingCornerContent(gua: palace.gua)
             results.append(FloorplanAuditItem(
                 id: "missing-corner-\(palace.gua)",
@@ -382,9 +404,9 @@ public class FloorplanEngine {
             )
         default:
             return (
-                tr("户型缺角 · 西南坤位", "戶型缺角 · 西南坤位", "Missing Corner · Southwest Kun"),
-                tr("房屋外接轮廓在西南坤位出现空缺，可能影响户型边界完整性；当前结果基于房间框近似。", "房屋外接輪廓在西南坤位出現空缺，可能影響戶型邊界完整性；當前結果基於房間框近似。", "The inferred footprint is open at the southwest Kun corner; this result is an approximation based on room boxes."),
-                tr("核对西南外墙、生活阳台和附属空间，确认缺角是否真实存在。", "核對西南外牆、生活陽台和附屬空間，確認缺角是否真實存在。", "Check the southwest exterior wall, balcony and attached spaces to confirm the actual outline.")
+                tr("户型缺角 · 当前方位", "戶型缺角 · 當前方位", "Missing Corner · Indicated Direction"),
+                tr("房屋外接轮廓在当前方位出现空缺，可能影响户型边界完整性；当前结果基于房间框近似。", "房屋外接輪廓在當前方位出現空缺，可能影響戶型邊界完整性；當前結果基於房間框近似。", "The inferred footprint is open in the indicated direction; this result is an approximation based on room boxes."),
+                tr("核对对应外墙、阳台和附属空间，确认缺角是否真实存在。", "核對對應外牆、陽台和附屬空間，確認缺角是否真實存在。", "Check the corresponding exterior wall, balcony and attached spaces to confirm the actual outline.")
             )
         }
     }

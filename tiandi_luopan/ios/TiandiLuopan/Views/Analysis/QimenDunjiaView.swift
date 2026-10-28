@@ -7,11 +7,15 @@ public struct QimenDunjiaView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
+    @State private var cachedChart: QimenChart?
     
     public init() {}
     
     public var body: some View {
-        let chart = QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+        // Motion publishes tilt and magnetic-field samples independently of
+        // the heading. Reuse the chart across those updates; Qimen only needs
+        // a new result when the heading or language changes.
+        let chart = cachedChart ?? QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
         
         return VStack(spacing: 12) {
             // 局数标题栏
@@ -86,6 +90,19 @@ public struct QimenDunjiaView: View {
                 .padding(.horizontal, 16)
             }
         }
+        .onAppear {
+            refreshChart()
+        }
+        .onChange(of: motion.headingState.facingAngle) { _ in
+            refreshChart()
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshChart()
+        }
+    }
+
+    private func refreshChart() {
+        cachedChart = QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
     }
     
     private func qimenCellView(cell: QimenPalaceCell) -> some View {

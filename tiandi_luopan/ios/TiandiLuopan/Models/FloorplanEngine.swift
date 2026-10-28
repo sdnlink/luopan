@@ -270,6 +270,16 @@ public class FloorplanEngine {
                 ))
             }
         }
+
+        // Check the four outer corner sectors of the edited footprint. This
+        // uses the room rectangles as an approximation of the building shell;
+        // it is intentionally reported as a warning so the user can confirm
+        // the actual exterior wall before relying on the result.
+        auditReport.append(contentsOf: missingCornerAudits(
+            rooms: rooms,
+            centroid: centroid,
+            heading: heading
+        ))
         
         // 增加穿堂煞与中宫检测
         if auditReport.isEmpty {
@@ -289,6 +299,94 @@ public class FloorplanEngine {
         }
         
         return (updatedRooms, auditReport)
+    }
+
+    private func missingCornerAudits(
+        rooms: [FloorplanRoom],
+        centroid: CGPoint,
+        heading: Double
+    ) -> [FloorplanAuditItem] {
+        guard !rooms.isEmpty else { return [] }
+        let bounds = rooms.reduce(CGRect.null) { partial, room in
+            partial.union(room.rect)
+        }
+        guard !bounds.isNull, bounds.width > 0.05, bounds.height > 0.05 else { return [] }
+
+        let sectorWidth = bounds.width / 3.0
+        let sectorHeight = bounds.height / 3.0
+        let sectors: [CGRect] = [
+            CGRect(x: bounds.minX, y: bounds.minY, width: sectorWidth, height: sectorHeight),
+            CGRect(x: bounds.maxX - sectorWidth, y: bounds.minY, width: sectorWidth, height: sectorHeight),
+            CGRect(x: bounds.maxX - sectorWidth, y: bounds.maxY - sectorHeight, width: sectorWidth, height: sectorHeight),
+            CGRect(x: bounds.minX, y: bounds.maxY - sectorHeight, width: sectorWidth, height: sectorHeight)
+        ]
+        let sectorArea = sectorWidth * sectorHeight
+        guard sectorArea > 0 else { return [] }
+
+        var results: [FloorplanAuditItem] = []
+        for sector in sectors {
+            let occupied = rooms.contains { room in
+                let overlap = room.rect.intersection(sector)
+                guard !overlap.isNull else { return false }
+                return (overlap.width * overlap.height) / sectorArea >= 0.18
+            }
+            guard !occupied else { continue }
+
+            let center = CGPoint(x: sector.midX, y: sector.midY)
+            let dx = Double(center.x - centroid.x)
+            let dy = Double(center.y - centroid.y)
+            var angle = atan2(dx, -dy) * 180.0 / Double.pi
+            if angle < 0 { angle += 360.0 }
+            let geoAngle = (angle + heading).truncatingRemainder(dividingBy: 360.0)
+            let palace = resolvePalace(geoAngle: geoAngle)
+            let content = missingCornerContent(gua: palace.gua)
+            results.append(FloorplanAuditItem(
+                id: "missing-corner-\(palace.gua)",
+                title: content.title,
+                palace: palace.dir,
+                severity: "预警",
+                lore: content.lore,
+                solution: content.solution
+            ))
+        }
+        return results
+    }
+
+    private func missingCornerContent(gua: String) -> (title: String, lore: String, solution: String) {
+        let language = LocalizationManager.shared.effectiveLanguage
+        func tr(_ hans: String, _ hant: String, _ en: String) -> String {
+            switch language {
+            case .en: return en
+            case .zhHant: return hant
+            default: return hans
+            }
+        }
+        switch gua {
+        case "乾", "Qian":
+            return (
+                tr("户型缺角 · 西北乾位", "戶型缺角 · 西北乾位", "Missing Corner · Northwest Qian"),
+                tr("房屋外接轮廓在西北乾位出现空缺，可能影响整体边界完整性；当前结果基于房间框近似。", "房屋外接輪廓在西北乾位出現空缺，可能影響整體邊界完整性；當前結果基於房間框近似。", "The inferred footprint is open at the northwest Qian corner; this result is an approximation based on room boxes."),
+                tr("核对西北外墙、阳台和设备平台是否实际缺失，再决定是否需要补足或调整布局。", "核對西北外牆、陽台和設備平台是否實際缺失，再決定是否需要補足或調整布局。", "Verify the northwest exterior wall, balcony and service platform before changing the layout.")
+            )
+        case "艮", "Gen":
+            return (
+                tr("户型缺角 · 东北艮位", "戶型缺角 · 東北艮位", "Missing Corner · Northeast Gen"),
+                tr("房屋外接轮廓在东北艮位出现空缺，可能使户型边界不完整；当前结果基于房间框近似。", "房屋外接輪廓在東北艮位出現空缺，可能使戶型邊界不完整；當前結果基於房間框近似。", "The inferred footprint is open at the northeast Gen corner; this result is an approximation based on room boxes."),
+                tr("核对东北外墙、入户平台和设备空间，确认空缺是否属于真实外墙形状。", "核對東北外牆、入戶平台和設備空間，確認空缺是否屬於真實外牆形狀。", "Check the northeast exterior wall, entry platform and service area to confirm the actual outline.")
+            )
+        case "巽", "Xun":
+            return (
+                tr("户型缺角 · 东南巽位", "戶型缺角 · 東南巽位", "Missing Corner · Southeast Xun"),
+                tr("房屋外接轮廓在东南巽位出现空缺，可能影响户型完整性；当前结果基于房间框近似。", "房屋外接輪廓在東南巽位出現空缺，可能影響戶型完整性；當前結果基於房間框近似。", "The inferred footprint is open at the southeast Xun corner; this result is an approximation based on room boxes."),
+                tr("核对东南阳台、飘窗和外墙线，避免把未绘制区域误判为缺角。", "核對東南陽台、飄窗和外牆線，避免把未繪製區域誤判為缺角。", "Check the southeast balcony, bay window and exterior wall line so an unmarked area is not mistaken for a missing corner.")
+            )
+        default:
+            return (
+                tr("户型缺角 · 西南坤位", "戶型缺角 · 西南坤位", "Missing Corner · Southwest Kun"),
+                tr("房屋外接轮廓在西南坤位出现空缺，可能影响户型边界完整性；当前结果基于房间框近似。", "房屋外接輪廓在西南坤位出現空缺，可能影響戶型邊界完整性；當前結果基於房間框近似。", "The inferred footprint is open at the southwest Kun corner; this result is an approximation based on room boxes."),
+                tr("核对西南外墙、生活阳台和附属空间，确认缺角是否真实存在。", "核對西南外牆、生活陽台和附屬空間，確認缺角是否真實存在。", "Check the southwest exterior wall, balcony and attached spaces to confirm the actual outline.")
+            )
+        }
     }
     
     private func resolvePalace(geoAngle: Double) -> (dir: String, gua: String) {

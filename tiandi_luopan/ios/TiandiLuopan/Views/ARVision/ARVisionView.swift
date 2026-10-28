@@ -306,6 +306,11 @@ public struct CameraPreviewView: UIViewRepresentable {
 // MARK: - AR 实景天心透视与形煞智能标注视图 (AR Vision View)
 
 public struct ARVisionView: View {
+    private enum CapturePurpose {
+        case aiScan
+        case snapshot
+    }
+
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -325,7 +330,7 @@ public struct ARVisionView: View {
     @State private var cameraPosition: AVCaptureDevice.Position = .back
     @State private var captureTrigger: Int = 0
     @State private var isAIScanning: Bool = false
-    @State private var pendingAIFrame: Bool = false
+    @State private var pendingCapturePurpose: CapturePurpose?
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var photoPermissionDenied: Bool = false
@@ -385,15 +390,22 @@ public struct ARVisionView: View {
                     isActive: isActive,
                     captureTrigger: captureTrigger,
                     onPhotoCaptured: { image in
-                        if pendingAIFrame {
-                            pendingAIFrame = false
+                        switch pendingCapturePurpose {
+                        case .aiScan:
+                            pendingCapturePurpose = nil
                             analyzeFrame(image)
-                        } else {
+                        case .snapshot:
+                            pendingCapturePurpose = nil
                             guard let image = image else {
                                 aiError = lang.t("ar_ai_no_frame")
                                 return
                             }
                             captureAndSaveSnapshot(baseImage: image)
+                        case .none:
+                            // A capture can finish after the AR tab was
+                            // dismissed or the request was superseded. Do not
+                            // turn that stale frame into an unexpected save.
+                            return
                         }
                     }
                 )
@@ -455,15 +467,17 @@ public struct ARVisionView: View {
         }
         .onAppear {
             checkCameraPermission()
-            withAnimation(Animation.linear(duration: 2.5).repeatForever(autoreverses: true)) {
-                scanOffset = 180
+            if isActive {
+                startScanAnimation()
             }
         }
         .onChange(of: isActive) { active in
             if active {
                 checkCameraPermission()
+                startScanAnimation()
             } else {
-                pendingAIFrame = false
+                stopScanAnimation()
+                pendingCapturePurpose = nil
                 isAIScanning = false
             }
         }
@@ -475,6 +489,30 @@ public struct ARVisionView: View {
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+    }
+
+    private func startScanAnimation() {
+        guard isActive else { return }
+        // Reset before starting a new cycle so returning to the AR tab always
+        // begins at the same edge and does not retain an off-screen animation.
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) {
+            scanOffset = -180
+        }
+        withAnimation(Animation.linear(duration: 2.5).repeatForever(autoreverses: true)) {
+            scanOffset = 180
+        }
+    }
+
+    private func stopScanAnimation() {
+        // A non-animated state write cancels the repeatForever transaction and
+        // prevents an inactive TabView child from driving display-link redraws.
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) {
+            scanOffset = -180
         }
     }
     
@@ -640,7 +678,7 @@ public struct ARVisionView: View {
                 .foregroundColor(.black)
                 .cornerRadius(14)
             }
-            .disabled(isAIScanning)
+            .disabled(isAIScanning || pendingCapturePurpose != nil)
             
             // 翻转镜头按钮
             Button(action: {
@@ -664,7 +702,9 @@ public struct ARVisionView: View {
                 if !iap.hasUnlockedVIP {
                     showPaywall = true
                 } else {
+                    guard pendingCapturePurpose == nil else { return }
                     if hasCameraPermission && isActive {
+                        pendingCapturePurpose = .snapshot
                         captureTrigger += 1
                     } else {
                         // A dark fallback image must never be presented as an
@@ -685,6 +725,7 @@ public struct ARVisionView: View {
                 .foregroundColor(.black)
                 .cornerRadius(14)
             }
+            .disabled(pendingCapturePurpose != nil)
             
             // 大师化解锦囊
             Button(action: {
@@ -808,7 +849,7 @@ public struct ARVisionView: View {
     }
 
     private func runAIScan() {
-        guard hasCameraPermission && isActive else {
+        guard pendingCapturePurpose == nil, hasCameraPermission && isActive else {
             aiError = lang.t("ar_ai_camera_required")
             return
         }
@@ -816,7 +857,7 @@ public struct ARVisionView: View {
         photoPermissionDenied = false
         aiResult = nil
         isAIScanning = true
-        pendingAIFrame = true
+        pendingCapturePurpose = .aiScan
         captureTrigger += 1
     }
 

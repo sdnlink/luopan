@@ -19,6 +19,9 @@ public struct TianJiShuView: View {
     @State private var showShareSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var isExporting: Bool = false
+    // Invalidated whenever a new render starts or the view disappears, so a
+    // late background result cannot overwrite current or dismissed state.
+    @State private var renderGeneration: Int = 0
     
     public init() {}
     
@@ -174,6 +177,8 @@ public struct TianJiShuView: View {
                 presentationMode.wrappedValue.dismiss()
             })
             .onAppear {
+                renderGeneration += 1
+                let generation = renderGeneration
                 // Capture all observable sensor values on the main thread
                 // before moving the expensive renderer to a worker queue.
                 // Reading @Published state from the background closure could
@@ -182,19 +187,34 @@ public struct TianJiShuView: View {
                 let heading = motion.headingState.facingAngle
                 let coordsDesc = motion.coordsDesc
                 let solarTimeDesc = motion.solarTimeDesc
+                let language = lang.effectiveLanguage
+                isGenerating = true
                 DispatchQueue.global(qos: .userInitiated).async {
                     let img = TianJiShuEngine.shared.generateScrollImage(
                         heading: heading,
                         coordsDesc: coordsDesc,
-                        solarTimeDesc: solarTimeDesc
+                        solarTimeDesc: solarTimeDesc,
+                        language: language
                     )
                     DispatchQueue.main.async {
+                        guard self.renderGeneration == generation else { return }
                         self.scrollImage = img
                         self.isGenerating = false
                     }
                 }
             }
-            .sheet(isPresented: $showShareSheet) {
+            .onDisappear {
+                // SwiftUI may dismiss the page while the worker is still
+                // rendering. Invalidate its completion and release any
+                // export gate left by an interrupted presentation.
+                renderGeneration += 1
+                isExporting = false
+            }
+            .sheet(isPresented: $showShareSheet, onDismiss: {
+                // completionWithItemsHandler is not guaranteed to run when a
+                // presentation is interrupted, so always clear the gate.
+                isExporting = false
+            }) {
                 if let img = scrollImage {
                     TianJiActivityViewController(activityItems: [img]) { completed in
                         isExporting = false

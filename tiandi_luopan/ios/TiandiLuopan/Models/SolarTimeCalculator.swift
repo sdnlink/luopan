@@ -87,6 +87,12 @@ public final class SolarTimeCalculator {
         solarTermIndex(forLongitude: solarApparentLongitude(for: date))
     }
 
+    /// Returns the localized-independent source name of the current solar-term
+    /// bucket.  The compass maps this name to its own north-based ring order.
+    public func solarTermName(for date: Date = Date()) -> String {
+        solarTerms[solarTermIndex(for: date)]
+    }
+
     /// Fractional days elapsed since the start of the current 15° solar-term
     /// bucket.  This is used by the Qimen 拆补 method to split each term into
     /// upper, middle and lower five-day yuan segments.

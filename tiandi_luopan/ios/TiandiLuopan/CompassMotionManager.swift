@@ -44,6 +44,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public private(set) var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published public var trueSolarTimeStr: String = "--:--:--"
     @Published public var solarTimeDesc: String = ""
+    @Published public private(set) var currentSolarTermName: String = ""
     
     @Published public var isDistorted: Bool = false
     @Published public var magneticStrengthUT: Double = 48.0
@@ -83,6 +84,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         // actual Core Location fix has arrived.
         latitude = 0.0
         longitude = 0.0
+        currentSolarTermName = SolarTimeCalculator.shared.solarTermName(for: Date())
         LocalizationManager.shared.$effectiveLanguage
             .sink { [weak self] _ in
                 guard let self = self, !self.hasLocationFix else { return }
@@ -262,6 +264,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     private func updateResolvedState(force: Bool = false) {
         let now = CACurrentMediaTime()
+        let currentTermName = SolarTimeCalculator.shared.solarTermName(for: Date())
+        if currentSolarTermName != currentTermName {
+            currentSolarTermName = currentTermName
+        }
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
         
         // 节流 headingState 广播：防止一秒数十次全量 TabView 深度重绘风暴引发手机发烫

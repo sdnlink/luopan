@@ -23,7 +23,11 @@ public struct CompassDialView: View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
             let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-            let radius = size * 0.47
+            // Keep a real safe margin for the outer stroke, radial labels and
+            // the north index. The previous 94% diameter left only a few
+            // points of breathing room on compact devices.
+            let radius = max(0, size * 0.5 - 18)
+            let dialCanvasSize = radius * 2 + 32
             
             ZStack {
                 // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)
@@ -64,6 +68,7 @@ public struct CompassDialView: View {
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
+                .frame(width: dialCanvasSize, height: dialCanvasSize)
                 .drawingGroup() // 启用 Metal GPU 纹理光栅化，彻底消除旋转时几百个图层的 CPU 测量与重绘负荷
                 .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
                 .animation(.linear(duration: 0.05), value: motion.continuousHeading)
@@ -194,20 +199,85 @@ public struct CompassDialView: View {
     
     // MARK: - 二十四节气与十二消息卦环
     private func solarTermsLayer(radius: CGFloat) -> some View {
-        ForEach(SolarTermsData.shared.terms) { term in
-            VStack(spacing: 0) {
-                Text(term.localizedName)
-                    .font(.system(size: 7, weight: term.isMajorTerm ? .bold : .regular))
-                    .foregroundColor(term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65))
-                if let hex = term.localizedHexagramLabel {
-                    Text(hex)
-                        .font(.system(size: 6, weight: .bold))
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+        let activeTerm = SolarTermsData.shared.terms.first {
+            $0.name == motion.currentSolarTermName
+        }
+
+        return ZStack {
+            if let activeTerm = activeTerm {
+                solarTermHighlightLayer(radius: radius, term: activeTerm)
+            }
+
+            ForEach(SolarTermsData.shared.terms) { term in
+                VStack(spacing: 0) {
+                    Text(term.localizedName)
+                        .font(.system(size: 7, weight: term.isMajorTerm ? .bold : .regular))
+                        .foregroundColor(term.name == motion.currentSolarTermName
+                            ? Color.black
+                            : (term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65)))
+                    if let hex = term.localizedHexagramLabel {
+                        Text(hex)
+                            .font(.system(size: 6, weight: .bold))
+                            .foregroundColor(term.name == motion.currentSolarTermName ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
+                    }
+                }
+                .offset(y: -radius + 6)
+                .rotationEffect(.degrees(term.angleCenter))
+            }
+        }
+    }
+
+    /// Highlights the complete 15° solar-term sector in the same north-based
+    /// coordinate system as the labels. A polygon is used instead of a shape
+    /// arc so the sector remains stable inside the fixed dial canvas.
+    private func solarTermHighlightLayer(radius: CGFloat, term: SolarTermItem) -> some View {
+        let center = CGPoint(x: radius, y: radius)
+        let innerRadius = max(0, radius - 18)
+        let outerRadius = radius + 5
+        let startAngle = term.angleCenter - 7.5
+        let endAngle = term.angleCenter + 7.5
+        let steps = 12
+
+        return Path { path in
+            func point(angle: Double, radius: CGFloat) -> CGPoint {
+                let radians = angle * .pi / 180.0
+                return CGPoint(
+                    x: center.x + sin(radians) * radius,
+                    y: center.y - cos(radians) * radius
+                )
+            }
+
+            path.move(to: point(angle: startAngle, radius: outerRadius))
+            for step in 1...steps {
+                let fraction = Double(step) / Double(steps)
+                path.addLine(to: point(angle: startAngle + (endAngle - startAngle) * fraction, radius: outerRadius))
+            }
+            for step in stride(from: steps, through: 0, by: -1) {
+                let fraction = Double(step) / Double(steps)
+                path.addLine(to: point(angle: startAngle + (endAngle - startAngle) * fraction, radius: innerRadius))
+            }
+            path.closeSubpath()
+        }
+        .fill(Color(red: 1.0, green: 0.78, blue: 0.18).opacity(0.72))
+        .overlay(
+            Path { path in
+                func point(angle: Double, radius: CGFloat) -> CGPoint {
+                    let radians = angle * .pi / 180.0
+                    return CGPoint(
+                        x: center.x + sin(radians) * radius,
+                        y: center.y - cos(radians) * radius
+                    )
+                }
+                path.move(to: point(angle: startAngle, radius: outerRadius))
+                for step in 1...steps {
+                    let fraction = Double(step) / Double(steps)
+                    path.addLine(to: point(angle: startAngle + (endAngle - startAngle) * fraction, radius: outerRadius))
                 }
             }
-            .offset(y: -radius + 6)
-            .rotationEffect(.degrees(term.angleCenter))
-        }
+            .stroke(Color.yellow, lineWidth: 1.5)
+        )
+        .frame(width: radius * 2, height: radius * 2)
+        .allowsHitTesting(false)
     }
     
     // MARK: - 六十四卦分金环
@@ -234,20 +304,28 @@ public struct CompassDialView: View {
     
     // MARK: - 二十四山正针环
     private func mountain24Layer(radius: CGFloat) -> some View {
-        ForEach(mountains) { m in
-            let isMainBranch = m.isCardinalOrCorner
-            
-            VStack(spacing: 1) {
-                Text(m.localizedName)
-                    .font(.system(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif))
-                    .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
-                Text(m.localizedElement)
-                    .font(.system(size: 7, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.5))
+        return ZStack {
+            ForEach(mountains) { m in
+                let isMainBranch = m.isCardinalOrCorner
+
+                VStack(spacing: 1) {
+                    Text(m.localizedName)
+                        .font(.system(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
+                    Text(m.localizedElement)
+                        .font(.system(size: 7, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .foregroundColor(Color.white.opacity(0.5))
+                }
+                .frame(width: max(24, radius * 0.25), height: 30)
+                .offset(y: -radius + 14)
+                .rotationEffect(.degrees(m.angleCenter))
             }
-            .offset(y: -radius + 14)
-            .rotationEffect(.degrees(m.angleCenter))
         }
+        .frame(width: radius * 2, height: radius * 2)
     }
     
     // MARK: - 先天八卦环
@@ -427,15 +505,19 @@ public struct CompassDialView: View {
     
     // MARK: - 正北与正南顶针
     private func northSouthIndexLayer(radius: CGFloat) -> some View {
+        let canvasSize = radius * 2 + 32
+        let center = canvasSize / 2
+
         ZStack {
             Path { path in
-                path.move(to: CGPoint(x: 0, y: -radius - 1))
-                path.addLine(to: CGPoint(x: -7, y: -radius - 12))
-                path.addLine(to: CGPoint(x: 7, y: -radius - 12))
+                path.move(to: CGPoint(x: center, y: center - radius - 1))
+                path.addLine(to: CGPoint(x: center - 7, y: center - radius - 12))
+                path.addLine(to: CGPoint(x: center + 7, y: center - radius - 12))
                 path.closeSubpath()
             }
             .fill(Color.red)
         }
+        .frame(width: canvasSize, height: canvasSize)
         .allowsHitTesting(false)
     }
 }

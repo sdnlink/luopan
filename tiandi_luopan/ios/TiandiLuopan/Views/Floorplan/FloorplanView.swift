@@ -657,7 +657,10 @@ public struct FloorplanView: View {
             // Tapping always opens the diagnostic sheet. Room placement still
             // uses the drag gesture while editing, and type changes are
             // available from a dedicated action inside the diagnostic sheet.
-            if isEditingRooms || acquireFloorplanAccess() {
+            // Layout editing is available before purchase, but room-level
+            // diagnosis remains protected by the same entitlement check as
+            // the report list. Do not let edit mode bypass the paywall.
+            if acquireFloorplanAccess() {
                 selectedRoom = room
             }
         }) {

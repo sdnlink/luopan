@@ -11,6 +11,7 @@ public struct XuanKongGridView: View {
     @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     @State private var showTianJiShuSheet: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var cachedChart: XuanKongChart?
     
     // 九宫格九个方位的标准九宫排布对应 (从左到右，从上到下：东南4、正南9、西南2；正东3、中宫5、正西7；东北8、正北1、西北6)
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
@@ -23,11 +24,13 @@ public struct XuanKongGridView: View {
         // The other three sub-tabs have their own engines. Avoid rebuilding
         // the complete nine-palace flying-star chart for every compass sample
         // while one of those tabs is active.
-        let chart: XuanKongChart? = isActive && selectedSubTab == 0 ? FlyingStarsEngine.shared.calculateChart(
-            period: selectedPeriod,
-            sitting: motion.headingState.sittingMountain,
-            facing: motion.headingState.facingMountain
-        ) : nil
+        let chart: XuanKongChart? = isActive && selectedSubTab == 0
+            ? (cachedChart ?? FlyingStarsEngine.shared.calculateChart(
+                period: selectedPeriod,
+                sitting: motion.headingState.sittingMountain,
+                facing: motion.headingState.facingMountain
+            ))
+            : nil
         
         ScrollView {
             if isActive {
@@ -63,6 +66,39 @@ public struct XuanKongGridView: View {
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
         }
+        .onAppear {
+            refreshChart()
+        }
+        .onChange(of: isActive) { _ in
+            refreshChart()
+        }
+        .onChange(of: selectedSubTab) { _ in
+            refreshChart()
+        }
+        .onChange(of: selectedPeriod) { _ in
+            refreshChart()
+        }
+        .onChange(of: motion.headingState.sittingMountain.id) { _ in
+            refreshChart()
+        }
+        .onChange(of: motion.headingState.facingMountain.id) { _ in
+            refreshChart()
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshChart()
+        }
+    }
+
+    private func refreshChart() {
+        guard isActive, selectedSubTab == 0 else {
+            cachedChart = nil
+            return
+        }
+        cachedChart = FlyingStarsEngine.shared.calculateChart(
+            period: selectedPeriod,
+            sitting: motion.headingState.sittingMountain,
+            facing: motion.headingState.facingMountain
+        )
     }
     
     // MARK: - 子 Tab 切换栏

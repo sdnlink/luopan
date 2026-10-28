@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 紫白飞星流年流月客星动态气运与太岁三煞视图 (PRD 第12章)
 
@@ -7,11 +8,14 @@ public struct PurpleWhiteView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
+    @State private var cachedChart: PurpleWhiteChart?
     
     public init() {}
     
     public var body: some View {
-        let chart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+        // Keep the expensive calendar and annual/monthly star calculation out
+        // of unrelated pitch, roll and magnetic-field redraws.
+        let chart = cachedChart ?? PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
         
         let lang = LocalizationManager.shared
         return VStack(spacing: 12) {
@@ -62,6 +66,22 @@ public struct PurpleWhiteView: View {
                 .padding(.horizontal, 16)
             }
         }
+        .onAppear {
+            refreshChart()
+        }
+        .onChange(of: motion.headingState.facingAngle) { _ in
+            refreshChart()
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshChart()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            refreshChart()
+        }
+    }
+
+    private func refreshChart() {
+        cachedChart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
     }
     
     private func tagPill(title: String, value: String, color: Color) -> some View {

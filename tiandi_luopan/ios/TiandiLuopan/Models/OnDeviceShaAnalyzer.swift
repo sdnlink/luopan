@@ -25,6 +25,31 @@ public final class OnDeviceShaAnalyzer {
         }
         let orientation = Self.cgOrientation(for: image.imageOrientation)
         DispatchQueue.global(qos: .userInitiated).async {
+            // Still capture output can be several megapixels even when the
+            // preview session is 720p. Rectangle detection does not need that
+            // resolution; downsample before Vision to reduce peak memory and
+            // CPU/GPU work during an AI scan.
+            let analysisImage: UIImage
+            let maxDimension = 1280.0
+            if max(CGFloat(cgImage.width), CGFloat(cgImage.height)) > maxDimension {
+                let scale = maxDimension / max(CGFloat(cgImage.width), CGFloat(cgImage.height))
+                let targetSize = CGSize(
+                    width: CGFloat(cgImage.width) * scale,
+                    height: CGFloat(cgImage.height) * scale
+                )
+                let format = UIGraphicsImageRendererFormat()
+                format.scale = 1
+                let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
+                analysisImage = renderer.image { _ in
+                    image.draw(in: CGRect(origin: .zero, size: targetSize))
+                }
+            } else {
+                analysisImage = image
+            }
+            guard let analysisCGImage = analysisImage.cgImage else {
+                DispatchQueue.main.async { completion(.failure(AnalysisError.invalidImage)) }
+                return
+            }
             let request = VNDetectRectanglesRequest()
             request.maximumObservations = 20
             request.minimumConfidence = 0.25
@@ -32,7 +57,8 @@ public final class OnDeviceShaAnalyzer {
             request.maximumAspectRatio = 1.0
             request.quadratureTolerance = 30.0
             do {
-                let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+                let handlerOrientation: CGImagePropertyOrientation = analysisImage === image ? orientation : .up
+                let handler = VNImageRequestHandler(cgImage: analysisCGImage, orientation: handlerOrientation, options: [:])
                 try handler.perform([request])
                 let regions = (request.results as? [VNRectangleObservation]) ?? []
                 guard let result = Self.classify(regions) else {

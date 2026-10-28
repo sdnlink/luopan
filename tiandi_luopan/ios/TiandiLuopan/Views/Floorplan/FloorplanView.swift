@@ -21,6 +21,8 @@ public struct FloorplanView: View {
     @State private var activeRoomStartRect: CGRect? = nil
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
+    @State private var auditedRooms: [FloorplanRoom] = []
+    @State private var auditReport: [FloorplanAuditItem] = []
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -36,12 +38,11 @@ public struct FloorplanView: View {
     }
     
     public var body: some View {
+        // CompassMotionManager publishes tilt and magnetic-field samples more
+        // often than the floorplan audit inputs change. Reuse the last audit
+        // result so those unrelated samples only redraw the visible overlay.
         let auditResult: (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) = isActive
-            ? FloorplanEngine.shared.auditFloorplan(
-                rooms: rooms,
-                centroid: centroid,
-                heading: effectiveHeading
-            )
+            ? (auditedRooms, auditReport)
             : (rooms, [])
         
         return ZStack {
@@ -101,12 +102,21 @@ public struct FloorplanView: View {
                let refreshedRoom = rooms.first(where: { $0.id == selectedID }) {
                 selectedRoom = refreshedRoom
             }
+            refreshAudit()
+        }
+        .onAppear {
+            refreshAudit()
+        }
+        .onChange(of: isActive) { active in
+            if active {
+                refreshAudit()
+            }
         }
         .onChange(of: effectiveHeading) { _ in
-            refreshSelectedRoom()
+            refreshAudit()
         }
         .onChange(of: centroid) { _ in
-            refreshSelectedRoom()
+            refreshAudit()
         }
     }
 
@@ -114,14 +124,18 @@ public struct FloorplanView: View {
     /// used by the canvas and report list. Without this, rotating the compass
     /// or dragging the Tai Ji point updated the page behind the sheet while
     /// the detail card continued to show stale palace/severity text.
-    private func refreshSelectedRoom() {
-        guard let selectedID = selectedRoom?.id else { return }
+    private func refreshAudit() {
+        guard isActive else { return }
         let result = FloorplanEngine.shared.auditFloorplan(
             rooms: rooms,
             centroid: centroid,
             heading: effectiveHeading
         )
-        selectedRoom = result.auditedRooms.first(where: { $0.id == selectedID })
+        auditedRooms = result.auditedRooms
+        auditReport = result.report
+        if let selectedID = selectedRoom?.id {
+            selectedRoom = result.auditedRooms.first(where: { $0.id == selectedID })
+        }
     }
 
     private var hasFloorplanAccess: Bool {
@@ -184,6 +198,7 @@ public struct FloorplanView: View {
                     isEditingRooms = false
                     activeRoomDragID = nil
                     activeRoomStartRect = nil
+                    refreshAudit()
                 }) {
                     Text(lang.t("reset_sample"))
                         .font(.system(size: 10))
@@ -348,10 +363,20 @@ public struct FloorplanView: View {
                     updated.rect.origin.x = max(0.0, min(maxX, startRect.origin.x + dx))
                     updated.rect.origin.y = max(0.0, min(maxY, startRect.origin.y + dy))
                     rooms[index] = updated
+
+                    // Keep the dragged rectangle responsive without rerunning
+                    // palace/severity evaluation for every drag sample. The
+                    // full audit is refreshed once the gesture ends.
+                    if let auditedIndex = auditedRooms.firstIndex(where: { $0.id == room.id }) {
+                        var audited = auditedRooms[auditedIndex]
+                        audited.rect = updated.rect
+                        auditedRooms[auditedIndex] = audited
+                    }
                 }
                 .onEnded { _ in
                     activeRoomDragID = nil
                     activeRoomStartRect = nil
+                    refreshAudit()
                 }
         )
     }

@@ -4,30 +4,34 @@ import SwiftUI
 
 public struct FenjinDetailSheet: View {
     public let fenjin: FenjinItem
+    @ObservedObject private var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     
     public var body: some View {
-        let lang = LocalizationManager.shared
+        // Keep the detail card live while the user rotates the compass. The
+        // value passed when presenting the sheet is only the initial snapshot.
+        let currentFenjin = Fenjin120Data.shared.resolveFenjin(for: motion.headingState.facingAngle)
         return NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     // 分金标题与吉凶徽章
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("【\(fenjin.jiaziName)】\(lang.t("fenjin_title_suffix"))")
+                            Text("【\(currentFenjin.jiaziName)】\(lang.t("fenjin_title_suffix"))")
                                 .font(.system(size: 26, weight: .bold, design: .serif))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                            Text("\(lang.t("fenjin_mountain_belong"))：\(fenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(fenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", fenjin.centerAngle))°)")
+                            Text("\(lang.t("fenjin_mountain_belong"))：\(currentFenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(currentFenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", currentFenjin.centerAngle))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
-                        Text(fenjin.localizedGrade)
+                        Text(currentFenjin.localizedGrade)
                             .font(.system(size: 13, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
-                            .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
-                            .foregroundColor(fenjin.isAuspicious ? .green : .red)
+                            .background(currentFenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                            .foregroundColor(currentFenjin.isAuspicious ? .green : .red)
                             .cornerRadius(6)
                     }
                     
@@ -37,7 +41,7 @@ public struct FenjinDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_range_section"))
                             .font(.system(size: 15, weight: .bold))
-                        Text("\(String(format: "%.1f", fenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", fenjin.endAngle))° (\(lang.t("fenjin_span")) 3.0°)")
+                        Text("\(String(format: "%.1f", currentFenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", currentFenjin.endAngle))° (\(lang.t("fenjin_span")) 3.0°)")
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(.primary)
                     }
@@ -46,7 +50,7 @@ public struct FenjinDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_lore_section"))
                             .font(.system(size: 15, weight: .bold))
-                        Text(fenjin.localizedLore)
+                        Text(currentFenjin.localizedLore)
                             .font(.system(size: 14))
                             .lineSpacing(4)
                             .padding(12)
@@ -58,7 +62,7 @@ public struct FenjinDetailSheet: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_guidance_section"))
                             .font(.system(size: 15, weight: .bold))
-                        Text(fenjin.isAuspicious ?
+                        Text(currentFenjin.isAuspicious ?
                              lang.t("fenjin_auspicious_advice") :
                              lang.t("fenjin_inauspicious_advice"))
                             .font(.system(size: 13))

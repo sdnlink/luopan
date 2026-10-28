@@ -65,7 +65,16 @@ public struct CameraPreviewView: UIViewRepresentable {
             photoCompletion = nil
             
             let session = AVCaptureSession()
-            session.sessionPreset = .high
+            // The AR page continuously streams frames for preview and the
+            // rectangle detector.  720p is sufficient for the on-device
+            // geometry analysis and the proof overlay, while materially
+            // reducing camera bandwidth, GPU work and device heat. Keep a
+            // high-quality fallback for older devices that cannot use it.
+            if session.canSetSessionPreset(.hd1280x720) {
+                session.sessionPreset = .hd1280x720
+            } else {
+                session.sessionPreset = .high
+            }
             
             guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
                   let input = try? AVCaptureDeviceInput(device: camera),

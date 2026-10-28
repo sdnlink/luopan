@@ -148,7 +148,12 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         guard let activeRequest = productsRequest, request === activeRequest else { return }
         isLoadingProducts = false
         productsRequest = nil
-        lastErrorMessage = error.localizedDescription
+        // Product metadata can fail to load before the user has attempted a
+        // purchase (offline launch, storefront outage, or a temporary App
+        // Store response). This is not a payment failure; publishing it via
+        // lastErrorMessage would make every paywall present a misleading
+        // purchase-error alert on app startup. Prices remain unavailable and
+        // an explicit purchase attempt will show the actionable retry error.
         print("StoreKit request products failed: \(error.localizedDescription)")
     }
     

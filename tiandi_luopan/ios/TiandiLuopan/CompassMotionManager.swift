@@ -107,12 +107,47 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         // changed. A 0.3° gate made slow turns feel unresponsive on devices
         // whose sensor already applies its own internal smoothing.
         locationManager.headingFilter = 0.05
-        locationManager.headingOrientation = .portrait
+        updateHeadingOrientation()
+    }
+
+    /// Core Location reports a bearing relative to the orientation supplied
+    /// here. The iPhone UI is portrait-only, but iPad also permits upside-down
+    /// portrait; using a hard-coded portrait orientation there creates a full
+    /// 180° error after the interface rotates.
+    private func updateHeadingOrientation() {
+        let targetOrientation: CLDeviceOrientation
+        guard let interfaceOrientation = UIApplication.shared.connectedScenes
+            .compactMap({ ($0 as? UIWindowScene)?.interfaceOrientation })
+            .first,
+              interfaceOrientation != .unknown else {
+            targetOrientation = .portrait
+            if locationManager.headingOrientation != targetOrientation {
+                locationManager.headingOrientation = targetOrientation
+            }
+            return
+        }
+
+        switch interfaceOrientation {
+        case .portrait:
+            targetOrientation = .portrait
+        case .portraitUpsideDown:
+            targetOrientation = .portraitUpsideDown
+        case .landscapeLeft:
+            targetOrientation = .landscapeLeft
+        case .landscapeRight:
+            targetOrientation = .landscapeRight
+        default:
+            targetOrientation = .portrait
+        }
+        if locationManager.headingOrientation != targetOrientation {
+            locationManager.headingOrientation = targetOrientation
+        }
     }
     
     public func start() {
         guard !isRunning else { return }
         isRunning = true
+        updateHeadingOrientation()
 
         if headingUpdatesEnabled && CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
@@ -506,6 +541,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         let now = CACurrentMediaTime()
         
         DispatchQueue.main.async {
+            self.updateHeadingOrientation()
             if abs(mag - self.magneticHeading) >= 0.1 {
                 self.magneticHeading = mag
             }

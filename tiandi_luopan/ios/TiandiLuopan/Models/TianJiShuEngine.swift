@@ -17,7 +17,12 @@ public class TianJiShuEngine {
         isPro: Bool = true
     ) -> UIImage {
         let size = CGSize(width: 1080, height: 2400)
-        let renderer = UIGraphicsImageRenderer(size: size)
+        // These dimensions describe the exported pixel size. The default
+        // renderer scale follows the device's Retina factor and could turn
+        // this into a 3240x7200 image, multiplying memory and render time.
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         // Resolve the language before entering the renderer closure. The
         // image is generated off the main queue while the user can still
         // change the app language, so the report must use one stable locale.

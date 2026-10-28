@@ -13,16 +13,20 @@ public class TianJiShuEngine {
         heading: Double,
         coordsDesc: String,
         solarTimeDesc: String,
+        language: AppLanguage? = nil,
         isPro: Bool = true
     ) -> UIImage {
         let size = CGSize(width: 1080, height: 2400)
         let renderer = UIGraphicsImageRenderer(size: size)
+        // Resolve the language before entering the renderer closure. The
+        // image is generated off the main queue while the user can still
+        // change the app language, so the report must use one stable locale.
+        let renderLanguage = language ?? LocalizationManager.shared.effectiveLanguage
         
         return renderer.image { ctx in
             let cg = ctx.cgContext
-            let language = LocalizationManager.shared.effectiveLanguage
             func tr(_ hans: String, _ hant: String, _ en: String) -> String {
-                switch language {
+                switch renderLanguage {
                 case .en: return en
                 case .zhHant: return hant
                 default: return hans
@@ -94,7 +98,7 @@ public class TianJiShuEngine {
             let hex = Hexagram64Data.shared.hexagram(for: heading)
             
             let p1Text: String
-            if language == .en {
+            if renderLanguage == .en {
                 p1Text = """
                 • Facing orientation: \(mFacing.localizedName) mountain (measured \(String(format: "%.1f", heading))°) · \(mFacing.localizedPalace) Palace
                 • Sitting mountain: \(mSitting.localizedName) (sitting \(String(format: "%.1f", sitAngle))°) · \(mSitting.localizedPalace)
@@ -103,7 +107,7 @@ public class TianJiShuEngine {
                 • Survey coordinates: \(coordsDesc)
                 • Solar-term true time: \(solarTimeDesc)
                 """
-            } else if language == .zhHant {
+            } else if renderLanguage == .zhHant {
                 p1Text = """
                 • 物理向首方位：\(mFacing.localizedName)山向首（實測 \(String(format: "%.1f", heading))°）· \(mFacing.localizedPalace)宮
                 • 住宅太極坐山：\(mSitting.localizedName)山立極（坐 \(String(format: "%.1f", sitAngle))°）· 屬\(mSitting.localizedPalace)
@@ -132,11 +136,11 @@ public class TianJiShuEngine {
             let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, date: Date())
             let meta = xkChart.periodMeta
             
-            drawSectionHeader(ctx: cg, title: language == .en ? "II · FLYING STARS & PERIOD \(meta.period)" : (language == .zhHant ? "第二卷 · \(meta.yuan)\(meta.period)運玄空飛星氣運方陣" : "第二卷 · \(meta.yuan)\(meta.period)运玄空飞星气运方阵"), atY: curY, vermilion: vermilion)
+            drawSectionHeader(ctx: cg, title: renderLanguage == .en ? "II · FLYING STARS & PERIOD \(meta.period)" : (renderLanguage == .zhHant ? "第二卷 · \(meta.yuan)\(meta.period)運玄空飛星氣運方陣" : "第二卷 · \(meta.yuan)\(meta.period)运玄空飞星气运方阵"), atY: curY, vermilion: vermilion)
             curY += 65
             
             let p2Text: String
-            if language == .en {
+            if renderLanguage == .en {
                 p2Text = """
                 • Current period: \(meta.label)
                 • Flying-star pattern: [\(mSitting.localizedName) / \(mFacing.localizedName)] \(xkChart.patternType)
@@ -145,10 +149,10 @@ public class TianJiShuEngine {
                 """
             } else {
                 p2Text = """
-                \(language == .zhHant ? "• 當前地運：" : "• 当前地运：")\(meta.label)
+                \(renderLanguage == .zhHant ? "• 當前地運：" : "• 当前地运：")\(meta.label)
                 • 玄空格局判定：【\(mSitting.localizedName)山\(mFacing.localizedName)向】\(xkChart.patternType)
-                \(language == .zhHant ? "• 當令旺星氣場：\(meta.starName)\(meta.element)星入中當運，主星臨照向首明堂。" : "• 当令旺星气场：\(meta.starName)\(meta.element)星入中当运，主星临照向首明堂。")
-                \(language == .zhHant ? "• 綜合理氣研判：\(xkChart.summaryAnalysis)" : "• 综合理气研判：\(xkChart.summaryAnalysis)")
+                \(renderLanguage == .zhHant ? "• 當令旺星氣場：\(meta.starName)\(meta.element)星入中當運，主星臨照向首明堂。" : "• 当令旺星气场：\(meta.starName)\(meta.element)星入中当运，主星临照向首明堂。")
+                \(renderLanguage == .zhHant ? "• 綜合理氣研判：\(xkChart.summaryAnalysis)" : "• 综合理气研判：\(xkChart.summaryAnalysis)")
                 """
             }
             p2Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 240), withAttributes: [
@@ -186,7 +190,7 @@ public class TianJiShuEngine {
             let bz = BaZhaiEngine.shared.analyze(sittingPalace: mSitting.palace, facingPalace: mFacing.palace)
             
             let p4Text: String
-            if language == .en {
+            if renderLanguage == .en {
                 p4Text = """
                 • QiMen time-space: \(qm.title)
                 • Best direction to move now: \(qm.bestNavDirection) (\(qm.bestNavReason))
@@ -195,10 +199,10 @@ public class TianJiShuEngine {
                 """
             } else {
                 p4Text = """
-                \(language == .zhHant ? "• 時家奇門時空：" : "• 时家奇门时空：")\(qm.title)
-                \(language == .zhHant ? "• 當前天時最優動身方：" : "• 当前天时最优动身方：")\(qm.bestNavDirection) (\(qm.bestNavReason))
-                \(language == .zhHant ? "• 住宅宅卦歸屬：【\(bz.localizedHouseGua)】 · 向首開門方：\(bz.localizedGateDirection)方納【\(bz.gateStar.localizedName)】" : "• 住宅宅卦归属：【\(bz.localizedHouseGua)】 · 向首开门方：\(bz.localizedGateDirection)方纳【\(bz.gateStar.localizedName)】")
-                \(language == .zhHant ? "• 生氣大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生氣")方，宜作主臥或安奉神位。" : "• 生气大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生气")方，宜作主卧或安奉神位。")
+                \(renderLanguage == .zhHant ? "• 時家奇門時空：" : "• 时家奇门时空：")\(qm.title)
+                \(renderLanguage == .zhHant ? "• 當前天時最優動身方：" : "• 当前天时最优动身方：")\(qm.bestNavDirection) (\(qm.bestNavReason))
+                \(renderLanguage == .zhHant ? "• 住宅宅卦歸屬：【\(bz.localizedHouseGua)】 · 向首開門方：\(bz.localizedGateDirection)方納【\(bz.gateStar.localizedName)】" : "• 住宅宅卦归属：【\(bz.localizedHouseGua)】 · 向首开门方：\(bz.localizedGateDirection)方纳【\(bz.gateStar.localizedName)】")
+                \(renderLanguage == .zhHant ? "• 生氣大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生氣")方，宜作主臥或安奉神位。" : "• 生气大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生气")方，宜作主卧或安奉神位。")
                 """
             }
             p4Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
@@ -212,7 +216,7 @@ public class TianJiShuEngine {
             curY += 65
             
             let p5Text: String
-            if language == .en {
+            if renderLanguage == .en {
                 p5Text = """
                 1. Entry: keep it bright and spacious; avoid beams over the console and add a natural jade wealth vessel.
                 2. Kitchen: keep the faucet and stove apart; avoid a stove facing the door or suspended without support.
@@ -221,10 +225,10 @@ public class TianJiShuEngine {
                 """
             } else {
                 p5Text = """
-                \(language == .zhHant ? "1. 入戶玄關：保持寬敞明亮，玄關櫃忌頂部有橫梁壓頂；宜安放天然黃玉聚寶盆迎財。" : "1. 入户玄关：保持宽敞明亮，玄关柜忌顶部有横梁压顶；宜安放天然黄玉聚宝盆迎财。")
-                \(language == .zhHant ? "2. 廚房灶台：避免水龍頭與灶台對衝（水火相煎），忌爐灶背向大門或懸空設台。" : "2. 厨房灶台：避免水龙头与灶台对冲（水火相煎），忌炉灶背向大门或悬空设台。")
-                \(language == .zhHant ? "3. 衛生間排濁：忌廁門直衝臥室床頭，常備活性竹炭或安忍水淨化地表陰濁濕氣。" : "3. 卫生间排浊：忌厕门直冲卧室床头，常备活性竹炭或安忍水净化地表阴浊湿气。")
-                \(language == .zhHant ? "4. 陽台防煞：若窗外對衝壁刀、電塔或反弓馬路，安放純銅泰山石敢當或山海鎮阻擋。" : "4. 阳台防煞：若窗外对冲壁刀、电塔或反弓马路，安放纯铜泰山石敢当或山海镇阻挡。")
+                \(renderLanguage == .zhHant ? "1. 入戶玄關：保持寬敞明亮，玄關櫃忌頂部有橫梁壓頂；宜安放天然黃玉聚寶盆迎財。" : "1. 入户玄关：保持宽敞明亮，玄关柜忌顶部有横梁压顶；宜安放天然黄玉聚宝盆迎财。")
+                \(renderLanguage == .zhHant ? "2. 廚房灶台：避免水龍頭與灶台對衝（水火相煎），忌爐灶背向大門或懸空設台。" : "2. 厨房灶台：避免水龙头与灶台对冲（水火相煎），忌炉灶背向大门或悬空设台。")
+                \(renderLanguage == .zhHant ? "3. 衛生間排濁：忌廁門直衝臥室床頭，常備活性竹炭或安忍水淨化地表陰濁濕氣。" : "3. 卫生间排浊：忌厕门直冲卧室床头，常备活性竹炭或安忍水净化地表阴浊湿气。")
+                \(renderLanguage == .zhHant ? "4. 陽台防煞：若窗外對衝壁刀、電塔或反弓馬路，安放純銅泰山石敢當或山海鎮阻擋。" : "4. 阳台防煞：若窗外对冲壁刀、电塔或反弓马路，安放纯铜泰山石敢当或山海镇阻挡。")
                 """
             }
             p5Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
@@ -260,7 +264,7 @@ public class TianJiShuEngine {
             let yOffset = ((gzYear - 4) % 60 + 60) % 60
             let curGzYear = "\(stems[yOffset % 10])\(branches[yOffset % 12])"
             
-            let signText = language == .en ? "MASTER FENG SHUI\nTIANJI YANXIANG\nYEAR \(curGzYear)" : (language == .zhHant ? "大 師 堪 輿 親 訂\n天 機 演 象 院\n歲 次 \(curGzYear) 謹 啟" : "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启")
+            let signText = renderLanguage == .en ? "MASTER FENG SHUI\nTIANJI YANXIANG\nYEAR \(curGzYear)" : (renderLanguage == .zhHant ? "大 師 堪 輿 親 訂\n天 機 演 象 院\n歲 次 \(curGzYear) 謹 啟" : "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启")
             signText.draw(at: CGPoint(x: 540, y: curY + 45), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 22, weight: .bold),
                 .foregroundColor: UIColor(red: 70/255.0, green: 50/255.0, blue: 35/255.0, alpha: 1.0)

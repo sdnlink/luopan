@@ -79,6 +79,24 @@ public struct RootContentView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             motion.start()
+            updateResourceUsage()
         }
+        .onChange(of: selectedTab) { _ in
+            updateResourceUsage()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            updateResourceUsage()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+    }
+
+    /// The live compass and camera survey need an awake screen while they are
+    /// in use.  Reports, settings and the paywall should follow the user's
+    /// normal Auto-Lock preference to avoid draining the battery while idle.
+    private func updateResourceUsage() {
+        UIApplication.shared.isIdleTimerDisabled = selectedTab == 0 || selectedTab == 1
+        motion.setDeviceMotionEnabled(selectedTab == 0 || selectedTab == 4)
     }
 }

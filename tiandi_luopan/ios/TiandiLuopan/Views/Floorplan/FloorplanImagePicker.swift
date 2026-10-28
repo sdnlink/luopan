@@ -37,9 +37,11 @@ public struct FloorplanImagePicker: UIViewControllerRepresentable {
             if let image = info[.originalImage] as? UIImage {
                 // Floor plans from modern cameras can exceed 10,000 px and keep
                 // hundreds of MB alive while the SwiftUI canvas is displayed.
-                // Keep enough detail for room placement while bounding the peak
-                // memory used by the imported asset.
-                parent.selectedImage = Self.downsample(image, maxDimension: 4096)
+                // The canvas is only a few hundred points high and is used for
+                // room placement rather than pixel-level editing. Keep enough
+                // detail for alignment while bounding the decoded bitmap to a
+                // much smaller memory footprint.
+                parent.selectedImage = Self.downsample(image, maxDimension: 2048)
                 parent.onImagePicked?()
             }
             parent.presentationMode.wrappedValue.dismiss()

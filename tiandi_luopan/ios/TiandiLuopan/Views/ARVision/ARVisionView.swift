@@ -229,10 +229,15 @@ public struct CameraPreviewView: UIViewRepresentable {
                 image = nil
             }
 
-            let completion = photoCompletion
-            photoCompletion = nil
-            isCapturingPhoto = false
-            DispatchQueue.main.async {
+            // AVCapturePhotoCaptureDelegate may callback on an internal queue,
+            // while cancellation and a new request are driven by SwiftUI on
+            // the main thread. Serialize completion ownership on main so a
+            // lens switch/interruption cannot deliver the same request twice.
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let completion = self.photoCompletion
+                self.photoCompletion = nil
+                self.isCapturingPhoto = false
                 completion?(image)
             }
         }

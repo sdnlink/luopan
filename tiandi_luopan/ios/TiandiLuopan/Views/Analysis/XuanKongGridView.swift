@@ -17,11 +17,14 @@ public struct XuanKongGridView: View {
     public init() {}
     
     public var body: some View {
-        let chart = FlyingStarsEngine.shared.calculateChart(
+        // The other three sub-tabs have their own engines. Avoid rebuilding
+        // the complete nine-palace flying-star chart for every compass sample
+        // while one of those tabs is active.
+        let chart: XuanKongChart? = selectedSubTab == 0 ? FlyingStarsEngine.shared.calculateChart(
             period: selectedPeriod,
             sitting: motion.headingState.sittingMountain,
             facing: motion.headingState.facingMountain
-        )
+        ) : nil
         
         ScrollView {
             VStack(spacing: 14) {
@@ -32,7 +35,7 @@ public struct XuanKongGridView: View {
                 tianJiShuBanner()
                     .padding(.horizontal, 16)
                 
-                if selectedSubTab == 0 {
+                if selectedSubTab == 0, let chart = chart {
                     // 板块 1: 玄空九星三元九运排盘
                     xuanKongContent(chart: chart)
                 } else if selectedSubTab == 1 {

@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 系统设置与专业版会员中心视图 (Settings & Member Center View)
 
 public struct SettingsView: View {
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -11,7 +12,8 @@ public struct SettingsView: View {
     @State private var paymentError: String = ""
     @State private var showPaymentError: Bool = false
     
-    public init() {
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
         UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
     }
     
@@ -20,7 +22,9 @@ public struct SettingsView: View {
     }
     
     public var body: some View {
-        NavigationView {
+        Group {
+            if isActive {
+                NavigationView {
             List {
                 // 1. 会员中心与多档位收银台
                 Section {
@@ -212,7 +216,12 @@ public struct SettingsView: View {
             Alert(title: Text(lang.t("payment_failed_title")), message: Text(paymentError), dismissButton: .default(Text(lang.t("done"))))
         }
         }
-        .preferredColorScheme(.dark)
+
+                .preferredColorScheme(.dark)
+            } else {
+                Color.clear.ignoresSafeArea()
+            }
+        }
     }
     
     private func productRow(id: IAPProductID, tag: String) -> some View {

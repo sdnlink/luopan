@@ -83,13 +83,12 @@ public struct FloorplanView: View {
         }
         }
         .sheet(item: $selectedRoom) { room in
-            if isEditingRooms {
-                FloorplanRoomTypeEditor(room: room) { type in
+            RoomAuditDetailSheet(
+                room: room,
+                onEditType: isEditingRooms ? { type in
                     updateRoomType(roomID: room.id, type: type)
-                }
-            } else {
-                RoomAuditDetailSheet(room: room)
-            }
+                } : nil
+            )
         }
         .sheet(isPresented: $showImagePicker) {
             FloorplanImagePicker(selectedImage: $userFloorplanImage) {
@@ -596,11 +595,10 @@ public struct FloorplanView: View {
         let bgColor = isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05))
         
         return Button(action: {
-            if isEditingRooms {
-                selectedRoom = room
-                return
-            }
-            if acquireFloorplanAccess() {
+            // Tapping always opens the diagnostic sheet. Room placement still
+            // uses the drag gesture while editing, and type changes are
+            // available from a dedicated action inside the diagnostic sheet.
+            if isEditingRooms || acquireFloorplanAccess() {
                 selectedRoom = room
             }
         }) {
@@ -849,11 +847,14 @@ private struct FloorplanRoomTypeEditor: View {
 // MARK: - 房间风水体检详勘弹窗 (Room Audit Detail Sheet)
 public struct RoomAuditDetailSheet: View {
     public let room: FloorplanRoom
+    private let onEditType: ((FloorplanRoomType) -> Void)?
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var lang = LocalizationManager.shared
+    @State private var showTypeEditor = false
     
-    public init(room: FloorplanRoom) {
+    public init(room: FloorplanRoom, onEditType: ((FloorplanRoomType) -> Void)? = nil) {
         self.room = room
+        self.onEditType = onEditType
     }
     
     public var body: some View {
@@ -895,6 +896,23 @@ public struct RoomAuditDetailSheet: View {
                         .padding(14)
                         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
                         .cornerRadius(12)
+
+                        if let onEditType = onEditType {
+                            Button(action: { showTypeEditor = true }) {
+                                Label(lang.t("floorplan_room_type"), systemImage: "tag")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.yanCyan)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                            .background(Color.yanCyan.opacity(0.10))
+                            .cornerRadius(10)
+                            .sheet(isPresented: $showTypeEditor) {
+                                FloorplanRoomTypeEditor(room: room) { type in
+                                    onEditType(type)
+                                }
+                            }
+                        }
                         
                         // 2. 气场格局诊断
                         VStack(alignment: .leading, spacing: 8) {

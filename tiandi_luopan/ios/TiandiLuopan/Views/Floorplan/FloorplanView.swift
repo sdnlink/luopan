@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import Vision
+import ImageIO
 
 // MARK: - 户型空间立极与全屋风水体检视图 (Floorplan View - PRD 5.3)
 
@@ -27,6 +28,8 @@ public struct FloorplanView: View {
     @State private var auditReport: [FloorplanAuditItem] = []
     @State private var isDetectingRooms: Bool = false
     @State private var roomDetectionMessage: String?
+    @State private var roomsBeforeDetection: [FloorplanRoom]?
+    @State private var centroidBeforeDetection: CGPoint?
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -78,10 +81,19 @@ public struct FloorplanView: View {
         }
         }
         .sheet(item: $selectedRoom) { room in
-            RoomAuditDetailSheet(room: room)
+            if isEditingRooms {
+                FloorplanRoomTypeEditor(room: room) { type in
+                    updateRoomType(roomID: room.id, type: type)
+                }
+            } else {
+                RoomAuditDetailSheet(room: room)
+            }
         }
         .sheet(isPresented: $showImagePicker) {
             FloorplanImagePicker(selectedImage: $userFloorplanImage) {
+                roomsBeforeDetection = nil
+                centroidBeforeDetection = nil
+                roomDetectionMessage = nil
                 if !iap.hasUnlockedVIP && !didConsumeFloorplanCredit {
                     if iap.consumeFloorplanCredit() {
                         didConsumeFloorplanCredit = true
@@ -208,6 +220,9 @@ public struct FloorplanView: View {
                     // imported plan's state.
                     rooms = FloorplanEngine.shared.generateSampleRooms()
                     centroid = CGPoint(x: 0.5, y: 0.5)
+                    roomsBeforeDetection = nil
+                    centroidBeforeDetection = nil
+                    roomDetectionMessage = nil
                     isEditingRooms = false
                     activeRoomDragID = nil
                     activeRoomStartRect = nil
@@ -305,6 +320,13 @@ public struct FloorplanView: View {
                     .foregroundColor(.white.opacity(0.65))
                     .lineLimit(2)
             }
+            if roomsBeforeDetection != nil {
+                Button(action: undoRoomDetection) {
+                    Text(lang.t("floorplan_undo_detect"))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.orange)
+                }
+            }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
@@ -329,6 +351,17 @@ public struct FloorplanView: View {
                         .foregroundColor(.yanCyan)
                 }
             }
+            HStack(spacing: 8) {
+                Button(action: { adjustManualHeading(by: -1) }) {
+                    Text("−1°")
+                }
+                Button(action: { adjustManualHeading(by: 1) }) {
+                    Text("+1°")
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .font(.system(size: 10, weight: .bold, design: .monospaced))
+            .foregroundColor(.orange)
             Slider(value: $compassRotation, in: 0...359.5, step: 0.5)
                 .accentColor(.orange)
                 .accessibilityValue(String(format: "%.1f°", compassRotation))
@@ -350,6 +383,7 @@ public struct FloorplanView: View {
 
         isDetectingRooms = true
         roomDetectionMessage = lang.t("floorplan_detecting")
+        let orientation = Self.cgOrientation(for: image.imageOrientation)
         DispatchQueue.global(qos: .userInitiated).async {
             let request = VNDetectRectanglesRequest()
             request.minimumConfidence = 0.35
@@ -359,7 +393,11 @@ public struct FloorplanView: View {
             request.maximumObservations = 32
 
             do {
-                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                let handler = VNImageRequestHandler(
+                    cgImage: cgImage,
+                    orientation: orientation,
+                    options: [:]
+                )
                 try handler.perform([request])
                 let candidates = Self.normalizedRoomCandidates(
                     from: request.results as? [VNRectangleObservation] ?? []
@@ -378,6 +416,20 @@ public struct FloorplanView: View {
                     roomDetectionMessage = lang.t("floorplan_detect_failed")
                 }
             }
+        }
+    }
+
+    private static func cgOrientation(for orientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+        switch orientation {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        case .upMirrored: return .upMirrored
+        case .downMirrored: return .downMirrored
+        case .leftMirrored: return .leftMirrored
+        case .rightMirrored: return .rightMirrored
+        @unknown default: return .up
         }
     }
 
@@ -412,6 +464,8 @@ public struct FloorplanView: View {
 
     private func applyRoomCandidates(_ candidates: [CGRect]) {
         guard !rooms.isEmpty else { return }
+        roomsBeforeDetection = rooms
+        centroidBeforeDetection = centroid
         let orderedRoomIndices = rooms.indices.sorted {
             rooms[$0].rect.width * rooms[$0].rect.height > rooms[$1].rect.width * rooms[$1].rect.height
         }
@@ -428,6 +482,32 @@ public struct FloorplanView: View {
             centroid = CGPoint(x: union.midX, y: union.midY)
         }
         roomDetectionMessage = "\(lang.t("floorplan_detected")) \(orderedCandidates.count)"
+        refreshAudit()
+    }
+
+    private func undoRoomDetection() {
+        guard let roomsBeforeDetection = roomsBeforeDetection else { return }
+        rooms = roomsBeforeDetection
+        if let centroidBeforeDetection = centroidBeforeDetection {
+            centroid = centroidBeforeDetection
+        }
+        self.roomsBeforeDetection = nil
+        self.centroidBeforeDetection = nil
+        roomDetectionMessage = nil
+        refreshAudit()
+    }
+
+    private func updateRoomType(roomID: String, type: FloorplanRoomType) {
+        guard let index = rooms.firstIndex(where: { $0.id == roomID }) else { return }
+        rooms[index].type = type
+        rooms[index].name = type.localizedName
+        refreshAudit()
+        selectedRoom = nil
+    }
+
+    private func adjustManualHeading(by delta: Double) {
+        compassRotation = (compassRotation + delta).truncatingRemainder(dividingBy: 360)
+        if compassRotation < 0 { compassRotation += 360 }
         refreshAudit()
     }
     
@@ -483,7 +563,10 @@ public struct FloorplanView: View {
         let bgColor = isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05))
         
         return Button(action: {
-            if isEditingRooms { return }
+            if isEditingRooms {
+                selectedRoom = room
+                return
+            }
             if acquireFloorplanAccess() {
                 selectedRoom = room
             }
@@ -687,6 +770,46 @@ public struct FloorplanView: View {
         .padding(10)
         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
         .cornerRadius(8)
+    }
+}
+
+private struct FloorplanRoomTypeEditor: View {
+    let room: FloorplanRoom
+    let onSelect: (FloorplanRoomType) -> Void
+    @Environment(\.presentationMode) private var presentationMode
+
+    var body: some View {
+        NavigationView {
+            List {
+                Section {
+                    ForEach(FloorplanRoomType.allCases) { type in
+                        Button(action: {
+                            onSelect(type)
+                            presentationMode.wrappedValue.dismiss()
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: type.iconName)
+                                    .frame(width: 24)
+                                    .foregroundColor(.yanCyan)
+                                Text(type.localizedName)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if room.type == type {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text(LocalizationManager.shared.t("floorplan_room_type"))
+                }
+            }
+            .navigationBarTitle(LocalizationManager.shared.t("floorplan_room_type"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
+                presentationMode.wrappedValue.dismiss()
+            })
+        }
     }
 }
 

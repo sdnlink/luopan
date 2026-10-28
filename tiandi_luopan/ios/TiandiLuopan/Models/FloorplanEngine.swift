@@ -27,6 +27,44 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
         case .balcony: return "sun.max.fill"
         }
     }
+
+    public var localizedName: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch self {
+            case .door: return "Main Entrance"
+            case .livingRoom: return "Living Room"
+            case .masterBedroom: return "Master Bedroom"
+            case .secondBedroom: return "Second Bedroom"
+            case .kitchen: return "Kitchen"
+            case .bathroom: return "Bathroom"
+            case .study: return "Study"
+            case .balcony: return "Balcony"
+            }
+        case .zhHant:
+            switch self {
+            case .door: return "入戶大門"
+            case .livingRoom: return "客廳"
+            case .masterBedroom: return "主臥"
+            case .secondBedroom: return "次臥"
+            case .kitchen: return "廚房"
+            case .bathroom: return "衛生間"
+            case .study: return "書房"
+            case .balcony: return "陽台"
+            }
+        case .zhHans:
+            switch self {
+            case .door: return "入户大门"
+            case .livingRoom: return "客厅"
+            case .masterBedroom: return "主卧"
+            case .secondBedroom: return "次卧"
+            case .kitchen: return "厨房"
+            case .bathroom: return "卫生间"
+            case .study: return "书房"
+            case .balcony: return "阳台"
+            }
+        }
+    }
 }
 
 public struct FloorplanRoom: Identifiable {

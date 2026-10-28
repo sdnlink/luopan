@@ -11,10 +11,14 @@ public struct SettingsView: View {
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var paymentError: String = ""
     @State private var showPaymentError: Bool = false
+
+    private static let appearanceConfigured: Void = {
+        UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+    }()
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
-        UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
+        _ = Self.appearanceConfigured
     }
     
     private var isProUnlocked: Bool {

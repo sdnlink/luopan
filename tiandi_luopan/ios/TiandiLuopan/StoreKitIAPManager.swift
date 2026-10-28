@@ -79,6 +79,8 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     private var productsRequest: SKProductsRequest?
     private var availableProducts: [String: SKProduct] = [:]
+    private var lastProductsFetchDate: Date?
+    private let productsRetryInterval: TimeInterval = 30
     private let entitlementLock = NSLock()
     
     // 本地持久化权益 Keys
@@ -110,12 +112,36 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     // MARK: - 商品信息请求
     
     public func fetchProducts() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.fetchProducts() }
+            return
+        }
         isLoadingProducts = true
+        lastProductsFetchDate = Date()
         let productIdentifiers = Set(IAPProductID.allCases.map { $0.rawValue })
         productsRequest?.cancel()
         productsRequest = SKProductsRequest(productIdentifiers: productIdentifiers)
         productsRequest?.delegate = self
         productsRequest?.start()
+    }
+
+    /// Retry a transient product metadata failure when the app returns to the
+    /// foreground or the paywall is shown. StoreKit can fail the first request
+    /// during an offline launch; without a later retry all paywalls would keep
+    /// showing “price unavailable” until the user attempted a purchase.
+    public func refreshProductsIfNeeded(force: Bool = false) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshProductsIfNeeded(force: force)
+            }
+            return
+        }
+        if !force,
+           let lastProductsFetchDate = lastProductsFetchDate,
+           Date().timeIntervalSince(lastProductsFetchDate) < productsRetryInterval {
+            return
+        }
+        fetchProducts()
     }
     
     public func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {

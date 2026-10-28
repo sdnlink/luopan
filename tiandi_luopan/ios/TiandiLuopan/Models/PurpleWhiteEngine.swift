@@ -133,7 +133,7 @@ public class PurpleWhiteEngine {
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
         
         // 立春交岁按太阳黄经判断，避免固定 2 月 4 日在不同年份错位。
-        let isBeforeLichun = rawMonth < 2 || (rawMonth == 2 && solarTermIndex < 2)
+        let isBeforeLichun = SolarTimeCalculator.shared.isBeforeLiChun(for: date)
         let effectiveYear = isBeforeLichun ? (rawYear - 1) : rawYear
         
         // 流月按节气月界计算。界面保留公历一月的 1 月显示习惯，避免

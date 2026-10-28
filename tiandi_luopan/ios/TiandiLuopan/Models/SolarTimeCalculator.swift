@@ -93,6 +93,23 @@ public final class SolarTimeCalculator {
         solarTerms[solarTermIndex(for: date)]
     }
 
+    /// Whether the instant is before the traditional Li Chun year boundary.
+    ///
+    /// The term index wraps at the winter solstice: index 23 covers the
+    /// interval from winter solstice to Xiao Han, followed by indices 0 and 1
+    /// before Li Chun (index 2).  Checking only `termIndex < 2` therefore
+    /// mislabels January dates that are still in index 23 as the new Ganzhi
+    /// year.
+    public func isBeforeLiChun(for date: Date) -> Bool {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let month = calendar.component(.month, from: date)
+        let termIndex = solarTermIndex(for: date)
+        // Bucket 23 is handled by the January branch above; in February only
+        // the two buckets immediately before Li Chun can still be active.
+        return month < 2 || (month == 2 && termIndex < 2)
+    }
+
     /// Fractional days elapsed since the start of the current 15° solar-term
     /// bucket.  This is used by the Qimen 拆补 method to split each term into
     /// upper, middle and lower five-day yuan segments.
@@ -138,7 +155,11 @@ public final class SolarTimeCalculator {
             : date
         let dayComponents = calendar.dateComponents([.year, .month, .day], from: dayPillarDate)
         let civilYear = components.year ?? 2000
-        let ganzhiYear = termIndex >= 2 ? civilYear : civilYear - 1
+        // Li Chun is a civil-date boundary in addition to the solar-term
+        // bucket.  In January the sun can still be in bucket 23 (冬至), which
+        // is before Li Chun even though its index is greater than 2.
+        let beforeLiChun = self.isBeforeLiChun(for: date)
+        let ganzhiYear = beforeLiChun ? civilYear - 1 : civilYear
         let yearCycle = positiveModulo(ganzhiYear - 4, 60)
         let yearStem = yearCycle % 10
         let yearBranch = yearCycle % 12

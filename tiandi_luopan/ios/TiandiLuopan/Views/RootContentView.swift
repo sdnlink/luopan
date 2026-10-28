@@ -98,5 +98,6 @@ public struct RootContentView: View {
     private func updateResourceUsage() {
         UIApplication.shared.isIdleTimerDisabled = selectedTab == 0 || selectedTab == 1
         motion.setDeviceMotionEnabled(selectedTab == 0 || selectedTab == 4)
+        motion.setHeadingUpdatesEnabled(selectedTab != 4)
     }
 }

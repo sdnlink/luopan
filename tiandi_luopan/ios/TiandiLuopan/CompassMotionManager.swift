@@ -66,6 +66,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var wasLevel: Bool = false
     private var isRunning: Bool = false
     private var deviceMotionEnabled: Bool = true
+    private var headingUpdatesEnabled: Bool = true
     private var lastSolarCalcTime: TimeInterval = 0
     private var lastResolvedHeading: Double = -999.0
     private var cancellables = Set<AnyCancellable>()
@@ -104,7 +105,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         guard !isRunning else { return }
         isRunning = true
 
-        if CLLocationManager.headingAvailable() {
+        if headingUpdatesEnabled && CLLocationManager.headingAvailable() {
             locationManager.startUpdatingHeading()
         }
         
@@ -140,6 +141,20 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             startMotionUpdates()
         } else {
             motionManager.stopDeviceMotionUpdates()
+        }
+    }
+
+    /// Core Location heading is only needed by pages that render a live
+    /// orientation. Settings can still show the last heading, magnetic field
+    /// and location data without keeping the heading sensor active.
+    public func setHeadingUpdatesEnabled(_ enabled: Bool) {
+        guard headingUpdatesEnabled != enabled else { return }
+        headingUpdatesEnabled = enabled
+        guard isRunning else { return }
+        if enabled && CLLocationManager.headingAvailable() {
+            locationManager.startUpdatingHeading()
+        } else {
+            locationManager.stopUpdatingHeading()
         }
     }
     
@@ -375,7 +390,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             guard self.isRunning else { return }
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 manager.startUpdatingLocation()
-                if CLLocationManager.headingAvailable() {
+                if self.headingUpdatesEnabled && CLLocationManager.headingAvailable() {
                     manager.startUpdatingHeading()
                 }
             }

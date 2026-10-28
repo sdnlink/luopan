@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 主罗盘界面 (Compass Main View)
 
 public struct CompassMainView: View {
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     
@@ -13,7 +14,9 @@ public struct CompassMainView: View {
     @State private var showLayerSheet = false
     @State private var showCalibSheet = false
     
-    public init() {}
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     public var body: some View {
         ZStack {
@@ -21,7 +24,8 @@ public struct CompassMainView: View {
             Color(red: 0.07, green: 0.07, blue: 0.09)
                 .ignoresSafeArea()
             
-            VStack(spacing: 4) {
+            if isActive {
+                VStack(spacing: 4) {
                 // 1. 顶部数据仪表
                 CompassHeaderView()
                 
@@ -66,6 +70,7 @@ public struct CompassMainView: View {
                 bottomStatusCard()
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
+                }
             }
         }
         .sheet(isPresented: $showFenjinSheet) {

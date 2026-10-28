@@ -56,12 +56,26 @@ public struct FloorplanRoom: Identifiable {
 }
 
 public struct FloorplanAuditItem: Identifiable {
-    public let id = UUID()
+    // The audit is recalculated whenever the compass moves. A generated UUID
+    // here makes SwiftUI treat every row as a brand-new view on each update,
+    // which resets row layout and can visibly shake the report list. Callers
+    // provide a stable room/report key instead.
+    public let id: String
     public let title: String
     public let palace: String
     public let severity: String // "吉", "提示", "预警", "严重煞气"
     public let lore: String
     public let solution: String
+
+    public init(id: String, title: String, palace: String, severity: String, lore: String, solution: String) {
+        self.id = id
+        self.title = title
+        self.palace = palace
+        self.severity = severity
+        self.lore = lore
+        self.solution = solution
+    }
+
     public var isSevere: Bool { severity.contains("严重") }
     public var isGood: Bool { severity.contains("吉") }
     public var isWarning: Bool { severity.contains("预警") }
@@ -185,6 +199,7 @@ public class FloorplanEngine {
             
             if audit.level != "平" {
                 auditReport.append(FloorplanAuditItem(
+                    id: "room-\(room.id)",
                     title: "\(r.name) · \(audit.title)",
                     palace: r.palaceName,
                     severity: audit.level,
@@ -202,6 +217,7 @@ public class FloorplanEngine {
             let lore = language == .en ? "Every functional area is well positioned, with activity separated and yin-yang in harmony." : (language == .zhHant ? "各功能區方位得所，動靜分離，陰陽調和。" : "各功能区方位得所，动静分离，阴阳调和。")
             let solution = language == .en ? "Keep the home bright and ventilated, with living plants to support steady family fortune." : (language == .zhHant ? "保持居室明亮通風，綠植點綴，可常保家運昌隆。" : "保持居室内明亮通风，绿植点缀，可常保家运昌隆。")
             auditReport.append(FloorplanAuditItem(
+                id: "whole-home-balanced",
                 title: title,
                 palace: palace,
                 severity: "吉",

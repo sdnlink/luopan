@@ -174,11 +174,19 @@ public struct TianJiShuView: View {
                 presentationMode.wrappedValue.dismiss()
             })
             .onAppear {
+                // Capture all observable sensor values on the main thread
+                // before moving the expensive renderer to a worker queue.
+                // Reading @Published state from the background closure could
+                // otherwise mix headings, coordinates and solar time from
+                // different updates.
+                let heading = motion.headingState.facingAngle
+                let coordsDesc = motion.coordsDesc
+                let solarTimeDesc = motion.solarTimeDesc
                 DispatchQueue.global(qos: .userInitiated).async {
                     let img = TianJiShuEngine.shared.generateScrollImage(
-                        heading: motion.headingState.facingAngle,
-                        coordsDesc: motion.coordsDesc,
-                        solarTimeDesc: motion.solarTimeDesc
+                        heading: heading,
+                        coordsDesc: coordsDesc,
+                        solarTimeDesc: solarTimeDesc
                     )
                     DispatchQueue.main.async {
                         self.scrollImage = img

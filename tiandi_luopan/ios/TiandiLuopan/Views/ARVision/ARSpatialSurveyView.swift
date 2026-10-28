@@ -45,6 +45,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
+    private var distanceSamples: [Float] = []
 
     public func attach(to sceneView: ARSCNView) {
         self.sceneView = sceneView
@@ -83,6 +84,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         largestPlaneWidth = nil
         largestPlaneDepth = nil
         distance = nil
+        distanceSamples.removeAll(keepingCapacity: true)
         semanticCounts = [:]
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
@@ -141,6 +143,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         activeConfiguration = nil
         lastMeshGeometryUpdate.removeAll()
         distance = nil
+        distanceSamples.removeAll(keepingCapacity: true)
         mappingState = .unavailable
         planeCount = 0
         meshAnchorCount = 0
@@ -184,7 +187,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     public func sessionInterruptionEnded(_ session: ARSession) {
         DispatchQueue.main.async { [weak self] in
-            self?.start()
+            self?.resume()
         }
     }
 
@@ -214,11 +217,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             largestPlaneDepth = nil
         }
 
-        if let query = sceneView.raycastQuery(
-            from: CGPoint(x: sceneView.bounds.midX, y: sceneView.bounds.midY),
-            allowing: .estimatedPlane,
-            alignment: .any
-        ), let result = sceneView.session.raycast(query).first {
+        let center = CGPoint(x: sceneView.bounds.midX, y: sceneView.bounds.midY)
+        let target: ARRaycastQuery.Target = lidarAvailable ? .existingPlaneGeometry : .estimatedPlane
+        let raycastResult = sceneView.raycastQuery(from: center, allowing: target, alignment: .any)
+            .flatMap { sceneView.session.raycast($0).first }
+            ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .any)
+                .flatMap { sceneView.session.raycast($0).first }
+        if let result = raycastResult {
             let cameraPosition = SIMD3<Float>(
                 frame.camera.transform.columns.3.x,
                 frame.camera.transform.columns.3.y,
@@ -229,8 +234,19 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                 result.worldTransform.columns.3.y,
                 result.worldTransform.columns.3.z
             )
-            distance = simd_distance(cameraPosition, hitPosition)
+            let measuredDistance = simd_distance(cameraPosition, hitPosition)
+            if measuredDistance.isFinite, measuredDistance > 0 {
+                distanceSamples.append(measuredDistance)
+                if distanceSamples.count > 5 {
+                    distanceSamples.removeFirst()
+                }
+                distance = distanceSamples.sorted()[distanceSamples.count / 2]
+            } else {
+                distanceSamples.removeAll(keepingCapacity: true)
+                distance = nil
+            }
         } else {
+            distanceSamples.removeAll(keepingCapacity: true)
             distance = nil
         }
 

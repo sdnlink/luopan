@@ -4,12 +4,12 @@ import SwiftUI
 
 public struct LayerSettingsSheet: View {
     @ObservedObject var layers = CompassLayerManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
     
     public init() {}
     
     public var body: some View {
-        let lang = LocalizationManager.shared
         return NavigationView {
             List {
                 // 流派预设一键切换

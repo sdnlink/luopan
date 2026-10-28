@@ -100,6 +100,7 @@ public struct VIPLockCardView: View {
 public struct VIPPaywallSheet: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
     
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var isPurchasing: Bool = false

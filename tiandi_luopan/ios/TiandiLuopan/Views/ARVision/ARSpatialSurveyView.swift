@@ -2,6 +2,7 @@ import SwiftUI
 import ARKit
 import SceneKit
 import simd
+import UIKit
 
 /// The tracking state is kept separate from presentation text so that the
 /// survey can be localized without making the AR session depend on UI state.
@@ -12,11 +13,28 @@ public enum ARSpatialTrackingState: Equatable {
     case limited
 }
 
+public enum ARSpatialMappingState: Equatable {
+    case unavailable
+    case limited
+    case extending
+    case mapped
+}
+
+public enum ARSpatialSurveyError: Error, Equatable {
+    case sessionUnavailable
+    case mapUnavailable
+    case archiveFailed
+}
+
 /// Owns one AR session and throttles expensive mesh and raycast work.  The
 /// existing camera based AR screen and this object are never active together.
 public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDelegate, ARSCNViewDelegate {
     @Published public private(set) var trackingState: ARSpatialTrackingState = .initializing
+    @Published public private(set) var mappingState: ARSpatialMappingState = .unavailable
     @Published public private(set) var planeCount: Int = 0
+    @Published public private(set) var meshAnchorCount: Int = 0
+    @Published public private(set) var largestPlaneWidth: Float?
+    @Published public private(set) var largestPlaneDepth: Float?
     @Published public private(set) var distance: Float?
     // Use raw values as keys because ARMeshClassification is imported from an
     // Objective-C enum and is not Hashable on every iOS SDK generation.
@@ -25,6 +43,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
+    private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
 
     public func attach(to sceneView: ARSCNView) {
         self.sceneView = sceneView
@@ -55,8 +74,52 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
 
         trackingState = .initializing
+        mappingState = .limited
         lastMeasurementTimestamp = 0
+        lastMeshGeometryUpdate.removeAll()
+        planeCount = 0
+        meshAnchorCount = 0
+        largestPlaneWidth = nil
+        largestPlaneDepth = nil
+        distance = nil
+        semanticCounts = [:]
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+    }
+
+    public func resetSurvey() {
+        start()
+    }
+
+    public func saveWorldMap(completion: @escaping (Result<URL, Error>) -> Void) {
+        guard let session = sceneView?.session else {
+            completion(.failure(ARSpatialSurveyError.sessionUnavailable))
+            return
+        }
+        guard session.currentFrame?.worldMappingStatus == .mapped else {
+            completion(.failure(ARSpatialSurveyError.mapUnavailable))
+            return
+        }
+
+        session.getCurrentWorldMap { worldMap, error in
+            DispatchQueue.main.async {
+                guard let worldMap = worldMap, error == nil else {
+                    completion(.failure(error ?? ARSpatialSurveyError.mapUnavailable))
+                    return
+                }
+                do {
+                    let data = try NSKeyedArchiver.archivedData(
+                        withRootObject: worldMap,
+                        requiringSecureCoding: false
+                    )
+                    let name = "TianJiYanXiang-\(Int(Date().timeIntervalSince1970)).arworldmap"
+                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+                    try data.write(to: url, options: .atomic)
+                    completion(.success(url))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }
     }
 
     public func stop() {
@@ -64,8 +127,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView?.session.delegate = nil
         sceneView?.delegate = nil
         sceneView = nil
+        lastMeshGeometryUpdate.removeAll()
         distance = nil
+        mappingState = .unavailable
         planeCount = 0
+        meshAnchorCount = 0
+        largestPlaneWidth = nil
+        largestPlaneDepth = nil
         semanticCounts = [:]
     }
 
@@ -116,8 +184,22 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private func updateMeasurements(frame: ARFrame, sceneView: ARSCNView) {
         let anchors = frame.anchors
-        planeCount = anchors.reduce(into: 0) { count, anchor in
-            if anchor is ARPlaneAnchor { count += 1 }
+        switch frame.worldMappingStatus {
+        case .notAvailable: mappingState = .unavailable
+        case .limited: mappingState = .limited
+        case .extending: mappingState = .extending
+        case .mapped: mappingState = .mapped
+        @unknown default: mappingState = .limited
+        }
+
+        let planes = anchors.compactMap { $0 as? ARPlaneAnchor }
+        planeCount = planes.count
+        if let largest = planes.max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
+            largestPlaneWidth = largest.extent.x
+            largestPlaneDepth = largest.extent.z
+        } else {
+            largestPlaneWidth = nil
+            largestPlaneDepth = nil
         }
 
         if let query = sceneView.raycastQuery(
@@ -145,9 +227,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             return
         }
 
+        let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
+        meshAnchorCount = meshAnchors.count
         var counts: [Int: Int] = [:]
         var inspectedFaces = 0
-        for meshAnchor in anchors.compactMap({ $0 as? ARMeshAnchor }) {
+        for meshAnchor in meshAnchors {
             let geometry = meshAnchor.geometry
             for faceIndex in 0..<geometry.faceCount {
                 // A dense room mesh can contain tens of thousands of faces.
@@ -162,6 +246,116 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             if inspectedFaces >= 4000 { break }
         }
         semanticCounts = counts
+    }
+
+    // Plane outlines provide immediate visual feedback while ARKit builds the
+    // world map. A line material keeps the camera view readable and avoids
+    // the heavy translucent surface fill used by many sample applications.
+    public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+        if let meshAnchor = anchor as? ARMeshAnchor {
+            guard let geometry = meshGeometry(for: meshAnchor) else { return nil }
+            let node = SCNNode(geometry: geometry)
+            node.name = "ar-spatial-mesh"
+            return node
+        }
+        guard let planeAnchor = anchor as? ARPlaneAnchor else { return nil }
+        let node = SCNNode()
+        node.geometry = planeGeometry(for: planeAnchor)
+        if planeAnchor.alignment == .horizontal {
+            node.eulerAngles.x = -.pi / 2
+        }
+        return node
+    }
+
+    public func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+        if let meshAnchor = anchor as? ARMeshAnchor {
+            let now = ProcessInfo.processInfo.systemUptime
+            if let last = lastMeshGeometryUpdate[meshAnchor.identifier], now - last < 0.5 {
+                return
+            }
+            lastMeshGeometryUpdate[meshAnchor.identifier] = now
+            if let geometry = meshGeometry(for: meshAnchor) {
+                node.geometry = geometry
+            }
+            return
+        }
+        guard let planeAnchor = anchor as? ARPlaneAnchor else { return }
+        node.geometry = planeGeometry(for: planeAnchor)
+        if planeAnchor.alignment == .horizontal {
+            node.eulerAngles.x = -.pi / 2
+        } else {
+            node.eulerAngles.x = 0
+        }
+    }
+
+    private func planeGeometry(for anchor: ARPlaneAnchor) -> SCNGeometry {
+        let plane = SCNPlane(width: CGFloat(anchor.extent.x), height: CGFloat(anchor.extent.z))
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.systemTeal.withAlphaComponent(0.75)
+        material.fillMode = .lines
+        material.isDoubleSided = true
+        plane.materials = [material]
+        return plane
+    }
+
+    private func meshGeometry(for anchor: ARMeshAnchor) -> SCNGeometry? {
+        let mesh = anchor.geometry
+        guard mesh.vertices.count > 0, mesh.faces.count > 0 else { return nil }
+
+        let vertices = mesh.vertices
+        let vertexData = Data(bytes: vertices.buffer.contents(), count: vertices.buffer.length)
+        let vertexSource = SCNGeometrySource(
+            data: vertexData,
+            semantic: .vertex,
+            vectorCount: vertices.count,
+            usesFloatComponents: true,
+            componentsPerVector: 3,
+            bytesPerComponent: MemoryLayout<Float>.size,
+            dataOffset: vertices.offset,
+            dataStride: vertices.stride
+        )
+
+        let faces = mesh.faces
+        let facePointer = faces.buffer.contents().advanced(by: faces.offset)
+        let faceData = Data(bytes: facePointer, count: faces.count * faces.bytesPerIndex)
+        let element = SCNGeometryElement(
+            data: faceData,
+            primitiveType: .triangles,
+            primitiveCount: faces.count,
+            bytesPerIndex: faces.bytesPerIndex
+        )
+        let geometry = SCNGeometry(sources: [vertexSource], elements: [element])
+        let material = SCNMaterial()
+        material.diffuse.contents = semanticColor(for: mesh)
+        material.lightingModel = .constant
+        material.fillMode = .lines
+        material.isDoubleSided = true
+        geometry.materials = [material]
+        return geometry
+    }
+
+    private func semanticColor(for geometry: ARMeshGeometry) -> UIColor {
+        var classCounts: [Int: Int] = [:]
+        let sampleCount = min(geometry.faceCount, 240)
+        for index in 0..<sampleCount {
+            let classification = geometry.classificationOf(faceWithIndex: index)
+            if classification != .none {
+                classCounts[classification.rawValue, default: 0] += 1
+            }
+        }
+        guard let rawValue = classCounts.max(by: { $0.value < $1.value })?.key,
+              let classification = ARMeshClassification(rawValue: rawValue) else {
+            return UIColor.systemTeal.withAlphaComponent(0.55)
+        }
+        switch classification {
+        case .wall: return UIColor.systemBlue.withAlphaComponent(0.7)
+        case .floor: return UIColor.systemGreen.withAlphaComponent(0.7)
+        case .ceiling: return UIColor.systemPurple.withAlphaComponent(0.7)
+        case .window: return UIColor.systemCyan.withAlphaComponent(0.8)
+        case .door: return UIColor.systemOrange.withAlphaComponent(0.8)
+        case .table, .seat: return UIColor.systemYellow.withAlphaComponent(0.8)
+        default: return UIColor.systemTeal.withAlphaComponent(0.55)
+        }
     }
 }
 
@@ -192,12 +386,41 @@ public struct ARSpatialPreviewView: UIViewRepresentable {
     }
 }
 
+private struct ARSpatialShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ARSpatialShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(
+                x: controller.view.bounds.midX,
+                y: controller.view.bounds.midY,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 /// ARKit powered room survey.  On devices without ARWorldTracking support it
 /// keeps the camera based AR experience available and explains the limitation.
 public struct ARSpatialSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @StateObject private var model = ARSpatialSurveyModel()
     @Environment(\.presentationMode) private var presentationMode
+    @State private var isSavingMap = false
+    @State private var shareItem: ARSpatialShareItem?
+    @State private var saveMessage: String?
 
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [
         (.wall, "ar_spatial_wall", "rectangle.portrait"),
@@ -247,6 +470,28 @@ public struct ARSpatialSurveyView: View {
                     .foregroundColor(model.lidarAvailable ? .green : .orange)
             }
             Spacer()
+            Button(action: {
+                saveMessage = nil
+                model.resetSurvey()
+            }) {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(9)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(lang.t("ar_spatial_reset"))
+            Button(action: saveMap) {
+                Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(isSavingMap ? .orange : .white)
+                    .padding(9)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .disabled(isSavingMap)
+            .accessibilityLabel(lang.t("ar_spatial_save_map"))
             Button(action: { presentationMode.wrappedValue.dismiss() }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .bold))
@@ -283,6 +528,15 @@ public struct ARSpatialSurveyView: View {
                     .foregroundColor(.white.opacity(0.85))
             }
 
+            HStack(spacing: 12) {
+                Label(mappingText, systemImage: "map")
+                if model.lidarAvailable {
+                    Text("\(lang.t("ar_spatial_mesh")): \(model.meshAnchorCount)")
+                }
+            }
+            .font(.system(size: 10, weight: .medium))
+            .foregroundColor(.white.opacity(0.75))
+
             HStack {
                 Image(systemName: "ruler")
                     .foregroundColor(.yanCyan)
@@ -295,6 +549,12 @@ public struct ARSpatialSurveyView: View {
             }
             .font(.system(size: 13, weight: .bold, design: .monospaced))
             .foregroundColor(.white)
+
+            if let width = model.largestPlaneWidth, let depth = model.largestPlaneDepth {
+                Text("\(lang.t("ar_spatial_largest_plane")): \(String(format: "%.2f × %.2f m", width, depth))")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.75))
+            }
 
             if model.lidarAvailable {
                 Text(lang.t("ar_spatial_semantic_candidate"))
@@ -312,48 +572,45 @@ public struct ARSpatialSurveyView: View {
                         }
                     }
 
-    // Plane outlines provide immediate visual feedback while ARKit builds the
-    // world map.  A line material keeps the camera view readable and avoids
-    // the heavy translucent surface fill used by many sample applications.
-    public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        guard let planeAnchor = anchor as? ARPlaneAnchor else { return nil }
-        let node = SCNNode()
-        node.geometry = planeGeometry(for: planeAnchor)
-        if planeAnchor.alignment == .horizontal {
-            node.eulerAngles.x = -.pi / 2
-        }
-        return node
-    }
-
-    public func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
-        guard let planeAnchor = anchor as? ARPlaneAnchor else { return }
-        node.geometry = planeGeometry(for: planeAnchor)
-        if planeAnchor.alignment == .horizontal {
-            node.eulerAngles.x = -.pi / 2
-        } else {
-            node.eulerAngles.x = 0
-        }
-    }
-
-    private func planeGeometry(for anchor: ARPlaneAnchor) -> SCNGeometry {
-        let plane = SCNPlane(width: CGFloat(anchor.extent.x), height: CGFloat(anchor.extent.z))
-        let material = SCNMaterial()
-        material.diffuse.contents = UIColor.systemTeal.withAlphaComponent(0.75)
-        material.fillMode = .lines
-        material.isDoubleSided = true
-        plane.materials = [material]
-        return plane
-    }
                 }
             } else {
                 Text(lang.t("ar_spatial_no_depth"))
                     .font(.system(size: 10))
                     .foregroundColor(.orange.opacity(0.9))
             }
+            if let saveMessage = saveMessage {
+                Text(saveMessage)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.yanCyan)
+            }
         }
         .padding(12)
         .background(Color.black.opacity(0.78))
         .cornerRadius(12)
+        .sheet(item: $shareItem) { item in
+            ARSpatialShareSheet(items: [item.url])
+        }
+    }
+
+    private func saveMap() {
+        guard !isSavingMap else { return }
+        isSavingMap = true
+        saveMessage = lang.t("ar_spatial_saving")
+        model.saveWorldMap { result in
+            isSavingMap = false
+            switch result {
+            case .success(let url):
+                saveMessage = lang.t("ar_spatial_map_ready")
+                shareItem = ARSpatialShareItem(url: url)
+            case .failure(let error):
+                if let spatialError = error as? ARSpatialSurveyError,
+                   spatialError == .mapUnavailable {
+                    saveMessage = lang.t("ar_spatial_mapping_not_ready")
+                } else {
+                    saveMessage = lang.t("ar_spatial_save_failed")
+                }
+            }
+        }
     }
 
     private var trackingText: String {
@@ -362,6 +619,15 @@ public struct ARSpatialSurveyView: View {
         case .limited: return lang.t("ar_spatial_tracking_limited")
         case .unavailable: return lang.t("ar_spatial_tracking_unavailable")
         case .initializing: return lang.t("ar_spatial_tracking_initializing")
+        }
+    }
+
+    private var mappingText: String {
+        switch model.mappingState {
+        case .mapped: return lang.t("ar_spatial_mapping_mapped")
+        case .extending: return lang.t("ar_spatial_mapping_extending")
+        case .limited: return lang.t("ar_spatial_mapping_limited")
+        case .unavailable: return lang.t("ar_spatial_mapping_unavailable")
         }
     }
 

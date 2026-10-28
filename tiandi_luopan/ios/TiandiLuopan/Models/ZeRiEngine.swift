@@ -53,7 +53,7 @@ public final class ZeRiEngine {
         
         // 1. 年柱干支 (严格遵循立春交岁天干地支更迭法则)
         let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
-        let isBeforeLiChun = month < 2 || (month == 2 && termIndex < 2)
+        let isBeforeLiChun = SolarTimeCalculator.shared.isBeforeLiChun(for: date)
         let gzYear = isBeforeLiChun ? (year - 1) : year
         let yOffset = (gzYear - 4) % 60
         let yearStem = stems[((yOffset % 10) + 10) % 10]

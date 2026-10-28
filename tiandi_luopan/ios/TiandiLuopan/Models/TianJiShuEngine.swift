@@ -261,9 +261,7 @@ public class TianJiShuEngine {
             let calendar = Calendar.current
             let now = reportDate
             let y = calendar.component(.year, from: now)
-            let m = calendar.component(.month, from: now)
-            let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: now)
-            let isBeforeLichun = m < 2 || (m == 2 && solarTermIndex < 2)
+            let isBeforeLichun = SolarTimeCalculator.shared.isBeforeLiChun(for: now)
             let gzYear = isBeforeLichun ? (y - 1) : y
             let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
             let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]

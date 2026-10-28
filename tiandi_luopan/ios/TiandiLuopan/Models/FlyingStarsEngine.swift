@@ -239,11 +239,9 @@ public final class FlyingStarsEngine {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         let year = calendar.component(.year, from: date)
-        let month = calendar.component(.month, from: date)
-        let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
-        // January always belongs to the previous Xuan Kong year. In February
-        // use the astronomical Li Chun bucket, avoiding a fixed Feb 4 cutoff.
-        let beforeLiChun = month < 2 || (month == 2 && termIndex < 2)
+        // Use the shared astronomical boundary, including the wrapped winter
+        // solstice bucket that occurs in January before Li Chun.
+        let beforeLiChun = SolarTimeCalculator.shared.isBeforeLiChun(for: date)
         return beforeLiChun ? year - 1 : year
     }
     

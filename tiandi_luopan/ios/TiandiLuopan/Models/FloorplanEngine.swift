@@ -30,7 +30,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
 }
 
 public struct FloorplanRoom: Identifiable {
-    public let id: String
+    public var id: String
     public var name: String
     public var type: FloorplanRoomType
     public var rect: CGRect // 相对比例 (0.0 .. 1.0)

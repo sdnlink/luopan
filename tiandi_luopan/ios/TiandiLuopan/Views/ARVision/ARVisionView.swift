@@ -377,6 +377,7 @@ public struct ARVisionView: View {
     
     public var body: some View {
         ZStack {
+            if isActive {
             // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             if hasCameraPermission && isActive {
                 CameraPreviewView(
@@ -458,12 +459,12 @@ public struct ARVisionView: View {
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 12)
+            }
         }
         .onAppear {
+            guard isActive else { return }
             checkCameraPermission()
-            if isActive {
-                startScanAnimation()
-            }
+            startScanAnimation()
         }
         .onChange(of: isActive) { active in
             if active {

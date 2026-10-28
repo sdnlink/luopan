@@ -376,6 +376,11 @@ public struct ARVisionView: View {
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var photoPermissionDenied: Bool = false
+    // Invalidated when the AR page disappears or a newer proof capture starts.
+    // Rendering a 1080x1920 proof image is asynchronous; without a generation
+    // check a frame captured just before leaving the tab could still be saved
+    // to Photos after the user had already moved on.
+    @State private var snapshotGeneration: Int = 0
     
     private let shaList = ExteriorShaEngine.shared.database
     
@@ -522,6 +527,7 @@ public struct ARVisionView: View {
                 stopScanAnimation()
                 pendingCapturePurpose = nil
                 isAIScanning = false
+                snapshotGeneration += 1
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -532,6 +538,11 @@ public struct ARVisionView: View {
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+        .onDisappear {
+            snapshotGeneration += 1
+            pendingCapturePurpose = nil
+            isAIScanning = false
         }
     }
 
@@ -937,6 +948,8 @@ public struct ARVisionView: View {
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
     private func captureAndSaveSnapshot(baseImage: UIImage) {
+        snapshotGeneration += 1
+        let generation = snapshotGeneration
         let size = CGSize(width: 1080, height: 1920)
         // Keep the proof image at its declared pixel dimensions instead of
         // inheriting a 2x/3x Retina scale and allocating a much larger bitmap.
@@ -1051,6 +1064,7 @@ public struct ARVisionView: View {
             }
         
             DispatchQueue.main.async {
+                guard self.isActive, self.snapshotGeneration == generation else { return }
                 self.saveSnapshotToPhotoLibrary(image)
             }
         }

@@ -243,13 +243,15 @@ public struct TianJiShuView: View {
                 let coordsDesc = motion.coordsDesc
                 let solarTimeDesc = motion.solarTimeDesc
                 let language = lang.effectiveLanguage
+                let reportDate = Date()
                 isGenerating = true
                 DispatchQueue.global(qos: .userInitiated).async {
                     let img = TianJiShuEngine.shared.generateScrollImage(
                         heading: heading,
                         coordsDesc: coordsDesc,
                         solarTimeDesc: solarTimeDesc,
-                        language: language
+                        language: language,
+                        reportDate: reportDate
                     )
                     DispatchQueue.main.async {
                         guard self.renderGeneration == generation else { return }

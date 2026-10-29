@@ -913,116 +913,123 @@ public struct ARVisionView: View {
     
     // MARK: - 顶栏信息与镜头翻转控制
     private func topStatusBar() -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(lang.t("ar_title"))
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
-                    .layoutPriority(1)
-            }
-            Spacer()
-
-            Button(action: runAIScan) {
-                HStack(spacing: 4) {
-                    Image(systemName: isAIScanning ? "hourglass" : "sparkles")
-                    Text(isAIScanning ? lang.t("ar_ai_scanning") : lang.t("ar_ai_scan"))
+        VStack(spacing: 8) {
+            // 第一行：标题与朝向信息 + 常驻镜头翻转
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(lang.t("ar_title"))
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .layoutPriority(1)
                 }
-                .font(.system(size: 11, weight: .bold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Color.yanCyan.opacity(0.85))
-                .foregroundColor(.black)
-                .cornerRadius(14)
-            }
-            .disabled(isAIScanning || pendingCapturePurpose != nil)
-
-            Button(action: {
-                guard hasCameraPermission else {
-                    aiError = lang.t("ar_ai_camera_required")
-                    return
-                }
-                showSpatialSurvey = true
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arkit")
-                    Text(lang.t("ar_spatial_survey"))
-                }
-                .font(.system(size: 11, weight: .bold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Color.purple.opacity(0.82))
-                .foregroundColor(.white)
-                .cornerRadius(14)
-            }
-            .disabled(isAIScanning || pendingCapturePurpose != nil)
-            
-            // 翻转镜头按钮
-            Button(action: {
-                let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
-                guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) != nil else {
-                    aiError = lang.t("ar_ai_camera_required")
-                    return
-                }
-                cameraPosition = nextPosition
-            }) {
-                Image(systemName: "camera.rotate.fill")
-                    .font(.system(size: 13))
-                    .padding(8)
-                    .background(Color.white.opacity(0.2))
-                    .foregroundColor(.white)
-                    .clipShape(Circle())
-            }
-            .disabled(isAIScanning || pendingCapturePurpose != nil)
-            
-            // 勘测存证快照拍照按钮
-            Button(action: {
-                if !iap.hasUnlockedVIP {
-                    showPaywall = true
-                } else {
-                    guard pendingCapturePurpose == nil else { return }
-                    if hasCameraPermission && isActive {
-                        pendingCapturePurpose = .snapshot
-                        captureTrigger += 1
-                    } else {
-                        // A dark fallback image must never be presented as an
-                        // on-site proof. Ask the user to restore camera access
-                        // and only save a snapshot after a real frame arrives.
+                Spacer()
+                // 翻转镜头按钮
+                Button(action: {
+                    let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
+                    guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) != nil else {
                         aiError = lang.t("ar_ai_camera_required")
+                        return
+                    }
+                    cameraPosition = nextPosition
+                }) {
+                    Image(systemName: "camera.rotate.fill")
+                        .font(.system(size: 13))
+                        .padding(8)
+                        .background(Color.white.opacity(0.2))
+                        .foregroundColor(.white)
+                        .clipShape(Circle())
+                }
+                .disabled(isAIScanning || pendingCapturePurpose != nil)
+            }
+
+            // 第二行：功能按钮组（小屏横向滚动兜底，避免挤压标题换行竖排）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button(action: runAIScan) {
+                        HStack(spacing: 4) {
+                            Image(systemName: isAIScanning ? "hourglass" : "sparkles")
+                            Text(isAIScanning ? lang.t("ar_ai_scanning") : lang.t("ar_ai_scan"))
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.yanCyan.opacity(0.85))
+                        .foregroundColor(.black)
+                        .cornerRadius(14)
+                    }
+                    .disabled(isAIScanning || pendingCapturePurpose != nil)
+
+                    Button(action: {
+                        guard hasCameraPermission else {
+                            aiError = lang.t("ar_ai_camera_required")
+                            return
+                        }
+                        showSpatialSurvey = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arkit")
+                            Text(lang.t("ar_spatial_survey"))
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.82))
+                        .foregroundColor(.white)
+                        .cornerRadius(14)
+                    }
+                    .disabled(isAIScanning || pendingCapturePurpose != nil)
+
+                    // 勘测存证快照拍照按钮
+                    Button(action: {
+                        if !iap.hasUnlockedVIP {
+                            showPaywall = true
+                        } else {
+                            guard pendingCapturePurpose == nil else { return }
+                            if hasCameraPermission && isActive {
+                                pendingCapturePurpose = .snapshot
+                                captureTrigger += 1
+                            } else {
+                                // A dark fallback image must never be presented as an
+                                // on-site proof. Ask the user to restore camera access
+                                // and only save a snapshot after a real frame arrives.
+                                aiError = lang.t("ar_ai_camera_required")
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "camera.fill")
+                            Text(lang.t("capture_proof"))
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.8))
+                        .foregroundColor(.black)
+                        .cornerRadius(14)
+                    }
+                    .disabled(isAIScanning || pendingCapturePurpose != nil)
+
+                    // 大师化解锦囊
+                    Button(action: {
+                        showRemedySheet = true
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "shield.lefthalf.fill")
+                            Text(lang.t("remedy_guide"))
+                        }
+                        .font(.system(size: 11, weight: .bold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                        .foregroundColor(.black)
+                        .cornerRadius(14)
                     }
                 }
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "camera.fill")
-                    Text(lang.t("capture_proof"))
-                }
-                .font(.system(size: 11, weight: .bold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Color.green.opacity(0.8))
-                .foregroundColor(.black)
-                .cornerRadius(14)
-            }
-            .disabled(isAIScanning || pendingCapturePurpose != nil)
-            
-            // 大师化解锦囊
-            Button(action: {
-                showRemedySheet = true
-            }) {
-                HStack(spacing: 3) {
-                    Image(systemName: "shield.lefthalf.fill")
-                    Text(lang.t("remedy_guide"))
-                }
-                .font(.system(size: 11, weight: .bold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(Color(red: 0.83, green: 0.68, blue: 0.21))
-                .foregroundColor(.black)
-                .cornerRadius(14)
             }
         }
         .padding(8)

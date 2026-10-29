@@ -356,6 +356,7 @@ public struct ARVisionView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @StateObject private var spatialModel = ARSpatialSurveyModel()
     
     public var isActive: Bool = true
     
@@ -377,7 +378,7 @@ public struct ARVisionView: View {
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var aiScanGeneration: Int = 0
-    @State private var aiScanFrames: [UIImage] = []
+    @State private var aiScanFrames: [ARCapturedFrame] = []
     @State private var photoPermissionDenied: Bool = false
     @State private var showSpatialSurvey: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
@@ -442,31 +443,27 @@ public struct ARVisionView: View {
             if isActive {
             // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             if hasCameraPermission && isActive && !showSpatialSurvey {
-                CameraPreviewView(
-                    cameraPosition: cameraPosition,
-                    isActive: isActive && !showSpatialSurvey,
-                    captureTrigger: captureTrigger,
-                    onPhotoCaptured: { image in
-                        switch pendingCapturePurpose {
-                        case .aiScan(let generation, let frameIndex):
-                            pendingCapturePurpose = nil
-                            collectAIScanFrame(image, generation: generation, frameIndex: frameIndex)
-                        case .snapshot:
-                            pendingCapturePurpose = nil
-                            guard let image = image else {
-                                aiError = lang.t("ar_ai_no_frame")
-                                return
-                            }
-                            captureAndSaveSnapshot(baseImage: image)
-                        case .none:
-                            // A capture can finish after the AR tab was
-                            // dismissed or the request was superseded. Do not
-                            // turn that stale frame into an unexpected save.
-                            return
+                if ARWorldTrackingConfiguration.isSupported {
+                    ARFusionCaptureView(
+                        model: spatialModel,
+                        isActive: isActive && !showSpatialSurvey,
+                        captureTrigger: captureTrigger,
+                        onFrameCaptured: { frame in
+                            handleCapturedFrame(frame)
                         }
-                    }
-                )
+                    )
                     .ignoresSafeArea()
+                } else {
+                    CameraPreviewView(
+                        cameraPosition: cameraPosition,
+                        isActive: isActive && !showSpatialSurvey,
+                        captureTrigger: captureTrigger,
+                        onPhotoCaptured: { image in
+                            handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
+                        }
+                    )
+                    .ignoresSafeArea()
+                }
             } else {
                 simulationCanvasLayer()
                     .ignoresSafeArea()
@@ -535,6 +532,7 @@ public struct ARVisionView: View {
             } else {
                 stopScanAnimation()
                 showSpatialSurvey = false
+                spatialModel.pause()
                 pendingCapturePurpose = nil
                 isAIScanning = false
                 aiScanGeneration &+= 1
@@ -560,6 +558,7 @@ public struct ARVisionView: View {
         }
         .onDisappear {
             showSpatialSurvey = false
+            spatialModel.stop()
             snapshotGeneration += 1
             pendingCapturePurpose = nil
             isAIScanning = false
@@ -828,7 +827,7 @@ public struct ARVisionView: View {
                     .foregroundColor(.white)
                     .clipShape(Circle())
             }
-            .disabled(isAIScanning || pendingCapturePurpose != nil)
+            .disabled(ARWorldTrackingConfiguration.isSupported || isAIScanning || pendingCapturePurpose != nil)
             
             // 勘测存证快照拍照按钮
             Button(action: {
@@ -1017,15 +1016,35 @@ public struct ARVisionView: View {
         captureTrigger += 1
     }
 
-    private func collectAIScanFrame(_ image: UIImage?, generation: Int, frameIndex: Int) {
+    private func handleCapturedFrame(_ frame: ARCapturedFrame?) {
+        switch pendingCapturePurpose {
+        case .aiScan(let generation, let frameIndex):
+            pendingCapturePurpose = nil
+            collectAIScanFrame(frame, generation: generation, frameIndex: frameIndex)
+        case .snapshot:
+            pendingCapturePurpose = nil
+            guard let frame = frame else {
+                aiError = lang.t("ar_ai_no_frame")
+                return
+            }
+            captureAndSaveSnapshot(baseImage: frame.image)
+        case .none:
+            // A capture can finish after the AR tab was dismissed or the
+            // request was superseded. Do not turn that stale frame into an
+            // unexpected save.
+            return
+        }
+    }
+
+    private func collectAIScanFrame(_ frame: ARCapturedFrame?, generation: Int, frameIndex: Int) {
         guard isActive, generation == aiScanGeneration else { return }
-        guard let image = image else {
+        guard let frame = frame else {
             isAIScanning = false
             aiScanFrames.removeAll(keepingCapacity: true)
             aiError = lang.t("ar_ai_no_frame")
             return
         }
-        aiScanFrames.append(image)
+        aiScanFrames.append(frame)
         let requiredFrames = 3
         if frameIndex + 1 < requiredFrames {
             // Give AVCapturePhotoOutput one run-loop turn between exposures so
@@ -1044,7 +1063,7 @@ public struct ARVisionView: View {
         analyzeFrames(frames, generation: generation)
     }
 
-    private func analyzeFrames(_ images: [UIImage], generation: Int) {
+    private func analyzeFrames(_ images: [ARCapturedFrame], generation: Int) {
         guard !images.isEmpty else {
             isAIScanning = false
             aiError = lang.t("ar_ai_no_frame")
@@ -1058,27 +1077,34 @@ public struct ARVisionView: View {
             index: 0,
             generation: generation,
             results: [],
-            failures: 0
+            failures: 0,
+            firstFailure: nil
         )
     }
 
     private func analyzeNextFrame(
-        _ images: [UIImage],
+        _ images: [ARCapturedFrame],
         index: Int,
         generation: Int,
         results: [ShaAnalysisResult],
-        failures: Int
+        failures: Int,
+        firstFailure: OnDeviceShaAnalyzer.AnalysisError?
     ) {
         guard isActive, generation == aiScanGeneration, index < images.count else { return }
-        OnDeviceShaAnalyzer.shared.analyze(image: images[index]) { result in
+        let frame = images[index]
+        OnDeviceShaAnalyzer.shared.analyze(image: frame.image, evidence: frame.evidence) { result in
             guard self.isActive, generation == self.aiScanGeneration else { return }
             var nextResults = results
             var nextFailures = failures
+            var nextFailure = firstFailure
             switch result {
             case .success(let analysis):
                 nextResults.append(analysis)
-            case .failure:
+            case .failure(let error):
                 nextFailures += 1
+                if nextFailure == nil {
+                    nextFailure = error as? OnDeviceShaAnalyzer.AnalysisError
+                }
             }
             let nextIndex = index + 1
             if nextIndex < images.count {
@@ -1087,24 +1113,38 @@ public struct ARVisionView: View {
                     index: nextIndex,
                     generation: generation,
                     results: nextResults,
-                    failures: nextFailures
+                    failures: nextFailures,
+                    firstFailure: nextFailure
                 )
             } else {
                 self.finishAIScan(
                     results: nextResults,
                     failures: nextFailures,
-                    generation: generation
+                    generation: generation,
+                    firstFailure: nextFailure
                 )
             }
         }
     }
 
-    private func finishAIScan(results: [ShaAnalysisResult], failures: Int, generation: Int) {
+    private func finishAIScan(
+        results: [ShaAnalysisResult],
+        failures: Int,
+        generation: Int,
+        firstFailure: OnDeviceShaAnalyzer.AnalysisError?
+    ) {
         guard generation == aiScanGeneration else { return }
         isAIScanning = false
         // Require every captured frame to produce the same candidate. A single
         // inconsistent frame is treated as environmental motion/occlusion,
         // never as confirmation.
+        if let firstFailure = firstFailure {
+            aiResult = nil
+            targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetOffset = .zero
+            aiError = firstFailure.localizedDescription
+            return
+        }
         guard failures == 0, results.count == 3,
               let first = results.first,
               results.dropFirst().allSatisfy({ candidate in

@@ -3,6 +3,8 @@ import ARKit
 import SceneKit
 import simd
 import UIKit
+import CoreImage
+import CoreVideo
 
 /// The tracking state is kept separate from presentation text so that the
 /// survey can be localized without making the AR session depend on UI state.
@@ -27,12 +29,60 @@ public enum ARSpatialSurveyError: Error, Equatable {
     case storageUnavailable
 }
 
+/// Evidence captured from the same ARFrame as a Vision image.  It is kept
+/// small so the frame can cross into the Vision worker without retaining an
+/// ARSession or a large depth buffer.
+public struct ARSceneEvidence {
+    public let trackingIsNormal: Bool
+    public let mappingIsUsable: Bool
+    public let lidarAvailable: Bool
+    public let depthStreamAvailable: Bool
+    public let depthCoverage: Float
+    public let verticalPlaneCount: Int
+    public let wallFaceCount: Int
+    public let depthSampleMeters: Float?
+    public let timestamp: TimeInterval
+
+    public init(
+        trackingIsNormal: Bool,
+        mappingIsUsable: Bool,
+        lidarAvailable: Bool,
+        depthStreamAvailable: Bool,
+        depthCoverage: Float,
+        verticalPlaneCount: Int,
+        wallFaceCount: Int,
+        depthSampleMeters: Float?,
+        timestamp: TimeInterval
+    ) {
+        self.trackingIsNormal = trackingIsNormal
+        self.mappingIsUsable = mappingIsUsable
+        self.lidarAvailable = lidarAvailable
+        self.depthStreamAvailable = depthStreamAvailable
+        self.depthCoverage = depthCoverage
+        self.verticalPlaneCount = verticalPlaneCount
+        self.wallFaceCount = wallFaceCount
+        self.depthSampleMeters = depthSampleMeters
+        self.timestamp = timestamp
+    }
+}
+
+public struct ARCapturedFrame {
+    public let image: UIImage
+    public let evidence: ARSceneEvidence?
+
+    public init(image: UIImage, evidence: ARSceneEvidence? = nil) {
+        self.image = image
+        self.evidence = evidence
+    }
+}
+
 /// Owns one AR session and throttles expensive mesh and raycast work.  The
 /// existing camera based AR screen and this object are never active together.
 public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDelegate, ARSCNViewDelegate {
     @Published public private(set) var trackingState: ARSpatialTrackingState = .initializing
     @Published public private(set) var mappingState: ARSpatialMappingState = .unavailable
     @Published public private(set) var planeCount: Int = 0
+    @Published public private(set) var verticalPlaneCount: Int = 0
     @Published public private(set) var meshAnchorCount: Int = 0
     @Published public private(set) var largestPlaneWidth: Float?
     @Published public private(set) var largestPlaneDepth: Float?
@@ -49,6 +99,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var lastPlaneGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
     private var distanceSamples: [Float] = []
+    private var rendersSpatialMesh = true
+    private var lastCapturedTimestamp: TimeInterval = 0
 
     /// World maps can be large and are user-created survey data. Store them
     /// in a durable app support directory so a background/suspension cycle or
@@ -100,8 +152,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
     }
 
-    public func attach(to sceneView: ARSCNView) {
+    public func attach(to sceneView: ARSCNView, renderMesh: Bool = true) {
         self.sceneView = sceneView
+        self.rendersSpatialMesh = renderMesh
         sceneView.session.delegate = self
         sceneView.delegate = self
     }
@@ -140,6 +193,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         largestPlaneDepth = nil
         distance = nil
         distanceSamples.removeAll(keepingCapacity: true)
+        lastCapturedTimestamp = 0
         semanticCounts = [:]
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
@@ -147,6 +201,69 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     public func resetSurvey() {
         start()
+    }
+
+    /// Captures the current AR camera frame and a compact snapshot of the
+    /// tracking/semantic state. The image and evidence are from one frame so
+    /// a later Vision result cannot accidentally use stale spatial metadata.
+    public func captureFrame(completion: @escaping (ARCapturedFrame?) -> Void) {
+        captureFrame(completion: completion, attempt: 0)
+    }
+
+    private func captureFrame(
+        completion: @escaping (ARCapturedFrame?) -> Void,
+        attempt: Int
+    ) {
+        guard let frame = sceneView?.session.currentFrame else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        // AVCapturePhotoOutput naturally waits for a new exposure. ARSession's
+        // currentFrame is a live pointer, so explicitly wait when a scan asks
+        // for the next sample too quickly; otherwise all three "frames" could
+        // be the same ARFrame and temporal consensus would be meaningless.
+        if frame.timestamp <= lastCapturedTimestamp + 0.04 {
+            guard attempt < 8 else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+                guard let self = self else { completion(nil); return }
+                self.captureFrame(completion: completion, attempt: attempt + 1)
+            }
+            return
+        }
+        lastCapturedTimestamp = frame.timestamp
+        guard let image = Self.image(from: frame.capturedImage) else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        let frameTrackingIsNormal: Bool
+        switch frame.camera.trackingState {
+        case .normal: frameTrackingIsNormal = true
+        case .limited(_), .notAvailable: frameTrackingIsNormal = false
+        @unknown default: frameTrackingIsNormal = false
+        }
+        let frameMappingIsUsable: Bool
+        switch frame.worldMappingStatus {
+        case .extending, .mapped: frameMappingIsUsable = true
+        case .notAvailable, .limited: frameMappingIsUsable = false
+        @unknown default: frameMappingIsUsable = false
+        }
+        let evidence = ARSceneEvidence(
+            trackingIsNormal: frameTrackingIsNormal,
+            mappingIsUsable: frameMappingIsUsable,
+            lidarAvailable: lidarAvailable,
+            depthStreamAvailable: frame.sceneDepth != nil,
+            depthCoverage: Self.depthCoverage(from: frame.sceneDepth?.depthMap),
+            verticalPlaneCount: verticalPlaneCount,
+            wallFaceCount: semanticCounts[ARMeshClassification.wall.rawValue] ?? 0,
+            depthSampleMeters: Self.centerDepthSample(from: frame.sceneDepth?.depthMap),
+            timestamp: frame.timestamp
+        )
+        DispatchQueue.main.async {
+            completion(ARCapturedFrame(image: image, evidence: evidence))
+        }
     }
 
     public func pause() {
@@ -204,8 +321,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         lastPlaneGeometryUpdate.removeAll()
         distance = nil
         distanceSamples.removeAll(keepingCapacity: true)
+        lastCapturedTimestamp = 0
         mappingState = .unavailable
         planeCount = 0
+        verticalPlaneCount = 0
         meshAnchorCount = 0
         largestPlaneWidth = nil
         largestPlaneDepth = nil
@@ -280,6 +399,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         let planes = anchors.compactMap { $0 as? ARPlaneAnchor }
         planeCount = planes.count
+        verticalPlaneCount = planes.filter { $0.alignment == .vertical }.count
         if let largest = planes.max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
             largestPlaneWidth = largest.extent.x
             largestPlaneDepth = largest.extent.z
@@ -354,10 +474,61 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         semanticCounts = counts
     }
 
+    private static func image(from pixelBuffer: CVPixelBuffer) -> UIImage? {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        let context = CIContext(options: nil)
+        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return nil }
+        // The app is portrait-only on iPhone; ARKit's camera buffer is
+        // landscape-oriented and needs this display orientation for Vision.
+        return UIImage(cgImage: cgImage, scale: 1, orientation: .right)
+    }
+
+    private static func centerDepthSample(from depthMap: CVPixelBuffer?) -> Float? {
+        guard let depthMap = depthMap else { return nil }
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        guard width > 0, height > 0 else { return nil }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+        let centerX = width / 2
+        let centerY = height / 2
+        let row = baseAddress.advanced(by: centerY * bytesPerRow)
+            .assumingMemoryBound(to: Float32.self)
+        let value = row[centerX]
+        return value.isFinite && value > 0 ? value : nil
+    }
+
+    private static func depthCoverage(from depthMap: CVPixelBuffer?) -> Float {
+        guard let depthMap = depthMap else { return 0 }
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else { return 0 }
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        guard width > 0, height > 0 else { return 0 }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+        var valid = 0
+        let total = 25
+        for rowIndex in 0..<5 {
+            let y = min(height - 1, max(0, height * (rowIndex + 1) / 6))
+            let row = baseAddress.advanced(by: y * bytesPerRow)
+                .assumingMemoryBound(to: Float32.self)
+            for columnIndex in 0..<5 {
+                let x = min(width - 1, max(0, width * (columnIndex + 1) / 6))
+                let value = row[x]
+                if value.isFinite && value > 0 { valid += 1 }
+            }
+        }
+        return Float(valid) / Float(total)
+    }
+
     // Plane outlines provide immediate visual feedback while ARKit builds the
     // world map. A line material keeps the camera view readable and avoids
     // the heavy translucent surface fill used by many sample applications.
     public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+        guard rendersSpatialMesh else { return nil }
         if let meshAnchor = anchor as? ARMeshAnchor {
             guard let geometry = meshGeometry(for: meshAnchor) else { return nil }
             let node = SCNNode(geometry: geometry)
@@ -374,6 +545,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+        guard rendersSpatialMesh else { return }
         if let meshAnchor = anchor as? ARMeshAnchor {
             let now = ProcessInfo.processInfo.systemUptime
             if let last = lastMeshGeometryUpdate[meshAnchor.identifier], now - last < 0.5 {
@@ -511,6 +683,72 @@ public struct ARSpatialPreviewView: UIViewRepresentable {
     public func updateUIView(_ uiView: ARSCNView, context: Context) {}
 
     public static func dismantleUIView(_ uiView: ARSCNView, coordinator: ()) {
+        uiView.session.pause()
+    }
+}
+
+/// Lightweight ARKit camera surface used by the live Sha scan. It shares the
+/// same tracking/mesh model as the spatial survey, but only exposes captured
+/// frames to the caller and keeps the AR overlay in SwiftUI.
+public struct ARFusionCaptureView: UIViewRepresentable {
+    @ObservedObject private var model: ARSpatialSurveyModel
+    public let isActive: Bool
+    public let captureTrigger: Int
+    public let onFrameCaptured: ((ARCapturedFrame?) -> Void)?
+
+    public init(
+        model: ARSpatialSurveyModel,
+        isActive: Bool = true,
+        captureTrigger: Int = 0,
+        onFrameCaptured: ((ARCapturedFrame?) -> Void)? = nil
+    ) {
+        self.model = model
+        self.isActive = isActive
+        self.captureTrigger = captureTrigger
+        self.onFrameCaptured = onFrameCaptured
+    }
+
+    public func makeUIView(context: Context) -> ARSCNView {
+        let view = ARSCNView(frame: .zero)
+        view.backgroundColor = .black
+        view.scene = SCNScene()
+        view.automaticallyUpdatesLighting = false
+        view.rendersMotionBlur = false
+        view.preferredFramesPerSecond = 30
+        view.antialiasingMode = .none
+        // The live scan only needs tracking, depth and semantic counts. Avoid
+        // drawing the full classified mesh here; the dedicated spatial survey
+        // screen remains responsible for that heavier visualization.
+        model.attach(to: view, renderMesh: false)
+        if isActive { model.start() }
+        return view
+    }
+
+    public func updateUIView(_ uiView: ARSCNView, context: Context) {
+        if !isActive {
+            model.pause()
+            return
+        }
+        if context.coordinator.lastCaptureTrigger != captureTrigger {
+            context.coordinator.lastCaptureTrigger = captureTrigger
+            model.captureFrame { frame in
+                onFrameCaptured?(frame)
+            }
+        }
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(captureTrigger: captureTrigger)
+    }
+
+    public final class Coordinator {
+        var lastCaptureTrigger: Int
+        init(captureTrigger: Int) {
+            self.lastCaptureTrigger = captureTrigger
+        }
+    }
+
+    public static func dismantleUIView(_ uiView: ARSCNView, coordinator: Coordinator) {
         uiView.session.pause()
     }
 }

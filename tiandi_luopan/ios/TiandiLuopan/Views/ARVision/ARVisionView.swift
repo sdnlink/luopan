@@ -364,6 +364,7 @@ public struct ARVisionView: View {
     @State private var selectedShaIndex: Int = 0
     @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
     @State private var targetOffset: CGSize = .zero
+    @State private var targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
     @State private var targetDragStart: CGSize?
     @State private var showRemedySheet: Bool = false
     @State private var showPaywall: Bool = false
@@ -391,7 +392,12 @@ public struct ARVisionView: View {
     
     // 计算靶心拖拽后的相对目标偏角与二十四山
     private var targetCalculatedHeading: Double {
-        let angleDelta = Double(targetOffset.width / 8.0)
+        // Vision returns a normalized horizontal location. Keep that
+        // location in the bearing calculation even before the overlay knows
+        // its concrete pixel size; a manual drag adds a screen-space delta.
+        let detectedAngleDelta = (targetNormalizedPoint.x - 0.5) * 50.0
+        let manualAngleDelta = Double(targetOffset.width / 8.0)
+        let angleDelta = detectedAngleDelta + manualAngleDelta
         let raw = motion.headingState.facingAngle + angleDelta
         return (raw.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
     }
@@ -674,49 +680,72 @@ public struct ARVisionView: View {
         let currentSha = shaList[activeShaIndex]
         let m = targetMountain
         
-        return ZStack {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.yellow, lineWidth: 2)
-                .frame(width: 180, height: 115)
-                .background(Color.yellow.opacity(0.12))
-            
-            VStack(spacing: 2) {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 6, height: 6)
-                Text("\(lang.t("ar_target_center")) · \(m.localizedName)\(lang.t("mountain_suffix"))")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.yellow)
-                }
-                Text(currentSha.localizedName)
-                    .font(.system(size: 15, weight: .bold, design: .serif))
-                    .foregroundColor(.white)
-                Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(currentSha.localizedAliases)
-                    .font(.system(size: 9))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-        }
-        .offset(targetOffset)
-        .gesture(
-            DragGesture()
-                .onChanged { gesture in
-                    if targetDragStart == nil {
-                        targetDragStart = targetOffset
+        return GeometryReader { proxy in
+            let detectedOffset = CGSize(
+                width: (targetNormalizedPoint.x - 0.5) * proxy.size.width,
+                height: (targetNormalizedPoint.y - 0.5) * proxy.size.height
+            )
+            let rawOffset = CGSize(
+                width: detectedOffset.width + targetOffset.width,
+                height: detectedOffset.height + targetOffset.height
+            )
+            // Keep the target card inside the camera viewport on every
+            // iPhone/iPad aspect ratio, including split-screen layouts.
+            let maxX = max(0, proxy.size.width / 2 - 92)
+            let maxY = max(0, proxy.size.height / 2 - 62)
+            let clampedOffset = CGSize(
+                width: min(max(rawOffset.width, -maxX), maxX),
+                height: min(max(rawOffset.height, -maxY), maxY)
+            )
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.yellow, lineWidth: 2)
+                    .frame(width: 180, height: 115)
+                    .background(Color.yellow.opacity(0.12))
+
+                VStack(spacing: 2) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 6, height: 6)
+                        Text("\(lang.t("ar_target_center")) · \(m.localizedName)\(lang.t("mountain_suffix"))")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.yellow)
                     }
-                    let start = targetDragStart ?? .zero
-                    targetOffset = CGSize(width: start.width + gesture.translation.width,
-                                          height: start.height + gesture.translation.height)
+                    Text(currentSha.localizedName)
+                        .font(.system(size: 15, weight: .bold, design: .serif))
+                        .foregroundColor(.white)
+                    Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(currentSha.localizedAliases)
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.7))
                 }
-                .onEnded { _ in
-                    targetDragStart = nil
-                }
-        )
+            }
+            .position(
+                x: proxy.size.width / 2 + clampedOffset.width,
+                y: proxy.size.height / 2 + clampedOffset.height
+            )
+            .gesture(
+                DragGesture()
+                    .onChanged { gesture in
+                        if targetDragStart == nil {
+                            targetDragStart = targetOffset
+                        }
+                        let start = targetDragStart ?? .zero
+                        targetOffset = CGSize(width: start.width + gesture.translation.width,
+                                              height: start.height + gesture.translation.height)
+                    }
+                    .onEnded { _ in
+                        targetDragStart = nil
+                    }
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - 顶栏信息与镜头翻转控制
@@ -968,10 +997,15 @@ public struct ARVisionView: View {
                 if let index = shaList.firstIndex(where: { $0.id == analysis.shaID }) {
                     selectedShaIndex = index
                     isAutoFollowingDirection = false
-                    // Vision coordinates are normalized to the captured frame;
-                    // map the selected region into the draggable target overlay.
-                    targetOffset = CGSize(width: (analysis.targetX - 0.5) * 400.0,
-                                          height: (analysis.targetY - 0.5) * 250.0)
+                    // Keep Vision's normalized location separate from the
+                    // manual drag offset. The overlay maps it to its actual
+                    // container size, so the marker stays anchored on every
+                    // iPhone/iPad aspect ratio.
+                    targetNormalizedPoint = CGPoint(
+                        x: min(max(analysis.targetX, 0.0), 1.0),
+                        y: min(max(analysis.targetY, 0.0), 1.0)
+                    )
+                    targetOffset = .zero
                 }
             case .failure(let error):
                 if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,

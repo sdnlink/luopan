@@ -223,8 +223,7 @@ public struct FloorplanView: View {
         guard !didRestorePersistedLayout else { return }
         didRestorePersistedLayout = true
         guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
-              let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data),
-              !saved.rooms.isEmpty else { return }
+              let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data) else { return }
 
         let restoredRooms = saved.rooms.map { room -> FloorplanRoom in
             var restored = Self.sanitizedRoom(room)
@@ -234,7 +233,6 @@ public struct FloorplanView: View {
             restored.name = restored.type.localizedName
             return restored
         }
-        guard !restoredRooms.isEmpty else { return }
         rooms = restoredRooms
         centroid = CGPoint(
             x: Self.clampedUnit(saved.centroidX, fallback: 0.5),

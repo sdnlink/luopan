@@ -33,6 +33,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
     private weak var captureView: RoomCaptureView?
     private var latestRoom: CapturedRoom?
+    private var initialCompassHeading: Double = 0.0
     private let roomBuilder = RoomBuilder(options: [.beautifyObjects])
 
     /// Reports are user-created exports. Keep them in the app's support
@@ -91,6 +92,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         captureView = view
         view.captureSession.delegate = self
         latestRoom = nil
+        initialCompassHeading = CompassMotionManager.shared.headingState.facingAngle
         estimatedWidthMeters = 0
         estimatedDepthMeters = 0
         estimatedAreaSqMeters = 0
@@ -270,25 +272,153 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             ))
         }
 
-        // 4. Compute area-weighted geometric centroid
-        let validRooms = generatedRooms.filter { $0.rect.width > 0 && $0.rect.height > 0 }
-        let totalArea = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.width * $1.rect.height }
-        let centroid: CGPoint
-        if totalArea > 0 {
-            let cx = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.midX * ($1.rect.width * $1.rect.height) } / totalArea
-            let cy = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.midY * ($1.rect.width * $1.rect.height) } / totalArea
-            centroid = CGPoint(x: max(0.15, min(0.85, cx)), y: max(0.15, min(0.85, cy)))
-        } else {
-            centroid = CGPoint(x: 0.5, y: 0.5)
+        // 4. Detect recessed/missing corners (.missingCorner) on L-shaped or notched layouts
+        let polyMetrics = Self.computeWallPolygonMetrics(for: room)
+        let boxArea = spanX * spanZ
+        if room.walls.count >= 5,
+           let poly = polyMetrics,
+           poly.areaSqMeters > 1.0,
+           poly.areaSqMeters < boxArea * 0.82 {
+            let cornerGrid: [(col: Float, row: Float)] = [(0, 0), (2, 0), (0, 2), (2, 2)]
+            for corner in cornerGrid {
+                let cellMinX = envelope.minX + corner.col * (spanX / 3.0)
+                let cellMaxX = cellMinX + (spanX / 3.0)
+                let cellMinZ = envelope.minZ + corner.row * (spanZ / 3.0)
+                let cellMaxZ = cellMinZ + (spanZ / 3.0)
+                let hasCoverage = Self.hasSurfaceOrObjectInCell(
+                    room: room,
+                    minX: cellMinX,
+                    maxX: cellMaxX,
+                    minZ: cellMinZ,
+                    maxZ: cellMaxZ
+                )
+                if !hasCoverage {
+                    let cRect = normalizeRect(
+                        centerX: (cellMinX + cellMaxX) * 0.5,
+                        centerZ: (cellMinZ + cellMaxZ) * 0.5,
+                        width: spanX * 0.24,
+                        depth: spanZ * 0.24
+                    )
+                    generatedRooms.append(FloorplanRoom(
+                        name: FloorplanRoomType.missingCorner.localizedName,
+                        type: .missingCorner,
+                        rect: cRect
+                    ))
+                }
+            }
         }
 
+        // 5. Compute geometric centroid (prefer PRD 6.7 wall-polygon Shoelace centroid, fallback to room area-weighted centroid)
+        let centroid: CGPoint
+        if let poly = polyMetrics {
+            let nx = CGFloat((poly.centroidX - envelope.minX) / spanX) * CGFloat(1.0 - 2 * padding) + CGFloat(padding)
+            let ny = CGFloat((poly.centroidZ - envelope.minZ) / spanZ) * CGFloat(1.0 - 2 * padding) + CGFloat(padding)
+            centroid = CGPoint(x: max(0.15, min(0.85, nx)), y: max(0.15, min(0.85, ny)))
+        } else {
+            let validRooms = generatedRooms.filter { $0.rect.width > 0 && $0.rect.height > 0 }
+            let totalArea = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.width * $1.rect.height }
+            if totalArea > 0 {
+                let cx = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.midX * ($1.rect.width * $1.rect.height) } / totalArea
+                let cy = validRooms.reduce(CGFloat(0)) { $0 + $1.rect.midY * ($1.rect.width * $1.rect.height) } / totalArea
+                centroid = CGPoint(x: max(0.15, min(0.85, cx)), y: max(0.15, min(0.85, cy)))
+            } else {
+                centroid = CGPoint(x: 0.5, y: 0.5)
+            }
+        }
+
+        let resolvedHeading = resolvedDoorCompassHeading(for: room)
         let blueprint = Self.render2DBlueprintImage(room: room, envelope: envelope)
         FloorplanView.persistRoomPlanImport(
             rooms: generatedRooms,
             centroid: centroid,
-            blueprintImage: blueprint
+            blueprintImage: blueprint,
+            compassHeading: resolvedHeading
         )
         return true
+    }
+
+    private func resolvedDoorCompassHeading(for room: CapturedRoom) -> Double? {
+        guard let primaryDoor = room.doors.first ?? room.openings.first else {
+            return nil
+        }
+        let normal = primaryDoor.transform.columns.2
+        let normLen = hypot(normal.x, normal.z)
+        guard normLen > 0.01 else { return nil }
+        let localAngleDeg = Double(atan2(normal.x, -normal.z)) * 180.0 / .pi
+        let raw = initialCompassHeading + localAngleDeg
+        return (raw.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+    }
+
+    /// Computes the true 2D floor polygon area and geometric centroid (PRD 6.7
+    /// Shoelace formula) from the captured wall segments.
+    private static func computeWallPolygonMetrics(
+        for room: CapturedRoom
+    ) -> (areaSqMeters: Float, centroidX: Float, centroidZ: Float)? {
+        guard room.walls.count >= 3 else { return nil }
+        var points: [SIMD2<Float>] = []
+        for wall in room.walls {
+            let c = wall.transform.columns.3
+            let ax = wall.transform.columns.0
+            let half = wall.dimensions.x * 0.5
+            points.append(SIMD2<Float>(c.x - ax.x * half, c.z - ax.z * half))
+            points.append(SIMD2<Float>(c.x + ax.x * half, c.z + ax.z * half))
+        }
+        guard points.count >= 3 else { return nil }
+        let mean = points.reduce(SIMD2<Float>(0, 0), +) / Float(points.count)
+        let sorted = points.sorted { a, b in
+            atan2(a.y - mean.y, a.x - mean.x) < atan2(b.y - mean.y, b.x - mean.x)
+        }
+        var signedArea2: Float = 0
+        var cxAccum: Float = 0
+        var czAccum: Float = 0
+        let n = sorted.count
+        for i in 0..<n {
+            let p0 = sorted[i]
+            let p1 = sorted[(i + 1) % n]
+            let cross = p0.x * p1.y - p1.x * p0.y
+            signedArea2 += cross
+            cxAccum += (p0.x + p1.x) * cross
+            czAccum += (p0.y + p1.y) * cross
+        }
+        let area = abs(signedArea2) * 0.5
+        guard area > 0.25, abs(signedArea2) > 0.001 else { return nil }
+        let cx = cxAccum / (3.0 * signedArea2)
+        let cz = czAccum / (3.0 * signedArea2)
+        guard cx.isFinite, cz.isFinite else { return nil }
+        return (area, cx, cz)
+    }
+
+    private static func hasSurfaceOrObjectInCell(
+        room: CapturedRoom,
+        minX: Float,
+        maxX: Float,
+        minZ: Float,
+        maxZ: Float
+    ) -> Bool {
+        let checkSurface: (CapturedRoom.Surface) -> Bool = { s in
+            let c = s.transform.columns.3
+            let ax = s.transform.columns.0
+            let half = s.dimensions.x * 0.5
+            let p1 = SIMD2<Float>(c.x - ax.x * half, c.z - ax.z * half)
+            let p2 = SIMD2<Float>(c.x + ax.x * half, c.z + ax.z * half)
+            let mid = SIMD2<Float>(c.x, c.z)
+            for pt in [p1, mid, p2] {
+                if pt.x >= minX && pt.x <= maxX && pt.y >= minZ && pt.y <= maxZ {
+                    return true
+                }
+            }
+            return false
+        }
+        if room.walls.contains(where: checkSurface) { return true }
+        if room.doors.contains(where: checkSurface) { return true }
+        if room.windows.contains(where: checkSurface) { return true }
+        for obj in room.objects {
+            let c = obj.transform.columns.3
+            if c.x >= minX && c.x <= maxX && c.z >= minZ && c.z <= maxZ {
+                return true
+            }
+        }
+        return false
     }
 
     private static func compute2DEnvelope(
@@ -414,7 +544,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let envelope = Self.compute2DEnvelope(for: room)
         let width = envelope.map { max(0, $0.maxX - $0.minX) } ?? 0
         let depth = envelope.map { max(0, $0.maxZ - $0.minZ) } ?? 0
-        let area = width * depth
+        let polyArea = Self.computeWallPolygonMetrics(for: room)?.areaSqMeters
+        let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room

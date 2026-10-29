@@ -618,7 +618,6 @@ public struct FloorplanView: View {
         refreshAudit(force: true)
     }
 
-    @ViewBuilder
     private func headingQualityNotice() -> some View {
         let referenceText: String
         if isSyncWithCompass {

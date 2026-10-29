@@ -181,7 +181,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         let currentSceneView = sceneView
         let update: () -> Void = { [weak self, weak currentSceneView] in
-            guard let self = self, let sceneView = currentSceneView else { return }
+            guard let self = self,
+                  let sceneView = currentSceneView,
+                  self.sceneView === sceneView else { return }
             self.trackingState = state
             self.updateMeasurements(frame: frame, sceneView: sceneView)
         }

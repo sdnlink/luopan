@@ -615,12 +615,7 @@ public struct FloorplanView: View {
     private func addRoom(type: FloorplanRoomType) {
         let roomWidth: CGFloat = 0.23
         let roomHeight: CGFloat = 0.18
-        let column = rooms.count % 3
-        let row = (rooms.count / 3) % 4
-        let origin = CGPoint(
-            x: min(1.0 - roomWidth, 0.05 + CGFloat(column) * 0.25),
-            y: min(1.0 - roomHeight, 0.06 + CGFloat(row) * 0.21)
-        )
+        let origin = suggestedRoomOrigin(width: roomWidth, height: roomHeight)
         rooms.append(FloorplanRoom(
             name: type.localizedName,
             type: type,
@@ -630,6 +625,41 @@ public struct FloorplanView: View {
         centroidBeforeDetection = nil
         isEditingRooms = true
         refreshAudit(force: true)
+    }
+
+    /// Choose the least-overlapping slot in a bounded editing grid. The old
+    /// count-based modulo placement wrapped after twelve rooms and could put
+    /// a newly added room directly on top of an existing one.
+    private func suggestedRoomOrigin(width: CGFloat, height: CGFloat) -> CGPoint {
+        let columns = 4
+        let rows = 5
+        let maxX = max(0, 1.0 - width)
+        let maxY = max(0, 1.0 - height)
+        let xStep = columns > 1 ? maxX / CGFloat(columns - 1) : 0
+        let yStep = rows > 1 ? maxY / CGFloat(rows - 1) : 0
+        let candidates: [CGPoint] = (0..<rows).flatMap { row in
+            (0..<columns).map { column in
+                CGPoint(
+                    x: min(maxX, CGFloat(column) * xStep),
+                    y: min(maxY, CGFloat(row) * yStep)
+                )
+            }
+        }
+        let score: (CGPoint) -> CGFloat = { origin in
+            let candidate = CGRect(origin: origin, size: CGSize(width: width, height: height))
+            return self.rooms.reduce(0) { partial, room in
+                let overlap = candidate.intersection(room.rect)
+                guard !overlap.isNull else { return partial }
+                return partial + overlap.width * overlap.height
+            }
+        }
+        return candidates.min {
+            let lhs = score($0)
+            let rhs = score($1)
+            if abs(lhs - rhs) > 0.0001 { return lhs < rhs }
+            if abs($0.y - $1.y) > 0.0001 { return $0.y < $1.y }
+            return $0.x < $1.x
+        } ?? CGPoint(x: 0, y: 0)
     }
 
     private func deleteRoom(roomID: String) {

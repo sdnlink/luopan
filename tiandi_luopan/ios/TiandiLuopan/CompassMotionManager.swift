@@ -81,6 +81,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastMountainIndex: Int = -1
     private var wasLevel: Bool = false
     private var isRunning: Bool = false
+    private var tabDeviceMotionEnabled: Bool = true
+    private var tabHeadingUpdatesEnabled: Bool = true
+    private var calibrationOverrideActive: Bool = false
     private var deviceMotionEnabled: Bool = true
     private var headingUpdatesEnabled: Bool = true
     private var hasCoreLocationTrueHeading: Bool = false
@@ -169,6 +172,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     }
     
     public func start() {
+        guard headingUpdatesEnabled || deviceMotionEnabled else {
+            stop()
+            return
+        }
         guard !isRunning else { return }
         isRunning = true
         updateHeadingOrientation()
@@ -190,6 +197,15 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
     }
     
+    /// 供 SceneDelegate 前台生命周期调用：仅当当前活跃标签页或校准弹窗允许传感器工作时才恢复运行
+    public func resumeIfSensorsEnabled() {
+        if headingUpdatesEnabled || deviceMotionEnabled {
+            start()
+        } else {
+            stop()
+        }
+    }
+    
     public func stop() {
         guard isRunning else { return }
         isRunning = false
@@ -197,37 +213,60 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         locationManager.stopUpdatingLocation()
         motionManager.stopDeviceMotionUpdates()
     }
+    
+    /// 校准指引弹窗（如在设置页打开）临时开启传感器，关闭后自动还原当前标签页的传感器策略
+    public func setCalibrationOverrideActive(_ active: Bool) {
+        guard calibrationOverrideActive != active else { return }
+        calibrationOverrideActive = active
+        applyEffectiveSensorConfig()
+        if headingUpdatesEnabled || deviceMotionEnabled {
+            start()
+        } else {
+            stop()
+        }
+    }
 
     /// Core Location heading remains available to every analysis tab, while
     /// the higher-power attitude/magnetic stream is only needed by the live
     /// compass and calibration screens.
     public func setDeviceMotionEnabled(_ enabled: Bool) {
-        guard deviceMotionEnabled != enabled else { return }
-        deviceMotionEnabled = enabled
-        guard isRunning else { return }
-        if enabled {
-            startMotionUpdates()
-        } else {
-            motionManager.stopDeviceMotionUpdates()
-        }
+        tabDeviceMotionEnabled = enabled
+        applyEffectiveSensorConfig()
     }
 
     /// Core Location heading is only needed by pages that render a live
     /// orientation. Settings can still show the last heading, magnetic field
     /// and location data without keeping the heading sensor active.
     public func setHeadingUpdatesEnabled(_ enabled: Bool) {
-        guard headingUpdatesEnabled != enabled else { return }
-        headingUpdatesEnabled = enabled
-        guard isRunning else { return }
-        if enabled && CLLocationManager.headingAvailable() {
-            // The interface may have rotated while heading updates were
-            // paused (for example after leaving Settings). Apply the current
-            // scene orientation before the first resumed sample so the first
-            // displayed bearing cannot be off by 90° or 180°.
-            updateHeadingOrientation()
-            locationManager.startUpdatingHeading()
-        } else {
-            locationManager.stopUpdatingHeading()
+        tabHeadingUpdatesEnabled = enabled
+        applyEffectiveSensorConfig()
+    }
+    
+    private func applyEffectiveSensorConfig() {
+        let effectiveDeviceMotion = tabDeviceMotionEnabled || calibrationOverrideActive
+        let effectiveHeading = tabHeadingUpdatesEnabled || calibrationOverrideActive
+        
+        if deviceMotionEnabled != effectiveDeviceMotion {
+            deviceMotionEnabled = effectiveDeviceMotion
+            if isRunning {
+                if effectiveDeviceMotion {
+                    startMotionUpdates()
+                } else {
+                    motionManager.stopDeviceMotionUpdates()
+                }
+            }
+        }
+        
+        if headingUpdatesEnabled != effectiveHeading {
+            headingUpdatesEnabled = effectiveHeading
+            if isRunning {
+                if effectiveHeading && CLLocationManager.headingAvailable() {
+                    updateHeadingOrientation()
+                    locationManager.startUpdatingHeading()
+                } else {
+                    locationManager.stopUpdatingHeading()
+                }
+            }
         }
     }
     

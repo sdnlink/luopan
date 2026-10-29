@@ -201,18 +201,15 @@ public struct CalibrationSheet: View {
         }
         .onAppear {
             guard keepsMotionActive else { return }
-            motion.setDeviceMotionEnabled(true)
-            motion.setHeadingUpdatesEnabled(true)
+            motion.setCalibrationOverrideActive(true)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             guard keepsMotionActive else { return }
-            motion.setDeviceMotionEnabled(true)
-            motion.setHeadingUpdatesEnabled(true)
+            motion.setCalibrationOverrideActive(true)
         }
         .onDisappear {
             guard keepsMotionActive else { return }
-            motion.setDeviceMotionEnabled(false)
-            motion.setHeadingUpdatesEnabled(false)
+            motion.setCalibrationOverrideActive(false)
         }
     }
 

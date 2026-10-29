@@ -108,7 +108,7 @@ public enum Direction8: String, CaseIterable, Codable {
             case .northeast: return "艮八宮"
             case .south: return "離九宮"
             }
-        default:
+        case .auto, .zhHans:
             return guaName
         }
     }
@@ -226,7 +226,7 @@ public struct Mountain24Item: Identifiable, Codable {
         case .zhHant:
             return name.replacingOccurrences(of: "兑", with: "兌")
                 .replacingOccurrences(of: "离", with: "離")
-        default:
+        case .auto, .zhHans:
             return name
         }
     }
@@ -251,7 +251,7 @@ public struct Mountain24Item: Identifiable, Codable {
             return thPalaces[palace] ?? palace
         case .zhHant:
             return ["兑": "兌", "离": "離"][palace] ?? palace
-        default:
+        case .auto, .zhHans:
             return palace
         }
     }
@@ -467,7 +467,7 @@ public final class Mountain24Data {
             } else {
                 fenJin = "\(sittingM.localizedName)山\(facingM.localizedName)向 正針下卦"
             }
-        default:
+        case .auto, .zhHans:
             if isJian {
                 fenJin = "\(sittingM.name)山\(facingM.name)向 兼 \(neighborM.name) (偏\(degStr)°)"
             } else {

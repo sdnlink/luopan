@@ -4,20 +4,37 @@ import ARKit
 import UIKit
 import Photos
 
-// MARK: - 原生高清相机预览层 (AVCaptureSession Representable)
+// MARK: - 原生高清相机预览层控制器与视图 (AVCaptureSession Representable)
+
+public final class CameraPreviewController: ObservableObject {
+    fileprivate weak var activeView: CameraPreviewView.CameraUIView?
+    
+    public init() {}
+    
+    public func stopSession() {
+        activeView?.stopSession()
+    }
+    
+    public func pauseSessionForBackground() {
+        activeView?.pauseSessionForBackground()
+    }
+}
 
 public struct CameraPreviewView: UIViewRepresentable {
+    public var controller: CameraPreviewController?
     public var cameraPosition: AVCaptureDevice.Position
     public var isActive: Bool
     public var captureTrigger: Int
     public var onPhotoCaptured: ((UIImage?) -> Void)?
     
     public init(
+        controller: CameraPreviewController? = nil,
         cameraPosition: AVCaptureDevice.Position = .back,
         isActive: Bool = true,
         captureTrigger: Int = 0,
         onPhotoCaptured: ((UIImage?) -> Void)? = nil
     ) {
+        self.controller = controller
         self.cameraPosition = cameraPosition
         self.isActive = isActive
         self.captureTrigger = captureTrigger
@@ -38,6 +55,20 @@ public struct CameraPreviewView: UIViewRepresentable {
         deinit {
             sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
             sessionObservers.removeAll()
+            if let session = captureSession {
+                sessionQueue.async {
+                    if session.isRunning {
+                        session.stopRunning()
+                    }
+                }
+            }
+        }
+        
+        override public func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window == nil {
+                stopSession()
+            }
         }
         
         override public func layoutSubviews() {
@@ -260,26 +291,27 @@ public struct CameraPreviewView: UIViewRepresentable {
         public func stopSession() {
             wantsRunning = false
             cancelPendingCapture()
-            let sessionToStop = captureSession
+            guard let sessionToStop = captureSession else { return }
             sessionQueue.async { [weak self] in
-                guard let self = self,
-                      let session = sessionToStop,
-                      self.captureSession === session else { return }
-                if session.isRunning {
-                    session.stopRunning()
+                if let self = self, self.captureSession !== sessionToStop {
+                    return
+                }
+                if sessionToStop.isRunning {
+                    sessionToStop.stopRunning()
                 }
             }
         }
 
-        private func pauseSessionForBackground() {
+        public func pauseSessionForBackground() {
             cancelPendingCapture()
-            let sessionToPause = captureSession
+            guard let sessionToPause = captureSession else { return }
             sessionQueue.async { [weak self] in
-                guard let self = self,
-                      let session = sessionToPause,
-                      self.captureSession === session,
-                      session.isRunning else { return }
-                session.stopRunning()
+                if let self = self, self.captureSession !== sessionToPause {
+                    return
+                }
+                if sessionToPause.isRunning {
+                    sessionToPause.stopRunning()
+                }
             }
         }
 
@@ -297,6 +329,7 @@ public struct CameraPreviewView: UIViewRepresentable {
     public func makeUIView(context: Context) -> CameraUIView {
         let view = CameraUIView()
         view.backgroundColor = .black
+        controller?.activeView = view
         if isActive {
             view.setupSession(position: cameraPosition)
         }
@@ -304,6 +337,7 @@ public struct CameraPreviewView: UIViewRepresentable {
     }
     
     public func updateUIView(_ uiView: CameraUIView, context: Context) {
+        controller?.activeView = uiView
         if !isActive {
             context.coordinator.lastActive = false
             uiView.stopSession()
@@ -358,6 +392,7 @@ public struct ARVisionView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @StateObject private var fusionModel = ARSpatialSurveyModel()
+    @StateObject private var cameraModel = CameraPreviewController()
     
     public var isActive: Bool = true
     
@@ -472,6 +507,7 @@ public struct ARVisionView: View {
                     .ignoresSafeArea()
                 } else {
                     CameraPreviewView(
+                        controller: cameraModel,
                         cameraPosition: cameraPosition,
                         isActive: isActive && !showSpatialSurvey,
                         captureTrigger: captureTrigger,
@@ -565,6 +601,7 @@ public struct ARVisionView: View {
                 startScanAnimation()
             } else {
                 stopScanAnimation()
+                cameraModel.stopSession()
                 fusionModel.pause()
                 showSpatialSurvey = false
                 pendingCapturePurpose = nil
@@ -584,6 +621,8 @@ public struct ARVisionView: View {
             if isActive { checkCameraPermission() }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            cameraModel.pauseSessionForBackground()
+            fusionModel.pause()
             guard isActive else { return }
             pendingCapturePurpose = nil
             isAIScanning = false
@@ -609,6 +648,7 @@ public struct ARVisionView: View {
             ARSpatialSurveyView()
         }
         .onDisappear {
+            cameraModel.stopSession()
             fusionModel.pause()
             showSpatialSurvey = false
             snapshotGeneration += 1

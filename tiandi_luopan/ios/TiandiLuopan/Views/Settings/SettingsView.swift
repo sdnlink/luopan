@@ -314,6 +314,7 @@ public struct SettingsView: View {
             if let message = message {
                 paymentError = message
                 showPaymentError = true
+                iap.clearTransientMessages()
             }
         }
         .alert(isPresented: $showPaymentError) {

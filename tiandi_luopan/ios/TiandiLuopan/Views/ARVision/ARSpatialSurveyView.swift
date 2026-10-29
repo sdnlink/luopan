@@ -84,7 +84,7 @@ public struct LubanRulerEvaluation: Equatable {
             let nName = Self.yinNamesHant[yinIndex]
             let nLuck = yinIsAuspicious ? "吉" : "凶"
             return String(format: "%.1f cm · 魯班門光尺：【%@】字門(%@) · 丁蘭尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck)
-        default:
+        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
             let yName = Self.yangNamesHans[yangGateIndex]
             let yLuck = yangIsAuspicious ? "吉" : "凶"
             let nName = Self.yinNamesHans[yinIndex]
@@ -409,7 +409,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             switch lang {
             case .en: currentStandingPalace = "Center Palace · 9 Purple (Auspicious)"
             case .zhHant: currentStandingPalace = "中宮立極 · 九紫右弼當令（大吉）"
-            default: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
+            case .auto, .zhHans, .ja, .ko, .vi, .th, .id: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
             }
             return
         }
@@ -451,7 +451,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         switch lang {
         case .en: currentStandingPalace = labelsEn[safeIdx]
         case .zhHant: currentStandingPalace = labelsHant[safeIdx]
-        default: currentStandingPalace = labelsHans[safeIdx]
+        case .auto, .zhHans, .ja, .ko, .vi, .th, .id: currentStandingPalace = labelsHans[safeIdx]
         }
     }
 
@@ -2138,7 +2138,7 @@ public struct ARSpatialSurveyView: View {
             return isWaitingSecond ? "Set Point B" : "LuBan Ruler (Point A)"
         case .zhHant:
             return isWaitingSecond ? "標定終點 B" : "魯班尺打點 A"
-        default:
+        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
             return isWaitingSecond ? "标定终点 B" : "鲁班尺打点 A"
         }
     }
@@ -2149,7 +2149,7 @@ public struct ARSpatialSurveyView: View {
             return "Point A locked — aim reticle at endpoint B and tap Set Point B"
         case .zhHant:
             return "已鎖定起點 A · 請將準星對準終點 B 點擊「標定終點 B」測算魯班尺吉凶"
-        default:
+        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
             return "已锁定起点 A · 请将准星对准终点 B 点击「标定终点 B」测算鲁班尺吉凶"
         }
     }

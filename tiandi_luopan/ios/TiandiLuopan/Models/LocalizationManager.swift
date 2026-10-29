@@ -76,6 +76,8 @@ public class LocalizationManager: ObservableObject {
     }
     
     @Published public var effectiveLanguage: AppLanguage = .zhHans
+    public private(set) var isTranslationTableValid: Bool = true
+    public private(set) var translationValidationIssues: [String] = []
     
     private let kAppLanguageKey = "app_language"
     
@@ -84,33 +86,42 @@ public class LocalizationManager: ObservableObject {
         let setting = AppLanguage(rawValue: saved) ?? .auto
         self.currentSetting = setting
         self.effectiveLanguage = LocalizationManager.resolveLanguage(for: setting)
-        validateTranslationTables()
+        self.isTranslationTableValid = validateTranslationTables()
     }
     
-    /// 启动加载时执行一次“重复 key 与多语种 key 完备性断言/校验”
+    /// 启动加载时执行非致命的“重复 key 与全语种并集 key 完备性校验”（避免单条翻译疏漏导致 Debug/TestFlight 崩溃，同时可捕获 zhHans 自身笔误）
     @discardableResult
     public func validateTranslationTables() -> Bool {
-        let baseKeys = Set(localizedStrings[.zhHans]?.entries.keys.map { $0 } ?? [])
-        var allValid = true
-        for (lang, table) in localizedStrings {
-            assert(
-                table.duplicateKeys.isEmpty,
-                "LocalizationManager [\(lang.rawValue)] 存在重复本地化 key: \(table.duplicateKeys)"
-            )
+        let expectedLanguages = AppLanguage.allCases.filter { $0 != .auto }
+        var unionKeys = Set<String>()
+        for table in localizedStrings.values {
+            unionKeys.formUnion(table.entries.keys)
+        }
+        var issues: [String] = []
+        for lang in expectedLanguages {
+            guard let table = localizedStrings[lang] else {
+                issues.append("[\(lang.rawValue)] 缺少完整语言字典表")
+                continue
+            }
             if !table.duplicateKeys.isEmpty {
-                allValid = false
+                issues.append("[\(lang.rawValue)] 存在重复本地化 key: \(table.duplicateKeys)")
             }
             let langKeys = Set(table.entries.keys)
-            let missing = baseKeys.subtracting(langKeys)
-            let extra = langKeys.subtracting(baseKeys)
-            assert(
-                missing.isEmpty && extra.isEmpty,
-                "LocalizationManager [\(lang.rawValue)] 与基准语种 key 集合不一致: missing=\(missing), extra=\(extra)"
-            )
-            if !missing.isEmpty || !extra.isEmpty {
-                allValid = false
+            let missing = unionKeys.subtracting(langKeys).sorted()
+            if !missing.isEmpty {
+                issues.append("[\(lang.rawValue)] 对比全语种并集缺失 key (\(missing.count) 项): \(missing)")
             }
         }
+        self.translationValidationIssues = issues
+        let allValid = issues.isEmpty
+        self.isTranslationTableValid = allValid
+        #if DEBUG
+        if !issues.isEmpty {
+            for issue in issues {
+                print("⚠️ [LocalizationManager] \(issue)")
+            }
+        }
+        #endif
         return allValid
     }
     
@@ -118,7 +129,7 @@ public class LocalizationManager: ObservableObject {
         currentSetting = lang
     }
     
-    private static func resolveLanguage(for setting: AppLanguage) -> AppLanguage {
+    public static func resolveLanguage(for setting: AppLanguage) -> AppLanguage {
         if setting == .auto {
             let pref = Locale.preferredLanguages.first ?? "zh-Hans"
             let lower = pref.lowercased()

@@ -29,7 +29,7 @@ public struct HexagramItem: Identifiable, Codable {
     public var localizedName: String {
         let language = LocalizationManager.shared.effectiveLanguage
         switch language {
-        case .zhHans:
+        case .auto, .zhHans:
             return name
         case .zhHant:
             return name
@@ -197,7 +197,7 @@ public struct HexagramItem: Identifiable, Codable {
 
     public var localizedLuckDegree: String {
         switch LocalizationManager.shared.effectiveLanguage {
-        case .zhHans:
+        case .auto, .zhHans:
             return luckDegree
         case .zhHant:
             return luckDegree
@@ -259,7 +259,7 @@ public struct HexagramItem: Identifiable, Codable {
     private func localizeTrigram(_ tri: String) -> String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
-        case .zhHans:
+        case .auto, .zhHans:
             return tri
         case .zhHant:
             return tri.replacingOccurrences(of: "离", with: "離").replacingOccurrences(of: "兑", with: "兌")

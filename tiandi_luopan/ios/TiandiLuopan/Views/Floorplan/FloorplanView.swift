@@ -1088,6 +1088,21 @@ public struct RoomAuditDetailSheet: View {
                         .padding(14)
                         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
                         .cornerRadius(12)
+
+                        if !room.inspectionLore.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(lang.t("floorplan_impact_scope"))
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(Color(red: 0.95, green: 0.82, blue: 0.4))
+                                Text(room.inspectionLore)
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineSpacing(3)
+                            }
+                            .padding(14)
+                            .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+                            .cornerRadius(12)
+                        }
                         
                         // 3. 经典堪舆古籍与现代环境机理
                         VStack(alignment: .leading, spacing: 8) {

@@ -80,9 +80,10 @@ public struct FloorplanRoom: Identifiable {
     public var palaceName: String // "西北乾宫", "东南巽宫", etc.
     public var inspectionTitle: String
     public var inspectionLevel: String // "吉", "平", "凶", "大凶"
+    public var inspectionLore: String
     public var inspectionAdvice: String
     
-    public init(id: String = UUID().uuidString, name: String, type: FloorplanRoomType, rect: CGRect, palaceName: String = "", inspectionTitle: String = "", inspectionLevel: String = "平", inspectionAdvice: String = "") {
+    public init(id: String = UUID().uuidString, name: String, type: FloorplanRoomType, rect: CGRect, palaceName: String = "", inspectionTitle: String = "", inspectionLevel: String = "平", inspectionLore: String = "", inspectionAdvice: String = "") {
         self.id = id
         self.name = name
         self.type = type
@@ -90,6 +91,7 @@ public struct FloorplanRoom: Identifiable {
         self.palaceName = palaceName
         self.inspectionTitle = inspectionTitle
         self.inspectionLevel = inspectionLevel
+        self.inspectionLore = inspectionLore
         self.inspectionAdvice = inspectionAdvice
     }
     public var isSevere: Bool {
@@ -252,6 +254,7 @@ public class FloorplanEngine {
                 let content = missingCornerContent(gua: palace.gua)
                 r.inspectionTitle = content.title
                 r.inspectionLevel = "预警"
+                r.inspectionLore = content.lore
                 r.inspectionAdvice = content.solution
                 updatedRooms.append(r)
                 auditReport.append(FloorplanAuditItem(
@@ -269,6 +272,7 @@ public class FloorplanEngine {
             let audit = evaluateRoom(type: r.type, palaceGua: palace.gua, palaceDir: palace.dir)
             r.inspectionTitle = audit.title
             r.inspectionLevel = audit.level
+            r.inspectionLore = audit.lore
             r.inspectionAdvice = audit.advice
             
             updatedRooms.append(r)

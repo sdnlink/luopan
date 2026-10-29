@@ -20,7 +20,9 @@ public final class OnDeviceShaAnalyzer {
 
     public func analyze(image: UIImage, completion: @escaping (Result<ShaAnalysisResult, Error>) -> Void) {
         guard let cgImage = image.cgImage else {
-            completion(.failure(AnalysisError.invalidImage))
+            DispatchQueue.main.async {
+                completion(.failure(AnalysisError.invalidImage))
+            }
             return
         }
         let orientation = Self.cgOrientation(for: image.imageOrientation)
@@ -62,7 +64,8 @@ public final class OnDeviceShaAnalyzer {
                 try handler.perform([request])
                 let regions = (request.results as? [VNRectangleObservation]) ?? []
                 guard let result = Self.classify(regions) else {
-                    DispatchQueue.main.async { completion(.failure(AnalysisError.noDetectableRegion)) }
+                    let error: AnalysisError = regions.isEmpty ? .noDetectableRegion : .ambiguousRegion
+                    DispatchQueue.main.async { completion(.failure(error)) }
                     return
                 }
                 DispatchQueue.main.async { completion(.success(result)) }
@@ -87,59 +90,77 @@ public final class OnDeviceShaAnalyzer {
     }
 
     private static func classify(_ regions: [VNRectangleObservation]) -> ShaAnalysisResult? {
-        guard let region = regions.max(by: { $0.boundingBox.width * $0.boundingBox.height < $1.boundingBox.width * $1.boundingBox.height }) else {
-            // A no-detection frame must not be presented as a low-confidence
-            // Fire Shape result; that would turn “no evidence” into a
-            // potentially alarming on-site diagnosis.
-            return nil
+        // VNDetectRectanglesRequest finds edges, not objects. A single
+        // rectangle cannot tell a road from a floor, a window from a wall, or
+        // a tower gap from a door. Reject the common full-frame and low
+        // confidence detections instead of turning them into a dramatic Sha
+        // diagnosis.
+        let usable = regions.filter { region in
+            let box = region.boundingBox
+            let area = box.width * box.height
+            let touchesWholeFrame = box.minX < 0.02 && box.minY < 0.02 && box.maxX > 0.98 && box.maxY > 0.98
+            return region.confidence >= 0.55 && area >= 0.025 && area <= 0.55 && !touchesWholeFrame
         }
-        let box = region.boundingBox
-        let area = box.width * box.height
-        // Ignore tiny edge artifacts returned by rectangle detection. They
-        // are not a usable scene region and otherwise get promoted to a
-        // confident-looking Sha diagnosis.
-        guard area >= 0.01, region.confidence >= 0.25 else { return nil }
-        let aspect = max(box.width, box.height) / max(0.001, min(box.width, box.height))
-        let centerX = box.midX
-        let centerY = box.midY
-        let id: String
-        // Narrow vertical gap between structures.
-        if aspect > 3.0 && box.width < 0.28 && centerX > 0.25 && centerX < 0.75 {
-            id = "tianzhan"
-        // Long low region near the lower edge: road/water/bridge signature.
-        } else if box.width > box.height * 2.2 && centerY < 0.48 {
-            id = "gejiao"
-        // Strong right-side mass suggests the right building is higher.
-        } else if centerX > 0.68 && area > 0.12 {
-            id = "baihu"
-        // A small upper-corner region is consistent with a peeking roof/corner.
-        } else if area < 0.12 && centerY > 0.68 {
-            id = "tantou"
-        // A broad central obstruction is the most conservative road/axis result.
-        } else if area > 0.35 {
-            id = "luchong"
-        } else {
-            id = "huoxing"
+        guard usable.count >= 2 else { return nil }
+
+        // Only report a possible Tian Zhan when two independently detected,
+        // tall structures flank the same central gap. The previous classifier
+        // labelled any narrow object (including a door or a lamp post) as this
+        // severe Sha. A paired observation is a much safer minimum signal.
+        let tall = usable.filter { region in
+            let box = region.boundingBox
+            let aspect = max(box.width, box.height) / max(0.001, min(box.width, box.height))
+            return aspect >= 3.2 && box.width <= 0.24 && box.height >= 0.18 && box.midX > 0.08 && box.midX < 0.92
         }
-        let confidence = min(0.98, max(0.35, 0.42 + Double(region.confidence) * 0.30 + min(area, 0.5) * 0.35))
+        var selectedPair: (VNRectangleObservation, VNRectangleObservation)?
+        var bestPairScore = -Double.infinity
+        for leftIndex in 0..<tall.count {
+            for rightIndex in (leftIndex + 1)..<tall.count {
+                let left = tall[leftIndex]
+                let right = tall[rightIndex]
+                let leftBox = left.boundingBox
+                let rightBox = right.boundingBox
+                guard leftBox.midX < 0.5, rightBox.midX > 0.5 else { continue }
+                let separation = rightBox.midX - leftBox.midX
+                guard separation >= 0.20, separation <= 0.78 else { continue }
+                let overlap = min(leftBox.maxY, rightBox.maxY) - max(leftBox.minY, rightBox.minY)
+                guard overlap >= 0.12 else { continue }
+                let centralGap = 1.0 - min(1.0, separation)
+                let score = Double(left.confidence + right.confidence) * 0.325 +
+                    Double(min(leftBox.height, rightBox.height)) * 0.20 +
+                    (1.0 - centralGap) * 0.15
+                if score > bestPairScore {
+                    bestPairScore = score
+                    selectedPair = (left, right)
+                }
+            }
+        }
+        guard let pair = selectedPair else { return nil }
+        let leftBox = pair.0.boundingBox
+        let rightBox = pair.1.boundingBox
+        let targetX = (leftBox.midX + rightBox.midX) * 0.5
+        let targetY = 1.0 - ((leftBox.midY + rightBox.midY) * 0.5)
+        let confidence = min(0.90, max(0.60, bestPairScore))
         return ShaAnalysisResult(
-            shaID: id,
+            shaID: "tianzhan",
             confidence: confidence,
-            targetX: centerX,
-            targetY: 1.0 - centerY,
-            detectedRegions: regions.count,
-            summary: "vision-rectangles"
+            targetX: Double(targetX),
+            targetY: Double(targetY),
+            detectedRegions: usable.count,
+            summary: "paired-vertical-structures"
         )
     }
 
     public enum AnalysisError: LocalizedError {
         case invalidImage
         case noDetectableRegion
+        case ambiguousRegion
         public var errorDescription: String? {
             let lang = LocalizationManager.shared
             switch self {
             case .invalidImage: return lang.t("ar_ai_no_frame")
             case .noDetectableRegion: return lang.t("ar_ai_no_region")
+            case .ambiguousRegion: return lang.t("ar_ai_ambiguous")
             }
         }
     }

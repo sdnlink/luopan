@@ -942,6 +942,11 @@ public struct ARVisionView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 8)
+                Text(lang.t("ar_ai_disclaimer"))
+                    .font(.system(size: 9))
+                    .foregroundColor(.orange.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 8)
             } else if let aiError = aiError {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(aiError)
@@ -1028,6 +1033,13 @@ public struct ARVisionView: View {
                 if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,
                    case .noDetectableRegion = analysisError {
                     aiError = lang.t("ar_ai_no_region")
+                } else if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,
+                          case .ambiguousRegion = analysisError {
+                    // A rectangle detector cannot distinguish many ordinary
+                    // objects from a classical Sha. Keep the current manual
+                    // selection and explicitly ask for human confirmation
+                    // instead of changing the diagnosis on weak evidence.
+                    aiError = lang.t("ar_ai_ambiguous")
                 } else {
                     aiError = lang.t("ar_ai_failed")
                 }

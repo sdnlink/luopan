@@ -318,6 +318,15 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         var unlocked: [String] = []
         if isVIP() { unlocked.append(IAPProductID.vipYearly.rawValue) }
         if isLifetime() { unlocked.append(IAPProductID.proLifetime.rawValue) }
+        if unlocked.isEmpty {
+            // Stopping the spinner without feedback leaves users unsure
+            // whether restore completed or silently failed. Consumable
+            // credits are intentionally not restored by StoreKit, so only
+            // report the absence of restorable subscriptions/non-consumables.
+            lastStatusMessage = LocalizationManager.shared.t("iap_restore_none")
+        } else {
+            lastStatusMessage = nil
+        }
         
         DispatchQueue.main.async { [weak self] in
             self?.isProcessingPurchase = false

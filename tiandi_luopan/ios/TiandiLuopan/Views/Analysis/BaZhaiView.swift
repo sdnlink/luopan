@@ -27,42 +27,11 @@ public struct BaZhaiView: View {
     
     public var body: some View {
         let state = motion.headingState
-        // Tilt and magnetic-field samples do not alter these calculations.
-        // Keep the expensive calendar and water-method results until the
-        // sitting/facing mountain or language actually changes.
-        let bz = cachedAnalysis ?? BaZhaiEngine.shared.analyze(
-            sittingPalace: state.sittingMountain.palace,
-            facingPalace: state.facingMountain.palace
-        )
-        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
-        let zeri = cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
-        
-        let content = VStack(spacing: 16) {
-            // 1. 子 Tab 切换条
-            subTabBar()
-            
-            if selectedSubTab == 0 {
-                // 八宅明镜板块
-                baZhaiContent(bz: bz, zeri: zeri, state: state)
-            } else {
-                // 三合水法板块
-                sanHeContent(shItems: shItems, state: state)
-            }
-        }
-        .padding(.top, isEmbedded ? 0 : 12)
-        .padding(.bottom, isEmbedded ? 0 : 24)
-        .sheet(isPresented: $showPaywall) {
-            VIPPaywallSheet(defaultProductId: .vipYearly)
-        }
-        
         return Group {
-            if isEmbedded {
-                content
+            if isActive {
+                activeContent(state: state)
             } else {
-                ScrollView {
-                    content
-                }
-                .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
+                Color.clear
             }
         }
 
@@ -93,6 +62,44 @@ public struct BaZhaiView: View {
             // recommendations, while hidden tabs do no calendar work.
             guard isActive else { return }
             refreshAnalysis()
+        }
+    }
+
+    /// Build the expensive analysis only while the embedded sub-tab is
+    /// visible. SwiftUI keeps sibling tabs alive, so doing this work at the
+    /// top of `body` used to recalculate the calendar and water method on
+    /// every compass sample even when the user was viewing another tab.
+    @ViewBuilder
+    private func activeContent(state: CompassHeadingState) -> some View {
+        let bz = cachedAnalysis ?? BaZhaiEngine.shared.analyze(
+            sittingPalace: state.sittingMountain.palace,
+            facingPalace: state.facingMountain.palace
+        )
+        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        let zeri = cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
+
+        let content = VStack(spacing: 16) {
+            subTabBar()
+
+            if selectedSubTab == 0 {
+                baZhaiContent(bz: bz, zeri: zeri, state: state)
+            } else {
+                sanHeContent(shItems: shItems, state: state)
+            }
+        }
+        .padding(.top, isEmbedded ? 0 : 12)
+        .padding(.bottom, isEmbedded ? 0 : 24)
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+
+        if isEmbedded {
+            content
+        } else {
+            ScrollView {
+                content
+            }
+            .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         }
     }
 

@@ -384,6 +384,8 @@ public struct ARVisionView: View {
     @State private var aiScanFrames: [ARCapturedFrame] = []
     @State private var photoPermissionDenied: Bool = false
     @State private var showSpatialSurvey: Bool = false
+    @State private var latestSnapshotImage: UIImage?
+    @State private var showSnapshotShareSheet: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
     // check a frame captured just before leaving the tab could still be saved
@@ -499,7 +501,7 @@ public struct ARVisionView: View {
                 
                 Spacer()
                 
-                // 截图存证保存提示
+                // 截图存证保存提示 + 一键分享
                 if showSnapshotToast {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
@@ -507,6 +509,22 @@ public struct ARVisionView: View {
                         Text(lang.t("save_success"))
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
+                        if latestSnapshotImage != nil {
+                            Button(action: {
+                                showSnapshotShareSheet = true
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "square.and.arrow.up")
+                                    Text(lang.t("share_and_print"))
+                                }
+                                .font(.system(size: 11, weight: .bold))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.yanCyan)
+                                .foregroundColor(.black)
+                                .cornerRadius(12)
+                            }
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
@@ -568,6 +586,11 @@ public struct ARVisionView: View {
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+        .sheet(isPresented: $showSnapshotShareSheet) {
+            if let snapshot = latestSnapshotImage {
+                ARProofShareSheet(items: [snapshot])
+            }
         }
         .fullScreenCover(isPresented: $showSpatialSurvey) {
             ARSpatialSurveyView()
@@ -676,16 +699,28 @@ public struct ARVisionView: View {
 
     }
     
-    // MARK: - 十字天心准星
+    // MARK: - 十字天心准星 (含双轴微型电子水准珠与仰俯倾角指示)
     private func crosshairCenterLayer() -> some View {
-        ZStack {
+        let rollDeg = fusionModel.cameraRollDegrees
+        let elevDeg = fusionModel.cameraElevationDegrees
+        let isHorizontalLevel = abs(rollDeg) <= 3.0
+        let bubbleOffsetX = CGFloat(min(max(rollDeg * 1.2, -16.0), 16.0))
+        let bubbleOffsetY = CGFloat(min(max(-elevDeg * 0.4, -12.0), 12.0))
+
+        return ZStack {
             Circle()
                 .stroke(Color.yanCyan.opacity(0.5), lineWidth: 1.5)
                 .frame(width: 140, height: 140)
             
             Circle()
-                .stroke(Color.yanCyan.opacity(0.8), lineWidth: 1)
+                .stroke(isHorizontalLevel ? Color.green.opacity(0.85) : Color.orange.opacity(0.85), lineWidth: 1.2)
                 .frame(width: 40, height: 40)
+
+            // 电子水准珠 (倾斜 ≤ 3° 为绿，超过 3° 变橙提醒端平)
+            Circle()
+                .fill(isHorizontalLevel ? Color.green.opacity(0.75) : Color.orange.opacity(0.85))
+                .frame(width: 9, height: 9)
+                .offset(x: bubbleOffsetX, y: bubbleOffsetY)
             
             // 十字准星
             Rectangle()
@@ -695,9 +730,9 @@ public struct ARVisionView: View {
                 .fill(Color.yanCyan.opacity(0.6))
                 .frame(width: 180, height: 1)
             
-            Text("\(String(format: "%.1f", motion.headingState.facingAngle))°")
+            Text("\(String(format: "%.1f", motion.headingState.facingAngle))° · \(String(format: "%+.1f°", elevDeg))")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(.yanCyan)
+                .foregroundColor(isHorizontalLevel ? .yanCyan : .orange)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: true, vertical: false)
@@ -717,7 +752,7 @@ public struct ARVisionView: View {
         .allowsHitTesting(false)
     }
     
-    // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角与对应二十四山)
+    // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角、二十四山与目标点 LiDAR 距离)
     private func targetBoundingBoxLayer() -> some View {
         let currentSha = shaList[activeShaIndex]
         let m = targetMountain
@@ -739,11 +774,16 @@ public struct ARVisionView: View {
                 width: min(max(rawOffset.width, -maxX), maxX),
                 height: min(max(rawOffset.height, -maxY), maxY)
             )
+            let normPoint = CGPoint(
+                x: min(max(0.5 + clampedOffset.width / max(proxy.size.width, 1), 0.02), 0.98),
+                y: min(max(0.5 + clampedOffset.height / max(proxy.size.height, 1), 0.02), 0.98)
+            )
+            let targetDist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: normPoint) : nil
 
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.yellow, lineWidth: 2)
-                    .frame(width: 180, height: 115)
+                    .frame(width: 184, height: 122)
                     .background(Color.yellow.opacity(0.12))
 
                 VStack(spacing: 2) {
@@ -763,9 +803,15 @@ public struct ARVisionView: View {
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                    if let d = targetDist {
+                        Text("\(fusionModel.lidarAvailable ? "LiDAR" : "AR") \(String(format: "%.2f m", d))")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .foregroundColor(.green)
+                    }
                     Text(currentSha.localizedAliases)
                         .font(.system(size: 9))
                         .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
                 }
             }
             .position(
@@ -1265,6 +1311,17 @@ public struct ARVisionView: View {
         let facingPinyin = mFacing.pinyin
         let facingName = mFacing.localizedName
         let facingPalace = mFacing.localizedPalace
+        let targetHeading = targetCalculatedHeading
+        let targetMtn = targetMountain
+        let targetMtnName = targetMtn.localizedName
+        let targetPalace = targetMtn.localizedPalace
+        let normTargetX = min(max(Double(targetNormalizedPoint.x) + manualTargetNormalizedOffset, 0.08), 0.92)
+        let normTargetY = min(max(Double(targetNormalizedPoint.y), 0.12), 0.72)
+        let sampledDist = (cameraPosition == .back)
+            ? fusionModel.sampleDepth(atPortraitNormalizedPoint: CGPoint(x: normTargetX, y: normTargetY))
+            : nil
+        let isLidar = fusionModel.lidarAvailable
+        let solarTimeStr = motion.trueSolarTimeStr
         let auditDate = Date()
         
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1295,6 +1352,51 @@ public struct ARVisionView: View {
             cg.move(to: CGPoint(x: 0, y: size.height / 2))
             cg.addLine(to: CGPoint(x: size.width, y: size.height / 2))
             cg.strokePath()
+
+            // 形煞锁定目标框绘入存证图
+            let boxW: CGFloat = 420
+            let boxH: CGFloat = 220
+            let boxCenter = CGPoint(x: CGFloat(normTargetX) * size.width, y: CGFloat(normTargetY) * size.height)
+            let targetBoxRect = CGRect(
+                x: max(40, min(size.width - boxW - 40, boxCenter.x - boxW / 2)),
+                y: max(120, min(size.height - 440 - boxH, boxCenter.y - boxH / 2)),
+                width: boxW,
+                height: boxH
+            )
+            cg.setFillColor(UIColor(red: 1.0, green: 0.85, blue: 0.15, alpha: 0.16).cgColor)
+            cg.fill(targetBoxRect)
+            cg.setStrokeColor(UIColor(red: 1.0, green: 0.85, blue: 0.15, alpha: 0.95).cgColor)
+            cg.setLineWidth(4)
+            cg.stroke(targetBoxRect)
+
+            let boxHeader = "\(shaName) · \(targetMtnName) (\(String(format: "%.1f°", targetHeading)))"
+            boxHeader.draw(
+                in: CGRect(x: targetBoxRect.minX + 20, y: targetBoxRect.minY + 24, width: boxW - 40, height: 60),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 30),
+                    .foregroundColor: UIColor(red: 1.0, green: 0.92, blue: 0.35, alpha: 1.0)
+                ]
+            )
+            let distLine: String
+            if let d = sampledDist {
+                distLine = "\(targetPalace) · \(isLidar ? "LiDAR" : "AR") \(String(format: "%.2f m", d))"
+            } else {
+                distLine = "\(targetPalace) · \(shaSeverity)"
+            }
+            distLine.draw(
+                in: CGRect(x: targetBoxRect.minX + 20, y: targetBoxRect.minY + 92, width: boxW - 40, height: 50),
+                withAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: 24, weight: .bold),
+                    .foregroundColor: UIColor.white
+                ]
+            )
+            shaAliases.draw(
+                in: CGRect(x: targetBoxRect.minX + 20, y: targetBoxRect.minY + 148, width: boxW - 40, height: 48),
+                withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 22),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.85)
+                ]
+            )
             
             // 水印卡片
             let cardRect = CGRect(x: 40, y: size.height - 380, width: size.width - 80, height: 320)
@@ -1318,6 +1420,7 @@ public struct ARVisionView: View {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
             let timeStr = dateFormatter.string(from: auditDate)
+            let distSuffix = sampledDist.map { String(format: " · %@ %.2fm", isLidar ? "LiDAR" : "AR", $0) } ?? ""
             
             let isEn = language == .en
             let isHant = language == .zhHant
@@ -1325,23 +1428,23 @@ public struct ARVisionView: View {
             let infoText: String
             if isEn {
                 infoText = """
-                Facing Orientation: Mountain \(facingPinyin) (Measured \(String(format: "%.1f", currentHeading))°)
+                Facing Orientation: Mountain \(facingPinyin) (Measured \(String(format: "%.1f", currentHeading))°)\(distSuffix)
                 Identified Sha: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
-                Coordinates: \(coordsStr)
+                Coordinates: \(coordsStr) · Solar: \(solarTimeStr)
                 Audit Time: \(timeStr) · SN: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             } else if isHant {
                 infoText = """
-                向首方位: \(facingName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)
+                向首方位: \(facingName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
                 識別形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
-                現場經緯: \(coordsStr)
+                現場經緯: \(coordsStr) · 真太陽時: \(solarTimeStr)
                 勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             } else {
                 infoText = """
-                向首方位: \(facingName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)
+                向首方位: \(facingName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
                 识别形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
-                现场经纬: \(coordsStr)
+                现场经纬: \(coordsStr) · 真太阳时: \(solarTimeStr)
                 勘察时间: \(timeStr) · 防伪鉴真: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
             }
@@ -1360,6 +1463,7 @@ public struct ARVisionView: View {
         
             DispatchQueue.main.async {
                 guard self.isActive, self.snapshotGeneration == generation else { return }
+                self.latestSnapshotImage = image
                 self.saveSnapshotToPhotoLibrary(image)
             }
         }
@@ -1379,7 +1483,7 @@ public struct ARVisionView: View {
                     }
                     withAnimation { showSnapshotToast = success }
                     if success {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                             withAnimation { showSnapshotToast = false }
                         }
                     }
@@ -1404,6 +1508,27 @@ public struct ARVisionView: View {
             photoPermissionDenied = true
         }
     }
+}
+
+private struct ARProofShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(
+                x: controller.view.bounds.midX,
+                y: controller.view.bounds.midY,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - 大师化解锦囊深度剖析与全案实操

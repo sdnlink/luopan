@@ -29,6 +29,71 @@ public enum ARSpatialSurveyError: Error, Equatable {
     case storageUnavailable
 }
 
+/// Traditional Lu Ban Ruler (门光尺 42.9 cm & 丁兰尺 39.0 cm) evaluation for 3D AR point-to-point measurements.
+public struct LubanRulerEvaluation: Equatable {
+    public let meters: Float
+    public let centimeters: Float
+    public let yangGateIndex: Int
+    public let yangIsAuspicious: Bool
+    public let yinIndex: Int
+    public let yinIsAuspicious: Bool
+
+    private static let yangNamesHans = ["财", "病", "离", "义", "官", "劫", "害", "本"]
+    private static let yangNamesHant = ["財", "病", "離", "義", "官", "劫", "害", "本"]
+    private static let yangNamesEn = ["Wealth", "Illness", "Separation", "Righteous", "Official", "Robbery", "Harm", "Origin"]
+    private static let yangAuspiciousFlags = [true, false, false, true, true, false, false, true]
+
+    private static let yinNamesHans = ["财", "失", "兴", "死", "官", "义", "苦", "旺", "害", "丁"]
+    private static let yinNamesHant = ["財", "失", "興", "死", "官", "義", "苦", "旺", "害", "丁"]
+    private static let yinNamesEn = ["Wealth", "Loss", "Prosper", "Decline", "Official", "Righteous", "Sorrow", "Flourish", "Harm", "Descendant"]
+    private static let yinAuspiciousFlags = [true, false, true, false, true, true, false, true, false, true]
+
+    public static func evaluate(meters: Float) -> LubanRulerEvaluation {
+        let cm = max(0.0, meters * 100.0)
+        let yangCycle: Float = 42.9
+        let yangStep: Float = yangCycle / 8.0
+        let yangRem = cm.truncatingRemainder(dividingBy: yangCycle)
+        let yIdx = min(7, max(0, Int(yangRem / yangStep)))
+
+        let yinCycle: Float = 39.0
+        let yinStep: Float = yinCycle / 10.0
+        let yinRem = cm.truncatingRemainder(dividingBy: yinCycle)
+        let nIdx = min(9, max(0, Int(yinRem / yinStep)))
+
+        return LubanRulerEvaluation(
+            meters: meters,
+            centimeters: cm,
+            yangGateIndex: yIdx,
+            yangIsAuspicious: yangAuspiciousFlags[yIdx],
+            yinIndex: nIdx,
+            yinIsAuspicious: yinAuspiciousFlags[nIdx]
+        )
+    }
+
+    public func localizedSummary(for language: AppLanguage) -> String {
+        switch language {
+        case .en:
+            let yName = Self.yangNamesEn[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "Auspicious" : "Inauspicious"
+            let nName = Self.yinNamesEn[yinIndex]
+            let nLuck = yinIsAuspicious ? "Auspicious" : "Inauspicious"
+            return String(format: "%.1f cm · LuBan: %@ (%@) · DingLan: %@ (%@)", centimeters, yName, yLuck, nName, nLuck)
+        case .zhHant:
+            let yName = Self.yangNamesHant[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "吉" : "凶"
+            let nName = Self.yinNamesHant[yinIndex]
+            let nLuck = yinIsAuspicious ? "吉" : "凶"
+            return String(format: "%.1f cm · 魯班門光尺：【%@】字門(%@) · 丁蘭尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck)
+        default:
+            let yName = Self.yangNamesHans[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "吉" : "凶"
+            let nName = Self.yinNamesHans[yinIndex]
+            let nLuck = yinIsAuspicious ? "吉" : "凶"
+            return String(format: "%.1f cm · 鲁班门光尺：【%@】字门(%@) · 丁兰尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck)
+        }
+    }
+}
+
 /// Evidence captured from the same ARFrame as a Vision image.  It is kept
 /// small so the frame can cross into the Vision worker without retaining an
 /// ARSession or a large depth buffer.
@@ -107,6 +172,14 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var semanticCounts: [Int: Int] = [:]
     @Published public private(set) var lidarAvailable = false
     @Published public private(set) var hasSavedWorldMap = false
+    @Published public private(set) var meshVisible = true
+    @Published public private(set) var lubanPointA: SIMD3<Float>?
+    @Published public private(set) var lubanPointB: SIMD3<Float>?
+    @Published public private(set) var lubanSpanMeters: Float?
+    @Published public private(set) var lubanEvaluation: LubanRulerEvaluation?
+    @Published public private(set) var savedAnchorCount: Int = 0
+    @Published public private(set) var cameraElevationDegrees: Double = 0.0
+    @Published public private(set) var cameraRollDegrees: Double = 0.0
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
@@ -117,6 +190,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var distanceSamples: [Float] = []
     private var rendersSpatialMesh = true
     private var lastCapturedTimestamp: TimeInterval = 0
+    private var lubanNodeA: SCNNode?
+    private var lubanNodeB: SCNNode?
+    private var lubanLineNode: SCNNode?
 
     /// World maps can be large and are user-created survey data. Store them
     /// in a durable app support directory so a background/suspension cycle or
@@ -215,9 +291,165 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         distanceSamples.removeAll(keepingCapacity: true)
         lastCapturedTimestamp = 0
         semanticCounts = [:]
+        savedAnchorCount = 0
+        clearLubanPoints()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
         refreshSavedWorldMapState()
+    }
+
+    public func toggleMeshVisibility() {
+        meshVisible.toggle()
+        guard let root = sceneView?.scene.rootNode else { return }
+        root.enumerateChildNodes { node, _ in
+            if node.name == "ar-spatial-mesh" || node.name == "ar-spatial-plane" {
+                node.isHidden = !self.meshVisible
+            }
+        }
+    }
+
+    public func clearLubanPoints() {
+        lubanPointA = nil
+        lubanPointB = nil
+        lubanSpanMeters = nil
+        lubanEvaluation = nil
+        lubanNodeA?.removeFromParentNode()
+        lubanNodeB?.removeFromParentNode()
+        lubanLineNode?.removeFromParentNode()
+        lubanNodeA = nil
+        lubanNodeB = nil
+        lubanLineNode = nil
+    }
+
+    /// Places a 3D Lu Ban ruler endpoint at the current center reticle hit position
+    /// and persists a corresponding ARAnchor so saved ARWorldMaps retain the survey point.
+    @discardableResult
+    public func placeLubanPoint() -> Bool {
+        guard let sceneView = sceneView,
+              let frame = sceneView.session.currentFrame else { return false }
+        let center = CGPoint(
+            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
+            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
+        )
+
+        var resolvedWorldPos: SIMD3<Float>?
+        let target: ARRaycastQuery.Target = lidarAvailable ? .existingPlaneGeometry : .estimatedPlane
+        if let result = sceneView.raycastQuery(from: center, allowing: target, alignment: .any)
+            .flatMap({ sceneView.session.raycast($0).first })
+            ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .any)
+                .flatMap({ sceneView.session.raycast($0).first }) {
+            let col = result.worldTransform.columns.3
+            resolvedWorldPos = SIMD3<Float>(col.x, col.y, col.z)
+        } else if let dist = distance, dist > 0.05, dist < 30.0 {
+            let camTransform = frame.camera.transform
+            let camPos = SIMD3<Float>(camTransform.columns.3.x, camTransform.columns.3.y, camTransform.columns.3.z)
+            let forward = -SIMD3<Float>(camTransform.columns.2.x, camTransform.columns.2.y, camTransform.columns.2.z)
+            resolvedWorldPos = camPos + simd_normalize(forward) * dist
+        }
+
+        guard let worldPos = resolvedWorldPos else { return false }
+
+        var anchorTransform = matrix_identity_float4x4
+        anchorTransform.columns.3 = SIMD4<Float>(worldPos.x, worldPos.y, worldPos.z, 1.0)
+        let anchor = ARAnchor(name: "luban-anchor", transform: anchorTransform)
+        sceneView.session.add(anchor: anchor)
+
+        if lubanPointA == nil || (lubanPointA != nil && lubanPointB != nil) {
+            clearLubanPoints()
+            lubanPointA = worldPos
+            let sphereNode = Self.makeMarkerNode(position: worldPos, color: UIColor(red: 0.0, green: 0.88, blue: 0.96, alpha: 0.95))
+            sceneView.scene.rootNode.addChildNode(sphereNode)
+            lubanNodeA = sphereNode
+        } else if let pointA = lubanPointA {
+            lubanPointB = worldPos
+            let sphereNode = Self.makeMarkerNode(position: worldPos, color: UIColor(red: 0.98, green: 0.80, blue: 0.25, alpha: 0.95))
+            sceneView.scene.rootNode.addChildNode(sphereNode)
+            lubanNodeB = sphereNode
+
+            let span = simd_distance(pointA, worldPos)
+            lubanSpanMeters = span
+            let eval = LubanRulerEvaluation.evaluate(meters: span)
+            lubanEvaluation = eval
+
+            let lineColor = eval.yangIsAuspicious
+                ? UIColor(red: 0.18, green: 0.88, blue: 0.48, alpha: 0.92)
+                : UIColor(red: 0.96, green: 0.32, blue: 0.28, alpha: 0.92)
+            let lineNode = Self.makeLineNode(from: pointA, to: worldPos, color: lineColor)
+            sceneView.scene.rootNode.addChildNode(lineNode)
+            lubanLineNode = lineNode
+        }
+        return true
+    }
+
+    /// Samples the LiDAR depth or raycast distance at any portrait-normalized
+    /// screen point `(x, y) in [0, 1]^2` for the live target bounding box.
+    public func sampleDepth(atPortraitNormalizedPoint point: CGPoint) -> Float? {
+        guard let sceneView = sceneView,
+              let frame = sceneView.session.currentFrame else {
+            return distance
+        }
+        let nx = Float(min(max(point.x, 0.02), 0.98))
+        let ny = Float(min(max(point.y, 0.02), 0.98))
+        if lidarAvailable {
+            let depthMap: CVPixelBuffer?
+            let confidenceMap: CVPixelBuffer?
+            if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth {
+                depthMap = smoothed.depthMap
+                confidenceMap = smoothed.confidenceMap
+            } else {
+                depthMap = frame.sceneDepth?.depthMap
+                confidenceMap = frame.sceneDepth?.confidenceMap
+            }
+            if let sampled = Self.regionalDepthSample(
+                from: depthMap,
+                confidenceMap: confidenceMap,
+                portraitNormX: nx,
+                portraitNormY: ny
+            ) {
+                return sampled
+            }
+        }
+        if sceneView.bounds.width > 0, sceneView.bounds.height > 0 {
+            let screenPt = CGPoint(
+                x: CGFloat(nx) * sceneView.bounds.width,
+                y: CGFloat(ny) * sceneView.bounds.height
+            )
+            if let result = sceneView.raycastQuery(from: screenPt, allowing: .estimatedPlane, alignment: .any)
+                .flatMap({ sceneView.session.raycast($0).first }) {
+                let cam = frame.camera.transform.columns.3
+                let hit = result.worldTransform.columns.3
+                let d = simd_distance(SIMD3<Float>(cam.x, cam.y, cam.z), SIMD3<Float>(hit.x, hit.y, hit.z))
+                if d.isFinite, d > 0.05, d < 60.0 {
+                    return d
+                }
+            }
+        }
+        return distance
+    }
+
+    private static func makeMarkerNode(position: SIMD3<Float>, color: UIColor) -> SCNNode {
+        let sphere = SCNSphere(radius: 0.016)
+        let mat = SCNMaterial()
+        mat.diffuse.contents = color
+        mat.lightingModel = .constant
+        sphere.materials = [mat]
+        let node = SCNNode(geometry: sphere)
+        node.position = SCNVector3(position.x, position.y, position.z)
+        return node
+    }
+
+    private static func makeLineNode(from start: SIMD3<Float>, to end: SIMD3<Float>, color: UIColor) -> SCNNode {
+        let indices: [Int32] = [0, 1]
+        let vertices = [SCNVector3(start.x, start.y, start.z), SCNVector3(end.x, end.y, end.z)]
+        let source = SCNGeometrySource(vertices: vertices)
+        let element = SCNGeometryElement(indices: indices, primitiveType: .line)
+        let geometry = SCNGeometry(sources: [source], elements: [element])
+        let mat = SCNMaterial()
+        mat.diffuse.contents = color
+        mat.lightingModel = .constant
+        mat.isDoubleSided = true
+        geometry.materials = [mat]
+        return SCNNode(geometry: geometry)
     }
 
     public func refreshSavedWorldMapState() {
@@ -330,28 +562,31 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         @unknown default: frameMappingIsUsable = false
         }
         let depthMap: CVPixelBuffer?
-        if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth?.depthMap {
-            depthMap = smoothed
+        let confidenceMap: CVPixelBuffer?
+        if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth {
+            depthMap = smoothed.depthMap
+            confidenceMap = smoothed.confidenceMap
         } else {
             depthMap = frame.sceneDepth?.depthMap
+            confidenceMap = frame.sceneDepth?.confidenceMap
         }
         let evidence = ARSceneEvidence(
             trackingIsNormal: frameTrackingIsNormal,
             mappingIsUsable: frameMappingIsUsable,
             lidarAvailable: lidarAvailable,
             depthStreamAvailable: depthMap != nil,
-            depthCoverage: Self.depthCoverage(from: depthMap),
+            depthCoverage: Self.depthCoverage(from: depthMap, confidenceMap: confidenceMap),
             horizontalFOVDegrees: Self.portraitHorizontalFOV(for: frame),
             verticalPlaneCount: frame.anchors
                 .compactMap { $0 as? ARPlaneAnchor }
                 .filter { $0.alignment == .vertical }
                 .count,
             wallFaceCount: Self.wallFaceCount(in: frame.anchors),
-            depthSampleMeters: Self.centerDepthSample(from: depthMap),
-            leftDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.25, portraitNormY: 0.5),
-            rightDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.75, portraitNormY: 0.5),
-            topDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.25),
-            bottomDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.78),
+            depthSampleMeters: Self.centerDepthSample(from: depthMap, confidenceMap: confidenceMap),
+            leftDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.25, portraitNormY: 0.5),
+            rightDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.75, portraitNormY: 0.5),
+            topDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.5, portraitNormY: 0.25),
+            bottomDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.5, portraitNormY: 0.78),
             timestamp: frame.timestamp
         )
         DispatchQueue.main.async {
@@ -483,6 +718,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private func updateMeasurements(frame: ARFrame, sceneView: ARSCNView) {
         let anchors = frame.anchors
+        let forwardY = min(1.0, max(-1.0, Double(-frame.camera.transform.columns.2.y)))
+        let rightY = min(1.0, max(-1.0, Double(-frame.camera.transform.columns.1.y)))
+        cameraElevationDegrees = asin(forwardY) * 180.0 / .pi
+        cameraRollDegrees = asin(rightY) * 180.0 / .pi
+
         switch frame.worldMappingStatus {
         case .notAvailable: mappingState = .unavailable
         case .limited: mappingState = .limited
@@ -494,6 +734,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let planes = anchors.compactMap { $0 as? ARPlaneAnchor }
         planeCount = planes.count
         verticalPlaneCount = planes.filter { $0.alignment == .vertical }.count
+        savedAnchorCount = anchors.filter { $0.name?.hasPrefix("luban-anchor") == true }.count
         if let largest = planes.max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
             largestPlaneWidth = largest.extent.x
             largestPlaneDepth = largest.extent.z
@@ -509,15 +750,18 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         var measuredDistance: Float? = nil
 
-        // 1. 优先使用 LiDAR 硬件直接测距（Time-of-Flight 激光毫米级点测）
+        // 1. 优先使用 LiDAR 硬件直接测距（Time-of-Flight 激光毫米级点测 + 置信度过滤）
         if lidarAvailable {
             let depthMap: CVPixelBuffer?
-            if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth?.depthMap {
-                depthMap = smoothed
+            let confidenceMap: CVPixelBuffer?
+            if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth {
+                depthMap = smoothed.depthMap
+                confidenceMap = smoothed.confidenceMap
             } else {
                 depthMap = frame.sceneDepth?.depthMap
+                confidenceMap = frame.sceneDepth?.confidenceMap
             }
-            if let depthVal = Self.centerDepthSample(from: depthMap), depthVal > 0.05, depthVal < 60.0 {
+            if let depthVal = Self.centerDepthSample(from: depthMap, confidenceMap: confidenceMap), depthVal > 0.05, depthVal < 60.0 {
                 measuredDistance = depthVal
             }
         }
@@ -600,16 +844,19 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return UIImage(cgImage: cgImage, scale: 1, orientation: .right)
     }
 
-    private static func centerDepthSample(from depthMap: CVPixelBuffer?) -> Float? {
-        return regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.5)
+    private static func centerDepthSample(from depthMap: CVPixelBuffer?, confidenceMap: CVPixelBuffer? = nil) -> Float? {
+        return regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.5, portraitNormY: 0.5)
     }
 
     /// Samples a median depth in a 3x3 neighborhood around a portrait-normalized
     /// point `(portraitNormX, portraitNormY) in [0, 1]^2`. Because ARKit's camera
     /// and depth buffers are landscape-right oriented while the UI is portrait,
     /// portrait X maps to buffer Y and portrait Y maps to inverted buffer X.
+    /// When a LiDAR `confidenceMap` is provided, pixels with low confidence (< 1)
+    /// are rejected to avoid glass reflections and noisy edge artifacts.
     private static func regionalDepthSample(
         from depthMap: CVPixelBuffer?,
+        confidenceMap: CVPixelBuffer? = nil,
         portraitNormX: Float,
         portraitNormY: Float
     ) -> Float? {
@@ -621,6 +868,22 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let height = CVPixelBufferGetHeight(depthMap)
         guard width > 0, height > 0 else { return nil }
         let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+
+        var confBase: UnsafeMutableRawPointer? = nil
+        var confBytesPerRow = 0
+        if let confidenceMap = confidenceMap,
+           CVPixelBufferGetWidth(confidenceMap) == width,
+           CVPixelBufferGetHeight(confidenceMap) == height {
+            CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
+            confBase = CVPixelBufferGetBaseAddress(confidenceMap)
+            confBytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
+        }
+        defer {
+            if let confidenceMap = confidenceMap, confBase != nil {
+                CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly)
+            }
+        }
+
         let bufferX = min(width - 1, max(0, Int(Float(width) * (1.0 - portraitNormY))))
         let bufferY = min(height - 1, max(0, Int(Float(height) * portraitNormX)))
         var samples: [Float] = []
@@ -628,8 +891,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             let y = min(height - 1, max(0, bufferY + dy))
             let row = baseAddress.advanced(by: y * bytesPerRow)
                 .assumingMemoryBound(to: Float32.self)
+            let confRow = confBase?.advanced(by: y * confBytesPerRow)
+                .assumingMemoryBound(to: UInt8.self)
             for dx in -1...1 {
                 let x = min(width - 1, max(0, bufferX + dx))
+                if let confRow = confRow, confRow[x] < 1 {
+                    continue
+                }
                 let val = row[x]
                 if val.isFinite && val > 0.05 && val < 60.0 {
                     samples.append(val)
@@ -641,7 +909,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return samples[samples.count / 2]
     }
 
-    private static func depthCoverage(from depthMap: CVPixelBuffer?) -> Float {
+    private static func depthCoverage(from depthMap: CVPixelBuffer?, confidenceMap: CVPixelBuffer? = nil) -> Float {
         guard let depthMap = depthMap else { return 0 }
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
@@ -650,14 +918,35 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let height = CVPixelBufferGetHeight(depthMap)
         guard width > 0, height > 0 else { return 0 }
         let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+
+        var confBase: UnsafeMutableRawPointer? = nil
+        var confBytesPerRow = 0
+        if let confidenceMap = confidenceMap,
+           CVPixelBufferGetWidth(confidenceMap) == width,
+           CVPixelBufferGetHeight(confidenceMap) == height {
+            CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
+            confBase = CVPixelBufferGetBaseAddress(confidenceMap)
+            confBytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
+        }
+        defer {
+            if let confidenceMap = confidenceMap, confBase != nil {
+                CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly)
+            }
+        }
+
         var valid = 0
         let total = 25
         for rowIndex in 0..<5 {
             let y = min(height - 1, max(0, height * (rowIndex + 1) / 6))
             let row = baseAddress.advanced(by: y * bytesPerRow)
                 .assumingMemoryBound(to: Float32.self)
+            let confRow = confBase?.advanced(by: y * confBytesPerRow)
+                .assumingMemoryBound(to: UInt8.self)
             for columnIndex in 0..<5 {
                 let x = min(width - 1, max(0, width * (columnIndex + 1) / 6))
+                if let confRow = confRow, confRow[x] < 1 {
+                    continue
+                }
                 let value = row[x]
                 if value.isFinite && value > 0 { valid += 1 }
             }
@@ -703,16 +992,29 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     // world map. A line material keeps the camera view readable and avoids
     // the heavy translucent surface fill used by many sample applications.
     public func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
+        if anchor.name?.hasPrefix("luban-anchor") == true {
+            let sphere = SCNSphere(radius: 0.014)
+            let mat = SCNMaterial()
+            mat.diffuse.contents = UIColor(red: 0.95, green: 0.80, blue: 0.25, alpha: 0.90)
+            mat.lightingModel = .constant
+            sphere.materials = [mat]
+            let node = SCNNode(geometry: sphere)
+            node.name = "ar-luban-anchor"
+            return node
+        }
         guard rendersSpatialMesh else { return nil }
         if let meshAnchor = anchor as? ARMeshAnchor {
             guard let geometry = meshGeometry(for: meshAnchor) else { return nil }
             let node = SCNNode(geometry: geometry)
             node.name = "ar-spatial-mesh"
+            node.isHidden = !meshVisible
             return node
         }
         guard let planeAnchor = anchor as? ARPlaneAnchor else { return nil }
         let node = SCNNode()
+        node.name = "ar-spatial-plane"
         node.geometry = planeGeometry(for: planeAnchor)
+        node.isHidden = !meshVisible
         if planeAnchor.alignment == .horizontal {
             node.eulerAngles.x = -.pi / 2
         }
@@ -1080,6 +1382,28 @@ public struct ARSpatialSurveyView: View {
             }
 #endif
             Button(action: {
+                _ = model.placeLubanPoint()
+            }) {
+                Image(systemName: "ruler.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(model.lubanPointA != nil ? .black : .white)
+                    .padding(9)
+                    .background(model.lubanPointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(lang.t("ar_spatial_measure"))
+            Button(action: {
+                model.toggleMeshVisibility()
+            }) {
+                Image(systemName: model.meshVisible ? "eye.fill" : "eye.slash.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(model.meshVisible ? .yanCyan : .white.opacity(0.75))
+                    .padding(9)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(lang.t("ar_spatial_mesh"))
+            Button(action: {
                 saveMessage = nil
                 model.resetSurvey()
             }) {
@@ -1154,6 +1478,10 @@ public struct ARSpatialSurveyView: View {
                 if model.lidarAvailable {
                     Text("\(lang.t("ar_spatial_mesh")): \(model.meshAnchorCount)")
                 }
+                if model.savedAnchorCount > 0 {
+                    Label("\(model.savedAnchorCount)", systemImage: "mappin.and.ellipse")
+                        .foregroundColor(.yanCyan)
+                }
             }
             .font(.system(size: 10, weight: .medium))
             .foregroundColor(.white.opacity(0.75))
@@ -1171,9 +1499,45 @@ public struct ARSpatialSurveyView: View {
                         .minimumScaleFactor(0.75)
                 }
                 Spacer()
+                Button(action: { _ = model.placeLubanPoint() }) {
+                    Text(lubanActionTitle)
+                        .font(.system(size: 10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.yanCyan.opacity(0.85))
+                        .foregroundColor(.black)
+                        .cornerRadius(8)
+                }
             }
             .font(.system(size: 13, weight: .bold, design: .monospaced))
             .foregroundColor(.white)
+
+            if let eval = model.lubanEvaluation {
+                HStack(spacing: 6) {
+                    Image(systemName: eval.yangIsAuspicious ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                        .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
+                        .font(.system(size: 11))
+                    Text(eval.localizedSummary(for: lang.effectiveLanguage))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    Spacer()
+                    Button(action: { model.clearLubanPoints() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(8)
+            } else if model.lubanPointA != nil {
+                Text(lubanPendingHint)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.yanCyan)
+            }
 
             if let width = model.largestPlaneWidth, let depth = model.largestPlaneDepth {
                 Text("\(lang.t("ar_spatial_largest_plane")): \(String(format: "%.2f × %.2f m", width, depth))")
@@ -1249,6 +1613,29 @@ public struct ARSpatialSurveyView: View {
             case .failure:
                 saveMessage = lang.t("ar_spatial_save_failed")
             }
+        }
+    }
+
+    private var lubanActionTitle: String {
+        let isWaitingSecond = (model.lubanPointA != nil && model.lubanPointB == nil)
+        switch lang.effectiveLanguage {
+        case .en:
+            return isWaitingSecond ? "Set Point B" : "LuBan Ruler (Point A)"
+        case .zhHant:
+            return isWaitingSecond ? "標定終點 B" : "魯班尺打點 A"
+        default:
+            return isWaitingSecond ? "标定终点 B" : "鲁班尺打点 A"
+        }
+    }
+
+    private var lubanPendingHint: String {
+        switch lang.effectiveLanguage {
+        case .en:
+            return "Point A locked — aim reticle at endpoint B and tap Set Point B"
+        case .zhHant:
+            return "已鎖定起點 A · 請將準星對準終點 B 點擊「標定終點 B」測算魯班尺吉凶"
+        default:
+            return "已锁定起点 A · 请将准星对准终点 B 点击「标定终点 B」测算鲁班尺吉凶"
         }
     }
 

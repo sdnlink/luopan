@@ -254,15 +254,17 @@ public struct FloorplanView: View {
     public static func persistRoomPlanImport(
         rooms: [FloorplanRoom],
         centroid: CGPoint,
-        blueprintImage: UIImage?
+        blueprintImage: UIImage?,
+        compassHeading: Double? = nil
     ) {
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
+        let resolvedHeading = compassHeading.map { normalizedHeading($0) } ?? CompassMotionManager.shared.headingState.facingAngle
         let saved = SavedFloorplanLayout(
             rooms: sanitizedRooms,
             centroidX: Double(clampedUnit(Double(centroid.x), fallback: 0.5)),
             centroidY: Double(clampedUnit(Double(centroid.y), fallback: 0.5)),
-            compassRotation: CompassMotionManager.shared.headingState.facingAngle,
-            isSyncWithCompass: true,
+            compassRotation: resolvedHeading,
+            isSyncWithCompass: compassHeading == nil,
             hasFloorplanAccess: true
         )
         if let data = try? JSONEncoder().encode(saved) {

@@ -43,6 +43,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
+    private var lastSemanticUpdateTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
     private var lastPlaneGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
@@ -79,6 +80,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         trackingState = .initializing
         mappingState = .limited
         lastMeasurementTimestamp = 0
+        lastSemanticUpdateTimestamp = 0
         lastMeshGeometryUpdate.removeAll()
         lastPlaneGeometryUpdate.removeAll()
         planeCount = 0
@@ -143,6 +145,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView?.delegate = nil
         sceneView = nil
         activeConfiguration = nil
+        lastMeasurementTimestamp = 0
+        lastSemanticUpdateTimestamp = 0
         lastMeshGeometryUpdate.removeAll()
         lastPlaneGeometryUpdate.removeAll()
         distance = nil
@@ -156,7 +160,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func session(_ session: ARSession, didUpdate frame: ARFrame) {
-        // Mesh classification and raycasting are deliberately sampled at 5 Hz.
+        // Mesh classification and raycasting are deliberately sampled at a
+        // bounded rate.
         // ARKit continues tracking at its native rate while the UI avoids a
         // display-link driven redraw and unnecessary device heat.
         guard frame.timestamp - lastMeasurementTimestamp >= 0.2 else { return }
@@ -265,6 +270,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             semanticCounts = [:]
             return
         }
+
+        // Mesh classification is considerably more expensive than the
+        // distance raycast. Keep tracking and distance responsive at 5 Hz,
+        // while updating the semantic summary at 2 Hz to avoid traversing
+        // thousands of faces on every sample.
+        guard frame.timestamp - lastSemanticUpdateTimestamp >= 0.5 else { return }
+        lastSemanticUpdateTimestamp = frame.timestamp
 
         let meshAnchors = anchors.compactMap { $0 as? ARMeshAnchor }
         meshAnchorCount = meshAnchors.count

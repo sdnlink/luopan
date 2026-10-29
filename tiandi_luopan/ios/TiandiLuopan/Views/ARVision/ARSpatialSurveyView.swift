@@ -38,6 +38,7 @@ public struct ARSceneEvidence {
     public let lidarAvailable: Bool
     public let depthStreamAvailable: Bool
     public let depthCoverage: Float
+    public let horizontalFOVDegrees: Double?
     public let verticalPlaneCount: Int
     public let wallFaceCount: Int
     public let depthSampleMeters: Float?
@@ -49,6 +50,7 @@ public struct ARSceneEvidence {
         lidarAvailable: Bool,
         depthStreamAvailable: Bool,
         depthCoverage: Float,
+        horizontalFOVDegrees: Double?,
         verticalPlaneCount: Int,
         wallFaceCount: Int,
         depthSampleMeters: Float?,
@@ -59,6 +61,7 @@ public struct ARSceneEvidence {
         self.lidarAvailable = lidarAvailable
         self.depthStreamAvailable = depthStreamAvailable
         self.depthCoverage = depthCoverage
+        self.horizontalFOVDegrees = horizontalFOVDegrees
         self.verticalPlaneCount = verticalPlaneCount
         self.wallFaceCount = wallFaceCount
         self.depthSampleMeters = depthSampleMeters
@@ -256,6 +259,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             lidarAvailable: lidarAvailable,
             depthStreamAvailable: frame.sceneDepth != nil,
             depthCoverage: Self.depthCoverage(from: frame.sceneDepth?.depthMap),
+            horizontalFOVDegrees: Self.portraitHorizontalFOV(for: frame),
             verticalPlaneCount: verticalPlaneCount,
             wallFaceCount: semanticCounts[ARMeshClassification.wall.rawValue] ?? 0,
             depthSampleMeters: Self.centerDepthSample(from: frame.sceneDepth?.depthMap),
@@ -522,6 +526,18 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             }
         }
         return Float(valid) / Float(total)
+    }
+
+    private static func portraitHorizontalFOV(for frame: ARFrame) -> Double? {
+        let pixelHeight = Double(CVPixelBufferGetHeight(frame.capturedImage))
+        let focalY = Double(frame.camera.intrinsics.columns.1.y)
+        guard pixelHeight > 0, focalY > 0 else { return nil }
+        // The app is portrait-only. After rotating ARKit's landscape buffer,
+        // the portrait horizontal axis corresponds to the sensor's vertical
+        // axis, so use fy rather than an arbitrary fixed field of view.
+        let radians = 2.0 * atan(pixelHeight / (2.0 * focalY))
+        let degrees = radians * 180.0 / .pi
+        return degrees.isFinite && degrees >= 20 && degrees <= 120 ? degrees : nil
     }
 
     // Plane outlines provide immediate visual feedback while ARKit builds the

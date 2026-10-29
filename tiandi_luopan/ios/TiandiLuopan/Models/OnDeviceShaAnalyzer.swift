@@ -12,6 +12,7 @@ public struct ShaAnalysisResult {
     public let targetY: Double
     public let detectedRegions: Int
     public let summary: String
+    public let horizontalFOVDegrees: Double?
 }
 
 public final class OnDeviceShaAnalyzer {
@@ -115,7 +116,8 @@ public final class OnDeviceShaAnalyzer {
                     targetX: (relaxed.targetX + strict.targetX) * 0.5,
                     targetY: (relaxed.targetY + strict.targetY) * 0.5,
                     detectedRegions: min(relaxed.detectedRegions, strict.detectedRegions),
-                    summary: "multi-pass-paired-vertical-structures"
+                    summary: "multi-pass-paired-vertical-structures",
+                    horizontalFOVDegrees: evidence?.horizontalFOVDegrees
                 )
                 DispatchQueue.main.async { completion(.success(result)) }
             } catch {
@@ -226,7 +228,8 @@ public final class OnDeviceShaAnalyzer {
             targetX: Double(targetX),
             targetY: Double(targetY),
             detectedRegions: usable.count,
-            summary: "paired-vertical-structures"
+            summary: "paired-vertical-structures",
+            horizontalFOVDegrees: nil
         )
     }
 

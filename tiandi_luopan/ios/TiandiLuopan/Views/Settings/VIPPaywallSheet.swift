@@ -222,6 +222,10 @@ public struct VIPPaywallSheet: View {
                                 .font(.system(size: 10))
                                 .foregroundColor(.white.opacity(0.45))
                                 .multilineTextAlignment(.center)
+                            Text(LocalizationManager.shared.t("settings_safety_disclaimer"))
+                                .font(.system(size: 10))
+                                .foregroundColor(.orange.opacity(0.75))
+                                .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)

@@ -784,7 +784,12 @@ public struct FloorplanView: View {
         return ZStack {
             // 八宫辐射线
             ForEach(0..<8) { i in
-                let angle = Double(i) * 45.0 - effectiveHeading
+                // Keep the overlay in the same coordinate system as
+                // FloorplanEngine.palaceForPoint, which resolves a point as
+                // screenAngle + heading. Subtracting here mirrored the
+                // visual sectors whenever the plan was rotated away from
+                // north, so the highlighted palace did not match the report.
+                let angle = Double(i) * 45.0 + effectiveHeading
                 Path { p in
                     p.move(to: centerPt)
                     let rad = angle * .pi / 180.0

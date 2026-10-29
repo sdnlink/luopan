@@ -1,8 +1,13 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 罗盘双针与地磁传感器校准弹窗 (Calibration Sheet)
 
 public struct CalibrationSheet: View {
+    /// Settings disables live sensors while idle. The settings-hosted sheet
+    /// opts into a temporary sensor session; the compass-hosted sheet keeps
+    /// the parent compass session unchanged.
+    public let keepsMotionActive: Bool
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
@@ -10,7 +15,9 @@ public struct CalibrationSheet: View {
     @State private var isCalibrating = false
     @State private var rotateDegree: Double = 0
     
-    public init() {}
+    public init(keepsMotionActive: Bool = false) {
+        self.keepsMotionActive = keepsMotionActive
+    }
     
     public var body: some View {
         return ZStack {
@@ -191,6 +198,21 @@ public struct CalibrationSheet: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+        .onAppear {
+            guard keepsMotionActive else { return }
+            motion.setDeviceMotionEnabled(true)
+            motion.setHeadingUpdatesEnabled(true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            guard keepsMotionActive else { return }
+            motion.setDeviceMotionEnabled(true)
+            motion.setHeadingUpdatesEnabled(true)
+        }
+        .onDisappear {
+            guard keepsMotionActive else { return }
+            motion.setDeviceMotionEnabled(false)
+            motion.setHeadingUpdatesEnabled(false)
         }
     }
 

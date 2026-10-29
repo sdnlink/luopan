@@ -243,7 +243,7 @@ public struct SettingsView: View {
             .navigationBarTitle(lang.t("tab_settings"), displayMode: .inline)
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showCalibrationGuide) {
-                CalibrationSheet()
+                CalibrationSheet(keepsMotionActive: true)
             }
             .sheet(isPresented: $showTerms) {
                 LegalDocumentSheet(

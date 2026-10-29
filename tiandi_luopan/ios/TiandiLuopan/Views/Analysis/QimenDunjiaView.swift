@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 // MARK: - 三式绝学 · 时家奇门遁甲全息排盘与出行导航视图 (PRD 第11章)
 
@@ -11,6 +12,15 @@ public struct QimenDunjiaView: View {
     @State private var cachedChart: QimenChart?
     @State private var lastChartHeading: Double?
     @State private var lastChartTimeKey: Int?
+
+    // Qimen uses the current hour. A low-frequency publisher catches an hour
+    // boundary while the phone is stationary; refreshChart's time key keeps
+    // the timer from rebuilding the chart during the other 59 ticks.
+    private static let chartRefreshTimer = Timer.publish(
+        every: 60,
+        on: .main,
+        in: .common
+    ).autoconnect()
     
     public init() {}
     
@@ -106,6 +116,9 @@ public struct QimenDunjiaView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
             refreshChart(force: true)
+        }
+        .onReceive(Self.chartRefreshTimer) { _ in
+            refreshChart()
         }
     }
 

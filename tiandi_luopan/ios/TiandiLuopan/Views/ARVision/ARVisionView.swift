@@ -365,6 +365,7 @@ public struct ARVisionView: View {
     @State private var selectedShaIndex: Int = 0
     @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
     @State private var targetOffset: CGSize = .zero
+    @State private var manualTargetNormalizedOffset: Double = 0.0
     @State private var targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
     @State private var targetHorizontalFOV: Double = 50.0
     @State private var targetDragStart: CGSize?
@@ -399,12 +400,10 @@ public struct ARVisionView: View {
         // Vision returns a normalized horizontal location. Keep that
         // location in the bearing calculation even before the overlay knows
         // its concrete pixel size; a manual drag adds a screen-space delta.
-        let normalizedHorizontalOffset = (targetNormalizedPoint.x - 0.5) * 2.0
+        let normalizedHorizontalOffset = (targetNormalizedPoint.x + manualTargetNormalizedOffset - 0.5) * 2.0
         let halfFOVRadians = targetHorizontalFOV * .pi / 360.0
         let detectedAngleDelta = atan(normalizedHorizontalOffset * tan(halfFOVRadians)) * 180.0 / .pi
-        let manualAngleDelta = Double(targetOffset.width / 8.0)
-        let angleDelta = detectedAngleDelta + manualAngleDelta
-        let raw = motion.headingState.facingAngle + angleDelta
+        let raw = motion.headingState.facingAngle + detectedAngleDelta
         return (raw.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
     }
     
@@ -544,12 +543,30 @@ public struct ARVisionView: View {
                 targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                 targetHorizontalFOV = 50.0
                 targetOffset = .zero
+                manualTargetNormalizedOffset = 0.0
                 targetDragStart = nil
                 snapshotGeneration += 1
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             if isActive { checkCameraPermission() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            guard isActive else { return }
+            // ARKit may keep delivering frames while a SwiftUI tab is still
+            // mounted. Explicitly pause it and invalidate an in-flight scan
+            // so background camera/LiDAR work cannot continue or complete with
+            // stale evidence after the app returns.
+            spatialModel.pause()
+            pendingCapturePurpose = nil
+            isAIScanning = false
+            aiScanGeneration &+= 1
+            aiScanFrames.removeAll(keepingCapacity: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            guard isActive, !showSpatialSurvey else { return }
+            checkCameraPermission()
+            spatialModel.resume()
         }
         .sheet(isPresented: $showRemedySheet) {
             ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
@@ -572,6 +589,7 @@ public struct ARVisionView: View {
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
             targetOffset = .zero
+            manualTargetNormalizedOffset = 0.0
             targetDragStart = nil
         }
     }
@@ -755,8 +773,18 @@ public struct ARVisionView: View {
                             targetDragStart = targetOffset
                         }
                         let start = targetDragStart ?? .zero
-                        targetOffset = CGSize(width: start.width + gesture.translation.width,
+                        let proposed = CGSize(width: start.width + gesture.translation.width,
                                               height: start.height + gesture.translation.height)
+                        let maxX = max(0, proxy.size.width / 2 - 92)
+                        let maxY = max(0, proxy.size.height / 2 - 62)
+                        let clamped = CGSize(
+                            width: min(max(proposed.width, -maxX), maxX),
+                            height: min(max(proposed.height, -maxY), maxY)
+                        )
+                        targetOffset = clamped
+                        manualTargetNormalizedOffset = Double(
+                            clamped.width / max(proxy.size.width, 1)
+                        )
                     }
                     .onEnded { _ in
                         targetDragStart = nil
@@ -934,6 +962,7 @@ public struct ARVisionView: View {
                             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                             targetHorizontalFOV = 50.0
                             targetOffset = .zero
+                            manualTargetNormalizedOffset = 0.0
                         }) {
                             Text(item.localizedName)
                                 .font(.system(size: 11, weight: isSelected ? .bold : .medium))
@@ -1016,6 +1045,7 @@ public struct ARVisionView: View {
         targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
         targetHorizontalFOV = 50.0
         targetOffset = .zero
+        manualTargetNormalizedOffset = 0.0
         aiScanFrames.removeAll(keepingCapacity: true)
         isAIScanning = true
         aiScanGeneration &+= 1
@@ -1150,6 +1180,7 @@ public struct ARVisionView: View {
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
             targetOffset = .zero
+            manualTargetNormalizedOffset = 0.0
             aiError = firstFailure.localizedDescription
             return
         }
@@ -1164,6 +1195,7 @@ public struct ARVisionView: View {
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
             targetOffset = .zero
+            manualTargetNormalizedOffset = 0.0
             aiError = lang.t("ar_ai_temporal_ambiguous")
             return
         }
@@ -1199,6 +1231,7 @@ public struct ARVisionView: View {
                 targetHorizontalFOV = fov
             }
             targetOffset = .zero
+            manualTargetNormalizedOffset = 0.0
         }
     }
     

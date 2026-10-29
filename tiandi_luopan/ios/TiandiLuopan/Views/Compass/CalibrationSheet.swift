@@ -216,6 +216,8 @@ public struct CalibrationSheet: View {
             
             Text(value)
                 .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background((customColor ?? (isOk ? Color.green : Color.red)).opacity(0.15))

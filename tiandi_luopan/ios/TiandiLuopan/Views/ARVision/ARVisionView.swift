@@ -661,6 +661,9 @@ public struct ARVisionView: View {
             Text("\(String(format: "%.1f", motion.headingState.facingAngle))°")
                 .font(.system(size: 11, weight: .bold, design: .monospaced))
                 .foregroundColor(.yanCyan)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .fixedSize(horizontal: true, vertical: false)
                 .offset(y: -50)
         }
         .allowsHitTesting(false)
@@ -692,6 +695,8 @@ public struct ARVisionView: View {
                 Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 Text(currentSha.localizedAliases)
                     .font(.system(size: 9))
                     .foregroundColor(.white.opacity(0.7))
@@ -724,6 +729,9 @@ public struct ARVisionView: View {
                 Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .layoutPriority(1)
             }
             Spacer()
 
@@ -856,6 +864,8 @@ public struct ARVisionView: View {
                 Text("\(lang.t("ar_current_facing")): \(targetMountain.localizedPalace) · \(targetMountain.localizedName)\(lang.t("mountain_suffix"))")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
             }
             .padding(.horizontal, 4)
             
@@ -887,6 +897,8 @@ public struct ARVisionView: View {
                     Text("\(lang.t("ar_ai_result")): \(String(format: "%.0f", aiResult.confidence * 100))% · \(aiResult.detectedRegions)")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
                     Spacer()
                 }
                 .padding(.horizontal, 8)

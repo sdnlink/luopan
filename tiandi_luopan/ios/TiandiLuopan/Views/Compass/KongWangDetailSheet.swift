@@ -64,6 +64,8 @@ public struct KongWangDetailSheet: View {
                             Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", currentHeading))° · \(m.localizedName) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.75)
                         }
                         Spacer()
                         Text(kwGradeText)

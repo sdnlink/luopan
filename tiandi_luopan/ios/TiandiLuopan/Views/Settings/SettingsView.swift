@@ -175,6 +175,9 @@ public struct SettingsView: View {
                         Text(String(format: "%.1f μT", motion.magneticStrengthUT))
                             .foregroundColor(.secondary)
                             .font(.system(size: 13, design: .monospaced))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                     
                     Button(action: {

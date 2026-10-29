@@ -594,10 +594,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let allObjects = rooms.flatMap { $0.objects }
 
         // 1. 入户门宽鲁班尺吉凶判定 (42.9cm 门光尺)
-        if let mainDoor = allDoors.first, mainDoor.dimensions.x > 0.45 {
-            let eval = LubanRulerEvaluation.evaluate(meters: Double(mainDoor.dimensions.x))
+        if let mainDoor = allDoors.first, Float(mainDoor.dimensions.x) > 0.45 {
+            let doorWidth = Float(mainDoor.dimensions.x)
+            let eval = LubanRulerEvaluation.evaluate(meters: doorWidth)
             let badge = eval.yangIsAuspicious ? "吉门" : "失度"
-            findings.append(String(format: "门宽 %.2fm · 鲁班尺【%@】(%@)", mainDoor.dimensions.x, eval.yangSegmentName, badge))
+            findings.append(String(format: "门宽 %.2fm · 鲁班尺【%@】(%@)", Double(doorWidth), eval.yangSegmentName, badge))
         }
 
         // 2. 穿堂风煞检测 (门对窗 / 门对门一箭穿心)

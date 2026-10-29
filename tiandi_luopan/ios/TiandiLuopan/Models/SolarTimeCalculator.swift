@@ -2,6 +2,8 @@ import Foundation
 
 // MARK: - 真太阳时与太阳黄经节气计算器
 
+public typealias TrueSolarTimeEngine = SolarTimeCalculator
+
 public struct SolarTimeResult {
     public let standardTimeString: String
     public let trueSolarTimeString: String
@@ -9,6 +11,7 @@ public struct SolarTimeResult {
     public let equationOfTimeMinutes: Double
     public let solarTermName: String
     public let baziGanzhi: String
+    public let dayPillar: String
 }
 
 public final class SolarTimeCalculator {
@@ -23,6 +26,10 @@ public final class SolarTimeCalculator {
     ]
     private let heavenlyStems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
     private let earthlyBranches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+
+    public func computeNow(longitude: Double) -> SolarTimeResult {
+        return calculate(date: Date(), longitude: longitude)
+    }
 
     public func calculate(date: Date = Date(), longitude: Double = 0.0) -> SolarTimeResult {
         var calendar = Calendar(identifier: .gregorian)
@@ -76,7 +83,8 @@ public final class SolarTimeCalculator {
             timeOffsetMinutes: totalOffsetMinutes,
             equationOfTimeMinutes: equationOfTime,
             solarTermName: solarTerms[termIndex],
-            baziGanzhi: bazi
+            baziGanzhi: bazi.fullText,
+            dayPillar: bazi.dayPillar
         )
     }
 
@@ -155,7 +163,7 @@ public final class SolarTimeCalculator {
         termIndex: Int,
         calendar: Calendar,
         beforeLiChun: Bool
-    ) -> String {
+    ) -> (fullText: String, dayPillar: String) {
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
         // In the traditional convention the day changes at 子初 (23:00),
         // while the year/month still follow the solar-term bucket supplied by
@@ -196,58 +204,59 @@ public final class SolarTimeCalculator {
         let hourBranch = ((hour + 1) / 2) % 12
         let hourStem = positiveModulo((dayStem % 5) * 2 + hourBranch, 10)
 
+        let dayPillar = "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])"
         let language = LocalizationManager.shared.effectiveLanguage
         switch language {
         case .en:
             let stemPinyin = ["Jia", "Yi", "Bing", "Ding", "Wu", "Ji", "Geng", "Xin", "Ren", "Gui"]
             let branchPinyin = ["Zi", "Chou", "Yin", "Mao", "Chen", "Si", "Wu", "Wei", "Shen", "You", "Xu", "Hai"]
-            return "\(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) Year · "
+            return (fullText: "\(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) Year · "
                 + "\(stemPinyin[monthStem])-\(branchPinyin[monthBranch]) Month · "
                 + "\(stemPinyin[dayStem])-\(branchPinyin[dayBranch]) Day · "
-                + "\(stemPinyin[hourStem])-\(branchPinyin[hourBranch]) Hour"
+                + "\(stemPinyin[hourStem])-\(branchPinyin[hourBranch]) Hour", dayPillar: dayPillar)
         case .id:
             let stemPinyin = ["Jia", "Yi", "Bing", "Ding", "Wu", "Ji", "Geng", "Xin", "Ren", "Gui"]
             let branchPinyin = ["Zi", "Chou", "Yin", "Mao", "Chen", "Si", "Wu", "Wei", "Shen", "You", "Xu", "Hai"]
-            return "Thn \(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) · "
+            return (fullText: "Thn \(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) · "
                 + "Bln \(stemPinyin[monthStem])-\(branchPinyin[monthBranch]) · "
                 + "Hr \(stemPinyin[dayStem])-\(branchPinyin[dayBranch]) · "
-                + "Jam \(stemPinyin[hourStem])-\(branchPinyin[hourBranch])"
+                + "Jam \(stemPinyin[hourStem])-\(branchPinyin[hourBranch])", dayPillar: dayPillar)
         case .ja:
-            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+            return (fullText: "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
                 + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
                 + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
-                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時"
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時", dayPillar: dayPillar)
         case .ko:
             let koStems = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
             let koBranches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
-            return "\(koStems[yearStem])\(koBranches[yearBranch])년 "
+            return (fullText: "\(koStems[yearStem])\(koBranches[yearBranch])년 "
                 + "\(koStems[monthStem])\(koBranches[monthBranch])월 "
                 + "\(koStems[dayStem])\(koBranches[dayBranch])일 "
-                + "\(koStems[hourStem])\(koBranches[hourBranch])시"
+                + "\(koStems[hourStem])\(koBranches[hourBranch])시", dayPillar: dayPillar)
         case .vi:
             let viStems = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
             let viBranches = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
-            return "\(viStems[yearStem]) \(viBranches[yearBranch]) năm · "
+            return (fullText: "\(viStems[yearStem]) \(viBranches[yearBranch]) năm · "
                 + "\(viStems[monthStem]) \(viBranches[monthBranch]) tháng · "
                 + "\(viStems[dayStem]) \(viBranches[dayBranch]) ngày · "
-                + "\(viStems[hourStem]) \(viBranches[hourBranch]) giờ"
+                + "\(viStems[hourStem]) \(viBranches[hourBranch]) giờ", dayPillar: dayPillar)
         case .th:
             let thStems = ["เจี่ย", "อี้", "ปิ่ง", "ติง", "อู่", "จี่", "เกิง", "ซิน", "เหริน", "กุ่ย"]
             let thBranches = ["จื่อ", "โฉ่ว", "หยิน", "เหมา", "เฉิน", "ซื่อ", "อู่", "เว่ย", "เซิน", "โหย่ว", "ซวี", "ฮ่าย"]
-            return "ปี \(thStems[yearStem])-\(thBranches[yearBranch]) · "
+            return (fullText: "ปี \(thStems[yearStem])-\(thBranches[yearBranch]) · "
                 + "เดือน \(thStems[monthStem])-\(thBranches[monthBranch]) · "
                 + "วัน \(thStems[dayStem])-\(thBranches[dayBranch]) · "
-                + "ยาม \(thStems[hourStem])-\(thBranches[hourBranch])"
+                + "ยาม \(thStems[hourStem])-\(thBranches[hourBranch])", dayPillar: dayPillar)
         case .zhHant:
-            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+            return (fullText: "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
                 + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
                 + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
-                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時"
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時", dayPillar: dayPillar)
         case .auto, .zhHans:
-            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+            return (fullText: "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
                 + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
                 + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
-                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])时"
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])时", dayPillar: dayPillar)
         }
     }
 }

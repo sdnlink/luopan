@@ -442,65 +442,24 @@ public class TianJiShuEngine {
             drawSectionHeader(ctx: cg, title: sec5Title, atY: curY, vermilion: vermilion)
             curY += 65
             
-            let p5Text: String
-            switch renderLanguage {
-            case .en:
-                p5Text = """
-                1. Entry: keep it bright and spacious; avoid beams over the console and add a natural jade wealth vessel.
-                2. Kitchen: keep the faucet and stove apart; avoid a stove facing the door or suspended without support.
-                3. Bathroom: prevent the door facing the bed; use bamboo charcoal or cleansing water to reduce damp qi.
-                4. Balcony: if facing a wall blade, tower or reverse-bow road, use a brass Taishan stone or Mountain-Sea Shield.
-                """
-            case .zhHant:
-                p5Text = """
-                1. 入戶玄關：保持寬敞明亮，玄關櫃忌頂部有橫梁壓頂；宜安放天然黃玉聚寶盆迎財。
-                2. 廚房灶台：避免水龍頭與灶台對衝（水火相煎），忌爐灶背向大門或懸空設台。
-                3. 衛生間排濁：忌廁門直衝臥室床頭，常備活性竹炭或安忍水淨化地表陰濁濕氣。
-                4. 陽台防煞：若窗外對衝壁刀、電塔或反弓馬路，安放純銅泰山石敢當或山海鎮阻擋。
-                """
-            case .ja:
-                p5Text = """
-                1. 玄関：明るく清潔に保ち、梁の圧迫を避け、天然黄玉の縁起物で金運を迎え入れます。
-                2. キッチン：水道とコンロの直面（水火激突）を避け、安定した台に設置します。
-                3. 浴室：ドアがベッドに直面しないようにし、炭や清浄な水で湿気を払います。
-                4. ベランダ：ビル角や電波塔、反弓道路がある場合は、銅製泰山石敢当や山海鎮で防ぎます。
-                """
-            case .ko:
-                p5Text = """
-                1. 현관: 밝고 넓게 유지하며, 상단 대들보 압박을 피하고 황옥 복주머니를 두어 재운을 맞이하세요.
-                2. 주방: 수도꼭지와 가스레인지의 정면 충돌(수화상충)을 피하고 조리대를 안정되게 배치하세요.
-                3. 욕실: 문이 침대 머리를 직격하지 않도록 하고, 숯이나 소금 단지로 습기를 정화하세요.
-                4. 발코니: 창밖으로 벽도살이나 고압탑, 반궁도로가 보이면 태산석감당이나 산해진으로 방어하세요.
-                """
-            case .vi:
-                p5Text = """
-                1. Huyền quan: giữ sáng sủa rộng rãi, tránh xà ngang đè lên tủ huyền quan; đặt tụ bảo bồn hoàng ngọc đón tài.
-                2. Bếp nấu: tránh vòi nước chiếu thẳng vào bếp (thủy hỏa tương xung), kỵ bếp quay lưng ra cửa.
-                3. Phòng tắm: tránh cửa vệ sinh chiếu thẳng đầu giường; dùng than hoạt tính hoặc muối thô hút ẩm.
-                4. Ban công: nếu ngoài cửa sổ gặp góc nhọn, cột điện hay đường phản cung, đặt Thái Sơn thạch hoặc Sơn Hải Trấn.
-                """
-            case .th:
-                p5Text = """
-                1. โถงทางเข้า: รักษาความสว่างและโปร่งโล่ง หลีกเลี่ยงคานกดทับ วางอ่างสมบัติหินหยกเหลืองเรียกทรัพย์
-                2. ห้องครัว: หลีกเลี่ยงก๊อกน้ำประจันหน้าเตาไฟ (น้ำไฟปะทะ) ไม่ควรตั้งเตาลอยไร้ที่พิง
-                3. ห้องน้ำ: ป้องกันประตูห้องน้ำตรงกับหัวเตียง ใช้ถ่านไม้ไผ่หรือโถเกลือเพื่อดูดซับความชื้น
-                4. ระเบียง: หากหน้าต่างตรงกับสันตึก เสาไฟฟ้า หรือถนนคันศร ให้ตั้งหินไท่ซานหรือกระจกซานไห่เจิ้น
-                """
-            case .id:
-                p5Text = """
-                1. Area Masuk: jaga tetap terang dan luas; hindari balok gantung dan letakkan mangkuk rezeki giok kuning.
-                2. Dapur: jauhkan keran dari kompor (benturan air-api); hindari kompor membelakangi pintu utama.
-                3. Kamar Mandi: hindari pintu menghadap ranjang; gunakan arang bambu untuk menyerap kelembapan.
-                4. Balkon: jika berhadapan dengan sudut tajam atau jalan melengkung, pasang batu Taishan atau Shan Hai Zhen.
-                """
-            default:
-                p5Text = """
-                1. 入户玄关：保持宽敞明亮，玄关柜忌顶部有横梁压顶；宜安放天然黄玉聚宝盆迎财。
-                2. 厨房灶台：避免水龙头与灶台对冲（水火相煎），忌炉灶背向大门或悬空设台。
-                3. 卫生间排浊：忌厕门直冲卧室床头，常备活性竹炭或安忍水净化地表阴浊湿气。
-                4. 阳台防煞：若窗外对冲壁刀、电塔或反弓马路，安放纯铜泰山石敢当或山海镇阻挡。
-                """
-            }
+            let pwChart = PurpleWhiteEngine.shared.calculateChart(date: reportDate, heading: heading)
+            let zeri = ZeRiEngine.shared.analyze(sitting: mSitting, date: reportDate)
+            let annualNote = tr8(
+                "• 岁运太岁与择日：太岁在\(pwChart.taiSuiDescription)、岁破在\(pwChart.suiPoDescription)、三煞在\(pwChart.sanShaDescription)；当前四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",
+                "• 歲運太歲與擇日：太歲在\(pwChart.taiSuiDescription)、歲破在\(pwChart.suiPoDescription)、三煞在\(pwChart.sanShaDescription)；當前四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",
+                "• Annual Tai Sui & Date Selection: Tai Sui at \(pwChart.taiSuiDescription), Sui Po at \(pwChart.suiPoDescription), San Sha at \(pwChart.sanShaDescription); Four Pillars [\(zeri.fourPillarsText)] (\(zeri.overallStatus)).",
+                "• 歳運太歳と択日：太歳\(pwChart.taiSuiDescription)・歳破\(pwChart.suiPoDescription)・三煞\(pwChart.sanShaDescription)；四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",
+                "• 세운 태세 및 택일: 태세 \(pwChart.taiSuiDescription), 세파 \(pwChart.suiPoDescription), 삼살 \(pwChart.sanShaDescription); 사주 【\(zeri.fourPillarsText)】(\(zeri.overallStatus)).",
+                "• Thái Tuế & Trạch Nhật: Thái Tuế \(pwChart.taiSuiDescription), Tuế Phá \(pwChart.suiPoDescription), Tam Sát \(pwChart.sanShaDescription); Tứ Trụ 【\(zeri.fourPillarsText)】 (\(zeri.overallStatus)).",
+                "• ไท่ซุ่ยประจำปีและฤกษ์ยาม: ไท่ซุ่ย \(pwChart.taiSuiDescription), ซุ่ยพั่ว \(pwChart.suiPoDescription), ซานซ่า \(pwChart.sanShaDescription); สี่เสา 【\(zeri.fourPillarsText)】 (\(zeri.overallStatus))",
+                "• Tai Sui Tahunan & Pemilihan Hari: Tai Sui di \(pwChart.taiSuiDescription), Sui Po di \(pwChart.suiPoDescription), San Sha di \(pwChart.sanShaDescription); Empat Pilar [\(zeri.fourPillarsText)] (\(zeri.overallStatus))."
+            )
+            let p5Text = """
+            \(xkChart.wealthAdvice)
+            \(xkChart.healthAdvice)
+            \(xkChart.remedyAdvice)
+            \(annualNote)
+            """
             p5Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
                 .font: bodyFont,
                 .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)

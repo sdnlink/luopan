@@ -12,6 +12,7 @@ public struct XuanKongGridView: View {
     @State private var showTianJiShuSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var cachedChart: XuanKongChart?
+    @State private var selectedPalaceIdx: Int = 4
     @State private var lastCurrentPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     private static let periodRefreshTimer = Timer.publish(
         every: 60,
@@ -268,6 +269,28 @@ public struct XuanKongGridView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
+            if chart.isSanBanGua || chart.isQiXingDaJie {
+                HStack(spacing: 6) {
+                    if chart.isSanBanGua {
+                        Text(sanBanGuaBadgeText())
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.2))
+                            .foregroundColor(Color.green)
+                            .cornerRadius(4)
+                    }
+                    if chart.isQiXingDaJie {
+                        Text(qiXingDaJieBadgeText())
+                            .font(.system(size: 10, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.22))
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            .cornerRadius(4)
+                    }
+                }
+            }
         }
     }
     
@@ -283,6 +306,9 @@ public struct XuanKongGridView: View {
             ForEach(gridDisplayOrder, id: \.self) { idx in
                 let cell = chart.palaces[idx]
                 palaceCellView(cell: cell)
+                    .onTapGesture {
+                        selectedPalaceIdx = cell.id
+                    }
             }
         }
     }
@@ -290,7 +316,8 @@ public struct XuanKongGridView: View {
     private func palaceCellView(cell: XuanKongPalace) -> some View {
         let isDanger25 = (cell.sittingStar == 2 && cell.facingStar == 5) || (cell.sittingStar == 5 && cell.facingStar == 2)
         let isDouble9 = cell.sittingStar == cell.activePeriod && cell.facingStar == cell.activePeriod
-        let borderColor = isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12))
+        let isSelected = cell.id == selectedPalaceIdx
+        let borderColor = isSelected ? Color.yanCyan : (isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12)))
         let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
         
         return VStack(spacing: 4) {
@@ -325,7 +352,7 @@ public struct XuanKongGridView: View {
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: (isDanger25 || isDouble9) ? 1.5 : 1)
+                .stroke(borderColor, lineWidth: (isSelected || isDanger25 || isDouble9) ? 1.5 : 1)
         )
     }
     
@@ -343,6 +370,28 @@ public struct XuanKongGridView: View {
             
             Divider().background(Color.white.opacity(0.1))
             
+            if chart.palaces.indices.contains(selectedPalaceIdx) {
+                let sel = chart.palaces[selectedPalaceIdx]
+                HStack(spacing: 6) {
+                    Text("【\(sel.localizedPalaceName)】")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color.yanCyan)
+                    Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Spacer()
+                    Text(sel.localizedEvaluation)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+            }
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(chart.wealthAdvice)
                 Text(chart.healthAdvice)
@@ -358,5 +407,24 @@ public struct XuanKongGridView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
+    }
+    
+    private func sanBanGuaBadgeText() -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "San Ban Gua (Auspicious Triad)"
+        case .zhHant, .ja: return "三般卦吉格 · 通氣連珠"
+        case .ko: return "삼반괘 길격"
+        case .vi: return "Tam Ban Quái Cát Cách"
+        case .th: return "ซานปานกั้ว (ผังมงคลสามประสาน)"
+        case .id: return "Pola San Ban Gua"
+        case .auto, .zhHans: return "三般卦吉格 · 通气连珠"
+        }
+    }
+    
+    private func qiXingDaJieBadgeText() -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Qi Xing Da Jie (Seven-Star Robbery)"
+        case .zhHant, .ja: return "七星打劫大吉局"
+        }
     }
 }

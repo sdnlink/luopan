@@ -4,6 +4,7 @@ import UIKit
 // MARK: - 八宅明镜与三合水法全景研判视图 (BaZhai & SanHe Water View)
 
 public struct BaZhaiView: View {
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -13,9 +14,15 @@ public struct BaZhaiView: View {
     @State private var cachedWaterItems: [SanHeWaterItem]?
     @State private var cachedZeRi: ZeRiAnalysis?
     public var isEmbedded: Bool = false
+    private static let clockRefreshTimer = Timer.publish(
+        every: 60,
+        on: .main,
+        in: .common
+    ).autoconnect()
     
-    public init(isEmbedded: Bool = false) {
+    public init(isEmbedded: Bool = false, isActive: Bool = true) {
         self.isEmbedded = isEmbedded
+        self.isActive = isActive
     }
     
     public var body: some View {
@@ -77,9 +84,17 @@ public struct BaZhaiView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             refreshAnalysis()
         }
+        .onReceive(Self.clockRefreshTimer) { _ in
+            // ZeRi includes the current hour pillar. Refresh at a low rate so
+            // an open page crosses an hour boundary without showing stale
+            // recommendations, while hidden tabs do no calendar work.
+            guard isActive else { return }
+            refreshAnalysis()
+        }
     }
 
     private func refreshAnalysis() {
+        guard isActive else { return }
         let state = motion.headingState
         cachedAnalysis = BaZhaiEngine.shared.analyze(
             sittingPalace: state.sittingMountain.palace,

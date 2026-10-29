@@ -56,6 +56,10 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     @Published public var floorplanCreditsCount: Int = 0
     @Published public var tianjiCreditsCount: Int = 0
     @Published public private(set) var isLoadingProducts: Bool = false
+    /// Invalidates price views whenever StoreKit returns metadata. This is
+    /// separate from the loading flag because a paywall may be presented
+    /// after a request has already completed.
+    @Published public private(set) var productsRevision: Int = 0
     @Published public private(set) var isProcessingPurchase: Bool = false
     @Published public private(set) var lastErrorMessage: String?
     @Published public private(set) var lastStatusMessage: String?
@@ -158,6 +162,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         for product in response.products {
             availableProducts[product.productIdentifier] = product
         }
+        productsRevision &+= 1
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.delegate?.iapManagerDidUpdateProducts(Array(self.availableProducts.values))

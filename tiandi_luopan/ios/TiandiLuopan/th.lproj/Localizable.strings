@@ -1,11 +1,15 @@
-/* Localizable.strings (th) - Auto-synced from LocalizationManager.swift */
+/*
+ * Localizable.strings (th)
+ * TianJiYanXiang Compass & FengShui
+ */
 
 "tab_compass" = "เข็มทิศ";
+"ar_roomplan_synced_floorplan" = "ซิงค์ไปยังผังแปลนบ้านแล้ว";
+"day_unit" = "วัน";
 "tab_ar" = "ดูสภาพ";
 "tab_floorplan" = "ผังบ้าน";
 "tab_analysis" = "ฮวงจุ้ย";
 "tab_settings" = "ตั้งค่า";
-"compass_title" = "เทียนจีเหยียนเซียง";
 "lock_heading" = "ล็อกทิศ";
 "locked_heading" = "ล็อกทิศแล้ว";
 "layers_settings" = "ชั้นแผน";
@@ -13,14 +17,9 @@
 "pure_alignment" = "ตรงแนวพอดี";
 "sub_mountain" = "เส้นเข็มรอง (兼針)";
 "small_void" = "ช่องว่างเล็ก (空亡)";
-"big_void" = "ช่องว่างใหญ่ (空亡)";
-"jewel_line" = "เส้นมงคล";
-"fire_pit" = "เส้นไม่มงคล";
-"fenjin_120" = "120 เฟินจิน";
 "true_solar_time" = "เวลาพระอาทิตย์จริง";
 "gps_coords" = "พิกัด GPS แบบเรียลไทม์";
 "location_unavailable" = "ยังไม่ได้ตำแหน่ง";
-"calib_accuracy" = "ความแม่นยำและการปรับเทียบแม่เหล็กโลก";
 "mag_distortion" = "สถานะการรบกวนสนามแม่เหล็ก";
 "haptic_feedback" = "สั่นเมื่อข้ามเขตทิศ";
 "gua_kan" = "คาน (坎)";
@@ -44,16 +43,12 @@
 "tianji_scroll" = "ม้วนยาวเทียนจีเหยียนเซียง";
 "save_to_photos" = "บันทึกลงรูปภาพ";
 "share_and_print" = "แชร์และพิมพ์ม้วนยาว";
-"period_selection" = "เลือกยุคหยวนอวิ้น";
-"current_period_9" = "ยุค 9 เซี่ยหยวนปัจจุบัน (2024–2043)";
-"sitting_facing" = "วิเคราะห์ทิศนั่ง-หัน";
 "floorplan_title" = "วางผังบ้าน แล้วตรวจทั้งหลัง";
 "import_plan" = "นำเข้าแปลน";
 "change_plan" = "เปลี่ยนแปลน";
 "reset_sample" = "รีเซ็ตตัวอย่าง";
 "floorplan_reset_confirm" = "ภาพแปลนที่นำเข้าและห้องที่จัดเองจะถูกลบ ไปต่อไหม?";
 "audit_checklist" = "รายการตรวจฮวงจุ้ยทั้งบ้าน";
-"room_details" = "รายงานวินิจฉัยโซนการใช้งาน";
 "ar_title" = "ดูทิศผ่านกล้อง";
 "ar_spatial_survey" = "สำรวจพื้นที่ 3 มิติด้วย AR";
 "ar_spatial_close" = "ปิดการสำรวจ 3 มิติ";
@@ -103,7 +98,6 @@
 "capture_proof" = "ถ่ายเก็บไว้";
 "remedy_guide" = "คู่มือแก้เคล็ด";
 "simulation_mode" = "โหมดจำลองภายใน / ฝึกฉากจริง";
-"sha_report" = "รายงานสิ่งที่เห็นรอบบ้าน";
 "ar_auto_follow" = "ตามทิศฉากจริง";
 "ar_manual_lock" = "ล็อกทิศที่กำลังดู";
 "ar_current_facing" = "ทิศหลักปัจจุบัน";
@@ -173,10 +167,6 @@
 "settings_mag_intensity" = "ความเข้มสนามแม่เหล็ก";
 "settings_calib_status_high" = "สูงมาก ✓";
 "settings_calib_status_need" = "ต้องสอบเทียบ ⚠️";
-"settings_calib_guide_title" = "วิธีสอบเทียบเข็มทิศและสนามแม่เหล็กรูป 8";
-"settings_calib_guide_1" = "1. อยู่ให้ห่างจากโลหะแม่เหล็ก คอมพิวเตอร์ ลำโพง และหม้อแปลงใหญ่";
-"settings_calib_guide_2" = "2. จับมือถือ วาดเลข 8 (∞) ในอากาศให้ครบทุกแกนอย่างนุ่มนวล";
-"settings_calib_guide_3" = "3. ทำ 3 ถึง 5 รอบ จนแถบสนามแม่เหล็กด้านบนเข็มทิศเป็นสีเขียว";
 "i_know" = "เข้าใจแล้ว";
 "fenjin_detail_title" = "ดูองศาแบ่งทิศ (分金)";
 "fenjin_title_suffix" = "แบ่งทิศ (分金)";
@@ -268,9 +258,6 @@
 "floorplan_height_expand" = "สูงขึ้น";
 "floorplan_edit_rooms" = "จัดห้อง";
 "floorplan_finish_rooms" = "จัดเสร็จ";
-"severity_critical" = "ซารุนแรง";
-"severity_warning" = "เตือน";
-"severity_auspicious" = "มงคล";
 "floorplan_level_auspicious" = "มงคล";
 "floorplan_level_severe" = "ชาแรง";
 "floorplan_level_warning" = "เตือน";
@@ -309,9 +296,7 @@
 "ar_watermark_stamp" = "เทียนจี\\nยืนยัน";
 "ar_env_features" = "📐 ลักษณะสภาพแวดล้อมหน้างาน";
 "ar_classic_lore" = "📜 ข้อความจากตำรา";
-"ar_remedy_title" = "🛡️ ของตั้งและวิธีปรับพื้นที่";
 "ar_vip_remedy_title" = "วิธีคลายชาของปรมาจารย์หยาง · VIP";
-"ar_vip_remedy_desc" = "สูตรคลายชาจากรูปภูมิ หลักวางของพิธี มาตรารูปัน และวิธีตั้งรับชา ปลดล็อก VIP";
 "ar_ai_scan" = "สแกนฉากด้วย AI";
 "ar_ai_scanning" = "AI กำลังวิเคราะห์…";
 "ar_ai_result" = "ความมั่นใจของตัวเลือก AI";
@@ -324,7 +309,6 @@
 "ar_ai_tracking_limited" = "AR ยังล็อกไม่นิ่ง เลื่อนมือถือช้า ๆ กวาดผนังและตัวอาคารแล้วลองใหม่";
 "ar_ai_depth_unavailable" = "ยังไม่ได้ความลึก LiDAR ที่ใช้ได้ เพิ่มแสงและให้เป้าอยู่ในภาพ";
 "ar_ai_scene_unmapped" = "AR ยังไม่ได้โครงพื้นที่ สแกนรอบตัวก่อนให้ AI ตัดสิน";
-"ar_ai_failed" = "วิเคราะห์ AI ไม่สำเร็จ จัดเฟรมแล้วลองใหม่";
 "camera_permission_denied" = "สิทธิ์กล้องถูกปิด โปรดอนุญาตกล้องในการตั้งค่าระบบ";
 "open_system_settings" = "เปิดตั้งค่าระบบ";
 "request_location_permission" = "อนุญาตตำแหน่ง";
@@ -335,18 +319,11 @@
 "tianji_vip_card_desc" = "รวมทิศนั่ง-หันที่วัด ดาวบิน เส้นน้ำแปดสาย คี่เหมินตามยาม และข่วยบ้านแปดหลัง เป็นม้วนกระดาษเส้นแดงไม่มีลายน้ำ";
 "tianji_vip_badge" = "👑 VIP / ส่งออกครั้งเดียว";
 "mag_warning_tap" = "พบแม่เหล็กรบกวนแรง · แตะเพื่อสอบเทียบ";
-"header_sitting_facing" = "นั่ง-หัน";
-"header_palace_suffix" = "วัง";
-"header_pitch_roll" = "ก้มเงย / ม้วน";
 "btn_palace_all" = "แปดทิศ";
 "btn_fenjin_detail" = "เฟินจิน";
 "btn_calib" = "ปรับเทียบ";
 "btn_layers" = "ชั้น";
 "xuankong_deep_analysis" = "📜 วิเคราะห์รูปแบบเชิงลึก";
-"xuankong_wealth_advice" = "• เสริมทรัพย์: ทิศดาวหันที่ถึงจังหวะ เปิดประตูเห็นน้ำ ใช้น้ำเคลื่อนกระตุ้นทรัพย์";
-"xuankong_health_advice" = "• เสริมคน: ทิศดาวเขาที่ถึงจังหวะ ตั้งห้องนอนหลัก หัวเตียงมีพนัก";
-"xuankong_remedy_advice" = "• คลายชา 2-5: ช่องที่ดาวดำ 2 ทับเหลือง 5 แขวนเหรียญหกจักรพรรดิ ให้ทองระบายดิน";
-"period_unit" = "ยุค";
 "gate_facing_prefix" = "ทิศเปิดประตูหัวหัน";
 "na_qi_prefix" = "นา";
 "zeri_title" = "เลือกวันตามดาวฟ้า · ตรวจวันขุดดินตั้งประตูด้วยตนเอง";
@@ -366,9 +343,6 @@
 "qimen_taboo_nav" = "• ทิศควรเลี่ยง: ประจัน";
 "qimen_taboo_suffix" = "กันสะดุดและตกใจ ตอนสำรวจเลี่ยงทิศปะทะ";
 "grade_auspicious" = "มงคล";
-"grade_great_auspicious" = "มงคลใหญ่";
-"grade_inauspicious" = "อัปมงคล";
-"grade_great_inauspicious" = "อัปมงคลใหญ่";
 "price_loading" = "กำลังโหลดราคา…";
 "price_unavailable" = "ราคายังไม่พร้อม";
 "reload_prices" = "โหลดราคาอีกครั้ง";
@@ -393,7 +367,6 @@
 "minute_unit" = "นาที";
 "year_suffix" = "ปี";
 "month_suffix" = "เดือน";
-"solar_calib_title" = "เทียบเวลาสุริยะจริงแล้ว";
 "mountain_suffix" = "เขา";
 "facing_suffix" = "หัน";
 "palace_suffix" = "กง";

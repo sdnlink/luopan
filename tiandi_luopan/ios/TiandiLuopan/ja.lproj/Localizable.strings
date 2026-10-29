@@ -1,11 +1,15 @@
-/* Localizable.strings (ja) - Auto-synced from LocalizationManager.swift */
+/*
+ * Localizable.strings (ja)
+ * TianJiYanXiang Compass & FengShui
+ */
 
 "tab_compass" = "羅盤";
+"ar_roomplan_synced_floorplan" = "間取り立極図面へ同期しました";
+"day_unit" = "日";
 "tab_ar" = "実景";
 "tab_floorplan" = "間取り";
 "tab_analysis" = "玄空";
 "tab_settings" = "設定";
-"compass_title" = "天機演象";
 "lock_heading" = "向きを固定";
 "locked_heading" = "向きを固定中";
 "layers_settings" = "層";
@@ -13,14 +17,9 @@
 "pure_alignment" = "正針";
 "sub_mountain" = "兼針替卦";
 "small_void" = "小空亡";
-"big_void" = "大空亡";
-"jewel_line" = "吉の分金";
-"fire_pit" = "凶の分金";
-"fenjin_120" = "一百二十分金";
 "true_solar_time" = "真太陽時";
 "gps_coords" = "GPSリアルタイム経緯度";
 "location_unavailable" = "位置未取得";
-"calib_accuracy" = "地磁気精度と校正";
 "mag_distortion" = "磁場干渉の状態";
 "haptic_feedback" = "山の境で振動";
 "gua_kan" = "坎";
@@ -44,16 +43,12 @@
 "tianji_scroll" = "福宅天機長巻";
 "save_to_photos" = "写真に保存";
 "share_and_print" = "長巻の共有と印刷";
-"period_selection" = "元運の選択";
-"current_period_9" = "現在は下元九運（2024–2043）";
-"sitting_facing" = "坐向分析";
 "floorplan_title" = "間取りの中心を決めて、部屋を見る";
 "import_plan" = "図面を読み込む";
 "change_plan" = "図面を変更";
 "reset_sample" = "サンプルをリセット";
 "floorplan_reset_confirm" = "読み込んだ図面と部屋の配置を消します。よろしいですか？";
 "audit_checklist" = "全室風水格局診断リスト";
-"room_details" = "機能別診断レポート";
 "ar_title" = "カメラで向きを見る";
 "ar_spatial_survey" = "AR三次元空間測量";
 "ar_spatial_close" = "三次元測量を閉じる";
@@ -103,7 +98,6 @@
 "capture_proof" = "写真を残す";
 "remedy_guide" = "化解錦嚢";
 "simulation_mode" = "室内／模擬実景トレーニングモード";
-"sha_report" = "形煞診断レポート";
 "ar_auto_follow" = "実景の向首追従";
 "ar_manual_lock" = "形煞を手動ロック";
 "ar_current_facing" = "現在の主応";
@@ -173,10 +167,6 @@
 "settings_mag_intensity" = "磁場強度";
 "settings_calib_status_high" = "極めて高い ✓";
 "settings_calib_status_need" = "校正が必要 ⚠️";
-"settings_calib_guide_title" = "コンパスと磁場の8の字校正";
-"settings_calib_guide_1" = "1. 強磁性の金属、パソコン、スピーカー、大型の変圧器から離れてください。";
-"settings_calib_guide_2" = "2. 端末を持ち、空中で「∞」を描くようにゆっくり振ってください。";
-"settings_calib_guide_3" = "3. 3〜5回繰り返し、羅盤上部の磁場表示が緑になるまで続けてください。";
 "i_know" = "了解";
 "fenjin_detail_title" = "分金度数";
 "fenjin_title_suffix" = "分金";
@@ -268,9 +258,6 @@
 "floorplan_height_expand" = "高さを拡大";
 "floorplan_edit_rooms" = "部屋を調整";
 "floorplan_finish_rooms" = "配置を完了";
-"severity_critical" = "重大な煞気";
-"severity_warning" = "警報";
-"severity_auspicious" = "吉";
 "floorplan_level_auspicious" = "吉";
 "floorplan_level_severe" = "強い煞気";
 "floorplan_level_warning" = "注意";
@@ -309,9 +296,7 @@
 "ar_watermark_stamp" = "天機\\n鑑真";
 "ar_env_features" = "📐 現場の識別ポイント";
 "ar_classic_lore" = "📜 経典の賦文";
-"ar_remedy_title" = "🛡️ 開光法器と空間の化解";
 "ar_vip_remedy_title" = "楊公の化煞要訣 · VIP";
-"ar_vip_remedy_desc" = "形巒の煞の制化、開光法器の安置、魯班尺の寸法と鎮煞の処方は VIP の解除が必要です。";
 "ar_ai_scan" = "AI 実景スキャン";
 "ar_ai_scanning" = "AI 分析中…";
 "ar_ai_result" = "AI候補の確度";
@@ -324,7 +309,6 @@
 "ar_ai_tracking_limited" = "AR の追跡がまだ不安定です。壁と建物をゆっくりスキャンしてから再試行してください。";
 "ar_ai_depth_unavailable" = "信頼できる LiDAR 深度が取れません。明るさを確保し、対象を画面に入れてください。";
 "ar_ai_scene_unmapped" = "AR が空間をまだ掴めていません。周囲をスキャンしてから AI 判定してください。";
-"ar_ai_failed" = "AI 分析に失敗しました。撮り直して再試行してください。";
 "camera_permission_denied" = "カメラ権限がオフです。システム設定でカメラへのアクセスを許可してください。";
 "open_system_settings" = "設定を開く";
 "request_location_permission" = "位置情報を許可";
@@ -335,18 +319,11 @@
 "tianji_vip_card_desc" = "実測の坐向、玄空飛星、八路黄泉、時家奇門、八宅命卦をまとめ、朱絲欄の宣紙長巻（透かしなし）として書き出します。";
 "tianji_vip_badge" = "👑 VIP / 1回書き出し";
 "mag_warning_tap" = "強磁の干渉を検出 · タップして校正";
-"header_sitting_facing" = "坐向";
-"header_palace_suffix" = "宮";
-"header_pitch_roll" = "ピッチ / ロール";
 "btn_palace_all" = "八方全鑑";
 "btn_fenjin_detail" = "分金詳勘";
 "btn_calib" = "校正";
 "btn_layers" = "レイヤー";
 "xuankong_deep_analysis" = "📜 格局の深読み";
-"xuankong_wealth_advice" = "• 旺財：向星が当令の方は開門見水がよく、動水で財を催す。";
-"xuankong_health_advice" = "• 旺丁：山星が当令の方に主臥を置き、ベッドに背もたれを。";
-"xuankong_remedy_advice" = "• 二五化煞：二黒と五黄が重なる宮に六帝銭を掛け、金で土を洩らす。";
-"period_unit" = "運";
 "gate_facing_prefix" = "向首開門方";
 "na_qi_prefix" = "納";
 "zeri_title" = "天星択日 · 動土安門の日課自己点検";
@@ -366,9 +343,6 @@
 "qimen_taboo_nav" = "• 避ける凶方：逢";
 "qimen_taboo_suffix" = "停滞や恐懼を防ぐため、踏査では対衝を避けてください。";
 "grade_auspicious" = "吉";
-"grade_great_auspicious" = "大吉";
-"grade_inauspicious" = "凶";
-"grade_great_inauspicious" = "大凶";
 "price_loading" = "価格を読み込み中…";
 "price_unavailable" = "価格を表示できません";
 "reload_prices" = "価格を再読み込み";
@@ -393,7 +367,6 @@
 "minute_unit" = "分";
 "year_suffix" = "年";
 "month_suffix" = "月";
-"solar_calib_title" = "真太陽時校正済み";
 "mountain_suffix" = "山";
 "facing_suffix" = "向";
 "palace_suffix" = "宮";

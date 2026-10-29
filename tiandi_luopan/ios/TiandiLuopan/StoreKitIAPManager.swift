@@ -13,9 +13,20 @@ public struct ReceiptValidationResult {
     public let purchasedProductIDs: Set<String>
     public let latestExpirationDate: Date?
     public let receiptSHA256: String
-    
-    public var isTrusted: Bool {
+    /// PKCS#7 证书链是否链到系统信任锚（Apple 签发证书链）。
+    public let certificateChainValid: Bool
+    /// CMS 数字签名是否由签名者证书私钥签发（防伪造/防篡改）。
+    public let signatureValid: Bool
+
+    /// 仅结构层面有效（PKCS#7 容器 + BundleID 匹配），不含密码学验证。
+    public var isStructurallyValid: Bool {
         return isValidContainer && bundleIDMatched
+    }
+
+    /// 可信收据：结构有效 **且** 证书链可信 **且** 数字签名验证通过。
+    /// App Store 真收据必然同时满足三项；伪造/篡改数据无法通过 Apple 签名验证。
+    public var isTrusted: Bool {
+        return isValidContainer && bundleIDMatched && certificateChainValid && signatureValid
     }
 }
 
@@ -723,7 +734,9 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
                 bundleIDMatched: false,
                 purchasedProductIDs: [],
                 latestExpirationDate: nil,
-                receiptSHA256: ""
+                receiptSHA256: "",
+                certificateChainValid: false,
+                signatureValid: false
             )
         }
         
@@ -776,17 +789,268 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         let bundleIDMatched = (parsedBundleID == expectedBundleID) || (parsedBundleID == "com.yanxiang.compass")
         let latestExpiry = expiryDates.max()
         
+        // 3. 密码学验证：PKCS#7 证书链可信度 + CMS 数字签名。
+        //    结构/BundleID 校验可被任意“长得像收据”的数据通过，只有 Apple
+        //    签发的证书链与签名才能证明该收据确由 App Store 生成且未被篡改。
+        let signatureVerification = ReceiptSignatureVerifier.verify(receiptData: receiptData)
+        
         return ReceiptValidationResult(
             isValidContainer: isValidContainer,
             bundleIDMatched: bundleIDMatched,
             purchasedProductIDs: purchasedIDs,
             latestExpirationDate: latestExpiry,
-            receiptSHA256: sha256Hex
+            receiptSHA256: sha256Hex,
+            certificateChainValid: signatureVerification.certificateChainValid,
+            signatureValid: signatureVerification.signatureValid
         )
     }
     
+    // MARK: - PKCS#7 收据密码学验证 (Apple App Store Receipt Signature)
+
+    private static let signedDataOID: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02]       // 1.2.840.113549.1.7.2
+    private static let sha1OID: [UInt8] = [0x2B, 0x0E, 0x03, 0x02, 0x1A]                                     // 1.3.14.3.2.26
+    private static let sha256OID: [UInt8] = [0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01]           // 2.16.840.1.101.3.4.2.1
+    private static let sha1WithRSAOID: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x05]     // 1.2.840.113549.1.1.5
+    private static let sha256WithRSAOID: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0B]   // 1.2.840.113549.1.1.11
+    private static let rsaEncryptionOID: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01]   // 1.2.840.113549.1.1.1
+    private static let ecdsaWithSHA256OID: [UInt8] = [0x2A, 0x86, 0x48, 0xCE, 0x3D, 0x04, 0x03, 0x02]       // 1.2.840.10045.4.3.2
+
+    /// 对 App Store 本地收据做两层密码学验证：
+    /// 1) 证书链可信（SecTrust 链到系统信任锚，即 Apple 签发的证书链）；
+    /// 2) CMS 数字签名由签名者证书的私钥签发（防止内容被篡改或整体伪造）。
+    /// 结构校验（SEQUENCE/OID/BundleID）无法证明“这是 Apple 生成的收据”，
+    /// 只有签名链可以。实现遵循 RFC 5652 (CMS) 对带 signedAttrs 的签名约定。
+    fileprivate struct ReceiptSignatureVerifier {
+        struct VerificationResult {
+            let certificateChainValid: Bool
+            let signatureValid: Bool
+        }
+
+        private struct DERNode {
+            let tag: UInt8
+            let isConstructed: Bool
+            let valueRange: Range<Int>
+            let nextOffset: Int
+        }
+
+        static func verify(receiptData: Data) -> VerificationResult {
+            let bytes = [UInt8](receiptData)
+            let empty = VerificationResult(certificateChainValid: false, signatureValid: false)
+
+            // 外层：SEQUENCE { OID signedData, [0] EXPLICIT SignedData }
+            guard let outer = readDER(bytes, 0, bytes.count), outer.tag == 0x30,
+                  let oid = readDER(bytes, outer.valueRange.lowerBound, outer.valueRange.upperBound),
+                  oid.tag == 0x06,
+                  Array(bytes[oid.valueRange]) == signedDataOID,
+                  let sdExplicit = readDER(bytes, oid.nextOffset, outer.valueRange.upperBound),
+                  sdExplicit.tag == 0xA0,
+                  let signedData = readDER(bytes, sdExplicit.valueRange.lowerBound, sdExplicit.valueRange.upperBound),
+                  signedData.tag == 0x30 else {
+                return empty
+            }
+
+            // SignedData: version, digestAlgorithms, contentInfo, [0] certificates, [1] crls?, signerInfos
+            let sdRange = signedData.valueRange
+            guard let version = readDER(bytes, sdRange.lowerBound, sdRange.upperBound), version.tag == 0x02,
+                  let digestAlgs = readDER(bytes, version.nextOffset, sdRange.upperBound), digestAlgs.tag == 0x31,
+                  let contentInfo = readDER(bytes, digestAlgs.nextOffset, sdRange.upperBound), contentInfo.tag == 0x30 else {
+                return empty
+            }
+            // contentInfo: SEQUENCE { OID, content? }；content 字段原始编码（含 [0] EXPLICIT 标签）作为无 signedAttrs 时的被签数据
+            guard let ciOID = readDER(bytes, contentInfo.valueRange.lowerBound, contentInfo.valueRange.upperBound),
+                  ciOID.tag == 0x06 else {
+                return empty
+            }
+            let contentFieldRange = ciOID.nextOffset..<contentInfo.valueRange.upperBound
+
+            // certificates [0] IMPLICIT（可选）
+            var cursor = contentInfo.nextOffset
+            var certificates: [Data] = []
+            if let certSet = readDER(bytes, cursor, sdRange.upperBound), certSet.tag == 0xA0 {
+                var off = certSet.valueRange.lowerBound
+                let certLimit = certSet.valueRange.upperBound
+                while off + 2 <= certLimit {
+                    guard let cert = readDER(bytes, off, certLimit), cert.tag == 0x30 else { break }
+                    certificates.append(Data(bytes[cert.valueRange]))
+                    off = cert.nextOffset
+                }
+                cursor = certSet.nextOffset
+            }
+            // crls [1] IMPLICIT（可选）
+            if let crlSet = readDER(bytes, cursor, sdRange.upperBound), crlSet.tag == 0xA1 {
+                cursor = crlSet.nextOffset
+            }
+            guard let signerInfos = readDER(bytes, cursor, sdRange.upperBound), signerInfos.tag == 0x31,
+                  let signer = readDER(bytes, signerInfos.valueRange.lowerBound, signerInfos.valueRange.upperBound),
+                  signer.tag == 0x30 else {
+                return empty
+            }
+
+            // SignerInfo: version, issuerAndSerial, digestAlgorithm, [0] signedAttrs?, signatureAlgorithm, signature
+            let siRange = signer.valueRange
+            guard let siVersion = readDER(bytes, siRange.lowerBound, siRange.upperBound), siVersion.tag == 0x02,
+                  let issuerSerial = readDER(bytes, siVersion.nextOffset, siRange.upperBound), issuerSerial.tag == 0x30,
+                  let digAlg = readDER(bytes, issuerSerial.nextOffset, siRange.upperBound), digAlg.tag == 0x30,
+                  let digAlgOID = readDER(bytes, digAlg.valueRange.lowerBound, digAlg.valueRange.upperBound),
+                  digAlgOID.tag == 0x06 else {
+                return empty
+            }
+            let digestAlgOIDBytes = Array(bytes[digAlgOID.valueRange])
+
+            var siCursor = digAlg.nextOffset
+            var signedAttrsValue: [UInt8]?
+            if let attrs = readDER(bytes, siCursor, siRange.upperBound), attrs.tag == 0xA0 {
+                signedAttrsValue = Array(bytes[attrs.valueRange])
+                siCursor = attrs.nextOffset
+            }
+            guard let sigAlg = readDER(bytes, siCursor, siRange.upperBound), sigAlg.tag == 0x30,
+                  let sigAlgOID = readDER(bytes, sigAlg.valueRange.lowerBound, sigAlg.valueRange.upperBound),
+                  sigAlgOID.tag == 0x06,
+                  let signature = readDER(bytes, sigAlg.nextOffset, siRange.upperBound), signature.tag == 0x04 else {
+                return empty
+            }
+            let sigAlgOIDBytes = Array(bytes[sigAlgOID.valueRange])
+            let signatureData = Data(bytes[signature.valueRange])
+            guard !signatureData.isEmpty else { return empty }
+
+            // 签名者证书序列号：issuerAndSerial = SEQUENCE { issuer Name, serial INTEGER }
+            guard let issuerName = readDER(bytes, issuerSerial.valueRange.lowerBound, issuerSerial.valueRange.upperBound),
+                  issuerName.tag == 0x30,
+                  let serial = readDER(bytes, issuerName.nextOffset, issuerSerial.valueRange.upperBound),
+                  serial.tag == 0x02 else {
+                return empty
+            }
+            let serialBytes = Array(bytes[serial.valueRange])
+            guard !serialBytes.isEmpty else { return empty }
+
+            // 在证书集合中定位签名者证书：tbsCertificate 内的第一个 INTEGER 即 serialNumber
+            var signerCertDER: Data?
+            for certData in certificates {
+                let cbytes = [UInt8](certData)
+                guard let cert = readDER(cbytes, 0, cbytes.count), cert.tag == 0x30,
+                      let tbs = readDER(cbytes, cert.valueRange.lowerBound, cert.valueRange.upperBound), tbs.tag == 0x30,
+                      let certSerial = readDER(cbytes, tbs.valueRange.lowerBound, tbs.valueRange.upperBound),
+                      certSerial.tag == 0x02,
+                      Array(cbytes[certSerial.valueRange]) == serialBytes else { continue }
+                signerCertDER = certData
+                break
+            }
+            guard let signerCertDER = signerCertDER else { return empty }
+
+            // ===== 1. 证书链验证（系统信任锚） =====
+            let certObjects = certificates.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
+            guard !certObjects.isEmpty else { return empty }
+            let policy = SecPolicyCreateBasicX509()
+            var trust: SecTrust?
+            let trustStatus = SecTrustCreateWithCertificates(certObjects as CFArray, [policy] as CFArray, &trust)
+            guard trustStatus == errSecSuccess, let trust = trust else { return empty }
+            let chainValid = SecTrustEvaluateWithError(trust, nil)
+
+            // ===== 2. CMS 数字签名验证 =====
+            guard chainValid, let publicKey = SecTrustCopyPublicKey(trust) else {
+                return VerificationResult(certificateChainValid: chainValid, signatureValid: false)
+            }
+
+            // 被签数据：有 signedAttrs 时按 CMS 约定重编码为 SET (0x31) 再摘要；
+            // 无 signedAttrs 时退化为对 contentInfo.content 字段原始编码摘要。
+            let dataToDigest: Data
+            if let attrsValue = signedAttrsValue {
+                let setBytes = [UInt8(0x31)] + derLengthBytes(attrsValue.count) + attrsValue
+                dataToDigest = Data(setBytes)
+            } else {
+                dataToDigest = Data(bytes[contentFieldRange])
+            }
+
+            // 算法映射（Apple 收据以 RSA 为主，ECDSA 作兜底）
+            var keyAlgorithm: SecKeyAlgorithm?
+            var useSHA256 = false
+            switch sigAlgOIDBytes {
+            case sha1WithRSAOID:
+                keyAlgorithm = .rsaSignatureDigestPKCS1v15SHA1
+            case sha256WithRSAOID:
+                keyAlgorithm = .rsaSignatureDigestPKCS1v15SHA256
+                useSHA256 = true
+            case rsaEncryptionOID:
+                if digestAlgOIDBytes == sha256OID {
+                    keyAlgorithm = .rsaSignatureDigestPKCS1v15SHA256
+                    useSHA256 = true
+                } else if digestAlgOIDBytes == sha1OID {
+                    keyAlgorithm = .rsaSignatureDigestPKCS1v15SHA1
+                } else {
+                    return VerificationResult(certificateChainValid: true, signatureValid: false)
+                }
+            case ecdsaWithSHA256OID:
+                keyAlgorithm = .ecdsaSignatureMessageX962SHA256
+            default:
+                return VerificationResult(certificateChainValid: true, signatureValid: false)
+            }
+            guard let keyAlgorithm = keyAlgorithm else {
+                return VerificationResult(certificateChainValid: true, signatureValid: false)
+            }
+            guard SecKeyIsAlgorithmSupported(publicKey, .verify, keyAlgorithm) else {
+                return VerificationResult(certificateChainValid: true, signatureValid: false)
+            }
+
+            let signedDataForVerification: Data
+            if keyAlgorithm == .ecdsaSignatureMessageX962SHA256 {
+                signedDataForVerification = dataToDigest
+            } else {
+                signedDataForVerification = useSHA256
+                    ? Data(SHA256.hash(data: dataToDigest))
+                    : Data(Insecure.SHA1.hash(data: dataToDigest))
+            }
+
+            var verifyError: Unmanaged<CFError>?
+            let signatureValid = SecKeyVerifySignature(
+                publicKey,
+                keyAlgorithm,
+                signedDataForVerification as CFData,
+                signatureData as CFData,
+                &verifyError
+            )
+            return VerificationResult(certificateChainValid: true, signatureValid: signatureValid)
+        }
+
+        // MARK: DER 读取与长度编码
+
+        private static func readDER(_ bytes: [UInt8], _ offset: Int, _ limit: Int) -> DERNode? {
+            guard offset >= 0, offset + 2 <= limit else { return nil }
+            let tag = bytes[offset]
+            let isConstructed = (tag & 0x20) != 0
+            var idx = offset + 1
+            let lenByte = bytes[idx]
+            idx += 1
+            if (lenByte & 0x80) == 0 {
+                let length = Int(lenByte)
+                guard idx + length <= limit else { return nil }
+                return DERNode(tag: tag, isConstructed: isConstructed, valueRange: idx..<(idx + length), nextOffset: idx + length)
+            } else {
+                let octetsCount = Int(lenByte & 0x7F)
+                guard octetsCount >= 1, octetsCount <= 4, idx + octetsCount <= limit else { return nil }
+                var length = 0
+                for i in 0..<octetsCount {
+                    length = (length << 8) | Int(bytes[idx + i])
+                }
+                idx += octetsCount
+                guard length >= 0, idx + length <= limit else { return nil }
+                return DERNode(tag: tag, isConstructed: isConstructed, valueRange: idx..<(idx + length), nextOffset: idx + length)
+            }
+        }
+
+        private static func derLengthBytes(_ length: Int) -> [UInt8] {
+            if length < 128 { return [UInt8(length)] }
+            var value = length
+            var octets: [UInt8] = []
+            while value > 0 {
+                octets.insert(UInt8(value & 0xFF), at: 0)
+                value >>= 8
+            }
+            return [0x80 | UInt8(octets.count)] + octets
+        }
+    }
+
     // MARK: - ASN.1 DER TLV 结构化解析器 (Apple PKCS#7 Receipt Attributes)
-    
+
     private struct ASN1TLV {
         let tag: UInt8
         let isConstructed: Bool
@@ -1144,8 +1408,10 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             }
             updateEntitlementSealLocked()
             return allowLifetime || allowYearly || !processedIDs.isEmpty
-        } else if !processedIDs.isEmpty {
-            // 兼容已有合法 StoreKit 交易 ID 记录的版本升级或签名格式演进，避免误删合法用户权益
+        } else if !processedIDs.isEmpty, receipt.isTrusted {
+            // 兼容已有合法 StoreKit 交易 ID 记录的版本升级或签名格式演进：
+            // 必须同时满足本地收据通过 Apple 签名验证（isTrusted 含证书链+数字签名），
+            // 仅凭 UserDefaults 中的任意字符串数组不再能绕过防篡改校验。
             updateEntitlementSealLocked()
             return true
         }

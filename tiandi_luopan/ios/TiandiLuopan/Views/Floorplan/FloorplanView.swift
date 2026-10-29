@@ -1185,6 +1185,11 @@ public struct FloorplanView: View {
                 .onEnded { _ in
                     centroidDragStart = nil
                     persistLayout()
+                    // The live drag is throttled to avoid rebuilding the
+                    // report for every touch sample. Always run one final
+                    // audit at the exact committed Tai Ji point so a small
+                    // last movement cannot leave room recommendations stale.
+                    refreshAudit(force: true)
                 }
         )
     }

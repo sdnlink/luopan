@@ -24,6 +24,8 @@ public struct FenjinDetailSheet: View {
                             Text("\(lang.t("fenjin_mountain_belong"))：\(currentFenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(currentFenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", currentFenjin.centerAngle))°)")
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.75)
                         }
                         Spacer()
                         Text(currentFenjin.localizedGrade)
@@ -44,6 +46,8 @@ public struct FenjinDetailSheet: View {
                         Text("\(String(format: "%.1f", currentFenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", currentFenjin.endAngle))° (\(lang.t("fenjin_span")) 3.0°)")
                             .font(.system(size: 13, design: .monospaced))
                             .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                     }
                     
                     // 孤虚旺相秘传断语

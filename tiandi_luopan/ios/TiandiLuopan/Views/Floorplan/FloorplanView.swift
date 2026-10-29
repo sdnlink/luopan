@@ -378,6 +378,9 @@ public struct FloorplanView: View {
                 Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(floorplanHeadingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(floorplanHeadingState.facingMountain.localizedName)\(lang.t("facing_suffix")))")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .layoutPriority(1)
             }
             
             Spacer()
@@ -633,6 +636,9 @@ public struct FloorplanView: View {
                 Text(String(format: "%.1f°", compassRotation))
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: true, vertical: false)
                 Button(action: {
                     compassRotation = motion.headingState.facingAngle
                     persistLayout()

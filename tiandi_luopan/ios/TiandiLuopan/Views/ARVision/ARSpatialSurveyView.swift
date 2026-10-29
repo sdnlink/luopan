@@ -650,8 +650,12 @@ public struct ARSpatialSurveyView: View {
                     .foregroundColor(.yanCyan)
                 if let distance = model.distance {
                     Text("\(lang.t("ar_spatial_distance")): \(String(format: "%.2f", distance)) m")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 } else {
                     Text(lang.t("ar_spatial_measure"))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
                 Spacer()
             }
@@ -662,6 +666,8 @@ public struct ARSpatialSurveyView: View {
                 Text("\(lang.t("ar_spatial_largest_plane")): \(String(format: "%.2f × %.2f m", width, depth))")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             if model.lidarAvailable {

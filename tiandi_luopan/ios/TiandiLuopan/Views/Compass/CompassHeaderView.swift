@@ -33,6 +33,8 @@ public struct CompassHeaderView: View {
                     Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix"))")
                             .font(.system(size: 18, weight: .bold, design: .serif))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
                         
                         Text(state.facingMountain.localizedPalace + lang.t("palace_suffix"))
                             .font(.system(size: 11, weight: .semibold))
@@ -46,6 +48,8 @@ public struct CompassHeaderView: View {
                     Text(state.fenJinDesc)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(state.isJianXiang ? Color.orange : Color(red: 0.8, green: 0.8, blue: 0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 
                 Spacer()
@@ -99,6 +103,8 @@ public struct CompassHeaderView: View {
                     Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
                 }
             }
             .padding(.horizontal, 16)

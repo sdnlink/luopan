@@ -242,6 +242,11 @@ public struct SettingsView: View {
             .listStyle(InsetGroupedListStyle())
             .navigationBarTitle(lang.t("tab_settings"), displayMode: .inline)
             .preferredColorScheme(.dark)
+            .onAppear {
+                guard isActive else { return }
+                iap.clearTransientMessages()
+                iap.refreshProductsIfNeeded()
+            }
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet(keepsMotionActive: true)
             }

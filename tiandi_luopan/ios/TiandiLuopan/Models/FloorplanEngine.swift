@@ -299,15 +299,29 @@ public class FloorplanEngine {
         // 增加穿堂煞与中宫检测
         if auditReport.isEmpty {
             let language = LocalizationManager.shared.effectiveLanguage
-            let title = language == .en ? "Balanced Whole-Home Qi" : (language == .zhHant ? "全屋空間氣場中和純清" : "全屋空间气场中和纯清")
-            let palace = language == .en ? "Whole Home" : "全局"
-            let lore = language == .en ? "Every functional area is well positioned, with activity separated and yin-yang in harmony." : (language == .zhHant ? "各功能區方位得所，動靜分離，陰陽調和。" : "各功能区方位得所，动静分离，阴阳调和。")
-            let solution = language == .en ? "Keep the home bright and ventilated, with living plants to support steady family fortune." : (language == .zhHant ? "保持居室明亮通風，綠植點綴，可常保家運昌隆。" : "保持居室内明亮通风，绿植点缀，可常保家运昌隆。")
+            let hasValidRoom = rooms.contains {
+                $0.type != .missingCorner && $0.rect.width > 0 && $0.rect.height > 0
+            }
+            let title: String
+            let palace: String
+            let lore: String
+            let solution: String
+            if hasValidRoom {
+                title = language == .en ? "Balanced Whole-Home Qi" : (language == .zhHant ? "全屋空間氣場中和純清" : "全屋空间气场中和纯清")
+                palace = language == .en ? "Whole Home" : "全局"
+                lore = language == .en ? "Every functional area is well positioned, with activity separated and yin-yang in harmony." : (language == .zhHant ? "各功能區方位得所，動靜分離，陰陽調和。" : "各功能区方位得所，动静分离，阴阳调和。")
+                solution = language == .en ? "Keep the home bright and ventilated, with living plants to support steady family fortune." : (language == .zhHant ? "保持居室明亮通風，綠植點綴，可常保家運昌隆。" : "保持居室内明亮通风，绿植点缀，可常保家运昌隆。")
+            } else {
+                title = language == .en ? "Floorplan Needs a Valid Room" : (language == .zhHant ? "戶型缺少有效房間" : "户型缺少有效房间")
+                palace = language == .en ? "Whole Home" : (language == .zhHant ? "全局" : "全局")
+                lore = language == .en ? "Only missing-corner markers remain, or all room rectangles have zero area, so a Tai Ji center and room placement cannot be calculated." : (language == .zhHant ? "目前只剩戶型缺角標記，或所有房間框面積為零，無法計算立極中宮與房間方位。" : "当前只剩户型缺角标记，或所有房间框面积为零，无法计算立极中宫与房间方位。")
+                solution = language == .en ? "Add at least one real room with a positive width and height, then place the Tai Ji point and run the audit again." : (language == .zhHant ? "請至少新增一個有實際寬高的房間，再設定立極點並重新體檢。" : "请至少新增一个有实际宽高的房间，再设置立极点并重新体检。")
+            }
             auditReport.append(FloorplanAuditItem(
-                id: "whole-home-balanced",
+                id: hasValidRoom ? "whole-home-balanced" : "floorplan-missing-valid-room",
                 title: title,
                 palace: palace,
-                severity: "吉",
+                severity: hasValidRoom ? "吉" : "预警",
                 lore: lore,
                 solution: solution
             ))

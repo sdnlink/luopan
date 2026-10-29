@@ -51,8 +51,11 @@ public struct FloorplanView: View {
         // CompassMotionManager publishes tilt and magnetic-field samples more
         // often than the floorplan audit inputs change. Reuse the last audit
         // result so those unrelated samples only redraw the visible overlay.
+        // Render the editable source rooms until the first audit finishes so
+        // the canvas never flashes empty during the initial appearance.
+        let roomsForCanvas = auditedRooms.isEmpty ? rooms : auditedRooms
         let auditResult: (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) = isActive
-            ? (auditedRooms, auditReport)
+            ? (roomsForCanvas, auditReport)
             : (rooms, [])
         
         return ZStack {

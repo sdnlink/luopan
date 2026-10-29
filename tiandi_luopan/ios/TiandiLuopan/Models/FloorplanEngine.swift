@@ -408,6 +408,30 @@ public class FloorplanEngine {
                 tr("西南坤位缺角常被用于提示家庭照料、伴侣关系、生活承托和居住安定方面需要关注；当前判断基于房间框，需先核对真实外墙。", "西南坤位缺角常被用於提示家庭照料、伴侶關係、生活承托和居住安定方面需要關注；當前判斷基於房間框，需先核對真實外牆。", "A southwest Kun gap is traditionally associated with caregiving, partnership, household support and stability; verify the actual exterior wall because this result is inferred from room boxes."),
                 tr("首选补足墙体或设置低矮、稳定的封闭柜体；无法改造时，可用黄色或米色陶瓷、天然石材、方形地垫和暖光作替代，保持整洁稳定，避免空置、漏水和尖锐杂物。", "首選補足牆體或設置低矮、穩定的封閉櫃體；無法改造時，可用黃色或米色陶瓷、天然石材、方形地墊和暖光作替代，保持整潔穩定，避免空置、漏水和尖銳雜物。", "Prefer completing the wall or adding a low, stable closed cabinet. If construction is impossible, use yellow or beige ceramic, natural stone, a square mat and warm light; keep it orderly and stable, avoiding leaks and sharp clutter.")
             )
+        case "坎", "Kan":
+            return (
+                tr("户型缺角 · 正北坎位", "戶型缺角 · 正北坎位", "Missing Corner · North Kan"),
+                tr("正北坎位缺角常被用于提示作息安全、情绪压力、财务流动和与水有关的使用空间；当前判断基于房间框，需先核对真实外墙、管线和排水。", "正北坎位缺角常被用於提示作息安全、情緒壓力、財務流動和與水有關的使用空間；當前判斷基於房間框，需先核對真實外牆、管線和排水。", "A north Kan gap is traditionally associated with rest, emotional pressure, financial flow and water-related utilities; verify the exterior wall, pipes and drainage because this result is inferred from room boxes."),
+                tr("首选补足外墙并检查防水、排水和采光；无法改造时，可用深色稳重收纳、适度照明和金属/玻璃小件作替代，保持地面干燥，避免漏水、阴暗和大面积镜面。", "首選補足外牆並檢查防水、排水和採光；無法改造時，可用深色穩重收納、適度照明和金屬／玻璃小件作替代，保持地面乾燥，避免漏水、陰暗和大面積鏡面。", "Prefer completing the wall and checking waterproofing, drainage and daylight. If construction is impossible, use stable dark-toned storage, measured lighting and small metal or glass accents; keep floors dry and avoid leaks, darkness and large mirrors.")
+            )
+        case "震", "Zhen":
+            return (
+                tr("户型缺角 · 正东震位", "戶型缺角 · 正東震位", "Missing Corner · East Zhen"),
+                tr("正东震位缺角常被用于提示家庭行动力、长子成长、启动计划和日常通行；当前判断基于房间框，需先核对真实外墙和门窗。", "正東震位缺角常被用於提示家庭行動力、長子成長、啟動計畫和日常通行；當前判斷基於房間框，需先核對真實外牆和門窗。", "An east Zhen gap is traditionally associated with initiative, the eldest child, new plans and daily movement; verify the exterior wall, doors and windows because this result is inferred from room boxes."),
+                tr("首选补足外墙或形成连续的木质界面；无法改造时，可用健康绿植、竖向木柜、木质屏风和充足但不刺眼的照明作替代，保持通道顺畅，避免破损电器、尖角和杂物阻路。", "首選補足外牆或形成連續的木質界面；無法改造時，可用健康綠植、豎向木櫃、木質屏風和充足但不刺眼的照明作替代，保持通道順暢，避免破損電器、尖角和雜物阻路。", "Prefer completing the wall or creating a continuous wood boundary. If construction is impossible, use healthy plants, vertical wood storage, a wood screen and even lighting; keep circulation clear and avoid damaged appliances, sharp corners and blocked paths.")
+            )
+        case "离", "Li":
+            return (
+                tr("户型缺角 · 正南离位", "戶型缺角 · 正南離位", "Missing Corner · South Li"),
+                tr("正南离位缺角常被用于提示采光、可见度、表达沟通和家庭活力；当前判断基于房间框，需先核对真实外墙、窗户和消防条件。", "正南離位缺角常被用於提示採光、可見度、表達溝通和家庭活力；當前判斷基於房間框，需先核對真實外牆、窗戶和消防條件。", "A south Li gap is traditionally associated with daylight, visibility, communication and household vitality; verify the exterior wall, windows and fire-safety conditions because this result is inferred from room boxes."),
+                tr("首选补足外墙并改善自然采光；无法改造时，可用合规的暖色照明、红紫色小面积软装和整洁的开放展示位作替代，避免明火、过热设备、遮挡逃生通道和过度反光。", "首選補足外牆並改善自然採光；無法改造時，可用合規的暖色照明、紅紫色小面積軟裝和整潔的開放展示位作替代，避免明火、過熱設備、遮擋逃生通道和過度反光。", "Prefer completing the wall and improving daylight. If construction is impossible, use code-compliant warm lighting, small red or purple accents and an orderly display area; avoid open flames, overheating devices, blocked exits and excessive glare.")
+            )
+        case "兑", "Dui":
+            return (
+                tr("户型缺角 · 正西兑位", "戶型缺角 · 正西兌位", "Missing Corner · West Dui"),
+                tr("正西兑位缺角常被用于提示沟通表达、子女互动、收纳秩序和生活愉悦感；当前判断基于房间框，需先核对真实外墙和窗边空间。", "正西兌位缺角常被用於提示溝通表達、子女互動、收納秩序和生活愉悅感；當前判斷基於房間框，需先核對真實外牆和窗邊空間。", "A west Dui gap is traditionally associated with communication, children, storage order and enjoyment of daily life; verify the exterior wall and window-side space because this result is inferred from room boxes."),
+                tr("首选补足外墙或设置整洁的封闭收纳；无法改造时，可用白色、金属色圆形物件、柔和灯光和易清洁材质作替代，保持安静整齐，避免尖锐金属、破损物品和噪声源。", "首選補足外牆或設置整潔的封閉收納；無法改造時，可用白色、金屬色圓形物件、柔和燈光和易清潔材質作替代，保持安靜整齊，避免尖銳金屬、破損物品和噪聲源。", "Prefer completing the wall or adding orderly closed storage. If construction is impossible, use white or metallic round objects, soft lighting and easy-clean materials; keep it quiet and orderly, avoiding sharp metal, damaged items and noise sources.")
+            )
         default:
             return (
                 tr("户型缺角 · 当前方位", "戶型缺角 · 當前方位", "Missing Corner · Indicated Direction"),

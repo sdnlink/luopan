@@ -366,6 +366,7 @@ public struct ARVisionView: View {
     @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
     @State private var targetOffset: CGSize = .zero
     @State private var targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+    @State private var targetHorizontalFOV: Double = 50.0
     @State private var targetDragStart: CGSize?
     @State private var showRemedySheet: Bool = false
     @State private var showPaywall: Bool = false
@@ -398,7 +399,9 @@ public struct ARVisionView: View {
         // Vision returns a normalized horizontal location. Keep that
         // location in the bearing calculation even before the overlay knows
         // its concrete pixel size; a manual drag adds a screen-space delta.
-        let detectedAngleDelta = (targetNormalizedPoint.x - 0.5) * 50.0
+        let normalizedHorizontalOffset = (targetNormalizedPoint.x - 0.5) * 2.0
+        let halfFOVRadians = targetHorizontalFOV * .pi / 360.0
+        let detectedAngleDelta = atan(normalizedHorizontalOffset * tan(halfFOVRadians)) * 180.0 / .pi
         let manualAngleDelta = Double(targetOffset.width / 8.0)
         let angleDelta = detectedAngleDelta + manualAngleDelta
         let raw = motion.headingState.facingAngle + angleDelta
@@ -539,6 +542,7 @@ public struct ARVisionView: View {
                 aiScanFrames.removeAll(keepingCapacity: true)
                 aiResult = nil
                 targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+                targetHorizontalFOV = 50.0
                 targetOffset = .zero
                 targetDragStart = nil
                 snapshotGeneration += 1
@@ -566,6 +570,7 @@ public struct ARVisionView: View {
             aiScanFrames.removeAll(keepingCapacity: true)
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetHorizontalFOV = 50.0
             targetOffset = .zero
             targetDragStart = nil
         }
@@ -927,6 +932,7 @@ public struct ARVisionView: View {
                             aiResult = nil
                             aiError = nil
                             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+                            targetHorizontalFOV = 50.0
                             targetOffset = .zero
                         }) {
                             Text(item.localizedName)
@@ -1008,6 +1014,7 @@ public struct ARVisionView: View {
         // Clear the previous candidate while the new frame is being checked;
         // a stale marker can otherwise look like a fresh detection.
         targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+        targetHorizontalFOV = 50.0
         targetOffset = .zero
         aiScanFrames.removeAll(keepingCapacity: true)
         isAIScanning = true
@@ -1141,6 +1148,7 @@ public struct ARVisionView: View {
         if let firstFailure = firstFailure {
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetHorizontalFOV = 50.0
             targetOffset = .zero
             aiError = firstFailure.localizedDescription
             return
@@ -1154,6 +1162,7 @@ public struct ARVisionView: View {
               }) else {
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetHorizontalFOV = 50.0
             targetOffset = .zero
             aiError = lang.t("ar_ai_temporal_ambiguous")
             return
@@ -1167,7 +1176,8 @@ public struct ARVisionView: View {
             targetX: targetX,
             targetY: targetY,
             detectedRegions: results.map { $0.detectedRegions }.min() ?? first.detectedRegions,
-            summary: "three-frame-temporal-consensus"
+            summary: "three-frame-temporal-consensus",
+            horizontalFOVDegrees: results.compactMap { $0.horizontalFOVDegrees }.first
         )
         applyAIScanResult(candidate)
     }
@@ -1184,6 +1194,10 @@ public struct ARVisionView: View {
                 x: min(max(analysis.targetX, 0.0), 1.0),
                 y: min(max(analysis.targetY, 0.0), 1.0)
             )
+            if let fov = analysis.horizontalFOVDegrees,
+               fov.isFinite, fov >= 20, fov <= 120 {
+                targetHorizontalFOV = fov
+            }
             targetOffset = .zero
         }
     }

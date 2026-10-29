@@ -39,8 +39,9 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     public func stop() {
-        guard let session = captureView?.captureSession else { return }
-        stopRoomCaptureSession(session)
+        if let session = captureView?.captureSession {
+            stopRoomCaptureSession(session)
+        }
         captureView = nil
         isCapturing = false
     }

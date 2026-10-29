@@ -28,6 +28,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var estimatedDepthMeters: Float = 0
     @Published public private(set) var estimatedAreaSqMeters: Float = 0
     @Published public private(set) var scannedRoomCount = 0
+    @Published public private(set) var spatialFindings: [String] = []
     @Published public private(set) var isCapturing = false
     @Published public private(set) var didFinish = false
     @Published public private(set) var errorMessage: String?
@@ -195,7 +196,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 "doorSurfaces": allDoors.map(surfaceToDict),
                 "windowSurfaces": allWindows.map(surfaceToDict),
                 "openingSurfaces": allOpenings.map(surfaceToDict),
-                "detectedObjects": allObjects.map(objectToDict)
+                "detectedObjects": allObjects.map(objectToDict),
+                "spatialFengshuiFindings": spatialFindings
             ]
 
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -585,6 +587,83 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
+    private static func computeSpatialFengshuiFindings(for rooms: [CapturedRoom]) -> [String] {
+        var findings: [String] = []
+        let allDoors = rooms.flatMap { $0.doors }
+        let allWindows = rooms.flatMap { $0.windows }
+        let allObjects = rooms.flatMap { $0.objects }
+
+        // 1. 入户门宽鲁班尺吉凶判定 (42.9cm 门光尺)
+        if let mainDoor = allDoors.first, mainDoor.dimensions.x > 0.45 {
+            let eval = LubanRulerEvaluation.evaluate(meters: Double(mainDoor.dimensions.x))
+            let badge = eval.yangIsAuspicious ? "吉门" : "失度"
+            findings.append(String(format: "门宽 %.2fm · 鲁班尺【%@】(%@)", mainDoor.dimensions.x, eval.yangSegmentName, badge))
+        }
+
+        // 2. 穿堂风煞检测 (门对窗 / 门对门一箭穿心)
+        for door in allDoors {
+            let dPos = SIMD2<Float>(door.transform.columns.3.x, door.transform.columns.3.z)
+            let dNormRaw = SIMD2<Float>(door.transform.columns.2.x, door.transform.columns.2.z)
+            let normLen = simd_length(dNormRaw)
+            guard normLen > 1e-4 else { continue }
+            let dNorm = dNormRaw / normLen
+
+            for win in allWindows {
+                let wPos = SIMD2<Float>(win.transform.columns.3.x, win.transform.columns.3.z)
+                let delta = wPos - dPos
+                let dist = simd_length(delta)
+                guard dist >= 1.8 && dist <= 12.0 else { continue }
+                let dir = delta / dist
+                let alignment = abs(simd_dot(dNorm, dir))
+                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
+                if alignment >= 0.88 && lateral <= 0.65 {
+                    findings.append(String(format: "⚠️ 穿堂煞：门窗对冲直通 (间距 %.1fm)", dist))
+                    break
+                }
+            }
+            if findings.count >= 2 { break }
+        }
+
+        // 3. 房门冲床检测 (Door normal ray hitting Bed)
+        let beds = allObjects.filter { $0.category == .bed }
+        for door in allDoors {
+            let dPos = SIMD2<Float>(door.transform.columns.3.x, door.transform.columns.3.z)
+            let dNormRaw = SIMD2<Float>(door.transform.columns.2.x, door.transform.columns.2.z)
+            let normLen = simd_length(dNormRaw)
+            guard normLen > 1e-4 else { continue }
+            let dNorm = dNormRaw / normLen
+            for bed in beds {
+                let bPos = SIMD2<Float>(bed.transform.columns.3.x, bed.transform.columns.3.z)
+                let delta = bPos - dPos
+                let dist = simd_length(delta)
+                guard dist >= 0.8 && dist <= 4.8 else { continue }
+                let alignment = abs(simd_dot(dNorm, delta / dist))
+                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
+                if alignment >= 0.85 && lateral <= 0.70 {
+                    findings.append(String(format: "⚠️ 门冲床：房门直对卧床 (%.1fm)", dist))
+                    break
+                }
+            }
+        }
+
+        // 4. 水火相冲检测 (厨灶与马桶卫浴过近)
+        let stoves = allObjects.filter { $0.category == .stove || $0.category == .oven }
+        let toilets = allObjects.filter { $0.category == .toilet || $0.category == .bathtub }
+        for stove in stoves {
+            let sPos = SIMD2<Float>(stove.transform.columns.3.x, stove.transform.columns.3.z)
+            for toilet in toilets {
+                let tPos = SIMD2<Float>(toilet.transform.columns.3.x, toilet.transform.columns.3.z)
+                let dist = simd_distance(sPos, tPos)
+                if dist <= 2.1 {
+                    findings.append(String(format: "⚠️ 水火冲：厨灶与卫浴紧邻 (%.1fm)", dist))
+                    break
+                }
+            }
+        }
+
+        return Array(findings.prefix(3))
+    }
+
     private func updateMetrics(from room: CapturedRoom, commitToHistory: Bool = false) {
         let combined = capturedRoomsHistory + [room]
         let wallCount = combined.reduce(0) { $0 + $1.walls.count }
@@ -597,6 +676,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let depth = envelope.map { max(0, $0.maxZ - $0.minZ) } ?? 0
         let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
+        let findings = Self.computeSpatialFengshuiFindings(for: combined)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room
@@ -614,6 +694,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             self.estimatedWidthMeters = width
             self.estimatedDepthMeters = depth
             self.estimatedAreaSqMeters = area
+            self.spatialFindings = findings
         }
     }
 
@@ -786,6 +867,22 @@ public struct ARRoomPlanSurveyView: View {
                         semanticCount("ar_spatial_window", value: model.windowCount, icon: "window.vertical.open")
                         semanticCount("ar_roomplan_opening", value: model.openingCount, icon: "rectangle.dashed")
                         semanticCount("ar_roomplan_object", value: model.objectCount, icon: "cube")
+                    }
+                    if !model.spatialFindings.isEmpty {
+                        VStack(alignment: .leading, spacing: 3) {
+                            ForEach(model.spatialFindings, id: \.self) { finding in
+                                Text(finding)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(finding.contains("⚠️") ? .orange : .green)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.08))
+                        .cornerRadius(8)
                     }
                     if let error = model.errorMessage {
                         Text("\(lang.t("ar_roomplan_failed")): \(error)")

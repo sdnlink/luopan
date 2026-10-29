@@ -93,30 +93,57 @@ public final class OnDeviceShaAnalyzer {
                     minimumConfidence: 0.70,
                     quadratureTolerance: 18.0
                 )
-                guard let relaxed = Self.classify(relaxedRegions, minimumConfidence: 0.60, evidence: evidence),
-                      let strict = Self.classify(strictRegions, minimumConfidence: 0.68, evidence: evidence),
-                      Self.isConsistent(relaxed, strict) else {
-                    let hasRegions = !relaxedRegions.isEmpty || !strictRegions.isEmpty
+                let relaxedRect = Self.classify(relaxedRegions, minimumConfidence: 0.60, evidence: evidence)
+                let strictRect = Self.classify(strictRegions, minimumConfidence: 0.68, evidence: evidence)
+                let contourA = Self.detectContourCandidate(
+                    cgImage: analysisCGImage,
+                    orientation: handlerOrientation,
+                    contrastAdjustment: 1.4,
+                    evidence: evidence
+                )
+                let contourB = Self.detectContourCandidate(
+                    cgImage: analysisCGImage,
+                    orientation: handlerOrientation,
+                    contrastAdjustment: 2.0,
+                    evidence: evidence
+                )
+
+                let primaryA: ShaAnalysisResult?
+                let primaryB: ShaAnalysisResult?
+                if let r = relaxedRect, let s = strictRect, Self.isConsistent(r, s) {
+                    primaryA = r
+                    primaryB = s
+                } else if let cA = contourA, let cB = contourB, Self.isConsistent(cA, cB) {
+                    primaryA = cA
+                    primaryB = cB
+                } else {
+                    primaryA = nil
+                    primaryB = nil
+                }
+
+                guard let relaxed = primaryA, let strict = primaryB else {
+                    let hasRegions = !relaxedRegions.isEmpty || !strictRegions.isEmpty || contourA != nil || contourB != nil
                     let error: AnalysisError = hasRegions ? .ambiguousRegion : .noDetectableRegion
                     DispatchQueue.main.async { completion(.failure(error)) }
                     return
                 }
+                let contourAgreementBonus = (contourA?.shaID == relaxed.shaID) ? 0.02 : 0.0
                 let spatialBonus: Double
                 if let evidence = evidence {
                     // Semantic walls/vertical planes and valid LiDAR depth coverage
                     // strengthen the geometry candidate.
                     let meshBonus = (evidence.wallFaceCount > 0 || evidence.verticalPlaneCount > 0) ? 0.03 : 0.0
                     let depthBonus = (evidence.lidarAvailable && evidence.depthCoverage >= 0.40) ? 0.03 : 0.0
-                    spatialBonus = meshBonus + depthBonus
+                    spatialBonus = meshBonus + depthBonus + contourAgreementBonus
                 } else {
-                    spatialBonus = 0
+                    spatialBonus = contourAgreementBonus
                 }
                 let result = ShaAnalysisResult(
                     shaID: relaxed.shaID,
                     confidence: min(0.95, (relaxed.confidence + strict.confidence) * 0.5 + spatialBonus),
                     targetX: (relaxed.targetX + strict.targetX) * 0.5,
                     targetY: (relaxed.targetY + strict.targetY) * 0.5,
-                    detectedRegions: min(relaxed.detectedRegions, strict.detectedRegions),
+                    detectedRegions: max(1, min(relaxed.detectedRegions, strict.detectedRegions)),
                     summary: relaxed.summary,
                     horizontalFOVDegrees: evidence?.horizontalFOVDegrees
                 )
@@ -142,6 +169,114 @@ public final class OnDeviceShaAnalyzer {
         let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
         try handler.perform([request])
         return (request.results as? [VNRectangleObservation]) ?? []
+    }
+
+    /// Uses `VNDetectContoursRequest` (iOS 14.0+) to detect non-rectangular
+    /// architectural silhouettes such as sharp triangular roofs/spires (`huoxing`)
+    /// and curved road/overpass arcs (`fangong`) that 4-corner rectangle detection
+    /// alone may reject.
+    private static func detectContourCandidate(
+        cgImage: CGImage,
+        orientation: CGImagePropertyOrientation,
+        contrastAdjustment: Float,
+        evidence: ARSceneEvidence?
+    ) -> ShaAnalysisResult? {
+        let request = VNDetectContoursRequest()
+        request.contrastAdjustment = contrastAdjustment
+        request.detectsDarkOnLight = true
+        request.maximumImageDimension = 512
+        let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
+        guard (try? handler.perform([request])) != nil,
+              let observation = request.results?.first as? VNContoursObservation else {
+            return nil
+        }
+
+        var bestCandidate: ShaAnalysisResult?
+        let topCount = min(observation.topLevelContourCount, 18)
+        for idx in 0..<topCount {
+            guard let contour = try? observation.contour(at: idx),
+                  let poly = try? contour.polygonApproximation(epsilon: 0.025) else { continue }
+            let pts = poly.normalizedPoints
+            guard pts.count >= 3 else { continue }
+
+            var minX: Float = 1.0, maxX: Float = 0.0
+            var minY: Float = 1.0, maxY: Float = 0.0
+            var arcLength: Double = 0.0
+            for i in 0..<pts.count {
+                let p = pts[i]
+                minX = min(minX, p.x)
+                maxX = max(maxX, p.x)
+                minY = min(minY, p.y)
+                maxY = max(maxY, p.y)
+                if i > 0 {
+                    let prev = pts[i - 1]
+                    arcLength += hypot(Double(p.x - prev.x), Double(p.y - prev.y))
+                }
+            }
+            let width = Double(maxX - minX)
+            let height = Double(maxY - minY)
+            let area = width * height
+            guard area >= 0.025, area <= 0.65 else { continue }
+
+            // (A) Sharp triangular spire / roof corner -> 火形煞 (huoxing)
+            if pts.count >= 3 && pts.count <= 5 && height >= 0.18 && Double(minY + maxY) * 0.5 >= 0.35 {
+                var minAngleDeg = 180.0
+                var apexPoint = pts[0]
+                for i in 0..<pts.count {
+                    let prev = pts[(i - 1 + pts.count) % pts.count]
+                    let curr = pts[i]
+                    let next = pts[(i + 1) % pts.count]
+                    let v1x = Double(prev.x - curr.x), v1y = Double(prev.y - curr.y)
+                    let v2x = Double(next.x - curr.x), v2y = Double(next.y - curr.y)
+                    let len1 = hypot(v1x, v1y), len2 = hypot(v2x, v2y)
+                    guard len1 > 0.04, len2 > 0.04 else { continue }
+                    let cosTheta = max(-1.0, min(1.0, (v1x * v2x + v1y * v2y) / (len1 * len2)))
+                    let deg = acos(cosTheta) * 180.0 / .pi
+                    if deg < minAngleDeg {
+                        minAngleDeg = deg
+                        apexPoint = curr
+                    }
+                }
+                if minAngleDeg <= 56.0 {
+                    let sharpnessScore = min(1.0, (60.0 - minAngleDeg) / 35.0)
+                    let score = min(0.91, 0.72 + sharpnessScore * 0.16)
+                    if score > (bestCandidate?.confidence ?? 0) {
+                        bestCandidate = ShaAnalysisResult(
+                            shaID: "huoxing",
+                            confidence: score,
+                            targetX: Double(apexPoint.x),
+                            targetY: Double(1.0 - apexPoint.y),
+                            detectedRegions: topCount,
+                            summary: "contour-acute-triangular-apex",
+                            horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                        )
+                    }
+                }
+            }
+
+            // (B) Wide curved lower-field arc -> 反弓水 (fangong)
+            if pts.count >= 5 && width >= 0.45 && height <= 0.28 && Double(minY + maxY) * 0.5 <= 0.40 {
+                let firstPt = pts.first!
+                let lastPt = pts.last!
+                let chord = hypot(Double(lastPt.x - firstPt.x), Double(lastPt.y - firstPt.y))
+                if chord >= 0.38 && arcLength / chord >= 1.15 && arcLength / chord <= 2.10 {
+                    let curveBonus = (evidence?.bottomDepthMeters ?? 5.0) <= 3.5 ? 0.04 : 0.0
+                    let score = min(0.90, 0.74 + min(0.12, (arcLength / chord - 1.15) * 0.35) + curveBonus)
+                    if score > (bestCandidate?.confidence ?? 0) {
+                        bestCandidate = ShaAnalysisResult(
+                            shaID: "fangong",
+                            confidence: score,
+                            targetX: Double(minX + maxX) * 0.5,
+                            targetY: Double(1.0 - (minY + maxY) * 0.5),
+                            detectedRegions: topCount,
+                            summary: "contour-curved-bow-arc",
+                            horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                        )
+                    }
+                }
+            }
+        }
+        return bestCandidate
     }
 
     private static func cgOrientation(for orientation: UIImage.Orientation) -> CGImagePropertyOrientation {

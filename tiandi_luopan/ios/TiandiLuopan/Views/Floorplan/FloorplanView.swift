@@ -120,7 +120,13 @@ public struct FloorplanView: View {
             )
         }
         .sheet(item: $roomForTypeEditing) { room in
-            FloorplanRoomTypeEditor(room: room) { type in
+            FloorplanRoomTypeEditor(
+                room: room,
+                onDelete: {
+                    deleteRoom(roomID: room.id)
+                    roomForTypeEditing = nil
+                }
+            ) { type in
                 updateRoomType(roomID: room.id, type: type)
                 roomForTypeEditing = nil
             }
@@ -1088,12 +1094,15 @@ public struct FloorplanView: View {
 private struct FloorplanRoomTypeEditor: View {
     let titleKey: String
     let room: FloorplanRoom?
+    let onDelete: (() -> Void)?
     let onSelect: (FloorplanRoomType) -> Void
     @Environment(\.presentationMode) private var presentationMode
+    @State private var showDeleteConfirmation = false
 
-    init(titleKey: String = "floorplan_room_type", room: FloorplanRoom?, onSelect: @escaping (FloorplanRoomType) -> Void) {
+    init(titleKey: String = "floorplan_room_type", room: FloorplanRoom?, onDelete: (() -> Void)? = nil, onSelect: @escaping (FloorplanRoomType) -> Void) {
         self.titleKey = titleKey
         self.room = room
+        self.onDelete = onDelete
         self.onSelect = onSelect
     }
 
@@ -1122,6 +1131,25 @@ private struct FloorplanRoomTypeEditor: View {
                     }
                 } header: {
                     Text(LocalizationManager.shared.t(titleKey))
+                }
+                if let onDelete = onDelete {
+                    Section {
+                        Button(action: { showDeleteConfirmation = true }) {
+                            Label(LocalizationManager.shared.t("floorplan_delete_room"), systemImage: "trash")
+                                .foregroundColor(.red)
+                        }
+                    }
+                    .alert(isPresented: $showDeleteConfirmation) {
+                        Alert(
+                            title: Text(LocalizationManager.shared.t("floorplan_delete_room")),
+                            message: Text(LocalizationManager.shared.t("floorplan_delete_confirm")),
+                            primaryButton: .destructive(Text(LocalizationManager.shared.t("floorplan_delete_room"))) {
+                                onDelete()
+                                presentationMode.wrappedValue.dismiss()
+                            },
+                            secondaryButton: .cancel()
+                        )
+                    }
                 }
             }
             .navigationBarTitle(LocalizationManager.shared.t(titleKey), displayMode: .inline)

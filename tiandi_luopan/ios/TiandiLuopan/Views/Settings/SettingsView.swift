@@ -207,6 +207,15 @@ public struct SettingsView: View {
                             .foregroundColor(.secondary)
                             .font(.system(size: 12))
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label(lang.t("settings_safety_title"), systemImage: "exclamationmark.shield.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.orange)
+                        Text(lang.t("settings_safety_disclaimer"))
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .lineSpacing(3)
+                    }
                 }
             }
             .listStyle(InsetGroupedListStyle())

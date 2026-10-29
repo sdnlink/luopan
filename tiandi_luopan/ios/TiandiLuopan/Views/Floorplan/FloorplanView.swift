@@ -837,6 +837,10 @@ public struct FloorplanView: View {
             DragGesture()
                 .onChanged { value in
                     guard isEditingRooms else { return }
+                    // A two-finger pinch can also emit a drag translation.
+                    // Once scaling has started, keep the room anchored and
+                    // let only the magnification gesture change its size.
+                    guard activeRoomScaleID == nil else { return }
 
                     if abs(value.translation.width) > 3 || abs(value.translation.height) > 3 {
                         roomWasDragged = true
@@ -886,6 +890,8 @@ public struct FloorplanView: View {
                     if activeRoomScaleID != room.id {
                         activeRoomScaleID = room.id
                         activeRoomScaleStartRect = room.rect
+                        activeRoomDragID = nil
+                        activeRoomStartRect = nil
                     }
                     guard let startRect = activeRoomScaleStartRect,
                           let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }

@@ -349,7 +349,9 @@ public class FloorplanEngine {
         heading: Double,
         excludingGua: Set<String>
     ) -> [FloorplanAuditItem] {
-        let footprintRooms = rooms.filter { $0.type != .missingCorner }
+        let footprintRooms = rooms.filter {
+            $0.type != .missingCorner && $0.rect.width > 0 && $0.rect.height > 0
+        }
         guard !footprintRooms.isEmpty else { return [] }
         let bounds = footprintRooms.reduce(CGRect.null) { partial, room in
             partial.union(room.rect)

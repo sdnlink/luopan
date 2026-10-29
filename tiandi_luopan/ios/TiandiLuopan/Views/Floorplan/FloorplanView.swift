@@ -657,9 +657,11 @@ public struct FloorplanView: View {
     // MARK: - 户型交互画布
     private func floorplanCanvasView(auditedRooms: [FloorplanRoom]) -> some View {
         GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let centerPt = CGPoint(x: centroid.x * w, y: centroid.y * h)
+            let layoutRect = floorplanContentRect(image: userFloorplanImage, in: geo.size)
+            let centerPt = CGPoint(
+                x: layoutRect.minX + centroid.x * layoutRect.width,
+                y: layoutRect.minY + centroid.y * layoutRect.height
+            )
             
             ZStack {
                 // 底色
@@ -675,30 +677,60 @@ public struct FloorplanView: View {
                     Image(uiImage: userImg)
                         .resizable()
                         .scaledToFit()
+                        .frame(width: layoutRect.width, height: layoutRect.height)
+                        .position(x: layoutRect.midX, y: layoutRect.midY)
                         .opacity(0.85)
                 }
                 
                 // 户型外墙与房间隔断
                 ForEach(auditedRooms) { room in
-                    roomBlockView(room: room, w: w, h: h)
+                    roomBlockView(room: room, layoutRect: layoutRect)
                 }
                 
                 // 随动半透明罗盘八宫扇区与十字天心
-                compassOverlayLayer(centerPt: centerPt, size: min(w, h))
+                compassOverlayLayer(centerPt: centerPt, size: min(layoutRect.width, layoutRect.height))
                 
                 // 可拖拽的中宫立极点 (Centroid Handle)
-                centroidHandle(centerPt: centerPt, w: w, h: h)
+                centroidHandle(centerPt: centerPt, layoutRect: layoutRect)
             }
             .clipped()
             .cornerRadius(12)
         }
     }
     
-    private func roomBlockView(room: FloorplanRoom, w: CGFloat, h: CGFloat) -> some View {
-        let rx = room.rect.origin.x * w
-        let ry = room.rect.origin.y * h
-        let rw = room.rect.size.width * w
-        let rh = room.rect.size.height * h
+    private func floorplanContentRect(image: UIImage?, in canvasSize: CGSize) -> CGRect {
+        guard let image = image,
+              image.size.width > 0,
+              image.size.height > 0,
+              canvasSize.width > 0,
+              canvasSize.height > 0 else {
+            return CGRect(origin: .zero, size: canvasSize)
+        }
+        let imageAspect = image.size.width / image.size.height
+        let canvasAspect = canvasSize.width / canvasSize.height
+        if imageAspect > canvasAspect {
+            let height = canvasSize.width / imageAspect
+            return CGRect(
+                x: 0,
+                y: (canvasSize.height - height) / 2,
+                width: canvasSize.width,
+                height: height
+            )
+        }
+        let width = canvasSize.height * imageAspect
+        return CGRect(
+            x: (canvasSize.width - width) / 2,
+            y: 0,
+            width: width,
+            height: canvasSize.height
+        )
+    }
+
+    private func roomBlockView(room: FloorplanRoom, layoutRect: CGRect) -> some View {
+        let rx = room.rect.origin.x * layoutRect.width
+        let ry = room.rect.origin.y * layoutRect.height
+        let rw = room.rect.size.width * layoutRect.width
+        let rh = room.rect.size.height * layoutRect.height
         
         let isBad = room.isBad
         let isGood = room.isGood
@@ -750,7 +782,10 @@ public struct FloorplanView: View {
             }
         }
         .frame(width: rw, height: rh)
-        .position(x: rx + rw / 2, y: ry + rh / 2)
+        .position(
+            x: layoutRect.minX + rx + rw / 2,
+            y: layoutRect.minY + ry + rh / 2
+        )
         .simultaneousGesture(
             DragGesture()
                 .onChanged { value in
@@ -767,8 +802,8 @@ public struct FloorplanView: View {
                     guard let startRect = activeRoomStartRect,
                           let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }
 
-                    let dx = value.translation.width / max(w, 1)
-                    let dy = value.translation.height / max(h, 1)
+                    let dx = value.translation.width / max(layoutRect.width, 1)
+                    let dy = value.translation.height / max(layoutRect.height, 1)
                     let maxX = max(0.0, 1.0 - startRect.width)
                     let maxY = max(0.0, 1.0 - startRect.height)
                     var updated = rooms[index]
@@ -836,7 +871,7 @@ public struct FloorplanView: View {
         .allowsHitTesting(false)
     }
     
-    private func centroidHandle(centerPt: CGPoint, w: CGFloat, h: CGFloat) -> some View {
+    private func centroidHandle(centerPt: CGPoint, layoutRect: CGRect) -> some View {
         ZStack {
             Circle()
                 .fill(Color(red: 0.95, green: 0.85, blue: 0.45))
@@ -857,8 +892,8 @@ public struct FloorplanView: View {
                         centroidDragStart = centroid
                     }
                     guard let start = centroidDragStart else { return }
-                    let newX = max(0.1, min(0.9, start.x + val.translation.width / max(w, 1)))
-                    let newY = max(0.1, min(0.9, start.y + val.translation.height / max(h, 1)))
+                    let newX = max(0.1, min(0.9, start.x + val.translation.width / max(layoutRect.width, 1)))
+                    let newY = max(0.1, min(0.9, start.y + val.translation.height / max(layoutRect.height, 1)))
                     centroid = CGPoint(x: newX, y: newY)
                 }
                 .onEnded { _ in

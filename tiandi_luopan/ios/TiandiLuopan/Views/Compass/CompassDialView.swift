@@ -9,7 +9,7 @@ public struct CompassDialView: View {
     @ObservedObject var lang = LocalizationManager.shared
     
     // 手势与缩放状态
-    @State private var dragStartAngle: Double = 0.0
+    @State private var lastDragAngle: Double = 0.0
     @State private var hasDragStart: Bool = false
     @State private var currentDragDelta: Double = 0.0
     @State private var scale: CGFloat = 1.0
@@ -101,20 +101,21 @@ public struct CompassDialView: View {
                         let location = value.location
                         let angle = atan2(location.y - center.y, location.x - center.x) * 180 / .pi
                         if !hasDragStart {
-                            dragStartAngle = angle
                             hasDragStart = true
+                            lastDragAngle = angle
                         } else {
-                            var delta = angle - dragStartAngle
-                            if delta > 180 { delta -= 360 }
-                            if delta < -180 { delta += 360 }
-                            currentDragDelta = delta
+                            var stepDelta = angle - lastDragAngle
+                            if stepDelta > 180 { stepDelta -= 360 }
+                            if stepDelta < -180 { stepDelta += 360 }
+                            currentDragDelta += stepDelta
+                            lastDragAngle = angle
                         }
                     }
                     .onEnded { _ in
                         if hasDragStart {
                             motion.applyManualDragDelta(degrees: currentDragDelta)
                         }
-                        dragStartAngle = 0
+                        lastDragAngle = 0
                         hasDragStart = false
                         currentDragDelta = 0
                     }

@@ -9,13 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        if #available(iOS 13.0, *) {
-            // Handled by SceneDelegate
-        } else {
-            window = UIWindow(frame: UIScreen.main.bounds)
-            window?.rootViewController = ViewController()
-            window?.makeKeyAndVisible()
-        }
+        // UIWindow 生命周期统一由 SceneDelegate 托管 (支持 iOS 14.0+)
         return true
     }
 

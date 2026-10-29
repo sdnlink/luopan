@@ -9,7 +9,7 @@ extension Color {
 // MARK: - 天机演象 纯原生 SwiftUI 根视图 (Root Content View - PRD 5.0 标准五大场景)
 
 public struct RootContentView: View {
-    @StateObject private var motion = CompassMotionManager.shared
+    private let motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedTab: Int = 0
     

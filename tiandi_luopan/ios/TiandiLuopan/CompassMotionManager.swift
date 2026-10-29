@@ -88,6 +88,12 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var solarCalculationInFlight: Bool = false
     private var solarCalculationGeneration: Int = 0
     private var lastResolvedHeading: Double = -999.0
+    // Heading and attitude are sampled independently. Keep the last attitude
+    // used to build `headingState` so a user can tilt the phone while keeping
+    // it pointed in the same direction and still get an up-to-date level
+    // state without rebuilding the state for every 30 Hz motion sample.
+    private var lastResolvedPitch: Double = .nan
+    private var lastResolvedRoll: Double = .nan
     private var cancellables = Set<AnyCancellable>()
     
     override public init() {
@@ -280,6 +286,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.recentHeadingSamples.removeAll(keepingCapacity: true)
             self.recentMagneticSamples.removeAll(keepingCapacity: true)
             self.lastResolvedHeading = -999.0
+            self.lastResolvedPitch = .nan
+            self.lastResolvedRoll = .nan
             self.updateHeadingOrientation()
             if self.isRunning && self.headingUpdatesEnabled && CLLocationManager.headingAvailable() {
                 self.locationManager.startUpdatingHeading()
@@ -422,8 +430,12 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             let rawAngleDelta = abs(effective - lastResolvedHeading)
             angleDelta = min(rawAngleDelta, 360.0 - rawAngleDelta)
         }
-        if force || angleDelta >= 0.05 {
+        let pitchDelta = lastResolvedPitch.isFinite ? abs(pitch - lastResolvedPitch) : .infinity
+        let rollDelta = lastResolvedRoll.isFinite ? abs(roll - lastResolvedRoll) : .infinity
+        if force || angleDelta >= 0.05 || pitchDelta >= 0.1 || rollDelta >= 0.1 {
             lastResolvedHeading = effective
+            lastResolvedPitch = pitch
+            lastResolvedRoll = roll
             let resolved = Mountain24Data.shared.resolveHeadingState(
                 heading: effective,
                 pitch: pitch,

@@ -68,7 +68,9 @@ public struct PurpleWhiteView: View {
                 }
                 Spacer()
                 let isEn = LocalizationManager.shared.effectiveLanguage == .en
-                let dateLabel = isEn ? "\(chart.year) / \(chart.month)" : "\(chart.year)年 · \(chart.month)月"
+                let dateLabel = isEn
+                    ? "\(chart.year) / \(chart.month)"
+                    : "\(chart.year)\(lang.t("year_suffix")) · \(chart.month)\(lang.t("month_suffix"))"
                 Text(dateLabel)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))

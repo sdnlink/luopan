@@ -12,6 +12,12 @@ public struct XuanKongGridView: View {
     @State private var showTianJiShuSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var cachedChart: XuanKongChart?
+    @State private var lastCurrentPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
+    private static let periodRefreshTimer = Timer.publish(
+        every: 60,
+        on: .main,
+        in: .common
+    ).autoconnect()
     
     // 九宫格九个方位的标准九宫排布对应 (从左到右，从上到下：东南4、正南9、西南2；正东3、中宫5、正西7；东北8、正北1、西北6)
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
@@ -47,7 +53,7 @@ public struct XuanKongGridView: View {
                     xuanKongContent(chart: chart)
                 } else if selectedSubTab == 1 {
                     // 板块 2: 八宅明镜与三合水法
-                    BaZhaiView(isEmbedded: true)
+                    BaZhaiView(isEmbedded: true, isActive: isActive && selectedSubTab == 1)
                 } else if selectedSubTab == 2 {
                     // 板块 3: 紫白飞星流年流月客星与太岁三煞
                     PurpleWhiteView()
@@ -86,6 +92,18 @@ public struct XuanKongGridView: View {
             refreshChart()
         }
         .onChange(of: lang.effectiveLanguage) { _ in
+            refreshChart()
+        }
+        .onReceive(Self.periodRefreshTimer) { _ in
+            guard isActive else { return }
+            let currentPeriod = FlyingStarsEngine.shared.currentPeriod(for: Date())
+            // If the user was following the previously current period, keep
+            // following it across the Li Chun/20-year boundary. A deliberate
+            // historical-period selection remains untouched.
+            if selectedPeriod == lastCurrentPeriod, selectedPeriod != currentPeriod {
+                selectedPeriod = currentPeriod
+            }
+            lastCurrentPeriod = currentPeriod
             refreshChart()
         }
     }

@@ -535,6 +535,10 @@ public struct ARVisionView: View {
                 showSpatialSurvey = false
                 pendingCapturePurpose = nil
                 isAIScanning = false
+                aiResult = nil
+                targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+                targetOffset = .zero
+                targetDragStart = nil
                 snapshotGeneration += 1
             }
         }
@@ -555,6 +559,10 @@ public struct ARVisionView: View {
             snapshotGeneration += 1
             pendingCapturePurpose = nil
             isAIScanning = false
+            aiResult = nil
+            targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetOffset = .zero
+            targetDragStart = nil
         }
     }
 

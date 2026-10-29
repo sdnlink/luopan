@@ -8,6 +8,7 @@ public struct QimenDunjiaView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     @State private var cachedChart: QimenChart?
+    @State private var lastChartHeading: Double?
     
     public init() {}
     
@@ -91,18 +92,28 @@ public struct QimenDunjiaView: View {
             }
         }
         .onAppear {
-            refreshChart()
+            refreshChart(force: true)
         }
         .onChange(of: motion.headingState.facingAngle) { _ in
             refreshChart()
         }
         .onChange(of: lang.effectiveLanguage) { _ in
-            refreshChart()
+            refreshChart(force: true)
         }
     }
 
-    private func refreshChart() {
-        cachedChart = QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+    private func refreshChart(force: Bool = false) {
+        let heading = motion.headingState.facingAngle
+        if !force, let lastHeading = lastChartHeading {
+            let rawDelta = abs(heading - lastHeading)
+            let delta = min(rawDelta, 360.0 - rawDelta)
+            // The chart's actionable turn instruction is displayed in whole
+            // degrees. Rebuilding it for sub-degree sensor noise only adds
+            // work and causes unnecessary SwiftUI row updates.
+            if delta < 1.0 { return }
+        }
+        lastChartHeading = heading
+        cachedChart = QimenEngine.shared.calculateChart(heading: heading)
     }
     
     private func qimenCellView(cell: QimenPalaceCell) -> some View {

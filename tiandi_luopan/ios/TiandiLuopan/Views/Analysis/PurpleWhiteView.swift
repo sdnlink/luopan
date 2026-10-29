@@ -9,6 +9,7 @@ public struct PurpleWhiteView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     @State private var cachedChart: PurpleWhiteChart?
+    @State private var lastFacingSector: Int?
     
     public init() {}
     
@@ -67,21 +68,39 @@ public struct PurpleWhiteView: View {
             }
         }
         .onAppear {
-            refreshChart()
+            refreshChart(force: true)
         }
         .onChange(of: motion.headingState.facingAngle) { _ in
             refreshChart()
         }
         .onChange(of: lang.effectiveLanguage) { _ in
-            refreshChart()
+            refreshChart(force: true)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            refreshChart()
+            refreshChart(force: true)
         }
     }
 
-    private func refreshChart() {
+    private func refreshChart(force: Bool = false) {
+        let sector = facingSector(for: motion.headingState.facingAngle)
+        if !force, lastFacingSector == sector { return }
+        lastFacingSector = sector
         cachedChart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+    }
+
+    private func facingSector(for heading: Double) -> Int {
+        let normalized = (heading.truncatingRemainder(dividingBy: 360.0) + 360.0)
+            .truncatingRemainder(dividingBy: 360.0)
+        switch normalized {
+        case 337.5..<360.0, 0.0..<22.5: return 1
+        case 22.5..<67.5: return 8
+        case 67.5..<112.5: return 3
+        case 112.5..<157.5: return 4
+        case 157.5..<202.5: return 9
+        case 202.5..<247.5: return 2
+        case 247.5..<292.5: return 7
+        default: return 6
+        }
     }
     
     private func tagPill(title: String, value: String, color: Color) -> some View {

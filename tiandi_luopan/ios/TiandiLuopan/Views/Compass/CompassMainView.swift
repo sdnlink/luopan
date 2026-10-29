@@ -95,11 +95,17 @@ public struct CompassMainView: View {
     
     // MARK: - 罗盘工具条
     private func compassToolBar() -> some View {
-        let m = motion.headingState.facingMountain
-        let rawDelta = abs(motion.headingState.facingAngle - m.centerAngle)
-        let delta = min(rawDelta, 360.0 - rawDelta)
-        let kwStatus = delta < 1.5 ? lang.t("pure_alignment") : (delta < 4.5 ? lang.t("sub_mountain") : lang.t("small_void"))
-        let kwColor = delta < 1.5 ? Color.green : (delta < 4.5 ? Color.yellow : Color.orange)
+        // 判级复用 Mountain24.kongWangLevel 统一口径（与详勘 sheet 一致）：
+        // 大空亡 ≥6.8°+子午卯酉缝 / 小空亡 ≥6.5° / 兼向 ≥1.5° / 其余纯清
+        let kwLevel = motion.headingState.kongWangLevel
+        let kwStatus = kwLevel.localizedTitle
+        let kwColor: Color
+        switch kwLevel {
+        case .pure: kwColor = Color.green
+        case .jianXiang: kwColor = Color.yellow
+        case .smallVoid: kwColor = Color.orange
+        case .largeVoid: kwColor = Color.red
+        }
         
         return HStack(spacing: 8) {
             // 锁定朝向按钮

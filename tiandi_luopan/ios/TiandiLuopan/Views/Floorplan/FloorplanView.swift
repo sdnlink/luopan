@@ -1573,11 +1573,17 @@ public struct FloorplanView: View {
 
     // MARK: - 一键导出全屋户型立极与堪舆全案长图 (PRD 5.3)
     private func exportFloorplanReport(report: [FloorplanAuditItem]) {
-        let canvasSize = CGSize(width: 1080, height: 1920)
-        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        // 主线程快照渲染所需状态，绘制移到后台队列，避免 1080×1920 全页
+        // 同步渲染（含全尺寸户型图）阻塞主线程导致点击导出卡顿。
         let roomsToDraw = auditedRooms.isEmpty ? rooms : auditedRooms
         let state = floorplanHeadingState
+        let heading = effectiveHeading
         let solarInfo = SolarTimeCalculator.shared.calculate(date: Date(), longitude: motion.longitude)
+        let bgImage = userFloorplanImage
+
+        DispatchQueue.global(qos: .userInitiated).async { [self] in
+            let canvasSize = CGSize(width: 1080, height: 1920)
+            let renderer = UIGraphicsImageRenderer(size: canvasSize)
 
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
@@ -1599,7 +1605,7 @@ public struct FloorplanView: View {
             ]
             "演象 · 户型空间立极与全屋堪舆全案".draw(at: CGPoint(x: 70, y: 64), withAttributes: titleAttrs)
 
-            let subText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", effectiveHeading)) · \(state.kongWangLevel.localizedTitle) · \(solarInfo.dayPillar)\(lang.t("day_unit")) \(solarInfo.trueSolarTimeString)"
+            let subText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", heading)) · \(state.kongWangLevel.localizedTitle) · \(solarInfo.dayPillar)\(lang.t("day_unit")) \(solarInfo.trueSolarTimeString)"
             subText.draw(at: CGPoint(x: 70, y: 116), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 21, weight: .semibold),
                 .foregroundColor: UIColor.cyan
@@ -1614,7 +1620,7 @@ public struct FloorplanView: View {
             UIColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 1.0).setFill()
             UIBezierPath(roundedRect: planBox, cornerRadius: 18).fill()
 
-            if let bgImg = userFloorplanImage {
+            if let bgImg = bgImage {
                 bgImg.draw(in: planBox.insetBy(dx: 20, dy: 20), blendMode: .normal, alpha: 0.80)
             }
 
@@ -1656,7 +1662,7 @@ public struct FloorplanView: View {
             cg.setLineWidth(2)
             cg.strokeEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
             for i in 0..<8 {
-                let boundary = (Double(i) * 45.0 + 22.5 - effectiveHeading) * .pi / 180.0
+                let boundary = (Double(i) * 45.0 + 22.5 - heading) * .pi / 180.0
                 cg.move(to: CGPoint(x: cx, y: cy))
                 cg.addLine(to: CGPoint(x: cx + CGFloat(sin(boundary)) * radius, y: cy - CGFloat(cos(boundary)) * radius))
             }
@@ -1696,8 +1702,12 @@ public struct FloorplanView: View {
             }
         }
 
-        exportedReportImage = image
-        showReportShareSheet = true
+        // 回主线程更新 SwiftUI 状态并弹出分享面板
+        DispatchQueue.main.async {
+            self.exportedReportImage = image
+            self.showReportShareSheet = true
+        }
+        }
     }
 }
 

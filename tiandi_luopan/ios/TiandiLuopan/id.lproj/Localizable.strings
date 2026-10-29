@@ -189,7 +189,7 @@
 "kw_small_grade" = "Batas tidak menguntungkan";
 "kw_small_desc" = "Arah dekat batas dua gunung dalam trigram yang sama. Qi tidak murni dan dapat menimbulkan ketidakharmonisan atau kecemasan.";
 "kw_small_remedy" = "Sesuaikan orientasi ke garis tengah murni atau derajat Fenjin yang sah.";
-"kw_sub_title" = "Sub-gunung (deviasi 1.5°~4.5°)";
+"kw_sub_title" = "Sub-gunung (deviasi 1.5°~6.5°)";
 "kw_sub_grade" = "Bintang Terbang pengganti";
 "kw_sub_desc" = "Arah menyimpang dari garis tengah. Peta Bintang Terbang harus diplot dengan rumus Bintang Pengganti.";
 "kw_sub_remedy" = "Lihat peta Tiga Periode Bintang Terbang untuk sebaran bintang pengganti.";

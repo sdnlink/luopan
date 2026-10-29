@@ -17,10 +17,13 @@ public struct CompassHeaderView: View {
                 // 实时度数 (大字体)
                 HStack(alignment: .top, spacing: 2) {
                     Text(String(format: "%.1f", state.facingAngle))
-                        .font(.system(size: 42, weight: .black, design: .rounded))
+                        .font(.system(size: 34, weight: .black, design: .rounded))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .fixedSize(horizontal: true, vertical: false)
                     Text("°")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 17, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.8))
                 }
                 

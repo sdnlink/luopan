@@ -158,7 +158,12 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         }
         if !force,
            let lastProductsFetchDate = lastProductsFetchDate,
-           Date().timeIntervalSince(lastProductsFetchDate) < productsRetryInterval {
+           Date().timeIntervalSince(lastProductsFetchDate) < productsRetryInterval,
+           // A failed/empty request must be recoverable the next time the
+           // paywall or foreground lifecycle appears. Otherwise the initial
+           // offline launch can leave every price unavailable for the whole
+           // retry window even after the App Store connection is restored.
+           (isLoadingProducts || !availableProducts.isEmpty) {
             return
         }
         fetchProducts()

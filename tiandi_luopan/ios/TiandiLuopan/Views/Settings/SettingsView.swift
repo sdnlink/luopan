@@ -60,7 +60,9 @@ public struct SettingsView: View {
                         }
                         .padding(.vertical, 4)
 
-                        if !iap.isLoadingProducts && !iap.hasAvailableProducts {
+                        if !iap.isLoadingProducts,
+                           let selectedProduct = IAPProductID(rawValue: selectedProductId),
+                           !iap.hasProduct(for: selectedProduct) {
                             HStack(spacing: 8) {
                                 Text(lang.t("price_unavailable"))
                                     .font(.system(size: 10))
@@ -97,7 +99,7 @@ public struct SettingsView: View {
                                 .foregroundColor(.black)
                                 .cornerRadius(8)
                             }
-                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts)
+                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !selectedProductIsAvailable)
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -342,6 +344,11 @@ public struct SettingsView: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    private var selectedProductIsAvailable: Bool {
+        guard let product = IAPProductID(rawValue: selectedProductId) else { return false }
+        return iap.hasProduct(for: product)
     }
     
     private func privilegeRow(icon: String, title: String) -> some View {

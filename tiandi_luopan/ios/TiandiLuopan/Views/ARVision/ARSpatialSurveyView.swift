@@ -182,6 +182,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var cameraRollDegrees: Double = 0.0
     @Published public private(set) var groundBaguaProjected: Bool = false
     @Published public private(set) var currentStandingPalace: String?
+    @Published public private(set) var estimatedRoomHeightMeters: Float?
+    @Published public private(set) var hasLowBeamWarning: Bool = false
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
@@ -669,6 +671,74 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return true
     }
 
+    /// Captures a 1080×1920 holographic AR survey report image combining the live
+    /// `ARSCNView` 3D scene (LiDAR mesh, 3D Lu Ban ruler, ground Bagua array) with
+    /// full compass & spatial fengshui telemetry.
+    public func captureSurveySnapshotReport() -> UIImage? {
+        guard let view = sceneView else { return nil }
+        let baseSnapshot = view.snapshot()
+        guard baseSnapshot.size.width > 0, baseSnapshot.size.height > 0 else { return nil }
+
+        let size = CGSize(width: 1080, height: 1920)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        let motion = CompassMotionManager.shared
+        let state = motion.headingState
+        let lang = LocalizationManager.shared
+
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            let scale = max(size.width / baseSnapshot.size.width, size.height / baseSnapshot.size.height)
+            let drawW = baseSnapshot.size.width * scale
+            let drawH = baseSnapshot.size.height * scale
+            baseSnapshot.draw(in: CGRect(x: (size.width - drawW) * 0.5, y: (size.height - drawH) * 0.5, width: drawW, height: drawH))
+
+            let cardRect = CGRect(x: 40, y: size.height - 420, width: size.width - 80, height: 360)
+            UIColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.88).setFill()
+            UIBezierPath(roundedRect: cardRect, cornerRadius: 18).fill()
+            UIColor(red: 0.85, green: 0.70, blue: 0.24, alpha: 0.85).setStroke()
+            let border = UIBezierPath(roundedRect: cardRect, cornerRadius: 18)
+            border.lineWidth = 2.5
+            border.stroke()
+
+            "演象 · AR 三维全息空间与 LiDAR 勘舆存证".draw(
+                at: CGPoint(x: 70, y: size.height - 392),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 32),
+                    .foregroundColor: UIColor(red: 0.96, green: 0.86, blue: 0.45, alpha: 1.0)
+                ]
+            )
+
+            var lines: [String] = []
+            lines.append("坐向山度: \(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) (\(String(format: "%.1f°", state.facingAngle))) · \(state.kongWangLevel.localizedTitle)")
+            if let d = distance {
+                lines.append("天心测距: \(lidarAvailable ? "LiDAR" : "AR") \(String(format: "%.2f m", d)) · 识别平面: \(planeCount) 处 (网格 \(meshAnchorCount))")
+            }
+            if let standing = currentStandingPalace {
+                lines.append("九宫踏勘: \(standing)")
+            }
+            if let eval = lubanEvaluation {
+                lines.append("三维鲁班: \(eval.localizedSummary(for: lang.effectiveLanguage))")
+            }
+            if let h = estimatedRoomHeightMeters {
+                let beamTag = hasLowBeamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"
+                lines.append(String(format: "空间净高: %.2f m (%@)", h, beamTag))
+            }
+            lines.append("定位与真太阳时: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+
+            let bodyText = lines.joined(separator: "\n")
+            bodyText.draw(
+                in: CGRect(x: 70, y: size.height - 336, width: size.width - 140, height: 260),
+                withAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: 22, weight: .semibold),
+                    .foregroundColor: UIColor.white
+                ]
+            )
+            _ = cg
+        }
+    }
+
     public func clearLubanPoints() {
         lubanPointA = nil
         lubanPointB = nil
@@ -1099,6 +1169,17 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         planeCount = planes.count
         verticalPlaneCount = planes.filter { $0.alignment == .vertical }.count
         savedAnchorCount = anchors.filter { $0.name?.hasPrefix("luban-anchor") == true }.count
+        let horizontalPlanes = planes.filter { $0.alignment == .horizontal }
+        let ys = horizontalPlanes.map { $0.transform.columns.3.y }.sorted()
+        if let minY = ys.first, let maxY = ys.last, maxY - minY >= 1.75 && maxY - minY <= 5.5 {
+            let h = maxY - minY
+            estimatedRoomHeightMeters = h
+            hasLowBeamWarning = (h < 2.42)
+        } else if let maxVertH = planes.filter({ $0.alignment == .vertical }).map({ $0.extent.z }).max(),
+                  maxVertH >= 1.85 && maxVertH <= 5.2 {
+            estimatedRoomHeightMeters = maxVertH
+            hasLowBeamWarning = (maxVertH < 2.42)
+        }
         if let largest = planes.max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
             largestPlaneWidth = largest.extent.x
             largestPlaneDepth = largest.extent.z
@@ -1605,7 +1686,7 @@ public struct ARFusionCaptureView: UIViewRepresentable {
 
 private struct ARSpatialShareItem: Identifiable {
     let id = UUID()
-    let url: URL
+    let item: Any
 }
 
 private struct ARSpatialShareSheet: UIViewControllerRepresentable {
@@ -1802,6 +1883,19 @@ public struct ARSpatialSurveyView: View {
                 .disabled(isSavingMap)
                 .accessibilityLabel(lang.t("ar_spatial_map_ready"))
             }
+            Button(action: {
+                if let img = model.captureSurveySnapshotReport() {
+                    shareItem = ARSpatialShareItem(item: img)
+                }
+            }) {
+                Image(systemName: "camera.viewfinder")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.green)
+                    .padding(9)
+                    .background(Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(lang.t("capture_proof"))
             Button(action: saveMap) {
                 Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
                     .font(.system(size: 13, weight: .bold))
@@ -1850,7 +1944,13 @@ public struct ARSpatialSurveyView: View {
 
             HStack(spacing: 12) {
                 Label(mappingText, systemImage: "map")
-                if model.lidarAvailable {
+                if false, let h = model.estimatedRoomHeightMeters {
+                let beamWarning = model.hasLowBeamWarning
+                Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(beamWarning ? .orange : .green)
+            }
+            if model.lidarAvailable {
                     Text("\(lang.t("ar_spatial_mesh")): \(model.meshAnchorCount)")
                 }
                 if model.savedAnchorCount > 0 {
@@ -1956,6 +2056,12 @@ public struct ARSpatialSurveyView: View {
                 }
             }
 
+            if let h = model.estimatedRoomHeightMeters {
+                let beamWarning = model.hasLowBeamWarning
+                Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(beamWarning ? .orange : .green)
+            }
             if model.lidarAvailable {
                 Text(lang.t("ar_spatial_semantic_candidate"))
                     .font(.system(size: 10, weight: .medium))
@@ -1988,7 +2094,7 @@ public struct ARSpatialSurveyView: View {
         .background(Color.black.opacity(0.78))
         .cornerRadius(12)
         .sheet(item: $shareItem) { item in
-            ARSpatialShareSheet(items: [item.url])
+            ARSpatialShareSheet(items: [item.item])
         }
     }
 
@@ -2001,7 +2107,7 @@ public struct ARSpatialSurveyView: View {
             switch result {
             case .success(let url):
                 saveMessage = lang.t("ar_spatial_map_ready")
-                shareItem = ARSpatialShareItem(url: url)
+                shareItem = ARSpatialShareItem(item: url)
             case .failure(let error):
                 if let spatialError = error as? ARSpatialSurveyError,
                    spatialError == .mapUnavailable {

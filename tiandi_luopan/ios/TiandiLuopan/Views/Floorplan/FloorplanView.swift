@@ -669,6 +669,10 @@ public struct FloorplanView: View {
     /// boxes are applied as layout suggestions to the existing room labels and
     /// remain fully editable by the user.
     private func detectRoomLayout() {
+        guard !rooms.isEmpty else {
+            roomDetectionMessage = lang.t("floorplan_detect_failed")
+            return
+        }
         guard let image = userFloorplanImage,
               let cgImage = image.cgImage,
               !isDetectingRooms else { return }

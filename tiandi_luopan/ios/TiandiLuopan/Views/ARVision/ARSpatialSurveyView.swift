@@ -541,6 +541,19 @@ public struct ARSpatialSurveyView: View {
                 model.stop()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            // ARSCNView does not guarantee that an active session is paused
+            // before the app is backgrounded. Stop frame delivery explicitly
+            // so the camera/LiDAR cannot continue consuming power while the
+            // user is away from the survey.
+            model.pause()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Resume only when the survey is still presented. If it was
+            // dismissed while the app was backgrounded, stop() cleared the
+            // configuration and this call safely becomes a no-op.
+            model.resume()
+        }
 #if canImport(RoomPlan)
         .onChange(of: showRoomPlan) { isPresented in
             if isPresented {

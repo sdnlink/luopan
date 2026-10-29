@@ -1715,6 +1715,7 @@ private struct ARSpatialShareSheet: UIViewControllerRepresentable {
 public struct ARSpatialSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @StateObject private var model = ARSpatialSurveyModel()
+    @StateObject private var fallbackCameraModel = CameraPreviewController()
     @Environment(\.presentationMode) private var presentationMode
     @State private var isSavingMap = false
     @State private var shareItem: ARSpatialShareItem?
@@ -1740,7 +1741,7 @@ public struct ARSpatialSurveyView: View {
                     .ignoresSafeArea()
                 centerReticle
             } else {
-                CameraPreviewView(isActive: true)
+                CameraPreviewView(controller: fallbackCameraModel, isActive: !showRoomPlan)
                     .ignoresSafeArea()
                 unsupportedOverlay
             }
@@ -1760,6 +1761,7 @@ public struct ARSpatialSurveyView: View {
             // disappear. Keep the model attached in that case so closing the
             // full-screen capture can resume the same spatial session.
             if !showRoomPlan {
+                fallbackCameraModel.stopSession()
                 model.stop()
             }
         }
@@ -1768,6 +1770,7 @@ public struct ARSpatialSurveyView: View {
             // before the app is backgrounded. Stop frame delivery explicitly
             // so the camera/LiDAR cannot continue consuming power while the
             // user is away from the survey.
+            fallbackCameraModel.pauseSessionForBackground()
             model.pause()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in

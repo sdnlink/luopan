@@ -34,6 +34,7 @@ public struct SettingsView: View {
     @State private var showCalibrationGuide: Bool = false
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var paymentError: String = ""
+    @State private var paymentAlertIsError: Bool = true
     @State private var showPaymentError: Bool = false
     @State private var legalDocument: LegalDocument?
 
@@ -99,8 +100,8 @@ public struct SettingsView: View {
                             }
                         }
                         
-                        // 购买与恢复按钮
-                        if !isProUnlocked {
+                        // 购买与恢复按钮（支持未解锁用户购买，以及年度 VIP 升级至终身版）
+                        if !iap.isLifetimeUser && (!isProUnlocked || selectedProductId == IAPProductID.proLifetime.rawValue) {
                             Button(action: {
                                 iap.purchase(productId: selectedProductId)
                             }) {
@@ -123,20 +124,21 @@ public struct SettingsView: View {
                                 .cornerRadius(8)
                             }
                             .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !selectedProductIsAvailable)
-                            
-                            Button(action: {
-                                iap.restorePurchases()
-                            }) {
-                                HStack {
-                                    Spacer()
-                                    Text(lang.t("restore_purchases"))
-                                        .font(.system(size: 11))
-                                        .foregroundColor(Color.yanCyan)
-                                    Spacer()
-                                }
-                            }
-                            .padding(.top, 2)
                         }
+                        
+                        Button(action: {
+                            iap.restorePurchases()
+                        }) {
+                            HStack {
+                                Spacer()
+                                Text(lang.t("restore_purchases"))
+                                    .font(.system(size: 11))
+                                    .foregroundColor(Color.yanCyan)
+                                Spacer()
+                            }
+                        }
+                        .disabled(iap.isProcessingPurchase)
+                        .padding(.top, 2)
                     }
                     .padding(.vertical, 4)
                 }
@@ -312,13 +314,27 @@ public struct SettingsView: View {
         .onReceive(iap.$lastErrorMessage) { message in
             guard isActive else { return }
             if let message = message {
+                paymentAlertIsError = true
+                paymentError = message
+                showPaymentError = true
+                iap.clearTransientMessages()
+            }
+        }
+        .onReceive(iap.$lastStatusMessage) { message in
+            guard isActive else { return }
+            if let message = message {
+                paymentAlertIsError = false
                 paymentError = message
                 showPaymentError = true
                 iap.clearTransientMessages()
             }
         }
         .alert(isPresented: $showPaymentError) {
-            Alert(title: Text(lang.t("payment_failed_title")), message: Text(paymentError), dismissButton: .default(Text(lang.t("done"))))
+            Alert(
+                title: Text(paymentAlertIsError ? lang.t("payment_failed_title") : lang.t("payment_status_title")),
+                message: Text(paymentError),
+                dismissButton: .default(Text(lang.t("done")))
+            )
         }
         }
 
@@ -428,37 +444,3 @@ public struct LegalDocumentSheet: View {
     }
 }
 
-// MARK: - 8字校准指南弹窗
-public struct CalibrationGuideSheet: View {
-    @Environment(\.presentationMode) var presentationMode
-    @ObservedObject var lang = LocalizationManager.shared
-    
-    public var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Image(systemName: "figure.walk.motion")
-                    .font(.system(size: 60))
-                    .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                    .padding(.top, 30)
-                
-                Text(lang.t("settings_calib_guide_title"))
-                    .font(.system(size: 18, weight: .bold))
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(lang.t("settings_calib_guide_1"))
-                    Text(lang.t("settings_calib_guide_2"))
-                    Text(lang.t("settings_calib_guide_3"))
-                }
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 24)
-                
-                Spacer()
-            }
-            .navigationBarTitle(lang.t("settings_calib_guide_title"), displayMode: .inline)
-            .navigationBarItems(trailing: Button(lang.t("i_know")) {
-                presentationMode.wrappedValue.dismiss()
-            })
-        }
-    }
-}

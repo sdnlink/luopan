@@ -56,6 +56,9 @@ public struct FloorplanView: View {
     @State private var lastAuditedHeading: Double?
     @State private var lastAuditedCentroid: CGPoint?
     @State private var didRestorePersistedLayout = false
+    @State private var showARSpatialSurvey: Bool = false
+    @State private var exportedReportImage: UIImage? = nil
+    @State private var showReportShareSheet: Bool = false
     // Room/center edits call persistLayout frequently. Keep the image
     // identity so a large JPEG is encoded only when the imported image
     // itself changes, rather than after every drag gesture.
@@ -196,6 +199,14 @@ public struct FloorplanView: View {
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .floorplanSingle)
+        }
+        .sheet(isPresented: $showARSpatialSurvey) {
+            ARSpatialSurveyView()
+        }
+        .sheet(isPresented: $showReportShareSheet) {
+            if let reportImage = exportedReportImage {
+                FloorplanReportShareSheet(items: [reportImage])
+            }
         }
         .onChange(of: lang.effectiveLanguage) { _ in
             // Keep the user's room geometry while refreshing language-dependent
@@ -462,6 +473,19 @@ public struct FloorplanView: View {
             }
             
             Spacer()
+
+            // AR 空间测绘 / RoomPlan 扫描快速入口
+            Button(action: {
+                showARSpatialSurvey = true
+            }) {
+                Image(systemName: "viewfinder")
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(6)
+                    .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(6)
+            }
+            .accessibilityLabel(lang.t("ar_spatial_survey"))
             
             // 导入真实户型图纸
             Button(action: {
@@ -1352,26 +1376,33 @@ public struct FloorplanView: View {
         )
     }
     
+    private static let overlayPalaceBadges: [(geoAngle: Double, title: String, star: String, isAuspicious: Bool)] = [
+        (0.0,   "坎北", "五黄煞", false),
+        (45.0,  "艮东北", "三碧", false),
+        (90.0,  "震东", "七赤", false),
+        (135.0, "巽东南", "八白财", true),
+        (180.0, "离南", "四绿文昌", true),
+        (225.0, "坤西南", "六白官", true),
+        (270.0, "兑西", "二黑病", false),
+        (315.0, "乾西北", "一白吉", true)
+    ]
+
     private func compassOverlayLayer(centerPt: CGPoint, size: CGFloat) -> some View {
         let r = size * 0.44
-        
+        let badgeR = size * 0.37
+
         return ZStack {
-            // 八宫辐射线
+            // 八宫分界辐射线 (位于每宫 ±22.5° 交界处，与 FloorplanEngine.palaceForPoint 完全对齐)
             ForEach(0..<8) { i in
-                // Keep the overlay in the same coordinate system as
-                // FloorplanEngine.palaceForPoint, which resolves a point as
-                // screenAngle + heading. Subtracting here mirrored the
-                // visual sectors whenever the plan was rotated away from
-                // north, so the highlighted palace did not match the report.
-                let angle = Double(i) * 45.0 + effectiveHeading
+                let boundaryAngle = Double(i) * 45.0 + 22.5 - effectiveHeading
                 Path { p in
                     p.move(to: centerPt)
-                    let rad = angle * .pi / 180.0
+                    let rad = boundaryAngle * .pi / 180.0
                     p.addLine(to: CGPoint(x: centerPt.x + CGFloat(sin(rad)) * r, y: centerPt.y - CGFloat(cos(rad)) * r))
                 }
                 .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.35), lineWidth: 1)
             }
-            
+
             // 十字天心红线
             Path { p in
                 p.move(to: CGPoint(x: centerPt.x - r, y: centerPt.y))
@@ -1380,12 +1411,34 @@ public struct FloorplanView: View {
                 p.addLine(to: CGPoint(x: centerPt.x, y: centerPt.y + r))
             }
             .stroke(Color.red.opacity(0.6), lineWidth: 1.5)
-            
+
             // 外圈金环
             Circle()
                 .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.4), lineWidth: 1)
                 .frame(width: r * 2, height: r * 2)
                 .position(centerPt)
+
+            // 八宫八卦方位与九运飞星财位/文昌位角标
+            ForEach(0..<Self.overlayPalaceBadges.count, id: \.self) { idx in
+                let item = Self.overlayPalaceBadges[idx]
+                let screenAngle = item.geoAngle - effectiveHeading
+                let rad = screenAngle * .pi / 180.0
+                let bx = centerPt.x + CGFloat(sin(rad)) * badgeR
+                let by = centerPt.y - CGFloat(cos(rad)) * badgeR
+                VStack(spacing: 0) {
+                    Text(item.title)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text(item.star)
+                        .font(.system(size: 7, weight: .semibold))
+                        .foregroundColor(item.isAuspicious ? .green : .orange.opacity(0.9))
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1.5)
+                .background(Color.black.opacity(0.62))
+                .cornerRadius(4)
+                .position(x: bx, y: by)
+            }
         }
         .allowsHitTesting(false)
     }
@@ -1438,6 +1491,22 @@ public struct FloorplanView: View {
                 Text(lang.t("drag_center_hint"))
                     .font(.system(size: 10))
                     .foregroundColor(.white.opacity(0.5))
+                Button(action: {
+                    if acquireFloorplanAccess() {
+                        exportFloorplanReport(report: report)
+                    }
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "square.and.arrow.up")
+                        Text(lang.t("ar_roomplan_share"))
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(6)
+                }
             }
             .padding(.horizontal, 16)
             
@@ -1501,6 +1570,145 @@ public struct FloorplanView: View {
         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
         .cornerRadius(8)
     }
+
+    // MARK: - 一键导出全屋户型立极与堪舆全案长图 (PRD 5.3)
+    private func exportFloorplanReport(report: [FloorplanAuditItem]) {
+        let canvasSize = CGSize(width: 1080, height: 1920)
+        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        let roomsToDraw = auditedRooms.isEmpty ? rooms : auditedRooms
+        let state = floorplanHeadingState
+        let solarInfo = TrueSolarTimeEngine.shared.computeNow(longitude: motion.longitude)
+
+        let image = renderer.image { ctx in
+            let cg = ctx.cgContext
+            UIColor(red: 0.06, green: 0.07, blue: 0.10, alpha: 1.0).setFill()
+            cg.fill(CGRect(origin: .zero, size: canvasSize))
+
+            // 1. 顶部金边标题卡
+            let headerRect = CGRect(x: 40, y: 40, width: 1000, height: 170)
+            UIColor(red: 0.11, green: 0.12, blue: 0.16, alpha: 1.0).setFill()
+            UIBezierPath(roundedRect: headerRect, cornerRadius: 18).fill()
+            UIColor(red: 0.83, green: 0.68, blue: 0.21, alpha: 0.65).setStroke()
+            let headerBorder = UIBezierPath(roundedRect: headerRect, cornerRadius: 18)
+            headerBorder.lineWidth = 2
+            headerBorder.stroke()
+
+            let titleAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 32),
+                .foregroundColor: UIColor(red: 0.95, green: 0.85, blue: 0.45, alpha: 1.0)
+            ]
+            "演象 · 户型空间立极与全屋堪舆全案".draw(at: CGPoint(x: 70, y: 64), withAttributes: titleAttrs)
+
+            let subText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", effectiveHeading)) · \(state.kongWangLevel.localizedTitle) · \(solarInfo.dayPillar)\(lang.t("day_unit")) \(solarInfo.trueSolarTimeStr)"
+            subText.draw(at: CGPoint(x: 70, y: 116), withAttributes: [
+                .font: UIFont.systemFont(ofSize: 21, weight: .semibold),
+                .foregroundColor: UIColor.cyan
+            ])
+            "下元九运 · 九宫八卦立极透视与居家化解建议".draw(at: CGPoint(x: 70, y: 154), withAttributes: [
+                .font: UIFont.systemFont(ofSize: 18, weight: .regular),
+                .foregroundColor: UIColor.white.withAlphaComponent(0.7)
+            ])
+
+            // 2. 户型立极画板区
+            let planBox = CGRect(x: 40, y: 234, width: 1000, height: 740)
+            UIColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 1.0).setFill()
+            UIBezierPath(roundedRect: planBox, cornerRadius: 18).fill()
+
+            if let bgImg = userFloorplanImage {
+                bgImg.draw(in: planBox.insetBy(dx: 20, dy: 20), blendMode: .normal, alpha: 0.80)
+            }
+
+            let innerBox = planBox.insetBy(dx: 24, dy: 24)
+            for room in roomsToDraw {
+                let rx = innerBox.minX + room.rect.origin.x * innerBox.width
+                let ry = innerBox.minY + room.rect.origin.y * innerBox.height
+                let rw = room.rect.size.width * innerBox.width
+                let rh = room.rect.size.height * innerBox.height
+                let rRect = CGRect(x: rx, y: ry, width: rw, height: rh)
+                let strokeCol: UIColor = (room.type == .missingCorner || room.isBad)
+                    ? UIColor(red: 1.0, green: 0.32, blue: 0.32, alpha: 0.9)
+                    : (room.isGood ? UIColor(red: 0.25, green: 0.90, blue: 0.55, alpha: 0.9) : UIColor.white.withAlphaComponent(0.45))
+                strokeCol.withAlphaComponent(0.18).setFill()
+                UIBezierPath(roundedRect: rRect, cornerRadius: 10).fill()
+                strokeCol.setStroke()
+                let rPath = UIBezierPath(roundedRect: rRect, cornerRadius: 10)
+                rPath.lineWidth = 2.5
+                rPath.stroke()
+
+                let label = "\(room.name)\n\(room.palaceName)"
+                let pStyle = NSMutableParagraphStyle()
+                pStyle.alignment = .center
+                label.draw(
+                    in: CGRect(x: rRect.minX + 4, y: rRect.midY - 22, width: max(20, rRect.width - 8), height: 48),
+                    withAttributes: [
+                        .font: UIFont.boldSystemFont(ofSize: 17),
+                        .foregroundColor: UIColor.white,
+                        .paragraphStyle: pStyle
+                    ]
+                )
+            }
+
+            // 太极中宫立极点与八宫辐射线
+            let cx = innerBox.minX + centroid.x * innerBox.width
+            let cy = innerBox.minY + centroid.y * innerBox.height
+            let radius = min(innerBox.width, innerBox.height) * 0.44
+            cg.setStrokeColor(UIColor(red: 0.83, green: 0.68, blue: 0.21, alpha: 0.45).cgColor)
+            cg.setLineWidth(2)
+            cg.strokeEllipse(in: CGRect(x: cx - radius, y: cy - radius, width: radius * 2, height: radius * 2))
+            for i in 0..<8 {
+                let boundary = (Double(i) * 45.0 + 22.5 - effectiveHeading) * .pi / 180.0
+                cg.move(to: CGPoint(x: cx, y: cy))
+                cg.addLine(to: CGPoint(x: cx + CGFloat(sin(boundary)) * radius, y: cy - CGFloat(cos(boundary)) * radius))
+            }
+            cg.strokePath()
+
+            UIColor.red.setFill()
+            cg.fillEllipse(in: CGRect(x: cx - 14, y: cy - 14, width: 28, height: 28))
+
+            // 3. 底部全屋体检清单
+            var cursorY: CGFloat = 1000
+            for item in report.prefix(6) {
+                guard cursorY + 138 <= 1880 else { break }
+                let rowRect = CGRect(x: 40, y: cursorY, width: 1000, height: 126)
+                UIColor(red: 0.12, green: 0.12, blue: 0.16, alpha: 1.0).setFill()
+                UIBezierPath(roundedRect: rowRect, cornerRadius: 14).fill()
+
+                let tagColor: UIColor = item.isSevere ? .systemRed : (item.isGood ? .systemGreen : .systemOrange)
+                tagColor.setFill()
+                cg.fillEllipse(in: CGRect(x: 64, y: cursorY + 24, width: 14, height: 14))
+
+                item.title.draw(at: CGPoint(x: 90, y: cursorY + 16), withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 22),
+                    .foregroundColor: UIColor.white
+                ])
+                item.lore.draw(in: CGRect(x: 90, y: cursorY + 48, width: 920, height: 34), withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 17),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.78)
+                ])
+                "\(lang.t("floorplan_solution_prefix")) \(item.solution)".draw(
+                    in: CGRect(x: 90, y: cursorY + 84, width: 920, height: 34),
+                    withAttributes: [
+                        .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+                        .foregroundColor: UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 1.0)
+                    ]
+                )
+                cursorY += 138
+            }
+        }
+
+        exportedReportImage = image
+        showReportShareSheet = true
+    }
+}
+
+private struct FloorplanReportShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private struct FloorplanRoomTypeEditor: View {

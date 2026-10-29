@@ -51,6 +51,17 @@ public struct FloorplanView: View {
         // 这里再按 0.5° 四舍五入会让户型方位和罗盘读数不同步。
         return motion.headingState.facingAngle
     }
+
+    private var floorplanHeadingState: CompassHeadingState {
+        if isSyncWithCompass {
+            return motion.headingState
+        }
+        return Mountain24Data.shared.resolveHeadingState(
+            heading: compassRotation,
+            pitch: motion.pitch,
+            roll: motion.roll
+        )
+    }
     
     public var body: some View {
         // CompassMotionManager publishes tilt and magnetic-field samples more
@@ -227,7 +238,7 @@ public struct FloorplanView: View {
                 Text(lang.t("floorplan_title"))
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(motion.headingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(motion.headingState.facingMountain.localizedName)\(lang.t("facing_suffix")))")
+                Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(floorplanHeadingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(floorplanHeadingState.facingMountain.localizedName)\(lang.t("facing_suffix")))")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.7))
             }
@@ -426,9 +437,14 @@ public struct FloorplanView: View {
 
     @ViewBuilder
     private func headingQualityNotice() -> some View {
-        let referenceText = activeNorthReference == .trueNorth
-            ? lang.t("heading_reference_true")
-            : lang.t("heading_reference_magnetic")
+        let referenceText: String
+        if isSyncWithCompass {
+            referenceText = activeNorthReference == .trueNorth
+                ? lang.t("heading_reference_true")
+                : lang.t("heading_reference_magnetic")
+        } else {
+            referenceText = lang.t("floorplan_manual_heading")
+        }
         VStack(alignment: .leading, spacing: 3) {
             Text("\(lang.t("floorplan_heading_reference")): \(referenceText)")
                 .font(.system(size: 9, weight: .medium))

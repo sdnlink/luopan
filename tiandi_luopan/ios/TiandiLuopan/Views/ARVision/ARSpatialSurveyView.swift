@@ -533,7 +533,14 @@ public struct ARSpatialSurveyView: View {
             .padding(.bottom, 12)
         }
         .background(Color.black.ignoresSafeArea())
-        .onDisappear { model.stop() }
+        .onDisappear {
+            // Presenting RoomPlan can make the covered view temporarily
+            // disappear. Keep the model attached in that case so closing the
+            // full-screen capture can resume the same spatial session.
+            if !showRoomPlan {
+                model.stop()
+            }
+        }
 #if canImport(RoomPlan)
         .onChange(of: showRoomPlan) { isPresented in
             if isPresented {

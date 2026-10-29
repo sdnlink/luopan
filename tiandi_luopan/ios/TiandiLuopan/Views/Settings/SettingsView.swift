@@ -11,6 +11,8 @@ public struct SettingsView: View {
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var paymentError: String = ""
     @State private var showPaymentError: Bool = false
+    @State private var showTerms: Bool = false
+    @State private var showPrivacy: Bool = false
 
     private static let appearanceConfigured: Void = {
         UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
@@ -216,6 +218,19 @@ public struct SettingsView: View {
                             .foregroundColor(.secondary)
                             .lineSpacing(3)
                     }
+                    HStack(spacing: 16) {
+                        Button(lang.t("legal_terms_button")) {
+                            showTerms = true
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.yanCyan)
+                        Spacer()
+                        Button(lang.t("legal_privacy_button")) {
+                            showPrivacy = true
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color.yanCyan)
+                    }
                 }
             }
             .listStyle(InsetGroupedListStyle())
@@ -223,6 +238,18 @@ public struct SettingsView: View {
             .preferredColorScheme(.dark)
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet()
+            }
+            .sheet(isPresented: $showTerms) {
+                LegalDocumentSheet(
+                    title: lang.t("legal_terms_title"),
+                    bodyText: lang.t("legal_terms_body")
+                )
+            }
+            .sheet(isPresented: $showPrivacy) {
+                LegalDocumentSheet(
+                    title: lang.t("legal_privacy_title"),
+                    bodyText: lang.t("legal_privacy_body")
+                )
             }
         .onReceive(iap.$lastErrorMessage) { message in
             if let message = message {
@@ -296,6 +323,35 @@ public struct SettingsView: View {
             Text(lang.t("vip_short"))
                 .font(.system(size: 9, weight: .bold))
                 .foregroundColor(.yellow)
+        }
+    }
+}
+
+// MARK: - 用户协议与隐私说明
+public struct LegalDocumentSheet: View {
+    public let title: String
+    public let bodyText: String
+    @Environment(\.presentationMode) private var presentationMode
+
+    public init(title: String, bodyText: String) {
+        self.title = title
+        self.bodyText = bodyText
+    }
+
+    public var body: some View {
+        NavigationView {
+            ScrollView {
+                Text(bodyText)
+                    .font(.system(size: 13))
+                    .foregroundColor(.primary)
+                    .lineSpacing(5)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .navigationBarTitle(title, displayMode: .inline)
+            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
+                presentationMode.wrappedValue.dismiss()
+            })
         }
     }
 }

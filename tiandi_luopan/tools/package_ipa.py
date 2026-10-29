@@ -2,6 +2,7 @@ import os
 import shutil
 import zipfile
 import struct
+import tempfile
 
 def create_macho_arm64_stub():
     """
@@ -32,6 +33,17 @@ def package_ipa():
     dist_dir = os.path.join(root_dir, "dist-ios")
     ipa_path = os.path.join(dist_dir, "YanXiangCompass-v1.3.0.ipa")
 
+    # Detect a previously built, real (non-stub) executable so we can reuse it.
+    # A real Xcode-built binary is far larger than the ~32-byte placeholder stub.
+    prebuilt_exec = os.path.join(app_dir, "TiandiLuopan")
+    reuse_real_binary = False
+    saved_exec = None
+    if os.path.exists(prebuilt_exec) and os.path.getsize(prebuilt_exec) > 4096:
+        reuse_real_binary = True
+        fd, saved_exec = tempfile.mkstemp(suffix=".appbin")
+        os.close(fd)
+        shutil.copy2(prebuilt_exec, saved_exec)
+
     # Clean previous build
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
@@ -48,10 +60,22 @@ def package_ipa():
     with open(os.path.join(app_dir, "PkgInfo"), "wb") as f:
         f.write(b"APPL????")
 
-    # 3. Executable binary stub
+    # 3. Executable binary
     exec_path = os.path.join(app_dir, "TiandiLuopan")
-    with open(exec_path, "wb") as f:
-        f.write(create_macho_arm64_stub())
+    if reuse_real_binary and saved_exec:
+        print("Using prebuilt real executable from a previous Xcode build...")
+        shutil.copy2(saved_exec, exec_path)
+        os.remove(saved_exec)
+    else:
+        print(
+            "WARNING: No real compiled binary found on this machine.\n"
+            "         Writing a placeholder Mach-O stub instead. The resulting\n"
+            "         IPA is NOT installable on a device. To produce a real,\n"
+            "         signed IPA you must build on macOS with Xcode (or use the\n"
+            "         GitHub Actions cloud macOS runner)."
+        )
+        with open(exec_path, "wb") as f:
+            f.write(create_macho_arm64_stub())
 
     # 4. Copy www web core assets
     src_www = os.path.join(root_dir, "ios/TiandiLuopan/www")

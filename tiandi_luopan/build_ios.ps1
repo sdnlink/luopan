@@ -28,7 +28,16 @@ python tools/package_ipa.py
 if ($LASTEXITCODE -ne 0) { throw "IPA 打包失败" }
 
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "  ✅ iOS 移植与打包成功！" -ForegroundColor Green
-Write-Host "  产物目录: dist-ios/YanXiangCompass-v1.2.4.ipa" -ForegroundColor Green
+Write-Host "  ✅ iOS 资源生成与打包流程完成！" -ForegroundColor Green
+Write-Host "  产物目录: dist-ios/YanXiangCompass-v1.3.0.ipa" -ForegroundColor Green
 Write-Host "  Xcode 工程: ios/TiandiLuopan.xcodeproj" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
+
+# 诚实提示：在非 macOS 环境（如 Windows）下，package_ipa.py 无法编译出真实的
+# Mach-O 可执行文件，只会写入一个占位桩二进制。该 IPA 不能安装/运行，仅用于
+# 资源结构验证。要产出可安装/可上架的 IPA，请在 Mac 上用 Xcode 打开上述工程，
+# 或依赖仓库内置的 GitHub Actions 云端 macOS 构建流程。
+if (-not ($IsMacOS -or (Test-Path "/usr/bin/xcrun") -or (Test-Path "/Applications/Xcode.app"))) {
+    Write-Host "`n[提醒] 当前非 macOS 环境：生成的 IPA 仅含占位桩二进制，" -ForegroundColor Yellow
+    Write-Host "        无法在 iPhone 上安装运行。请使用 Mac + Xcode 或 GitHub Actions 产出真实 IPA。" -ForegroundColor Yellow
+}

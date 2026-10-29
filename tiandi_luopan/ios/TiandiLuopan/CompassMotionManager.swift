@@ -127,9 +127,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     private func setupLocationManager() {
         locationManager.delegate = self
-        // 采用最高精度位置与高灵敏传感器融合，确保罗盘与地理真北完全精准
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 5.0
+        // 罗盘仅需经纬度用于磁偏角、真太阳时与粗略速度，最近十米精度已绰绰
+        // 有余；相比 kCLLocationAccuracyBest 可让 GPS 射频大幅降频、显著降低耗电。
+        locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        locationManager.distanceFilter = 10.0
         // kCLHeadingFilterNone 确保硬件级所有微小方位角变化均实时上报，消除阶梯跳变与迟滞
         locationManager.headingFilter = kCLHeadingFilterNone
         updateHeadingOrientation()
@@ -188,7 +189,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         locationAuthorizationStatus = status
         if status == .notDetermined {
             locationManager.requestWhenInUseAuthorization()
-        } else if status == .authorizedWhenInUse || status == .authorizedAlways {
+        } else if (status == .authorizedWhenInUse || status == .authorizedAlways), headingUpdatesEnabled {
+            // 位置仅被实时罗盘/AR 页消费（磁偏角、真太阳时、速度）。在不需要
+            // 渲染方位的页面（如设置页）保持 GPS 关闭，避免无谓耗电。
             locationManager.startUpdatingLocation()
         }
         
@@ -263,8 +266,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 if effectiveHeading && CLLocationManager.headingAvailable() {
                     updateHeadingOrientation()
                     locationManager.startUpdatingHeading()
+                    let locStatus = locationManager.authorizationStatus
+                    if locStatus == .authorizedWhenInUse || locStatus == .authorizedAlways {
+                        locationManager.startUpdatingLocation()
+                    }
                 } else {
                     locationManager.stopUpdatingHeading()
+                    // 关闭方位渲染时一并停掉 GPS，回到罗盘页时会自动重启。
+                    locationManager.stopUpdatingLocation()
                 }
             }
         }
@@ -290,7 +299,13 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             locationManager.requestWhenInUseAuthorization()
             return
         }
-        locationManager.startUpdatingLocation()
+        // 仅请求一次高精度定位而非开启持续 GPS 流；Core Location 在交付定位
+        // （或超时）后会自动停止更新，避免手动刷新后 GPS 一直空转耗电。
+        if CLLocationManager.locationServicesEnabled() {
+            locationManager.requestLocation()
+        } else {
+            locationManager.startUpdatingLocation()
+        }
     }
     
     public func toggleLock() {
@@ -593,7 +608,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             }
             guard self.isRunning else { return }
             if status == .authorizedWhenInUse || status == .authorizedAlways {
-                manager.startUpdatingLocation()
+                // 同样仅在需要方位渲染时开启连续定位，避免在设置页授权后 GPS 空转。
+                if self.headingUpdatesEnabled {
+                    manager.startUpdatingLocation()
+                }
                 if self.headingUpdatesEnabled && CLLocationManager.headingAvailable() {
                     self.updateHeadingOrientation()
                     manager.startUpdatingHeading()

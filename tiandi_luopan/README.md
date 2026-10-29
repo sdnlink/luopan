@@ -311,15 +311,25 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 ### 5.1 产物与工程路径
 * **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.0.ipa`
-* **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj` (Swift 5.x + WebKit + CoreLocation + CoreMotion)
-* **Web / PWA 资源**：`ios/TiandiLuopan/www/`
+* **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj`（Swift 5.x + **纯 SwiftUI** + CoreLocation + CoreMotion + ARKit + StoreKit）
+* **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（可选。原生 App 本身是纯 SwiftUI 壳，**不通过 WKWebView 渲染该目录**；`www` 仅由 `tools/serve_ios_web.py` 在局域网内作为免签 PWA 提供服务，详见 5.3 方式 4）
 
-### 5.2 Windows 下一键重新打包
-在 Windows 终端执行：
+### 5.2 资源生成与打包（重要：真实 IPA 仍需 macOS）
+
+`build_ios.ps1` 会调用 `tools/` 下的 Python 脚本完成三件事：
+
+1. 提取并生成全套高清 iOS AppIcon / PWA 图标资源；
+2. 重新生成 Web 适配核心（`prepare_ios_web.py`）；
+3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.0.ipa`。
+
+> **⚠️ 关于“在 Windows 上打包 IPA”的说明**
+> 一个可被设备安装的、**经过 Apple 签名**的 IPA 必须依赖 macOS + Xcode（`xcodebuild` / `codesign`）或 Apple 的云构建链编译出真实的 Mach-O 可执行文件。**Windows 环境无法完成这一步。**
+> 因此：若当前机器上没有由 Xcode 编译出的真实 `TiandiLuopan.app`，`package_ipa.py` 只会写入一个**占位桩二进制**并明确打印警告——该 IPA **无法安装/运行**，仅用于资源结构验证。要产出可上架/可安装的 IPA，请使用方式 2（Mac + Xcode）或方式 3（GitHub Actions 云端 macOS Runner）。
+
+在 Windows 终端执行（仅用于资源生成与占位包验证）：
 ```powershell
 .\build_ios.ps1
 ```
-脚本将自动提取全套高清 iOS AppIcon 资产、编译 Web 适配核心并生成最新的 `.ipa` 文件。
 
 ### 5.3 iPhone 安装方案
 
@@ -343,7 +353,9 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 ```powershell
 python tools/serve_ios_web.py
 ```
-iPhone 连接同一 Wi-Fi，用 Safari 打开控制台输出的局域网网址，点击底部分享按钮 -> **「添加到主屏幕」**，即可免签名作为独立全屏 App 运行，享受 60FPS 流畅罗盘。
+iPhone 连接同一 Wi-Fi，用 Safari 打开控制台输出的局域网网址，点击底部分享按钮 -> **「添加到主屏幕」**，即可免签名作为独立全屏 App 运行。
+
+> 该 PWA 模式加载的是 `ios/TiandiLuopan/www/` 内的 **Web 版**实现（与方式 2 的纯原生 SwiftUI App 是两套独立代码）。它适合无 Mac 时的临时体验/演示，功能与性能不及原生工程。
 
 ### 5.5 Apple In-App Purchase (IAP) 原生内购与付费权益接入
 

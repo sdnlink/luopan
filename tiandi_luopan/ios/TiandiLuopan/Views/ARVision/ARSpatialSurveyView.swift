@@ -180,6 +180,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var savedAnchorCount: Int = 0
     @Published public private(set) var cameraElevationDegrees: Double = 0.0
     @Published public private(set) var cameraRollDegrees: Double = 0.0
+    @Published public private(set) var groundBaguaProjected: Bool = false
+    @Published public private(set) var currentStandingPalace: String?
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
@@ -193,6 +195,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var lubanNodeA: SCNNode?
     private var lubanNodeB: SCNNode?
     private var lubanLineNode: SCNNode?
+    private var groundBaguaNode: SCNNode?
+    private var groundBaguaCenter: SIMD3<Float>?
+    private var groundBaguaSpan: Float = 2.4
+    private var groundBaguaNorthYawRadians: Float = 0.0
 
     /// World maps can be large and are user-created survey data. Store them
     /// in a durable app support directory so a background/suspension cycle or
@@ -293,9 +299,250 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         semanticCounts = [:]
         savedAnchorCount = 0
         clearLubanPoints()
+        clearGroundBaguaOverlay()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
         refreshSavedWorldMapState()
+    }
+
+    public func clearGroundBaguaOverlay() {
+        groundBaguaProjected = false
+        currentStandingPalace = nil
+        groundBaguaNode?.removeFromParentNode()
+        groundBaguaNode = nil
+        groundBaguaCenter = nil
+    }
+
+    /// Projects or removes a 3D True-North-aligned Nine-Palace Bagua & Luopan
+    /// holographic array on the detected floor plane.
+    @discardableResult
+    public func toggleGroundBaguaOverlay() -> Bool {
+        if groundBaguaProjected {
+            clearGroundBaguaOverlay()
+            return false
+        }
+        guard let sceneView = sceneView,
+              let frame = sceneView.session.currentFrame else { return false }
+
+        let center = CGPoint(
+            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
+            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
+        )
+
+        var floorPos: SIMD3<Float>?
+        var resolvedSpan: Float = 2.4
+
+        if let hit = sceneView.raycastQuery(from: center, allowing: .existingPlaneGeometry, alignment: .horizontal)
+            .flatMap({ sceneView.session.raycast($0).first })
+            ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .horizontal)
+                .flatMap({ sceneView.session.raycast($0).first }) {
+            let col = hit.worldTransform.columns.3
+            floorPos = SIMD3<Float>(col.x, col.y, col.z)
+            if let plane = hit.anchor as? ARPlaneAnchor {
+                resolvedSpan = min(4.2, max(1.8, min(plane.extent.x, plane.extent.z) * 0.92))
+            }
+        } else if let largestHoriz = frame.anchors
+            .compactMap({ $0 as? ARPlaneAnchor })
+            .filter({ $0.alignment == .horizontal })
+            .max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
+            let col = largestHoriz.transform.columns.3
+            floorPos = SIMD3<Float>(col.x, col.y, col.z)
+            resolvedSpan = min(4.2, max(1.8, min(largestHoriz.extent.x, largestHoriz.extent.z) * 0.92))
+        } else {
+            let cam = frame.camera.transform
+            let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
+            let forward = -SIMD3<Float>(cam.columns.2.x, 0, cam.columns.2.z)
+            let horizDir = simd_length(forward) > 0.01 ? simd_normalize(forward) : SIMD3<Float>(0, 0, -1)
+            floorPos = SIMD3<Float>(camPos.x + horizDir.x * 1.6, camPos.y - 1.25, camPos.z + horizDir.z * 1.6)
+        }
+
+        guard let centerPos = floorPos else { return false }
+
+        let camForward = -SIMD3<Float>(frame.camera.transform.columns.2.x, 0, frame.camera.transform.columns.2.z)
+        let cameraWorldYaw = atan2(camForward.x, -camForward.z)
+        let compassHeadingRad = Float(CompassMotionManager.shared.headingState.facingAngle * .pi / 180.0)
+        let northYaw = cameraWorldYaw - compassHeadingRad
+
+        let plane = SCNPlane(width: CGFloat(resolvedSpan), height: CGFloat(resolvedSpan))
+        let mat = SCNMaterial()
+        mat.diffuse.contents = Self.renderGroundBaguaTexture()
+        mat.lightingModel = .constant
+        mat.isDoubleSided = true
+        mat.writesToDepthBuffer = false
+        plane.materials = [mat]
+
+        let node = SCNNode(geometry: plane)
+        node.name = "ar-ground-bagua"
+        node.position = SCNVector3(centerPos.x, centerPos.y + 0.008, centerPos.z)
+        node.eulerAngles = SCNVector3(-Float.pi / 2.0, northYaw, 0)
+        sceneView.scene.rootNode.addChildNode(node)
+
+        groundBaguaNode = node
+        groundBaguaCenter = centerPos
+        groundBaguaSpan = resolvedSpan
+        groundBaguaNorthYawRadians = northYaw
+        groundBaguaProjected = true
+        updateStandingPalace(cameraTransform: frame.camera.transform)
+        return true
+    }
+
+    private func updateStandingPalace(cameraTransform: simd_float4x4) {
+        guard groundBaguaProjected, let center = groundBaguaCenter else {
+            currentStandingPalace = nil
+            return
+        }
+        let camPos = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+        let dx = camPos.x - center.x
+        let dz = camPos.z - center.z
+        let cosY = cos(-groundBaguaNorthYawRadians)
+        let sinY = sin(-groundBaguaNorthYawRadians)
+        let localX = dx * cosY - dz * sinY
+        let localZ = dx * sinY + dz * cosY
+        let halfSpan = max(0.5, groundBaguaSpan * 0.5)
+        let normX = localX / halfSpan
+        let normZ = localZ / halfSpan
+        let lang = LocalizationManager.shared.effectiveLanguage
+
+        if abs(normX) <= 0.33 && abs(normZ) <= 0.33 {
+            switch lang {
+            case .en: currentStandingPalace = "Center Palace · 9 Purple (Auspicious)"
+            case .zhHant: currentStandingPalace = "中宮立極 · 九紫右弼當令（大吉）"
+            default: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
+            }
+            return
+        }
+        // Standard South-at-top / North-at-bottom Lo Shu orientation:
+        // local -Z is North (Kan), +Z is South (Li), +X is East (Zhen), -X is West (Dui)
+        let angleDeg = (Double(atan2(localX, -localZ)) * 180.0 / .pi + 360.0).truncatingRemainder(dividingBy: 360.0)
+        let index = Int(((angleDeg + 22.5).truncatingRemainder(dividingBy: 360.0)) / 45.0)
+        let labelsHans = [
+            "正北坎宫 · 五黄廉贞（宜静不宜动）",
+            "东北艮宫 · 三碧禄存（是非位）",
+            "正东震宫 · 七赤破军（退气位）",
+            "东南巽宫 · 八白左辅（次财位·吉）",
+            "正南离宫 · 四绿文昌（功名位·吉）",
+            "西南坤宫 · 六白武曲（偏财权印·吉）",
+            "正西兑宫 · 二黑巨门（病符位）",
+            "西北乾宫 · 一白贪狼（未来生气·大吉）"
+        ]
+        let labelsHant = [
+            "正北坎宮 · 五黃廉貞（宜靜不宜動）",
+            "東北艮宮 · 三碧祿存（是非位）",
+            "正東震宮 · 七赤破軍（退氣位）",
+            "東南巽宮 · 八白左輔（次財位·吉）",
+            "正南離宮 · 四綠文昌（功名位·吉）",
+            "西南坤宮 · 六白武曲（偏財權印·吉）",
+            "正西兌宮 · 二黑巨門（病符位）",
+            "西北乾宮 · 一白貪狼（未來生氣·大吉）"
+        ]
+        let labelsEn = [
+            "North (Kan) · 5 Yellow",
+            "Northeast (Gen) · 3 Jade",
+            "East (Zhen) · 7 Red",
+            "Southeast (Xun) · 8 White (Wealth)",
+            "South (Li) · 4 Green (Academic)",
+            "Southwest (Kun) · 6 White (Career)",
+            "West (Dui) · 2 Black (Illness)",
+            "Northwest (Qian) · 1 White (Noble)"
+        ]
+        let safeIdx = min(7, max(0, index))
+        switch lang {
+        case .en: currentStandingPalace = labelsEn[safeIdx]
+        case .zhHant: currentStandingPalace = labelsHant[safeIdx]
+        default: currentStandingPalace = labelsHans[safeIdx]
+        }
+    }
+
+    private static func renderGroundBaguaTexture() -> UIImage {
+        let size = CGSize(width: 768, height: 768)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            let rect = CGRect(origin: .zero, size: size)
+            cg.clear(rect)
+
+            // Outer translucent dark gold disk
+            let insetRect = rect.insetBy(dx: 12, dy: 12)
+            cg.setFillColor(UIColor(red: 0.06, green: 0.08, blue: 0.12, alpha: 0.58).cgColor)
+            cg.fillEllipse(in: insetRect)
+
+            cg.setStrokeColor(UIColor(red: 0.95, green: 0.80, blue: 0.30, alpha: 0.88).cgColor)
+            cg.setLineWidth(4)
+            cg.strokeEllipse(in: insetRect)
+            cg.strokeEllipse(in: rect.insetBy(dx: 64, dy: 64))
+
+            // 3x3 Nine-Palace grid inside the circle
+            let gridBox = rect.insetBy(dx: 128, dy: 128)
+            cg.setStrokeColor(UIColor(red: 0.0, green: 0.85, blue: 0.96, alpha: 0.78).cgColor)
+            cg.setLineWidth(2.5)
+            cg.stroke(gridBox)
+
+            let cellW = gridBox.width / 3.0
+            let cellH = gridBox.height / 3.0
+            for idx in 1...2 {
+                let x = gridBox.minX + CGFloat(idx) * cellW
+                let y = gridBox.minY + CGFloat(idx) * cellH
+                cg.move(to: CGPoint(x: x, y: gridBox.minY))
+                cg.addLine(to: CGPoint(x: x, y: gridBox.maxY))
+                cg.move(to: CGPoint(x: gridBox.minX, y: y))
+                cg.addLine(to: CGPoint(x: gridBox.maxX, y: y))
+            }
+            cg.strokePath()
+
+            // Draw Period 9 Lo Shu cells (North at top of texture so -Z aligns with North)
+            // Row 0 (North): NW(一白乾), N(五黄坎), NE(三碧艮)
+            // Row 1 (Center): W(二黑兑), Center(九紫中), E(七赤震)
+            // Row 2 (South): SW(六白坤), S(四绿离), SE(八白巽)
+            let cells: [[(title: String, sub: String, color: UIColor)]] = [
+                [
+                    ("乾 · 一白", "西北生旺", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
+                    ("坎 · 五黄", "正北廉贞", UIColor(red: 1.0, green: 0.45, blue: 0.40, alpha: 0.95)),
+                    ("艮 · 三碧", "东北禄存", UIColor(red: 0.95, green: 0.75, blue: 0.35, alpha: 0.95))
+                ],
+                [
+                    ("兑 · 二黑", "正西病符", UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)),
+                    ("中宫 · 九紫", "天心太极", UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1.0)),
+                    ("震 · 七赤", "正东破军", UIColor(red: 0.85, green: 0.85, blue: 0.92, alpha: 0.95))
+                ],
+                [
+                    ("坤 · 六白", "西南武曲", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
+                    ("离 · 四绿", "正南文昌", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
+                    ("巽 · 八白", "东南左辅", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95))
+                ]
+            ]
+
+            for r in 0..<3 {
+                for c in 0..<3 {
+                    let item = cells[r][c]
+                    let cellRect = CGRect(
+                        x: gridBox.minX + CGFloat(c) * cellW,
+                        y: gridBox.minY + CGFloat(r) * cellH,
+                        width: cellW,
+                        height: cellH
+                    )
+                    let pStyle = NSMutableParagraphStyle()
+                    pStyle.alignment = .center
+                    item.title.draw(
+                        in: CGRect(x: cellRect.minX + 6, y: cellRect.midY - 28, width: cellW - 12, height: 32),
+                        withAttributes: [
+                            .font: UIFont.boldSystemFont(ofSize: 24),
+                            .foregroundColor: item.color,
+                            .paragraphStyle: pStyle
+                        ]
+                    )
+                    item.sub.draw(
+                        in: CGRect(x: cellRect.minX + 6, y: cellRect.midY + 6, width: cellW - 12, height: 26),
+                        withAttributes: [
+                            .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
+                            .foregroundColor: UIColor.white.withAlphaComponent(0.9),
+                            .paragraphStyle: pStyle
+                        ]
+                    )
+                }
+            }
+        }
     }
 
     public func toggleMeshVisibility() {
@@ -722,6 +969,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let rightY = min(1.0, max(-1.0, Double(-frame.camera.transform.columns.1.y)))
         cameraElevationDegrees = asin(forwardY) * 180.0 / .pi
         cameraRollDegrees = asin(rightY) * 180.0 / .pi
+        if groundBaguaProjected {
+            updateStandingPalace(cameraTransform: frame.camera.transform)
+        }
 
         switch frame.worldMappingStatus {
         case .notAvailable: mappingState = .unavailable
@@ -1382,6 +1632,17 @@ public struct ARSpatialSurveyView: View {
             }
 #endif
             Button(action: {
+                _ = model.toggleGroundBaguaOverlay()
+            }) {
+                Image(systemName: "square.grid.3x3.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(model.groundBaguaProjected ? .black : .white)
+                    .padding(9)
+                    .background(model.groundBaguaProjected ? Color(red: 0.95, green: 0.80, blue: 0.25) : Color.black.opacity(0.55))
+                    .clipShape(Circle())
+            }
+            .accessibilityLabel(lang.t("xuankong_stars"))
+            Button(action: {
                 _ = model.placeLubanPoint()
             }) {
                 Image(systemName: "ruler.fill")
@@ -1511,6 +1772,24 @@ public struct ARSpatialSurveyView: View {
             }
             .font(.system(size: 13, weight: .bold, design: .monospaced))
             .foregroundColor(.white)
+
+            if let standing = model.currentStandingPalace {
+                HStack(spacing: 6) {
+                    Image(systemName: "safari.fill")
+                        .foregroundColor(Color(red: 0.95, green: 0.80, blue: 0.25))
+                        .font(.system(size: 11))
+                    Text(standing)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(8)
+            }
 
             if let eval = model.lubanEvaluation {
                 HStack(spacing: 6) {

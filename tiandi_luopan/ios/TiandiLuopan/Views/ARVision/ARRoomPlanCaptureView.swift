@@ -27,14 +27,26 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var estimatedWidthMeters: Float = 0
     @Published public private(set) var estimatedDepthMeters: Float = 0
     @Published public private(set) var estimatedAreaSqMeters: Float = 0
+    @Published public private(set) var scannedRoomCount = 0
     @Published public private(set) var isCapturing = false
     @Published public private(set) var didFinish = false
     @Published public private(set) var errorMessage: String?
 
     private weak var captureView: RoomCaptureView?
     private var latestRoom: CapturedRoom?
+    private var capturedRoomsHistory: [CapturedRoom] = []
     private var initialCompassHeading: Double = 0.0
     private let roomBuilder = RoomBuilder(options: [.beautifyObjects])
+
+    private var activeRooms: [CapturedRoom] {
+        if isCapturing, let current = latestRoom {
+            return capturedRoomsHistory + [current]
+        }
+        if !capturedRoomsHistory.isEmpty {
+            return capturedRoomsHistory
+        }
+        return latestRoom.map { [$0] } ?? []
+    }
 
     /// Reports are user-created exports. Keep them in the app's support
     /// directory instead of `temporaryDirectory`, which iOS may purge while
@@ -92,6 +104,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         captureView = view
         view.captureSession.delegate = self
         latestRoom = nil
+        capturedRoomsHistory.removeAll()
+        scannedRoomCount = 0
         initialCompassHeading = CompassMotionManager.shared.headingState.facingAngle
         estimatedWidthMeters = 0
         estimatedDepthMeters = 0
@@ -100,6 +114,21 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         didFinish = false
         errorMessage = nil
         view.captureSession.run(configuration: RoomCaptureSession.Configuration())
+    }
+
+    public func startNextRoomSegment() {
+        guard let view = captureView, !isCapturing else { return }
+        latestRoom = nil
+        isCapturing = true
+        didFinish = false
+        errorMessage = nil
+        view.captureSession.run(configuration: RoomCaptureSession.Configuration())
+    }
+
+    public func finishCurrentRoomSegment() {
+        if let session = captureView?.captureSession {
+            stopRoomCaptureSession(session)
+        }
     }
 
     public func stop() {
@@ -111,7 +140,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     public func saveSemanticReport() -> Result<[URL], Error> {
-        guard didFinish else {
+        let rooms = activeRooms
+        guard didFinish, !rooms.isEmpty else {
             return .failure(ARRoomPlanExportError.captureNotFinished)
         }
         do {
@@ -141,9 +171,16 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 ]
             }
 
+            let allWalls = rooms.flatMap { $0.walls }
+            let allDoors = rooms.flatMap { $0.doors }
+            let allWindows = rooms.flatMap { $0.windows }
+            let allOpenings = rooms.flatMap { $0.openings }
+            let allObjects = rooms.flatMap { $0.objects }
+
             let payload: [String: Any] = [
                 "source": "RoomPlan",
                 "createdAt": ISO8601DateFormatter().string(from: Date()),
+                "mergedRoomSegments": rooms.count,
                 "walls": wallCount,
                 "doors": doorCount,
                 "windows": windowCount,
@@ -154,11 +191,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                     "depth": Double(estimatedDepthMeters),
                     "areaSqMeters": Double(estimatedAreaSqMeters)
                 ],
-                "wallSurfaces": latestRoom?.walls.map(surfaceToDict) ?? [],
-                "doorSurfaces": latestRoom?.doors.map(surfaceToDict) ?? [],
-                "windowSurfaces": latestRoom?.windows.map(surfaceToDict) ?? [],
-                "openingSurfaces": latestRoom?.openings.map(surfaceToDict) ?? [],
-                "detectedObjects": latestRoom?.objects.map(objectToDict) ?? []
+                "wallSurfaces": allWalls.map(surfaceToDict),
+                "doorSurfaces": allDoors.map(surfaceToDict),
+                "windowSurfaces": allWindows.map(surfaceToDict),
+                "openingSurfaces": allOpenings.map(surfaceToDict),
+                "detectedObjects": allObjects.map(objectToDict)
             ]
 
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -166,7 +203,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             try data.write(to: jsonURL, options: .atomic)
             exportedURLs.append(jsonURL)
 
-            if let room = latestRoom {
+            if let room = rooms.last {
                 let usdzURL = directory.appendingPathComponent("TianJiYanXiang-RoomPlan-\(exportID).usdz")
                 if (try? room.export(to: usdzURL)) != nil {
                     exportedURLs.append(usdzURL)
@@ -180,12 +217,13 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
-    /// Converts the 3D CapturedRoom geometry into a 2D top-down architectural
-    /// blueprint image and normalized `[FloorplanRoom]` blocks, then syncs them
+    /// Converts the 3D CapturedRoom geometry (single or multi-room merged) into a 2D top-down
+    /// architectural blueprint image and normalized `[FloorplanRoom]` blocks, then syncs them
     /// directly to Tab 3 (`FloorplanView`) for Nine-Palace / Eight-Mansions audit.
     public func syncToFloorplan() -> Bool {
-        guard let room = latestRoom,
-              let envelope = Self.compute2DEnvelope(for: room) else {
+        let rooms = activeRooms
+        guard !rooms.isEmpty,
+              let envelope = Self.compute2DEnvelope(for: rooms) else {
             return false
         }
         let spanX = max(0.5, envelope.maxX - envelope.minX)
@@ -206,9 +244,13 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
 
         var generatedRooms: [FloorplanRoom] = []
+        let allDoors = rooms.flatMap { $0.doors }
+        let allOpenings = rooms.flatMap { $0.openings }
+        let allObjects = rooms.flatMap { $0.objects }
+        let allWalls = rooms.flatMap { $0.walls }
 
         // 1. Map doors (or openings if no doors) to `.door` blocks
-        let doorSurfaces = !room.doors.isEmpty ? room.doors : Array(room.openings.prefix(1))
+        let doorSurfaces = !allDoors.isEmpty ? allDoors : Array(allOpenings.prefix(1))
         for door in doorSurfaces.prefix(2) {
             let pos = door.transform.columns.3
             let rect = normalizeRect(
@@ -226,7 +268,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
         // 2. Map furniture objects into functional room zones
         var assignedTypes = Set<FloorplanRoomType>()
-        for object in room.objects {
+        for object in allObjects {
             let roomType: FloorplanRoomType?
             switch object.category {
             case .toilet, .bathtub:
@@ -273,9 +315,9 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
 
         // 4. Detect recessed/missing corners (.missingCorner) on L-shaped or notched layouts
-        let polyMetrics = Self.computeWallPolygonMetrics(for: room)
+        let polyMetrics = Self.computeWallPolygonMetrics(for: rooms)
         let boxArea = spanX * spanZ
-        if room.walls.count >= 5,
+        if allWalls.count >= 5,
            let poly = polyMetrics,
            poly.areaSqMeters > 1.0,
            poly.areaSqMeters < boxArea * 0.82 {
@@ -286,7 +328,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let cellMinZ = envelope.minZ + corner.row * (spanZ / 3.0)
                 let cellMaxZ = cellMinZ + (spanZ / 3.0)
                 let hasCoverage = Self.hasSurfaceOrObjectInCell(
-                    room: room,
+                    rooms: rooms,
                     minX: cellMinX,
                     maxX: cellMaxX,
                     minZ: cellMinZ,
@@ -326,8 +368,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             }
         }
 
-        let resolvedHeading = resolvedDoorCompassHeading(for: room)
-        let blueprint = Self.render2DBlueprintImage(room: room, envelope: envelope)
+        let resolvedHeading = resolvedDoorCompassHeading(for: rooms)
+        let blueprint = Self.render2DBlueprintImage(rooms: rooms, envelope: envelope)
         FloorplanView.persistRoomPlanImport(
             rooms: generatedRooms,
             centroid: centroid,
@@ -337,11 +379,12 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         return true
     }
 
-    private func resolvedDoorCompassHeading(for room: CapturedRoom) -> Double? {
-        guard let primaryDoor = room.doors.first ?? room.openings.first else {
+    private func resolvedDoorCompassHeading(for rooms: [CapturedRoom]) -> Double? {
+        let primaryDoor = rooms.flatMap({ $0.doors }).first ?? rooms.flatMap({ $0.openings }).first
+        guard let door = primaryDoor else {
             return nil
         }
-        let normal = primaryDoor.transform.columns.2
+        let normal = door.transform.columns.2
         let normLen = hypot(normal.x, normal.z)
         guard normLen > 0.01 else { return nil }
         let localAngleDeg = Double(atan2(normal.x, -normal.z)) * 180.0 / .pi
@@ -350,13 +393,14 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     /// Computes the true 2D floor polygon area and geometric centroid (PRD 6.7
-    /// Shoelace formula) from the captured wall segments.
+    /// Shoelace formula) from the captured wall segments across all rooms.
     private static func computeWallPolygonMetrics(
-        for room: CapturedRoom
+        for rooms: [CapturedRoom]
     ) -> (areaSqMeters: Float, centroidX: Float, centroidZ: Float)? {
-        guard room.walls.count >= 3 else { return nil }
+        let walls = rooms.flatMap { $0.walls }
+        guard walls.count >= 3 else { return nil }
         var points: [SIMD2<Float>] = []
-        for wall in room.walls {
+        for wall in walls {
             let c = wall.transform.columns.3
             let ax = wall.transform.columns.0
             let half = wall.dimensions.x * 0.5
@@ -389,7 +433,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     private static func hasSurfaceOrObjectInCell(
-        room: CapturedRoom,
+        rooms: [CapturedRoom],
         minX: Float,
         maxX: Float,
         minZ: Float,
@@ -409,20 +453,22 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             }
             return false
         }
-        if room.walls.contains(where: checkSurface) { return true }
-        if room.doors.contains(where: checkSurface) { return true }
-        if room.windows.contains(where: checkSurface) { return true }
-        for obj in room.objects {
-            let c = obj.transform.columns.3
-            if c.x >= minX && c.x <= maxX && c.z >= minZ && c.z <= maxZ {
-                return true
+        for room in rooms {
+            if room.walls.contains(where: checkSurface) { return true }
+            if room.doors.contains(where: checkSurface) { return true }
+            if room.windows.contains(where: checkSurface) { return true }
+            for obj in room.objects {
+                let c = obj.transform.columns.3
+                if c.x >= minX && c.x <= maxX && c.z >= minZ && c.z <= maxZ {
+                    return true
+                }
             }
         }
         return false
     }
 
     private static func compute2DEnvelope(
-        for room: CapturedRoom
+        for rooms: [CapturedRoom]
     ) -> (minX: Float, maxX: Float, minZ: Float, maxZ: Float)? {
         var minX = Float.greatestFiniteMagnitude
         var maxX = -Float.greatestFiniteMagnitude
@@ -442,26 +488,28 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             maxZ = max(maxZ, center.z + dz)
             hasPoint = true
         }
-        room.walls.forEach(includeSurface)
-        room.doors.forEach(includeSurface)
-        room.windows.forEach(includeSurface)
-        room.openings.forEach(includeSurface)
-        for object in room.objects {
-            let center = object.transform.columns.3
-            let halfW = object.dimensions.x * 0.5
-            let halfD = object.dimensions.z * 0.5
-            minX = min(minX, center.x - halfW)
-            maxX = max(maxX, center.x + halfW)
-            minZ = min(minZ, center.z - halfD)
-            maxZ = max(maxZ, center.z + halfD)
-            hasPoint = true
+        for room in rooms {
+            room.walls.forEach(includeSurface)
+            room.doors.forEach(includeSurface)
+            room.windows.forEach(includeSurface)
+            room.openings.forEach(includeSurface)
+            for object in room.objects {
+                let center = object.transform.columns.3
+                let halfW = object.dimensions.x * 0.5
+                let halfD = object.dimensions.z * 0.5
+                minX = min(minX, center.x - halfW)
+                maxX = max(maxX, center.x + halfW)
+                minZ = min(minZ, center.z - halfD)
+                maxZ = max(maxZ, center.z + halfD)
+                hasPoint = true
+            }
         }
         guard hasPoint, maxX > minX, maxZ > minZ else { return nil }
         return (minX, maxX, minZ, maxZ)
     }
 
     private static func render2DBlueprintImage(
-        room: CapturedRoom,
+        rooms: [CapturedRoom],
         envelope: (minX: Float, maxX: Float, minZ: Float, maxZ: Float)
     ) -> UIImage {
         let size = CGSize(width: 960, height: 960)
@@ -511,22 +559,24 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 cg.strokePath()
             }
 
-            // Walls, windows, doors
-            for wall in room.walls {
-                drawSurfaceSegment(wall, UIColor(red: 0.85, green: 0.90, blue: 0.96, alpha: 0.95), 8.0)
-            }
-            for window in room.windows {
-                drawSurfaceSegment(window, UIColor(red: 0.0, green: 0.82, blue: 0.95, alpha: 0.95), 6.0)
-            }
-            for door in room.doors {
-                drawSurfaceSegment(door, UIColor(red: 0.95, green: 0.75, blue: 0.25, alpha: 0.98), 7.0)
-            }
-            for opening in room.openings {
-                drawSurfaceSegment(opening, UIColor.systemGreen.withAlphaComponent(0.85), 5.0)
+            // Walls, windows, doors across all merged rooms
+            for room in rooms {
+                for wall in room.walls {
+                    drawSurfaceSegment(wall, UIColor(red: 0.85, green: 0.90, blue: 0.96, alpha: 0.95), 8.0)
+                }
+                for window in room.windows {
+                    drawSurfaceSegment(window, UIColor(red: 0.0, green: 0.82, blue: 0.95, alpha: 0.95), 6.0)
+                }
+                for door in room.doors {
+                    drawSurfaceSegment(door, UIColor(red: 0.95, green: 0.75, blue: 0.25, alpha: 0.98), 7.0)
+                }
+                for opening in room.openings {
+                    drawSurfaceSegment(opening, UIColor.systemGreen.withAlphaComponent(0.85), 5.0)
+                }
             }
 
             // Dimension caption
-            let dimText = String(format: "LiDAR RoomPlan · %.2f m × %.2f m (%.1f m²)", spanX, spanZ, spanX * spanZ)
+            let dimText = String(format: "LiDAR RoomPlan (%d) · %.2f m × %.2f m (%.1f m²)", rooms.count, spanX, spanZ, spanX * spanZ)
             let attrs: [NSAttributedString.Key: Any] = [
                 .font: UIFont.monospacedSystemFont(ofSize: 22, weight: .bold),
                 .foregroundColor: UIColor(red: 0.95, green: 0.85, blue: 0.45, alpha: 0.9)
@@ -535,20 +585,27 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
-    private func updateMetrics(from room: CapturedRoom) {
-        let wallCount = room.walls.count
-        let doorCount = room.doors.count
-        let windowCount = room.windows.count
-        let openingCount = room.openings.count
-        let objectCount = room.objects.count
-        let envelope = Self.compute2DEnvelope(for: room)
+    private func updateMetrics(from room: CapturedRoom, commitToHistory: Bool = false) {
+        let combined = capturedRoomsHistory + [room]
+        let wallCount = combined.reduce(0) { $0 + $1.walls.count }
+        let doorCount = combined.reduce(0) { $0 + $1.doors.count }
+        let windowCount = combined.reduce(0) { $0 + $1.windows.count }
+        let openingCount = combined.reduce(0) { $0 + $1.openings.count }
+        let objectCount = combined.reduce(0) { $0 + $1.objects.count }
+        let envelope = Self.compute2DEnvelope(for: combined)
         let width = envelope.map { max(0, $0.maxX - $0.minX) } ?? 0
         let depth = envelope.map { max(0, $0.maxZ - $0.minZ) } ?? 0
-        let polyArea = Self.computeWallPolygonMetrics(for: room)?.areaSqMeters
+        let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room
+            if commitToHistory {
+                self.capturedRoomsHistory.append(room)
+                self.scannedRoomCount = self.capturedRoomsHistory.count
+            } else {
+                self.scannedRoomCount = max(1, self.capturedRoomsHistory.count + 1)
+            }
             self.wallCount = wallCount
             self.doorCount = doorCount
             self.windowCount = windowCount
@@ -561,7 +618,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     public func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
-        updateMetrics(from: room)
+        updateMetrics(from: room, commitToHistory: false)
     }
 
     public func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
@@ -569,7 +626,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 self.isCapturing = false
-                self.didFinish = false
+                self.didFinish = !self.capturedRoomsHistory.isEmpty
                 self.errorMessage = error.localizedDescription
             }
             return
@@ -577,8 +634,16 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         Task { [weak self] in
             guard let self = self else { return }
             if let finalRoom = try? await self.roomBuilder.capturedRoom(from: data) {
-                self.updateMetrics(from: finalRoom)
+                self.updateMetrics(from: finalRoom, commitToHistory: true)
+            } else if let fallbackRoom = self.latestRoom {
+                self.updateMetrics(from: fallbackRoom, commitToHistory: true)
             }
+            #if canImport(RoomPlan)
+            if #available(iOS 17.0, *), self.capturedRoomsHistory.count > 1 {
+                let structureBuilder = StructureBuilder(options: [.beautifyObjects])
+                _ = try? await structureBuilder.capturedStructure(from: self.capturedRoomsHistory)
+            }
+            #endif
             await MainActor.run {
                 self.isCapturing = false
                 self.didFinish = true
@@ -636,13 +701,13 @@ public struct ARRoomPlanSurveyView: View {
                         Text(lang.t("ar_roomplan_title"))
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                        Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : lang.t("ar_roomplan_finished"))
+                        Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : "\(lang.t("ar_roomplan_finished")) (\(max(1, model.scannedRoomCount)) 室)")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(model.isCapturing ? .green : .orange)
                     }
                     Spacer()
                     if model.isCapturing {
-                        Button(action: { model.stop() }) {
+                        Button(action: { model.finishCurrentRoomSegment() }) {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(.black)
@@ -652,6 +717,15 @@ public struct ARRoomPlanSurveyView: View {
                         }
                         .accessibilityLabel(lang.t("ar_roomplan_finish"))
                     } else if model.didFinish {
+                        Button(action: { model.startNextRoomSegment() }) {
+                            Image(systemName: "plus.square.on.square")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.black)
+                                .padding(9)
+                                .background(Color.green.opacity(0.9))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("继续加扫下一间")
                         Button(action: syncToFloorplan) {
                             Image(systemName: "scope")
                                 .font(.system(size: 13, weight: .bold))

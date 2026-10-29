@@ -32,7 +32,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable, Codable {
 
     public var localizedName: String {
         switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
+        case .en, .th, .vi, .id, .ja, .ko:
             switch self {
             case .door: return "Main Entrance"
             case .livingRoom: return "Living Room"

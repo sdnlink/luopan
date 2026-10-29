@@ -1,11 +1,15 @@
-/* Localizable.strings (id) - Auto-synced from LocalizationManager.swift */
+/*
+ * Localizable.strings (id)
+ * TianJiYanXiang Compass & FengShui
+ */
 
 "tab_compass" = "Kompas";
+"ar_roomplan_synced_floorplan" = "Disinkronkan ke Denah Lantai";
+"day_unit" = " Hari";
 "tab_ar" = "Lihat lokasi";
 "tab_floorplan" = "Denah";
 "tab_analysis" = "Feng shui";
 "tab_settings" = "Pengaturan";
-"compass_title" = "TianJi YanXiang";
 "lock_heading" = "Kunci arah";
 "locked_heading" = "Arah terkunci";
 "layers_settings" = "Lapisan piringan";
@@ -13,14 +17,9 @@
 "pure_alignment" = "Tepat di garis";
 "sub_mountain" = "Jarum sekunder (兼針)";
 "small_void" = "Garis kosong kecil";
-"big_void" = "Garis kosong besar";
-"jewel_line" = "Garis baik";
-"fire_pit" = "Garis buruk";
-"fenjin_120" = "120 fenjin";
 "true_solar_time" = "Waktu matahari";
 "gps_coords" = "Koordinat GPS real-time";
 "location_unavailable" = "Lokasi belum tersedia";
-"calib_accuracy" = "Akurasi geomagnetik & kalibrasi";
 "mag_distortion" = "Interferensi magnetik";
 "haptic_feedback" = "Getar saat melewati batas arah";
 "gua_kan" = "Kan (坎)";
@@ -44,16 +43,12 @@
 "tianji_scroll" = "Gulungan panjang TianJi";
 "save_to_photos" = "Simpan ke Foto";
 "share_and_print" = "Bagikan & cetak gulungan";
-"period_selection" = "Pilih periode Yuan Yun";
-"current_period_9" = "Periode 9 Xia Yuan saat ini (2024–2043)";
-"sitting_facing" = "Analisis duduk & menghadap";
 "floorplan_title" = "Tentukan pusat rumah, lalu periksa tiap ruang";
 "import_plan" = "Impor denah";
 "change_plan" = "Ganti denah";
 "reset_sample" = "Reset contoh";
 "floorplan_reset_confirm" = "Denah yang dimasukkan dan susunan kamar akan dihapus. Lanjut?";
 "audit_checklist" = "Daftar periksa seluruh rumah";
-"room_details" = "Laporan diagnostik zona fungsi";
 "ar_title" = "Lihat arah lewat kamera";
 "ar_spatial_survey" = "Survei spasial 3D AR";
 "ar_spatial_close" = "Tutup survei 3D";
@@ -103,7 +98,6 @@
 "capture_proof" = "Ambil foto";
 "remedy_guide" = "Panduan penangkal";
 "simulation_mode" = "Mode simulasi indoor";
-"sha_report" = "Laporan diagnostik Xing Sha";
 "ar_auto_follow" = "Ikuti arah nyata";
 "ar_manual_lock" = "Kunci Xing Sha manual";
 "ar_current_facing" = "Arah utama saat ini";
@@ -173,10 +167,6 @@
 "settings_mag_intensity" = "Kekuatan medan magnetik";
 "settings_calib_status_high" = "Optimal ✓";
 "settings_calib_status_need" = "Perlu kalibrasi ⚠️";
-"settings_calib_guide_title" = "Panduan kalibrasi kompas angka-8";
-"settings_calib_guide_1" = "1. Jauhi logam magnet, komputer, speaker, dan trafo besar.";
-"settings_calib_guide_2" = "2. Gerakkan iPhone di udara membentuk angka 8 dengan lancar.";
-"settings_calib_guide_3" = "3. Ulangi 3–5 kali sampai indikator magnet di atas kompas hijau.";
 "i_know" = "Mengerti";
 "fenjin_detail_title" = "Rincian derajat Fenjin";
 "fenjin_title_suffix" = "Fenjin";
@@ -268,9 +258,6 @@
 "floorplan_height_expand" = "Tambah tinggi";
 "floorplan_edit_rooms" = "Atur ruangan";
 "floorplan_finish_rooms" = "Selesai tata letak";
-"severity_critical" = "Sha kritis";
-"severity_warning" = "Peringatan";
-"severity_auspicious" = "Baik";
 "floorplan_level_auspicious" = "Baik";
 "floorplan_level_severe" = "Sha parah";
 "floorplan_level_warning" = "Peringatan";
@@ -309,9 +296,7 @@
 "ar_watermark_stamp" = "TianJi\\nTerverifikasi";
 "ar_env_features" = "📐 Ciri lingkungan di lokasi";
 "ar_classic_lore" = "📜 Kutipan kitab klasik";
-"ar_remedy_title" = "🛡️ Jimat dan cara merapikan ruang";
 "ar_vip_remedy_title" = "Cara meredam Sha Yang Gong · VIP";
-"ar_vip_remedy_desc" = "Cara meredam energi buruk, tata letak jimat, dan ukuran Lu Ban. Buka VIP.";
 "ar_ai_scan" = "Pindai adegan AI";
 "ar_ai_scanning" = "AI sedang menganalisis…";
 "ar_ai_result" = "Tingkat yakin usulan AI";
@@ -324,7 +309,6 @@
 "ar_ai_tracking_limited" = "Pelacakan AR belum stabil. Geser ponsel pelan di dinding dan struktur, lalu coba lagi.";
 "ar_ai_depth_unavailable" = "Kedalaman LiDAR belum andal. Perbaiki cahaya dan jaga sasaran tetap di layar.";
 "ar_ai_scene_unmapped" = "AR belum memetakan ruang. Pindai sekitar dulu sebelum analisis AI.";
-"ar_ai_failed" = "Analisis AI gagal. Bingkai ulang dan coba lagi.";
 "camera_permission_denied" = "Akses kamera nonaktif. Izinkan kamera di Pengaturan sistem.";
 "open_system_settings" = "Buka Pengaturan";
 "request_location_permission" = "Izinkan lokasi";
@@ -335,18 +319,11 @@
 "tianji_vip_card_desc" = "Menyusun arah duduk-hadap terukur, Flying Stars, jalur air delapan, Qi Men jam, dan gua Delapan Rumah menjadi gulungan kertas xuan tanpa watermark.";
 "tianji_vip_badge" = "👑 VIP / ekspor sekali";
 "mag_warning_tap" = "Interferensi magnet · ketuk untuk kalibrasi";
-"header_sitting_facing" = "Duduk/Hadap";
-"header_palace_suffix" = "Istana";
-"header_pitch_roll" = "Pitch / Roll";
 "btn_palace_all" = "8 arah";
 "btn_fenjin_detail" = "Fenjin";
 "btn_calib" = "Kalibrasi";
 "btn_layers" = "Lapisan";
 "xuankong_deep_analysis" = "📜 Analisis mendalam";
-"xuankong_wealth_advice" = "• Tata rezeki: di istana bintang hadap yang berkuasa, air di depan pintu membantu qi uang;";
-"xuankong_health_advice" = "• Tata keluarga: istana bintang gunung yang berkuasa cocok untuk kamar utama dan ranjang bertumpu;";
-"xuankong_remedy_advice" = "• Penetralan 2-5: di istana 2-Hitam/5-Kuning bertumpuk, gantung koin Enam Kaisar agar logam meredam tanah.";
-"period_unit" = "periode";
 "gate_facing_prefix" = "Arah pintu utama";
 "na_qi_prefix" = "Na";
 "zeri_title" = "Pilih Hari Bintang Langit · Periksa Mandiri Hari Gali Tanah & Pasang Pintu";
@@ -366,9 +343,6 @@
 "qimen_taboo_nav" = "• Arah dihindari: Menghadap";
 "qimen_taboo_suffix" = " agar tidak terhambat atau kaget; survei sebaiknya menghindari benturan.";
 "grade_auspicious" = "Mujur";
-"grade_great_auspicious" = "Sangat mujur";
-"grade_inauspicious" = "Sial";
-"grade_great_inauspicious" = "Sangat sial";
 "price_loading" = "Memuat harga…";
 "price_unavailable" = "Harga belum tersedia";
 "reload_prices" = "Muat ulang harga";
@@ -393,7 +367,6 @@
 "minute_unit" = "mnt";
 "year_suffix" = "tahun";
 "month_suffix" = "bulan";
-"solar_calib_title" = "Waktu surya sejati dikalibrasi";
 "mountain_suffix" = " gunung";
 "facing_suffix" = " hadap";
 "palace_suffix" = " istana";

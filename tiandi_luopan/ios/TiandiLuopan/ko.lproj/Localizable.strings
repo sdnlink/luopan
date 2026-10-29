@@ -1,11 +1,15 @@
-/* Localizable.strings (ko) - Auto-synced from LocalizationManager.swift */
+/*
+ * Localizable.strings (ko)
+ * TianJiYanXiang Compass & FengShui
+ */
 
 "tab_compass" = "나침반";
+"ar_roomplan_synced_floorplan" = "평면도 입극 도면에 동기화됨";
+"day_unit" = "일";
 "tab_ar" = "실경";
 "tab_floorplan" = "평면도";
 "tab_analysis" = "현공";
 "tab_settings" = "설정";
-"compass_title" = "천기연상";
 "lock_heading" = "방향 고정";
 "locked_heading" = "방향 고정됨";
 "layers_settings" = "층";
@@ -13,14 +17,9 @@
 "pure_alignment" = "정침";
 "sub_mountain" = "겸침 체괘";
 "small_void" = "작은 공망";
-"big_void" = "큰 공망";
-"jewel_line" = "좋은 분금";
-"fire_pit" = "나쁜 분금";
-"fenjin_120" = "백이십분금";
 "true_solar_time" = "진태양시";
 "gps_coords" = "GPS 실시간 좌표";
 "location_unavailable" = "위치를 아직 얻지 못함";
-"calib_accuracy" = "지자기 정밀도와 보정";
 "mag_distortion" = "자기장 간섭 상태";
 "haptic_feedback" = "산 경계를 지날 때 진동";
 "gua_kan" = "감 (坎)";
@@ -44,16 +43,12 @@
 "tianji_scroll" = "복택 천기 장권";
 "save_to_photos" = "사진에 저장";
 "share_and_print" = "장권 공유 및 인쇄";
-"period_selection" = "원운 선택";
-"current_period_9" = "현재 하원 9운 (2024–2043)";
-"sitting_facing" = "좌향 분석";
 "floorplan_title" = "집의 중심을 잡고 방을 살펴봅니다";
 "import_plan" = "도면 가져오기";
 "change_plan" = "도면 바꾸기";
 "reset_sample" = "샘플 초기화";
 "floorplan_reset_confirm" = "가져온 도면과 방 배치를 지웁니다. 계속할까요?";
 "audit_checklist" = "전 주택 풍수 국면 진단 목록";
-"room_details" = "기능 구역 진단 보고서";
 "ar_title" = "카메라로 방향 보기";
 "ar_spatial_survey" = "AR 3차원 공간 측량";
 "ar_spatial_close" = "3차원 측량 닫기";
@@ -103,7 +98,6 @@
 "capture_proof" = "사진 남기기";
 "remedy_guide" = "화해 비책";
 "simulation_mode" = "실내 / 모의 실경 연습 모드";
-"sha_report" = "형살 진단 보고서";
 "ar_auto_follow" = "실경 향 추적";
 "ar_manual_lock" = "형살 수동 고정";
 "ar_current_facing" = "현재 주응";
@@ -173,10 +167,6 @@
 "settings_mag_intensity" = "자기장 감응 강도";
 "settings_calib_status_high" = "매우 높음 ✓";
 "settings_calib_status_need" = "보정 필요 ⚠️";
-"settings_calib_guide_title" = "나침반·자기장 8자 보정법";
-"settings_calib_guide_1" = "1. 자석에 붙는 금속, 컴퓨터, 스피커, 큰 변압기에서 떨어져 주세요.";
-"settings_calib_guide_2" = "2. 휴대전화를 들고 공중에서 ∞ 자로 부드럽게 그려 주세요.";
-"settings_calib_guide_3" = "3. 3~5번 반복해서 나침반 위 자기장 표시가 초록으로 돌아올 때까지 하세요.";
 "i_know" = "확인";
 "fenjin_detail_title" = "분금 도수 상세";
 "fenjin_title_suffix" = "분금";
@@ -268,9 +258,6 @@
 "floorplan_height_expand" = "높이 늘리기";
 "floorplan_edit_rooms" = "방 조정";
 "floorplan_finish_rooms" = "배치 완료";
-"severity_critical" = "중대 살기";
-"severity_warning" = "경보";
-"severity_auspicious" = "길";
 "floorplan_level_auspicious" = "길";
 "floorplan_level_severe" = "살기 심함";
 "floorplan_level_warning" = "주의";
@@ -309,9 +296,7 @@
 "ar_watermark_stamp" = "천기\\n확인";
 "ar_env_features" = "📐 현장 환경 특징";
 "ar_classic_lore" = "📜 고전 구절";
-"ar_remedy_title" = "🛡️ 법기와 공간 다스림";
 "ar_vip_remedy_title" = "양공 화살 요결 · VIP";
-"ar_vip_remedy_desc" = "형세의 살을 다스리는 법, 법기 놓는 금기, 노반척 치수와 진살 처방은 VIP를 열어야 봅니다.";
 "ar_ai_scan" = "AI 실경 스캔";
 "ar_ai_scanning" = "AI 분석 중…";
 "ar_ai_result" = "AI 후보 신뢰도";
@@ -324,7 +309,6 @@
 "ar_ai_tracking_limited" = "AR 추적이 아직 불안정합니다. 벽과 건물 구조를 천천히 스캔한 뒤 다시 시도하세요.";
 "ar_ai_depth_unavailable" = "믿을 만한 LiDAR 깊이 값이 없습니다. 조명을 밝히고 대상을 화면에 두세요.";
 "ar_ai_scene_unmapped" = "AR가 공간을 아직 못 잡았습니다. 주변을 먼저 스캔한 뒤 AI를 돌리세요.";
-"ar_ai_failed" = "AI 분석에 실패했습니다. 구도를 다시 잡고 재시도하세요.";
 "camera_permission_denied" = "카메라 권한이 꺼져 있습니다. 시스템 설정에서 카메라 접근을 허용하세요.";
 "open_system_settings" = "설정 열기";
 "request_location_permission" = "위치 권한 허용";
@@ -335,18 +319,11 @@
 "tianji_vip_card_desc" = "실측 좌향, 현공비성, 팔로황천, 시가 기문, 팔택 명괘를 모아 선지 두루마리로 내보냅니다. 워터마크 없음.";
 "tianji_vip_badge" = "👑 VIP / 1회 내보내기";
 "mag_warning_tap" = "강한 자기 간섭 · 탭하여 보정";
-"header_sitting_facing" = "좌향";
-"header_palace_suffix" = "궁";
-"header_pitch_roll" = "피치 / 롤";
 "btn_palace_all" = "팔방 전감";
 "btn_fenjin_detail" = "분금";
 "btn_calib" = "보정";
 "btn_layers" = "레이어";
 "xuankong_deep_analysis" = "📜 격국 자세히 보기";
-"xuankong_wealth_advice" = "• 재물: 향성이 때를 만난 쪽에 문을 열고 물을 두어 재물을 부릅니다.";
-"xuankong_health_advice" = "• 사람: 산성이 때를 만난 쪽에 안방을 두고 침대는 등받이가 있게.";
-"xuankong_remedy_advice" = "• 2·5 화살: 이흑과 오황이 겹친 궁에 육제전을 걸어 금으로 토를 빼세요.";
-"period_unit" = "운";
 "gate_facing_prefix" = "향수 개문방";
 "na_qi_prefix" = "납";
 "zeri_title" = "천성택일 · 동토·안문 일과 자가 점검";
@@ -366,9 +343,6 @@
 "qimen_taboo_nav" = "• 피할 흉방: 봉";
 "qimen_taboo_suffix" = "막힘과 놀람을 피하려면 답사 때 마주치는 방향을 피하세요.";
 "grade_auspicious" = "길";
-"grade_great_auspicious" = "대길";
-"grade_inauspicious" = "흉";
-"grade_great_inauspicious" = "대흉";
 "price_loading" = "가격 불러오는 중…";
 "price_unavailable" = "가격을 표시할 수 없음";
 "reload_prices" = "가격 다시 불러오기";
@@ -393,7 +367,6 @@
 "minute_unit" = "분";
 "year_suffix" = "년";
 "month_suffix" = "월";
-"solar_calib_title" = "진태양시 보정됨";
 "mountain_suffix" = "산";
 "facing_suffix" = "향";
 "palace_suffix" = "궁";

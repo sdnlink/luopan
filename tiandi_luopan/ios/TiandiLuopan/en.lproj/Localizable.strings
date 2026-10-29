@@ -1,11 +1,15 @@
-/* Localizable.strings (en) - Auto-synced from LocalizationManager.swift */
+/*
+ * Localizable.strings (en)
+ * TianJiYanXiang Compass & FengShui
+ */
 
 "tab_compass" = "Compass";
+"ar_roomplan_synced_floorplan" = "Synced to Floorplan Blueprint";
+"day_unit" = " Day";
 "tab_ar" = "AR Vision";
 "tab_floorplan" = "Floor Plan";
 "tab_analysis" = "Feng Shui";
 "tab_settings" = "Settings";
-"compass_title" = "TianJi YanXiang";
 "lock_heading" = "Lock Heading";
 "locked_heading" = "Heading Locked";
 "layers_settings" = "Layers";
@@ -13,14 +17,9 @@
 "pure_alignment" = "Pure Line";
 "sub_mountain" = "Sub-Mountain";
 "small_void" = "Small Void Line";
-"big_void" = "Great Void Line";
-"jewel_line" = "Jewel Line (Auspicious)";
-"fire_pit" = "Fire Pit (Inauspicious)";
-"fenjin_120" = "120 Fenjin";
 "true_solar_time" = "True Solar Time";
 "gps_coords" = "GPS Coordinates";
 "location_unavailable" = "Location unavailable";
-"calib_accuracy" = "Sensor Accuracy";
 "mag_distortion" = "Magnetic Interference";
 "haptic_feedback" = "Boundary Haptic Feedback";
 "gua_kan" = "Kan";
@@ -43,16 +42,12 @@
 "tianji_scroll" = "Celestial Scroll";
 "save_to_photos" = "Save to Photos";
 "share_and_print" = "Share & Print";
-"period_selection" = "Period Selection";
-"current_period_9" = "Current Period 9 (2024-2043)";
-"sitting_facing" = "Sitting & Facing";
 "floorplan_title" = "Floor Plan Spatial Audit";
 "import_plan" = "Import Plan";
 "change_plan" = "Change Plan";
 "reset_sample" = "Reset Sample";
 "floorplan_reset_confirm" = "The imported plan and custom room layout will be cleared. Continue?";
 "audit_checklist" = "Comprehensive Audit Checklist";
-"room_details" = "Room Diagnostic Report";
 "ar_title" = "AR Spatial & Exterior Sha Analysis";
 "ar_spatial_survey" = "AR 3D Spatial Survey";
 "ar_spatial_close" = "Close 3D Survey";
@@ -102,7 +97,6 @@
 "capture_proof" = "Capture Proof";
 "remedy_guide" = "Remedy Guide";
 "simulation_mode" = "Indoor Simulation Mode";
-"sha_report" = "Sha Diagnostic Report";
 "ar_auto_follow" = "Auto Facing";
 "ar_manual_lock" = "Manual Lock";
 "ar_current_facing" = "Target Facing";
@@ -172,10 +166,6 @@
 "settings_mag_intensity" = "Magnetic Field Strength";
 "settings_calib_status_high" = "Optimal ✓";
 "settings_calib_status_need" = "Calibration Required ⚠️";
-"settings_calib_guide_title" = "Figure-8 Compass Calibration Guide";
-"settings_calib_guide_1" = "1. Move away from magnetic metals, computers, speakers and power supplies;";
-"settings_calib_guide_2" = "2. Wave your iPhone smoothly in a figure-8 motion in 3D space;";
-"settings_calib_guide_3" = "3. Repeat 3 to 5 times until the top sensor status shows green.";
 "i_know" = "Got It";
 "fenjin_detail_title" = "Fenjin Degree Analysis";
 "fenjin_title_suffix" = "Fenjin";
@@ -267,9 +257,6 @@
 "floorplan_height_expand" = "Increase room height";
 "floorplan_edit_rooms" = "Adjust Rooms";
 "floorplan_finish_rooms" = "Finish Layout";
-"severity_critical" = "Critical Sha";
-"severity_warning" = "Warning";
-"severity_auspicious" = "Auspicious";
 "floorplan_level_auspicious" = "Auspicious";
 "floorplan_level_severe" = "Severe Sha";
 "floorplan_level_warning" = "Warning";
@@ -308,9 +295,7 @@
 "ar_watermark_stamp" = "TJ\nVerified";
 "ar_env_features" = "📐 On-Site Environment Features";
 "ar_classic_lore" = "📜 Classical Treatise Lore";
-"ar_remedy_title" = "🛡️ Consecrated Talismans & Harmonization Guide";
 "ar_vip_remedy_title" = "Yang Gong Harmonization Secrets · VIP";
-"ar_vip_remedy_desc" = "Master formulas for neutralizing negative environmental energy, talisman placement, and Lu Ban sacred measurements.";
 "ar_ai_scan" = "AI Scene Scan";
 "ar_ai_scanning" = "AI Analyzing…";
 "ar_ai_result" = "AI Candidate Confidence";
@@ -323,7 +308,6 @@
 "ar_ai_tracking_limited" = "AR tracking is not stable yet. Move the phone slowly across walls and building structure, then try again.";
 "ar_ai_depth_unavailable" = "Reliable LiDAR depth was not available. Improve lighting and keep the target in view.";
 "ar_ai_scene_unmapped" = "AR has not mapped enough of the scene. Scan the surroundings before running AI analysis.";
-"ar_ai_failed" = "AI analysis failed. Reframe the scene and try again.";
 "camera_permission_denied" = "Camera access is off. Allow camera access in Settings.";
 "open_system_settings" = "Open Settings";
 "request_location_permission" = "Allow Location Access";
@@ -334,18 +318,11 @@
 "tianji_vip_card_desc" = "Comprehensive compilation of facing, Flying Stars, HuangQuan water, QiMen and 8 Mansions into an exquisite watermark-free scroll.";
 "tianji_vip_badge" = "👑 VIP / Single Export";
 "mag_warning_tap" = "Magnetic Interference Detected · Tap to Calibrate";
-"header_sitting_facing" = "Sitting/Facing";
-"header_palace_suffix" = "Palace";
-"header_pitch_roll" = "Pitch / Roll";
 "btn_palace_all" = "8 Directions";
 "btn_fenjin_detail" = "Fenjin";
 "btn_calib" = "Calibrate";
 "btn_layers" = "Layers";
 "xuankong_deep_analysis" = "📜 Flying Stars In-Depth Analysis";
-"xuankong_wealth_advice" = "• Wealth Qi: Water at facing star palace brings financial abundance;";
-"xuankong_health_advice" = "• Health & Family: Mountain star palace suitable for master bedroom & bed placement;";
-"xuankong_remedy_advice" = "• 2-5 Neutralization: Hang Six Emperor coins at 2-Black/5-Yellow clash palace to disperse earth qi with metal.";
-"period_unit" = "Period";
 "gate_facing_prefix" = "Main Door Direction";
 "na_qi_prefix" = "Qi";
 "zeri_title" = "Celestial Date Selection · Date Quality Check";
@@ -365,9 +342,6 @@
 "qimen_taboo_nav" = "• Directions to Avoid: Facing ";
 "qimen_taboo_suffix" = " to prevent obstacles and conflict.";
 "grade_auspicious" = "Auspicious";
-"grade_great_auspicious" = "Great Auspicious";
-"grade_inauspicious" = "Inauspicious";
-"grade_great_inauspicious" = "Great Inauspicious";
 "price_loading" = "Loading price…";
 "price_unavailable" = "Price unavailable";
 "reload_prices" = "Reload prices";
@@ -392,7 +366,6 @@
 "minute_unit" = "m";
 "year_suffix" = "";
 "month_suffix" = "";
-"solar_calib_title" = "True Solar Time Calibrated";
 "altitude_unit" = "m";
 "mountain_suffix" = " Mountain";
 "facing_suffix" = " Facing";

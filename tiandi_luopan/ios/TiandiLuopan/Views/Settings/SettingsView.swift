@@ -3,6 +3,7 @@ import SwiftUI
 private enum LegalDocument: String, Identifiable {
     case terms
     case privacy
+    case compliance
 
     var id: String { rawValue }
 
@@ -10,6 +11,7 @@ private enum LegalDocument: String, Identifiable {
         switch self {
         case .terms: return "legal_terms_title"
         case .privacy: return "legal_privacy_title"
+        case .compliance: return "legal_compliance_title"
         }
     }
 
@@ -17,6 +19,7 @@ private enum LegalDocument: String, Identifiable {
         switch self {
         case .terms: return "legal_terms_body"
         case .privacy: return "legal_privacy_body"
+        case .compliance: return "legal_compliance_body"
         }
     }
 }
@@ -273,6 +276,19 @@ public struct SettingsView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                     }
+                    Button {
+                        legalDocument = .compliance
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.shield.fill")
+                            Text(lang.t("legal_compliance_button"))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                        }
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.orange)
                 }
             }
             .listStyle(InsetGroupedListStyle())

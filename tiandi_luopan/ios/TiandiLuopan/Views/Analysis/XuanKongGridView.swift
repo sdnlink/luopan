@@ -425,6 +425,11 @@ public struct XuanKongGridView: View {
         switch lang.effectiveLanguage {
         case .en: return "Qi Xing Da Jie (Seven-Star Robbery)"
         case .zhHant, .ja: return "七星打劫大吉局"
+        case .ko: return "칠성타겁 대길국"
+        case .vi: return "Thất Tinh Đả Kiếp Đại Cát Cục"
+        case .th: return "ชีซิงต่าเจี๋ย (ผังเจ็ดดาวมงคลใหญ่)"
+        case .id: return "Formasi Qi Xing Da Jie"
+        case .auto, .zhHans: return "七星打劫大吉局"
         }
     }
 }

@@ -135,7 +135,7 @@ public final class ZeRiEngine {
             let dStr = "Hr \(pinyinStems[dayStem] ?? dayStem)-\(pinyinBranches[dayBranch] ?? dayBranch)"
             let hStr = "Jam \(pinyinStems[hStem] ?? hStem)-\(pinyinBranches[hBranch] ?? hBranch)"
             pillars = "\(yStr) · \(mStr) · \(dStr) · \(hStr)"
-        default:
+        case .auto, .zhHans:
             pillars = "\(yearStem)\(yearBranch)年 \(mStem)\(mBranch)月 \(dayStem)\(dayBranch)日 \(hStem)\(hBranch)时"
         }
         
@@ -162,7 +162,7 @@ public final class ZeRiEngine {
                 suiPo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะไท่ส่วยประจำปี 【\(yearBranch)】 ติดขัดเคราะห์【ส่วยพั่ว】"
             case .id:
                 suiPo = "Cabang hari bentrok dengan Tai Sui tahunan (\(yearBranch)); Tabu Benturan Tahun."
-            default:
+            case .auto, .zhHans:
                 suiPo = "今日【\(dayBranch)日】直冲年支太岁【\(yearBranch)位】，犯【岁破大煞】，主百事不利。"
             }
             if let suiPo = suiPo { warnings.append(suiPo) }
@@ -185,7 +185,7 @@ public final class ZeRiEngine {
                 yuePo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะประจำเดือน 【\(mBranch)】 ติดขัดเคราะห์【เยว่พั่ว】"
             case .id:
                 yuePo = "Cabang hari bentrok dengan Penguasa Bulan (\(mBranch)); Tabu Benturan Bulan."
-            default:
+            case .auto, .zhHans:
                 yuePo = "今日【\(dayBranch)日】直冲月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
             }
             if let yuePo = yuePo { warnings.append(yuePo) }
@@ -219,7 +219,7 @@ public final class ZeRiEngine {
                 sanSha = "กิ่งดินวัน 【\(dayBranch)】 ปะทะทิศพิงบ้าน 【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
             case .id:
                 sanSha = "Cabang hari bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
-            default:
+            case .auto, .zhHans:
                 sanSha = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }
             if let sanSha = sanSha { warnings.append(sanSha) }
@@ -242,7 +242,7 @@ public final class ZeRiEngine {
             status = isAuspicious ? "ฤกษ์วันนี้เป็นมงคล" : "มีดาวเทพปะทะ"
         case .id:
             status = isAuspicious ? "Hari Ini Menguntungkan" : "Benturan Sha Terdeteksi"
-        default:
+        case .auto, .zhHans:
             status = isAuspicious ? "今日日课吉" : "动土神煞有冲"
         }
         
@@ -263,7 +263,7 @@ public final class ZeRiEngine {
                 details = "เทพดาวทิศพิง: ไร้เคราะห์ส่วยพั่วและเยว่พั่ว สี่เสาประสานกลมกลืน เหมาะแก่การลงเสาเอกและตั้งประตู"
             case .id:
                 details = "Sha Gunung Sandaran: Bebas dari benturan tahun/bulan. Empat Pilar selaras, ideal untuk renovasi dan pasang pintu."
-            default:
+            case .auto, .zhHans:
                 details = "坐向神煞：无岁破、无月破、无坐向冲克。四柱比和合化，宜修造动土、安门立向。"
             }
         } else {
@@ -294,7 +294,7 @@ public final class ZeRiEngine {
         case .id:
             yi = isAuspicious ? ["Peletakan Batu Pertama", "Pemasangan Pintu", "Pindah Rumah", "Pembukaan Usaha"] : ["Meditasi Tenang", "Ibadah Doa"]
             ji = isAuspicious ? ["Gali Makam", "Tindakan Kasar"] : ["Konstruksi Rumah", "Pasang Pintu", "Pindah Masuk"]
-        default:
+        case .auto, .zhHans:
             yi = isAuspicious ? ["动土起造", "安门修方", "入宅安香", "开业祈福"] : ["静思祈祷", "祭祀修心"]
             ji = isAuspicious ? ["破土开生坟", "暴烈行事"] : ["修造动土", "安门立向", "入宅开张"]
         }

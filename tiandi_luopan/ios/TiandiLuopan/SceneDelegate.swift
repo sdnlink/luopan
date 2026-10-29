@@ -23,7 +23,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         StoreKitIAPManager.shared.refreshEntitlements()
         StoreKitIAPManager.shared.refreshProductsIfNeeded()
-        CompassMotionManager.shared.start()
+        CompassMotionManager.shared.resumeIfSensorsEnabled()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -32,7 +32,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        CompassMotionManager.shared.start()
+        CompassMotionManager.shared.resumeIfSensorsEnabled()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

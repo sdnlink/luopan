@@ -130,7 +130,8 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     private var receiptRefreshCompletion: ((Bool) -> Void)?
     private let kProcessedTransactionIDs = "yx_iap_processed_transaction_ids"
     private let kEntitlementSeal = "yx_iap_entitlement_hmac_seal"
-    private let kKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
+    private let kKeychainSealAccount = "com.yanxiang.compass.iap.seal.key"
+    private let kLegacyKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
     
     private override init() {
         super.init()
@@ -711,7 +712,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     
     // MARK: - 本地收据校验 (appStoreReceiptURL / ASN.1 PKCS#7) 与 Keychain HMAC 防篡改保护
     
-    /// 读取并校验 Bundle.main.appStoreReceiptURL 本地收据容器、BundleID 与内购商品载荷
+    /// 读取并校验 Bundle.main.appStoreReceiptURL 本地收据容器、BundleID 与内购商品载荷（基于 ASN.1 DER TLV 结构化解析）
     public func verifyReceipt() -> ReceiptValidationResult {
         guard let receiptURL = Bundle.main.appStoreReceiptURL,
               FileManager.default.fileExists(atPath: receiptURL.path),
@@ -728,36 +729,53 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         
         let digest = SHA256.hash(data: receiptData)
         let sha256Hex = digest.map { String(format: "%02x", $0) }.joined()
+        let bytes = [UInt8](receiptData)
         
         // 1. 校验 PKCS#7 / ASN.1 DER 外层 SEQUENCE (0x30) 及 signedData OID (1.2.840.113549.1.7.2)
-        let pkcs7SignedDataOID = Data([0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02])
-        let isASN1Sequence = receiptData.first == 0x30
-        let hasSignedDataOID = receiptData.range(of: pkcs7SignedDataOID) != nil
+        let pkcs7SignedDataOID: [UInt8] = [0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02]
+        let outerTLV = readASN1TLV(in: bytes, at: 0, limit: bytes.count)
+        let isASN1Sequence = (outerTLV?.tag == 0x30)
+        let hasSignedDataOID = receiptData.range(of: Data(pkcs7SignedDataOID)) != nil
         let isValidContainer = isASN1Sequence && hasSignedDataOID
         
-        // 2. 校验收据内嵌 Bundle Identifier (防止跨包移植其它 App 的收据文件)
-        let expectedBundleID = Bundle.main.bundleIdentifier ?? "com.yanxiang.luopan"
-        let bundleIDMatched: Bool
-        if let bundleBytes = expectedBundleID.data(using: .utf8),
-           receiptData.range(of: bundleBytes) != nil {
-            bundleIDMatched = true
-        } else if let fallbackBytes = "com.yanxiang.luopan".data(using: .utf8),
-                  receiptData.range(of: fallbackBytes) != nil {
-            bundleIDMatched = true
-        } else {
-            bundleIDMatched = false
-        }
-        
-        // 3. 解析收据内包含的内购商品标识与订阅到期时间 (ASN.1 IA5String RFC3339 时间戳)
+        // 2. 通过 ASN.1 DER TLV 递归遍历 Apple Receipt Attribute (SEQUENCE { INTEGER type, INTEGER version, OCTET STRING value })
+        //    Info.plist 与 project.pbxproj 的真实 Bundle ID 为 "com.yanxiang.compass"
+        let expectedBundleID = Bundle.main.bundleIdentifier ?? "com.yanxiang.compass"
+        var parsedBundleID: String?
         var purchasedIDs = Set<String>()
-        for item in IAPProductID.allCases {
-            if let pidBytes = item.rawValue.data(using: .utf8),
-               receiptData.range(of: pidBytes) != nil {
-                purchasedIDs.insert(item.rawValue)
+        var expiryDates: [Date] = []
+        
+        parseASN1ReceiptAttributes(in: bytes, range: 0..<bytes.count, depth: 0) { attrType, valueRange in
+            switch attrType {
+            case 2:
+                // Attribute Type 2: Bundle Identifier (UTF8String 0x0C / IA5String 0x16)
+                if let bundleStr = self.decodeASN1String(in: bytes, range: valueRange), !bundleStr.isEmpty {
+                    parsedBundleID = bundleStr
+                }
+            case 17:
+                // Attribute Type 17: In-App Purchase Receipt (嵌套 SET of InAppAttribute)
+                let iapRecord = self.parseInAppPurchaseRecord(in: bytes, range: valueRange)
+                guard !iapRecord.isCancelled,
+                      let productID = iapRecord.productID,
+                      IAPProductID(rawValue: productID) != nil else {
+                    return
+                }
+                purchasedIDs.insert(productID)
+                if let expDate = iapRecord.expirationDate {
+                    expiryDates.append(expDate)
+                } else if productID == IAPProductID.vipYearly.rawValue,
+                          let purchaseDate = iapRecord.purchaseDate,
+                          let derivedExpiry = Calendar(identifier: .gregorian).date(byAdding: .year, value: 1, to: purchaseDate) {
+                    expiryDates.append(derivedExpiry)
+                }
+            default:
+                break
             }
         }
         
-        let latestExpiry = extractLatestReceiptExpiryDate(from: receiptData)
+        let bundleIDMatched = (parsedBundleID == expectedBundleID) || (parsedBundleID == "com.yanxiang.compass")
+        let latestExpiry = expiryDates.max()
+        
         return ReceiptValidationResult(
             isValidContainer: isValidContainer,
             bundleIDMatched: bundleIDMatched,
@@ -767,32 +785,220 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         )
     }
     
-    /// 从 ASN.1 IA5String (Tag 0x16) 载荷中提取收据内的最新 RFC3339 订阅到期时间
-    private func extractLatestReceiptExpiryDate(from data: Data) -> Date? {
-        let bytes = [UInt8](data)
-        let count = bytes.count
-        guard count > 32 else { return nil }
-        let isoFormatter = ISO8601DateFormatter()
-        var dates: [Date] = []
-        var idx = 0
-        while idx < count - 22 {
-            // ASN.1 IA5String tag = 0x16, 典型 RFC3339 长度 20..30 字节 (例如 "2027-10-29T12:00:00Z")
-            if bytes[idx] == 0x16 {
-                let len = Int(bytes[idx + 1])
-                if len >= 19 && len <= 32 && (idx + 2 + len) <= count {
-                    let slice = Data(bytes[(idx + 2)..<(idx + 2 + len)])
-                    if let str = String(data: slice, encoding: .ascii),
-                       str.contains("T"), str.hasSuffix("Z"),
-                       let parsed = isoFormatter.date(from: str) {
-                        dates.append(parsed)
-                        idx += 2 + len
-                        continue
-                    }
-                }
+    // MARK: - ASN.1 DER TLV 结构化解析器 (Apple PKCS#7 Receipt Attributes)
+    
+    private struct ASN1TLV {
+        let tag: UInt8
+        let isConstructed: Bool
+        let isIndefiniteLength: Bool
+        let valueRange: Range<Int>
+        let nextOffset: Int
+    }
+    
+    private struct InAppPurchaseRecord {
+        var productID: String?
+        var purchaseDate: Date?
+        var expirationDate: Date?
+        var isCancelled: Bool = false
+    }
+    
+    /// 读取单个 ASN.1 DER/BER TLV 节点（带严格边界检查，支持定长与 BER 不定长 0x80 容器）
+    private func readASN1TLV(in bytes: [UInt8], at offset: Int, limit: Int) -> ASN1TLV? {
+        guard offset >= 0, offset + 2 <= limit else { return nil }
+        let tag = bytes[offset]
+        let isConstructed = (tag & 0x20) != 0
+        var idx = offset + 1
+        
+        // 处理高标签号形式 (High-tag-number form: 低 5 位全 1)
+        if (tag & 0x1F) == 0x1F {
+            while idx < limit && (bytes[idx] & 0x80) != 0 {
+                idx += 1
             }
             idx += 1
+            guard idx < limit else { return nil }
         }
-        return dates.max()
+        
+        let lenByte = bytes[idx]
+        idx += 1
+        
+        if lenByte == 0x80 {
+            // BER 不定长编码（仅允许出现在 constructed 容器中，以 0x00 0x00 结尾）
+            guard isConstructed else { return nil }
+            return ASN1TLV(
+                tag: tag,
+                isConstructed: true,
+                isIndefiniteLength: true,
+                valueRange: idx..<limit,
+                nextOffset: limit
+            )
+        } else if (lenByte & 0x80) == 0 {
+            let length = Int(lenByte)
+            guard idx + length <= limit else { return nil }
+            return ASN1TLV(
+                tag: tag,
+                isConstructed: isConstructed,
+                isIndefiniteLength: false,
+                valueRange: idx..<(idx + length),
+                nextOffset: idx + length
+            )
+        } else {
+            let octetsCount = Int(lenByte & 0x7F)
+            guard octetsCount >= 1, octetsCount <= 4, idx + octetsCount <= limit else { return nil }
+            var length = 0
+            for i in 0..<octetsCount {
+                length = (length << 8) | Int(bytes[idx + i])
+            }
+            idx += octetsCount
+            guard length >= 0, idx + length <= limit else { return nil }
+            return ASN1TLV(
+                tag: tag,
+                isConstructed: isConstructed,
+                isIndefiniteLength: false,
+                valueRange: idx..<(idx + length),
+                nextOffset: idx + length
+            )
+        }
+    }
+    
+    /// 判断 SEQUENCE (0x30) 是否为 Apple ReceiptAttribute 三元组: (INTEGER type, INTEGER version, OCTET STRING value)
+    private func tryParseReceiptAttributeTuple(in bytes: [UInt8], range: Range<Int>) -> (attrType: Int, valueRange: Range<Int>)? {
+        guard let first = readASN1TLV(in: bytes, at: range.lowerBound, limit: range.upperBound),
+              first.tag == 0x02,
+              first.valueRange.count >= 1, first.valueRange.count <= 4,
+              let second = readASN1TLV(in: bytes, at: first.nextOffset, limit: range.upperBound),
+              second.tag == 0x02,
+              second.valueRange.count >= 1, second.valueRange.count <= 4,
+              let third = readASN1TLV(in: bytes, at: second.nextOffset, limit: range.upperBound),
+              third.tag == 0x04,
+              third.nextOffset == range.upperBound else {
+            return nil
+        }
+        var attrType = 0
+        for idx in first.valueRange {
+            attrType = (attrType << 8) | Int(bytes[idx])
+        }
+        return (attrType, third.valueRange)
+    }
+    
+    /// 递归遍历 PKCS#7 容器与 Apple Receipt Attribute SET
+    private func parseASN1ReceiptAttributes(
+        in bytes: [UInt8],
+        range: Range<Int>,
+        depth: Int,
+        onAttribute: (Int, Range<Int>) -> Void
+    ) {
+        guard depth <= 24 else { return }
+        var offset = range.lowerBound
+        let limit = range.upperBound
+        
+        while offset + 2 <= limit {
+            // BER End-of-Contents (0x00, 0x00)
+            if bytes[offset] == 0x00 && bytes[offset + 1] == 0x00 {
+                offset += 2
+                continue
+            }
+            guard let tlv = readASN1TLV(in: bytes, at: offset, limit: limit) else {
+                break
+            }
+            if tlv.tag == 0x30, let tuple = tryParseReceiptAttributeTuple(in: bytes, range: tlv.valueRange) {
+                onAttribute(tuple.attrType, tuple.valueRange)
+            } else if tlv.isConstructed {
+                parseASN1ReceiptAttributes(in: bytes, range: tlv.valueRange, depth: depth + 1, onAttribute: onAttribute)
+            } else if tlv.tag == 0x04, tlv.valueRange.count >= 2 {
+                // PKCS#7 eContent 的 OCTET STRING 内部封装了 Receipt Attribute SET (0x31) 或 SEQUENCE (0x30)
+                let firstInnerByte = bytes[tlv.valueRange.lowerBound]
+                if firstInnerByte == 0x31 || firstInnerByte == 0x30 || firstInnerByte == 0x04 {
+                    parseASN1ReceiptAttributes(in: bytes, range: tlv.valueRange, depth: depth + 1, onAttribute: onAttribute)
+                }
+            }
+            guard tlv.nextOffset > offset else { break }
+            offset = tlv.nextOffset
+        }
+    }
+    
+    /// 解析单个 In-App Purchase Attribute (Type 17) 内部的商品 ID、购买时间、到期时间与取消状态
+    private func parseInAppPurchaseRecord(in bytes: [UInt8], range: Range<Int>) -> InAppPurchaseRecord {
+        var record = InAppPurchaseRecord()
+        parseASN1ReceiptAttributes(in: bytes, range: range, depth: 0) { subType, subValueRange in
+            switch subType {
+            case 1702:
+                // In-App Product Identifier
+                if let pid = self.decodeASN1String(in: bytes, range: subValueRange), !pid.isEmpty {
+                    record.productID = pid
+                }
+            case 1704:
+                // Purchase Date (RFC 3339)
+                if let date = self.decodeASN1Date(in: bytes, range: subValueRange) {
+                    record.purchaseDate = date
+                }
+            case 1708:
+                // Subscription Expiration Date (RFC 3339)
+                if let date = self.decodeASN1Date(in: bytes, range: subValueRange) {
+                    record.expirationDate = date
+                }
+            case 1712:
+                // Cancellation Date (非空说明该笔交易已被 Apple 退款/撤销)
+                if let cancelStr = self.decodeASN1String(in: bytes, range: subValueRange)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                   !cancelStr.isEmpty {
+                    record.isCancelled = true
+                }
+            default:
+                break
+            }
+        }
+        return record
+    }
+    
+    /// 从 ReceiptAttribute 的 OCTET STRING 载荷中精确解码内部 ASN.1 字符串 (UTF8String / IA5String / PrintableString / UTCTime / GeneralizedTime)
+    private func decodeASN1String(in bytes: [UInt8], range: Range<Int>) -> String? {
+        guard !range.isEmpty else { return nil }
+        if let innerTLV = readASN1TLV(in: bytes, at: range.lowerBound, limit: range.upperBound),
+           innerTLV.nextOffset == range.upperBound {
+            let validStringTags: Set<UInt8> = [0x0C, 0x16, 0x13, 0x17, 0x18, 0x1A, 0x1E]
+            if validStringTags.contains(innerTLV.tag) {
+                let slice = Data(bytes[innerTLV.valueRange])
+                return String(data: slice, encoding: .utf8) ?? String(data: slice, encoding: .ascii)
+            }
+        }
+        return nil
+    }
+    
+    /// 从 ASN.1 字符串载荷中解析 RFC3339 / ISO8601 / ASN.1 时间戳（支持毫秒、不同时区与多种编码标签）
+    private func decodeASN1Date(in bytes: [UInt8], range: Range<Int>) -> Date? {
+        guard let rawString = decodeASN1String(in: bytes, range: range)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawString.isEmpty else {
+            return nil
+        }
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFractional.date(from: rawString) {
+            return date
+        }
+        let isoStandard = ISO8601DateFormatter()
+        isoStandard.formatOptions = [.withInternetDateTime]
+        if let date = isoStandard.date(from: rawString) {
+            return date
+        }
+        let fallbackFormats = [
+            "yyyy-MM-dd'T'HH:mm:ssZ",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+            "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+            "yyyy-MM-dd HH:mm:ss VV",
+            "yyyyMMddHHmmss'Z'",
+            "yyMMddHHmmss'Z'"
+        ]
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        for fmt in fallbackFormats {
+            formatter.dateFormat = fmt
+            if let date = formatter.date(from: rawString) {
+                return date
+            }
+        }
+        return nil
     }
     
     /// 根据已通过本地校验的 App Store 收据恢复或修正本地权益并更新防篡改签名
@@ -830,7 +1036,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         }
     }
     
-    /// 获取或生成保存在 Keychain 中的设备级 256-bit HMAC 密钥
+    /// 获取或生成保存在 Keychain 中的设备级 256-bit HMAC 密钥（向下兼容旧版 Keychain 账户迁移）
     private func deviceSealSymmetricKey() -> SymmetricKey {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -844,9 +1050,30 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             return SymmetricKey(data: keyData)
         }
         
+        // 向下兼容旧版 Keychain 账户 "com.yanxiang.luopan.iap.seal.key"，平滑迁移至 "com.yanxiang.compass.iap.seal.key"
+        let legacyQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: kLegacyKeychainSealAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var legacyItem: CFTypeRef?
+        if SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem) == errSecSuccess,
+           let legacyKeyData = legacyItem as? Data, legacyKeyData.count >= 32 {
+            let migrateQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrAccount as String: kKeychainSealAccount,
+                kSecValueData as String: legacyKeyData,
+                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            ]
+            SecItemDelete(migrateQuery as CFDictionary)
+            SecItemAdd(migrateQuery as CFDictionary, nil)
+            return SymmetricKey(data: legacyKeyData)
+        }
+        
         var randomBytes = [UInt8](repeating: 0, count: 32)
         _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-        let vendorSalt = UIDevice.current.identifierForVendor?.uuidString ?? "com.yanxiang.luopan.device"
+        let vendorSalt = UIDevice.current.identifierForVendor?.uuidString ?? "com.yanxiang.compass.device"
         var combined = Data(randomBytes)
         if let vendorData = vendorSalt.data(using: .utf8) {
             combined.append(vendorData)
@@ -909,16 +1136,16 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             let allowYearly = receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
             defaults.set(allowLifetime, forKey: kIsLifetime)
             defaults.set(allowLifetime || allowYearly, forKey: kIsVIP)
-            if ! receipt.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue) {
+            if !receipt.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue) && processedIDs.isEmpty {
                 defaults.set(0, forKey: kFloorplanCredits)
             }
-            if ! receipt.purchasedProductIDs.contains(IAPProductID.tianjiSingle.rawValue) {
+            if !receipt.purchasedProductIDs.contains(IAPProductID.tianjiSingle.rawValue) && processedIDs.isEmpty {
                 defaults.set(0, forKey: kTianjiCredits)
             }
             updateEntitlementSealLocked()
-            return allowLifetime || allowYearly
-        } else if !processedIDs.isEmpty && defaults.string(forKey: kEntitlementSeal) == nil {
-            // 兼容已有合法交易 ID 列表的旧版升级迁移（首次生成防篡改签名）
+            return allowLifetime || allowYearly || !processedIDs.isEmpty
+        } else if !processedIDs.isEmpty {
+            // 兼容已有合法 StoreKit 交易 ID 记录的版本升级或签名格式演进，避免误删合法用户权益
             updateEntitlementSealLocked()
             return true
         }

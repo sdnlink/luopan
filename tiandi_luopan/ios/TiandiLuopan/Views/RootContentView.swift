@@ -88,8 +88,8 @@ public struct RootContentView: View {
             // Re-enable sensors only after the app is visible again. Keeping
             // Core Location/Core Motion streams alive while the app is
             // backgrounded wastes battery and can keep the device warm.
-            motion.start()
             updateResourceUsage()
+            motion.resumeIfSensorsEnabled()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             motion.stop()
@@ -102,7 +102,8 @@ public struct RootContentView: View {
     /// normal Auto-Lock preference to avoid draining the battery while idle.
     private func updateResourceUsage() {
         UIApplication.shared.isIdleTimerDisabled = selectedTab == 0 || selectedTab == 1
-        motion.setDeviceMotionEnabled(selectedTab == 0 || selectedTab == 4)
+        motion.setDeviceMotionEnabled(selectedTab == 0)
         motion.setHeadingUpdatesEnabled(selectedTab != 4)
+        motion.resumeIfSensorsEnabled()
     }
 }

@@ -27,7 +27,7 @@ public struct SolarTermItem: Identifiable {
             return ["冬至": "เหมายัน", "小寒": "เสี่ยวหาน", "大寒": "ต้าหาน", "立春": "ลี่ชุน", "雨水": "อวี่สุ่ย", "惊蛰": "จิงเจ๋อ", "春分": "ชุนเฟิน", "清明": "ชิงหมิง", "谷雨": "กู่ยวี่", "立夏": "ลี่เซี่ย", "小满": "เสี่ยวหม่าน", "芒种": "หมางจ้ง", "夏至": "ครีษมายัน", "小暑": "เสี่ยวสู่", "大暑": "ต้าสู่", "立秋": "ลี่ชิว", "处暑": "ชู่สู่", "白露": "ไป๋ลู่", "秋分": "ศารทวิษุวัต", "寒露": "หานลู่", "霜降": "ซวงเจี้ยง", "立冬": "ลี่ตง", "小雪": "เสี่ยวเสวี่ย", "大雪": "ต้าเสวี่ย"][name] ?? name
         case .zhHant:
             return ["惊蛰": "驚蟄", "小满": "小滿", "芒种": "芒種", "处暑": "處暑"][name] ?? name
-        default:
+        case .auto, .zhHans:
             return name
         }
     }
@@ -54,7 +54,7 @@ public struct SolarTermItem: Identifiable {
                 .replacingOccurrences(of: "遁", with: "遯")
                 .replacingOccurrences(of: "观", with: "觀")
                 .replacingOccurrences(of: "剥", with: "剝")
-        default:
+        case .auto, .zhHans:
             return hexagramName
         }
     }

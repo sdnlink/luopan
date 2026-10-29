@@ -243,7 +243,7 @@ public final class SolarTimeCalculator {
                 + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
                 + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
                 + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時"
-        default:
+        case .auto, .zhHans:
             return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
                 + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
                 + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "

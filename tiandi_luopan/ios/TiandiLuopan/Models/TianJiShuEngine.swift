@@ -49,7 +49,7 @@ public class TianJiShuEngine {
                 case .vi: return vi
                 case .th: return th
                 case .id: return id
-                default: return hans
+                case .auto, .zhHans: return hans
                 }
             }
             
@@ -211,7 +211,7 @@ public class TianJiShuEngine {
                 • Koordinat Survei: \(coordsDesc)
                 • Waktu Matahari Sejati: \(solarTimeDesc)
                 """
-            default:
+            case .auto, .zhHans:
                 p1Text = """
                 • 物理向首方位：\(mFacing.localizedName)山向首（实测 \(String(format: "%.1f", heading))°）· \(mFacing.localizedPalace)宫
                 • 住宅太极坐山：\(mSitting.localizedName)山立极（坐 \(String(format: "%.1f", sitAngle))°）· 属\(mSitting.localizedPalace)
@@ -295,7 +295,7 @@ public class TianJiShuEngine {
                 • Qi Bintang Berkuasa: Bintang \(meta.starName) \(meta.element) masuk ke tengah menyinari ruang depan.
                 • Analisis Keseluruhan: \(xkChart.summaryAnalysis)
                 """
-            default:
+            case .auto, .zhHans:
                 p2Text = """
                 • 当前地运：\(meta.label)
                 • 玄空格局判定：【\(mSitting.localizedName)山\(mFacing.localizedName)向】\(xkChart.patternType)
@@ -414,7 +414,7 @@ public class TianJiShuEngine {
                 • Gua Rumah: [\(bz.localizedHouseGua)] · Arah Pintu: \(bz.localizedGateDirection) menyerap [\(bz.gateStar.localizedName)]
                 • Arah Sheng Qi: \(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "Sheng Qi"); sangat cocok untuk kamar utama atau altar.
                 """
-            default:
+            case .auto, .zhHans:
                 p4Text = """
                 • 时家奇门时空：\(qm.title)
                 • 当前天时最优动身方：\(qm.bestNavDirection) (\(qm.bestNavReason))
@@ -516,7 +516,7 @@ public class TianJiShuEngine {
                 signText = "ปรมาจารย์ฮวงจุ้ยลิขิต\nสถาบันเทียนจียั่นเซี่ยง\nปี \(curGzYear)"
             case .id:
                 signText = "MASTER FENG SHUI RESMI\nTIANJI YANXIANG ACADEMY\nTAHUN \(curGzYear)"
-            default:
+            case .auto, .zhHans:
                 signText = "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启"
             }
             signText.draw(at: CGPoint(x: 500, y: curY + 45), withAttributes: [
@@ -552,7 +552,7 @@ public class TianJiShuEngine {
         case .vi: message = "Bản đồ phong thủy tuyên chỉ đã lưu vào album ảnh thành công!"
         case .th: message = "บันทึกคัมภีร์ตรวจฮวงจุ้ยลงในอัลบั้มรูปเรียบร้อยแล้ว!"
         case .id: message = "Gulungan Feng Shui berhasil disimpan ke galeri foto!"
-        default: message = "天机宣纸勘测长卷已成功保存至系统相册！"
+        case .auto, .zhHans: message = "天机宣纸勘测长卷已成功保存至系统相册！"
         }
         let failure = LocalizationManager.shared.t("save_failed")
 

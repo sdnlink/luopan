@@ -524,7 +524,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
         case .vi: return vi[id] ?? en[id] ?? metaphysicsHarm
         case .th: return th[id] ?? en[id] ?? metaphysicsHarm
         case .id: return indo[id] ?? en[id] ?? metaphysicsHarm
-        default: return en[id] ?? metaphysicsHarm
+        case .auto, .zhHans, .en: return en[id] ?? metaphysicsHarm
         }
     }
 
@@ -608,7 +608,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
         case .vi: return vi[id] ?? en[id] ?? classicalText
         case .th: return th[id] ?? en[id] ?? classicalText
         case .id: return indoClassical[id] ?? en[id] ?? classicalText
-        default: return en[id] ?? classicalText
+        case .auto, .zhHans, .en: return en[id] ?? classicalText
         }
     }
 }

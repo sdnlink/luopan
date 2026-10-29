@@ -71,7 +71,7 @@ public struct FenjinItem: Identifiable {
 
     public var localizedGrade: String {
         switch LocalizationManager.shared.effectiveLanguage {
-        case .zhHans:
+        case .auto, .zhHans:
             return grade
         case .zhHant:
             return grade.replacingOccurrences(of: "孤虚", with: "孤虛")

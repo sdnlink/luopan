@@ -111,6 +111,7 @@ public struct VIPPaywallSheet: View {
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var isPurchasing: Bool = false
     @State private var alertMsg: String = ""
+    @State private var alertIsError: Bool = false
     @State private var showAlert: Bool = false
     
     public init(defaultProductId: IAPProductID = .vipYearly) {
@@ -293,18 +294,22 @@ public struct VIPPaywallSheet: View {
         }
         .onReceive(iap.$lastErrorMessage.compactMap { $0 }) { message in
             isPurchasing = false
+            alertIsError = true
             alertMsg = message
             showAlert = true
+            iap.clearTransientMessages()
         }
         .onReceive(iap.$lastStatusMessage.compactMap { $0 }) { message in
             isPurchasing = false
+            alertIsError = false
             alertMsg = message
             showAlert = true
+            iap.clearTransientMessages()
         }
         .alert(isPresented: $showAlert) {
-            Alert(title: Text(iap.lastErrorMessage == nil
-                              ? LocalizationManager.shared.t("payment_status_title")
-                              : LocalizationManager.shared.t("payment_failed_title")),
+            Alert(title: Text(alertIsError
+                              ? LocalizationManager.shared.t("payment_failed_title")
+                              : LocalizationManager.shared.t("payment_status_title")),
                   message: Text(alertMsg),
                   dismissButton: .default(Text(LocalizationManager.shared.t("done"))))
         }

@@ -368,7 +368,7 @@ public class FloorplanEngine {
                 case .vi: palace = ("Trung tâm", "Trung")
                 case .th: palace = ("จุดศูนย์กลาง", "กลาง")
                 case .id: palace = ("Pusat", "Tengah")
-                default: palace = ("中央", "中")
+                case .auto, .zhHans: palace = ("中央", "中")
                 }
             } else {
                 palace = palaceForPoint(
@@ -479,7 +479,7 @@ public class FloorplanEngine {
                     palace = "Keseluruhan"
                     lore = "Setiap area fungsional berada di posisi yang baik, terpisah dengan rapi, dan yin-yang selaras."
                     solution = "Jaga rumah tetap terang dan berventilasi baik, hiasi tanaman hijau untuk rezeki stabil."
-                default:
+                case .auto, .zhHans:
                     title = "全屋空间气场中和纯清"
                     palace = "全局"
                     lore = "各功能区方位得所，动静分离，阴阳调和。"
@@ -522,7 +522,7 @@ public class FloorplanEngine {
                     palace = "Keseluruhan"
                     lore = "Hanya tersisa penanda sudut hilang atau luas area nol, sehingga pusat Tai Ji tidak dapat dihitung."
                     solution = "Tambahkan minimal satu ruangan nyata, lalu tentukan titik Tai Ji dan periksa kembali."
-                default:
+                case .auto, .zhHans:
                     title = "户型缺少有效房间"
                     palace = "全局"
                     lore = "当前只剩户型缺角标记，或所有房间框面积为零，无法计算立极中宫与房间方位。"
@@ -676,7 +676,7 @@ public class FloorplanEngine {
         case .vi: return vi
         case .th: return th
         case .id: return id
-        default: return hans
+        case .auto, .zhHans: return hans
         }
     }
 

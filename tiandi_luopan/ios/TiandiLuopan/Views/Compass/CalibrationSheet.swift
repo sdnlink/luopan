@@ -150,8 +150,8 @@ public struct CalibrationSheet: View {
                             withAnimation(Animation.linear(duration: 1.5).repeatCount(2, autoreverses: false)) {
                                 rotateDegree += 360
                             }
-                            motion.resetManualOffset()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            motion.requestSensorCalibration()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                                 isCalibrating = false
                             }
                         }) {
@@ -172,6 +172,7 @@ public struct CalibrationSheet: View {
                             .foregroundColor(.black)
                             .cornerRadius(10)
                         }
+                        .disabled(isCalibrating)
                         
                         Button(action: {
                             presentationMode.wrappedValue.dismiss()

@@ -1814,122 +1814,131 @@ public struct ARSpatialSurveyView: View {
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(lang.t("ar_spatial_survey"))
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                Text(model.lidarAvailable ? lang.t("ar_spatial_lidar_available") : lang.t("ar_spatial_lidar_unavailable"))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(model.lidarAvailable ? .green : .orange)
-            }
-            Spacer()
-#if canImport(RoomPlan)
-            if #available(iOS 16.0, *),
-               ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
-                Button(action: {
-                    model.pause()
-                    showRoomPlan = true
-                }) {
-                    Image(systemName: "house.fill")
+        VStack(spacing: 8) {
+            // 第一行：标题与状态 + 常驻关闭按钮
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(lang.t("ar_spatial_survey"))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    Text(model.lidarAvailable ? lang.t("ar_spatial_lidar_available") : lang.t("ar_spatial_lidar_unavailable"))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(model.lidarAvailable ? .green : .orange)
+                }
+                Spacer()
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.white)
-                        .padding(9)
-                        .background(Color.blue.opacity(0.8))
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel(lang.t("ar_roomplan_title"))
-            }
-#endif
-            Button(action: {
-                _ = model.toggleGroundBaguaOverlay()
-            }) {
-                Image(systemName: "square.grid.3x3.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(model.groundBaguaProjected ? .black : .white)
-                    .padding(9)
-                    .background(model.groundBaguaProjected ? Color(red: 0.95, green: 0.80, blue: 0.25) : Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel(lang.t("xuankong_stars"))
-            Button(action: {
-                _ = model.placeLubanPoint()
-            }) {
-                Image(systemName: "ruler.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(model.lubanPointA != nil ? .black : .white)
-                    .padding(9)
-                    .background(model.lubanPointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel(lang.t("ar_spatial_measure"))
-            Button(action: {
-                model.toggleMeshVisibility()
-            }) {
-                Image(systemName: model.meshVisible ? "eye.fill" : "eye.slash.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(model.meshVisible ? .yanCyan : .white.opacity(0.75))
-                    .padding(9)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel(lang.t("ar_spatial_mesh"))
-            Button(action: {
-                saveMessage = nil
-                model.resetSurvey()
-            }) {
-                Image(systemName: "arrow.counterclockwise")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(9)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel(lang.t("ar_spatial_reset"))
-            if model.hasSavedWorldMap {
-                Button(action: restoreLatestMap) {
-                    Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.yanCyan)
                         .padding(9)
                         .background(Color.black.opacity(0.55))
                         .clipShape(Circle())
                 }
-                .disabled(isSavingMap)
-                .accessibilityLabel(lang.t("ar_spatial_map_ready"))
+                .accessibilityLabel(lang.t("ar_spatial_close"))
             }
-            Button(action: {
-                if let img = model.captureSurveySnapshotReport() {
-                    shareItem = ARSpatialShareItem(item: img)
+
+            // 第二行：功能图标按钮组（小屏横向滚动兜底，避免挤压标题竖排）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+#if canImport(RoomPlan)
+                    if #available(iOS 16.0, *),
+                       ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+                        Button(action: {
+                            model.pause()
+                            showRoomPlan = true
+                        }) {
+                            Image(systemName: "house.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(9)
+                                .background(Color.blue.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel(lang.t("ar_roomplan_title"))
+                    }
+#endif
+                    Button(action: {
+                        _ = model.toggleGroundBaguaOverlay()
+                    }) {
+                        Image(systemName: "square.grid.3x3.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(model.groundBaguaProjected ? .black : .white)
+                            .padding(9)
+                            .background(model.groundBaguaProjected ? Color(red: 0.95, green: 0.80, blue: 0.25) : Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel(lang.t("xuankong_stars"))
+                    Button(action: {
+                        _ = model.placeLubanPoint()
+                    }) {
+                        Image(systemName: "ruler.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(model.lubanPointA != nil ? .black : .white)
+                            .padding(9)
+                            .background(model.lubanPointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel(lang.t("ar_spatial_measure"))
+                    Button(action: {
+                        model.toggleMeshVisibility()
+                    }) {
+                        Image(systemName: model.meshVisible ? "eye.fill" : "eye.slash.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(model.meshVisible ? .yanCyan : .white.opacity(0.75))
+                            .padding(9)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel(lang.t("ar_spatial_mesh"))
+                    Button(action: {
+                        saveMessage = nil
+                        model.resetSurvey()
+                    }) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(9)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel(lang.t("ar_spatial_reset"))
+                    if model.hasSavedWorldMap {
+                        Button(action: restoreLatestMap) {
+                            Image(systemName: "arrow.down.doc.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.yanCyan)
+                                .padding(9)
+                                .background(Color.black.opacity(0.55))
+                                .clipShape(Circle())
+                        }
+                        .disabled(isSavingMap)
+                        .accessibilityLabel(lang.t("ar_spatial_map_ready"))
+                    }
+                    Button(action: {
+                        if let img = model.captureSurveySnapshotReport() {
+                            shareItem = ARSpatialShareItem(item: img)
+                        }
+                    }) {
+                        Image(systemName: "camera.viewfinder")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.green)
+                            .padding(9)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel(lang.t("capture_proof"))
+                    Button(action: saveMap) {
+                        Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(isSavingMap ? .orange : .white)
+                            .padding(9)
+                            .background(Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .disabled(isSavingMap)
+                    .accessibilityLabel(lang.t("ar_spatial_save_map"))
                 }
-            }) {
-                Image(systemName: "camera.viewfinder")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.green)
-                    .padding(9)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
             }
-            .accessibilityLabel(lang.t("capture_proof"))
-            Button(action: saveMap) {
-                Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(isSavingMap ? .orange : .white)
-                    .padding(9)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .disabled(isSavingMap)
-            .accessibilityLabel(lang.t("ar_spatial_save_map"))
-            Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(9)
-                    .background(Color.black.opacity(0.55))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel(lang.t("ar_spatial_close"))
         }
         .padding(10)
         .background(Color.black.opacity(0.68))

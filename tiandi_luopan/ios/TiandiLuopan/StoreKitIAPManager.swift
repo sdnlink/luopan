@@ -938,16 +938,24 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             guard let signerCertDER = signerCertDER else { return empty }
 
             // ===== 1. 证书链验证（系统信任锚） =====
-            let certObjects = certificates.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
-            guard !certObjects.isEmpty else { return empty }
+            // SecTrustCreateWithCertificates 约定首个证书为待评估的叶子证书。
+            // PKCS#7 中的 certificates 为无序集合，必须确保 signerCert 排在首位。
+            guard let signerCert = SecCertificateCreateWithData(nil, signerCertDER as CFData) else { return empty }
+            var orderedCerts: [SecCertificate] = [signerCert]
+            for cdata in certificates where cdata != signerCertDER {
+                if let cert = SecCertificateCreateWithData(nil, cdata as CFData) {
+                    orderedCerts.append(cert)
+                }
+            }
             let policy = SecPolicyCreateBasicX509()
             var trust: SecTrust?
-            let trustStatus = SecTrustCreateWithCertificates(certObjects as CFArray, [policy] as CFArray, &trust)
+            let trustStatus = SecTrustCreateWithCertificates(orderedCerts as CFArray, [policy] as CFArray, &trust)
             guard trustStatus == errSecSuccess, let trust = trust else { return empty }
             let chainValid = SecTrustEvaluateWithError(trust, nil)
 
             // ===== 2. CMS 数字签名验证 =====
-            guard chainValid, let publicKey = SecTrustCopyPublicKey(trust) else {
+            // 直接从签名者叶子证书拷贝公钥，确保验签公钥与签名私钥严格对应
+            guard chainValid, let publicKey = SecCertificateCopyKey(signerCert) ?? SecTrustCopyPublicKey(trust) else {
                 return VerificationResult(certificateChainValid: chainValid, signatureValid: false)
             }
 

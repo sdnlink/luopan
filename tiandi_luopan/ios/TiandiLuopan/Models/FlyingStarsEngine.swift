@@ -272,13 +272,13 @@ public struct XuanKongChart {
         
         switch lang {
         case .en:
-            let wcNote = wcName != nil ? " Wenchang/Harmony star gathers at [\(wcName!)]." : ""
+            let wcNote = wcName.map { " Wenchang/Harmony star gathers at [\($0)]." } ?? ""
             return "• Wealth & Prosperity: Current Period-\(period) facing star lands at [\(wangName)] (Star \(wangCombo)), and future Sheng-Qi Star \(nextStar) reaches [\(sqName)] (Star \(sqCombo)). Keep these sectors bright, open, or place moving water to activate wealth.\(wcNote)"
         case .zhHant:
-            let wcNote = wcName != nil ? "另【\(wcName!)】逢文昌吉星會聚，利書房策劃。" : ""
+            let wcNote = wcName.map { "另【\($0)】逢文昌吉星會聚，利書房策劃。" } ?? ""
             return "• 催財旺位：當令\(period)運向星飛臨【\(wangName)】（山向\(wangCombo)），生氣\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂開闊、安設動水或長明燈催旺財源。\(wcNote)"
         case .ja:
-            let wcNote = wcName != nil ? "また【\(wcName!)】は文昌吉星が会聚し書斎に吉。" : ""
+            let wcNote = wcName.map { "また【\($0)】は文昌吉星が会聚し書斎に吉。" } ?? ""
             return "• 催財旺位：当令\(period)運の向星が【\(wangName)】（山向\(wangCombo)）に飛臨し、生気\(nextStar)星が【\(sqName)】（山向\(sqCombo)）に到ります。採光や動水を設けて財気を催旺してください。\(wcNote)"
         case .ko:
             return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오."
@@ -289,7 +289,7 @@ public struct XuanKongChart {
         case .id:
             return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki."
         case .auto, .zhHans:
-            let wcNote = wcName != nil ? "另【\(wcName!)】逢文昌吉星会聚，利书房策划。" : ""
+            let wcNote = wcName.map { "另【\($0)】逢文昌吉星会聚，利书房策划。" } ?? ""
             return "• 催财旺位：当令\(period)运向星飞临【\(wangName)】（山向\(wangCombo)），生气\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂开阔、安设动水或长明灯催旺财源。\(wcNote)"
         }
     }
@@ -551,6 +551,26 @@ public final class FlyingStarsEngine {
     private let palaceNames = ["坎一宫 (正北)", "坤二宫 (西南)", "震三宫 (正东)", "巽四宫 (东南)", "天心五 (中宫)", "乾六宫 (西北)", "兑七宫 (正西)", "艮八宫 (东北)", "离九宫 (正南)"]
     private let palaceDirections = ["正北", "西南", "正东", "东南", "中宫", "西北", "正西", "东北", "正南"]
     
+    /// 根据入中之星与坐向元龙判定顺逆飞性（玄空风水正统排盘法：
+    /// 依坐向山之元龙，查入中星本宫对应同元龙之山的阴阳；阳顺阴逆。五黄随坐向本山之元龙阴阳）。
+    private func resolveFlightPolarity(starInCentral: Int, baseMountain: Mountain24Item) -> Bool {
+        if starInCentral == 5 {
+            return baseMountain.polarity > 0
+        }
+        let palaceNameByStar: [Int: String] = [
+            1: "坎", 2: "坤", 3: "震", 4: "巽",
+            6: "乾", 7: "兑", 8: "艮", 9: "离"
+        ]
+        guard let homePalace = palaceNameByStar[starInCentral] else {
+            return baseMountain.polarity > 0
+        }
+        let homeMountains = Mountain24Data.shared.mountains.filter { $0.palace == homePalace }
+        if let matched = homeMountains.first(where: { $0.yuan == baseMountain.yuan }) {
+            return matched.polarity > 0
+        }
+        return baseMountain.polarity > 0
+    }
+
     public func calculateChart(period: Int? = nil, sitting: Mountain24Item, facing: Mountain24Item, date: Date = Date()) -> XuanKongChart {
         let activePeriod = period ?? currentPeriod(for: date)
         let meta = periodMeta(period: activePeriod, for: date)
@@ -573,9 +593,9 @@ public final class FlyingStarsEngine {
         let sittingInCentral = basePeriod[sittingPalaceIdx]
         let facingInCentral = basePeriod[facingPalaceIdx]
         
-        // 3. 判断山星与向星顺飞/逆飞性 (根据坐向元龙阳顺阴逆)
-        let sittingIsForward = sitting.polarity > 0
-        let facingIsForward = facing.polarity > 0
+        // 3. 判断山星与向星顺飞/逆飞性 (严格遵循正统沈氏玄空元龙本宫阴阳顺逆法则)
+        let sittingIsForward = resolveFlightPolarity(starInCentral: sittingInCentral, baseMountain: sitting)
+        let facingIsForward = resolveFlightPolarity(starInCentral: facingInCentral, baseMountain: facing)
         
         var mountainStars = [Int](repeating: 0, count: 9)
         var facingStars = [Int](repeating: 0, count: 9)

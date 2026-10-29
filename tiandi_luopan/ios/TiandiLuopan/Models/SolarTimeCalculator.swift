@@ -63,7 +63,12 @@ public final class SolarTimeCalculator {
         // can move an instant across a solar-term boundary, so derive the
         // year/month pillar bucket from the corrected instant as well.
         let baziTermIndex = solarTermIndex(for: trueSolarDate)
-        let bazi = calculateBazi(for: trueSolarDate, termIndex: baziTermIndex, calendar: calendar)
+        let bazi = calculateBazi(
+            for: trueSolarDate,
+            termIndex: baziTermIndex,
+            calendar: calendar,
+            beforeLiChun: isBeforeLiChun(for: trueSolarDate)
+        )
 
         return SolarTimeResult(
             standardTimeString: formatter.string(from: date),
@@ -145,7 +150,12 @@ public final class SolarTimeCalculator {
         return result >= 0 ? result : result + modulus
     }
 
-    private func calculateBazi(for date: Date, termIndex: Int, calendar: Calendar) -> String {
+    private func calculateBazi(
+        for date: Date,
+        termIndex: Int,
+        calendar: Calendar,
+        beforeLiChun: Bool
+    ) -> String {
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
         // In the traditional convention the day changes at 子初 (23:00),
         // while the year/month still follow the solar-term bucket supplied by
@@ -158,7 +168,9 @@ public final class SolarTimeCalculator {
         // Li Chun is a civil-date boundary in addition to the solar-term
         // bucket.  In January the sun can still be in bucket 23 (冬至), which
         // is before Li Chun even though its index is greater than 2.
-        let beforeLiChun = self.isBeforeLiChun(for: date)
+        // The caller evaluates Li Chun using the same corrected apparent-solar
+        // instant used for the month bucket. This avoids assigning a different
+        // year during the few minutes around the boundary.
         let ganzhiYear = beforeLiChun ? civilYear - 1 : civilYear
         let yearCycle = positiveModulo(ganzhiYear - 4, 60)
         let yearStem = yearCycle % 10

@@ -262,6 +262,26 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.hapticLevel.impactOccurred()
         }
     }
+
+    /// Reset software heading filters before the user performs the iOS
+    /// figure-eight calibration movement. Core Location owns the hardware
+    /// calibration prompt; clearing the local history prevents pre-calibration
+    /// samples from being blended into the first corrected readings.
+    public func requestSensorCalibration() {
+        DispatchQueue.main.async {
+            self.manualOffset = 0.0
+            self.hasInitializedFilter = false
+            self.hasInitializedMagneticFilter = false
+            self.recentHeadingSamples.removeAll(keepingCapacity: true)
+            self.recentMagneticSamples.removeAll(keepingCapacity: true)
+            self.lastResolvedHeading = -999.0
+            self.updateHeadingOrientation()
+            if self.isRunning && self.headingUpdatesEnabled && CLLocationManager.headingAvailable() {
+                self.locationManager.startUpdatingHeading()
+            }
+            self.updateResolvedState(force: true)
+        }
+    }
     
     public func applyManualDragDelta(degrees: Double) {
         DispatchQueue.main.async {
@@ -567,6 +587,12 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 }
             }
         }
+    }
+
+    public func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        // Let iOS present its native figure-eight calibration prompt when the
+        // magnetometer reports that calibration is needed.
+        return true
     }
     
     public func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {

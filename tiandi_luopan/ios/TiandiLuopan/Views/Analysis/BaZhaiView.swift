@@ -78,6 +78,9 @@ public struct BaZhaiView: View {
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshAnalysis()
         }
+        .onChange(of: isActive) { active in
+            if active { refreshAnalysis() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
             refreshAnalysis()
         }

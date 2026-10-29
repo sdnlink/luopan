@@ -5,6 +5,7 @@ import Combine
 // MARK: - 三式绝学 · 时家奇门遁甲全息排盘与出行导航视图 (PRD 第11章)
 
 public struct QimenDunjiaView: View {
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
@@ -22,7 +23,9 @@ public struct QimenDunjiaView: View {
         in: .common
     ).autoconnect()
     
-    public init() {}
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     public var body: some View {
         // Motion publishes tilt and magnetic-field samples independently of
@@ -114,6 +117,9 @@ public struct QimenDunjiaView: View {
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshChart(force: true)
         }
+        .onChange(of: isActive) { active in
+            if active { refreshChart(force: true) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
             refreshChart(force: true)
         }
@@ -123,6 +129,7 @@ public struct QimenDunjiaView: View {
     }
 
     private func refreshChart(force: Bool = false) {
+        guard isActive else { return }
         let heading = motion.headingState.facingAngle
         let now = Date()
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour], from: now)

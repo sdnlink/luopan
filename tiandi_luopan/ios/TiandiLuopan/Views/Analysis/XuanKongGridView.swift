@@ -59,7 +59,7 @@ public struct XuanKongGridView: View {
                     PurpleWhiteView()
                 } else {
                     // 板块 4: 三式绝学时家奇门遁甲全息排盘
-                    QimenDunjiaView()
+                    QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
                 .padding(.top, 10)

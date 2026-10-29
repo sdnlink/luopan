@@ -59,6 +59,20 @@ public struct SettingsView: View {
                             productRow(id: .tianjiSingle, tag: lang.t("product_tianji_single_tag"))
                         }
                         .padding(.vertical, 4)
+
+                        if !iap.isLoadingProducts && !iap.hasAvailableProducts {
+                            HStack(spacing: 8) {
+                                Text(lang.t("price_unavailable"))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.orange.opacity(0.9))
+                                Spacer()
+                                Button(lang.t("reload_prices")) {
+                                    iap.refreshProductsIfNeeded(force: true)
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.yanCyan)
+                            }
+                        }
                         
                         // 购买与恢复按钮
                         if !isProUnlocked {

@@ -134,6 +134,7 @@ public struct FloorplanView: View {
         }
         .sheet(isPresented: $showImagePicker) {
             FloorplanImagePicker(selectedImage: $userFloorplanImage) {
+                let replacingExistingPlan = floorplanImageBeforePicker != nil
                 roomsBeforeDetection = nil
                 centroidBeforeDetection = nil
                 roomDetectionMessage = nil
@@ -148,7 +149,16 @@ public struct FloorplanView: View {
                     }
                     didConsumeFloorplanCredit = true
                 }
+                if replacingExistingPlan {
+                    // A new plan has a different coordinate system. Do not
+                    // silently carry the previous plan's room geometry into
+                    // it; start from editable sample frames instead.
+                    rooms = FloorplanEngine.shared.generateSampleRooms()
+                    centroid = CGPoint(x: 0.5, y: 0.5)
+                    isEditingRooms = true
+                }
                 floorplanImageBeforePicker = nil
+                refreshAudit(force: true)
             }
         }
         .sheet(isPresented: $showPaywall) {

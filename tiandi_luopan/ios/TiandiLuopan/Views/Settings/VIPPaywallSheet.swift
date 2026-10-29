@@ -182,7 +182,7 @@ public struct VIPPaywallSheet: View {
                         }
                         .padding(.horizontal, 16)
 
-                        if !iap.isLoadingProducts && !iap.hasAvailableProducts {
+                        if !iap.isLoadingProducts && !iap.hasProduct(for: selectedIAPProduct) {
                             HStack(spacing: 8) {
                                 Text(LocalizationManager.shared.t("price_unavailable"))
                                     .font(.system(size: 10))
@@ -226,7 +226,7 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(.black)
                                 .cornerRadius(10)
                             }
-                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts)
+                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !iap.hasProduct(for: selectedIAPProduct))
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -315,6 +315,10 @@ public struct VIPPaywallSheet: View {
             return LocalizationManager.shared.t("vip_badge_title")
         }
         return "\(id.title) (\(iap.localizedPrice(for: id)))"
+    }
+
+    private var selectedIAPProduct: IAPProductID {
+        IAPProductID(rawValue: selectedProductId) ?? .vipYearly
     }
     
     private func privilegeItem(icon: String, title: String, desc: String) -> some View {

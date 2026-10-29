@@ -88,6 +88,14 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     public var hasAvailableProducts: Bool {
         !availableProducts.isEmpty
     }
+
+    /// A storefront can return only a subset of the requested identifiers
+    /// (for example while a new product is still propagating). Expose the
+    /// per-product state so purchase buttons do not offer an item whose price
+    /// is still unavailable.
+    public func hasProduct(for productID: IAPProductID) -> Bool {
+        availableProducts[productID.rawValue] != nil
+    }
     
     private var productsRequest: SKProductsRequest?
     private var availableProducts: [String: SKProduct] = [:]

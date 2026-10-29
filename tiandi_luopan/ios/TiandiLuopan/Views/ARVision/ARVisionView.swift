@@ -357,6 +357,7 @@ public struct ARVisionView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @StateObject private var fusionModel = ARSpatialSurveyModel()
     
     public var isActive: Bool = true
     
@@ -443,17 +444,29 @@ public struct ARVisionView: View {
     public var body: some View {
         ZStack {
             if isActive {
-            // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
+            // 1. 真机摄像头实时预览 / ARKit+LiDAR融合流 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             if hasCameraPermission && isActive && !showSpatialSurvey {
-                CameraPreviewView(
-                    cameraPosition: cameraPosition,
-                    isActive: isActive && !showSpatialSurvey,
-                    captureTrigger: captureTrigger,
-                    onPhotoCaptured: { image in
-                        handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
-                    }
-                )
-                .ignoresSafeArea()
+                if cameraPosition == .back && ARWorldTrackingConfiguration.isSupported {
+                    ARFusionCaptureView(
+                        model: fusionModel,
+                        isActive: isActive && !showSpatialSurvey,
+                        captureTrigger: captureTrigger,
+                        onFrameCaptured: { frame in
+                            handleCapturedFrame(frame)
+                        }
+                    )
+                    .ignoresSafeArea()
+                } else {
+                    CameraPreviewView(
+                        cameraPosition: cameraPosition,
+                        isActive: isActive && !showSpatialSurvey,
+                        captureTrigger: captureTrigger,
+                        onPhotoCaptured: { image in
+                            handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
+                        }
+                    )
+                    .ignoresSafeArea()
+                }
             } else {
                 simulationCanvasLayer()
                     .ignoresSafeArea()
@@ -521,6 +534,7 @@ public struct ARVisionView: View {
                 startScanAnimation()
             } else {
                 stopScanAnimation()
+                fusionModel.pause()
                 showSpatialSurvey = false
                 pendingCapturePurpose = nil
                 isAIScanning = false
@@ -559,6 +573,7 @@ public struct ARVisionView: View {
             ARSpatialSurveyView()
         }
         .onDisappear {
+            fusionModel.pause()
             showSpatialSurvey = false
             snapshotGeneration += 1
             pendingCapturePurpose = nil
@@ -687,6 +702,17 @@ public struct ARVisionView: View {
                 .minimumScaleFactor(0.7)
                 .fixedSize(horizontal: true, vertical: false)
                 .offset(y: -50)
+
+            if cameraPosition == .back, let dist = fusionModel.distance {
+                Text("\(fusionModel.lidarAvailable ? "LiDAR" : "AR") · \(String(format: "%.2f m", dist))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(fusionModel.lidarAvailable ? .green : .yanCyan)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.black.opacity(0.6))
+                    .cornerRadius(6)
+                    .offset(y: 52)
+            }
         }
         .allowsHitTesting(false)
     }

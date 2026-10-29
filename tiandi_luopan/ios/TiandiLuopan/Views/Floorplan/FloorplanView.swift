@@ -5,6 +5,10 @@ import ImageIO
 
 // MARK: - 户型空间立极与全屋风水体检视图 (Floorplan View - PRD 5.3)
 
+extension Notification.Name {
+    public static let didImportRoomPlanFloorplan = Notification.Name("com.yanxiang.compass.didImportRoomPlanFloorplan")
+}
+
 private struct SavedFloorplanLayout: Codable {
     let rooms: [FloorplanRoom]
     let centroidX: Double
@@ -239,6 +243,38 @@ public struct FloorplanView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             persistLayout()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didImportRoomPlanFloorplan)) { _ in
+            didRestorePersistedLayout = false
+            persistedImageObjectID = nil
+            restorePersistedLayoutIfNeeded()
+            refreshAudit(force: true)
+        }
+    }
+
+    public static func persistRoomPlanImport(
+        rooms: [FloorplanRoom],
+        centroid: CGPoint,
+        blueprintImage: UIImage?
+    ) {
+        let sanitizedRooms = rooms.map { sanitizedRoom($0) }
+        let saved = SavedFloorplanLayout(
+            rooms: sanitizedRooms,
+            centroidX: Double(clampedUnit(Double(centroid.x), fallback: 0.5)),
+            centroidY: Double(clampedUnit(Double(centroid.y), fallback: 0.5)),
+            compassRotation: CompassMotionManager.shared.headingState.facingAngle,
+            isSyncWithCompass: true,
+            hasFloorplanAccess: true
+        )
+        if let data = try? JSONEncoder().encode(saved) {
+            UserDefaults.standard.set(data, forKey: savedLayoutKey)
+        }
+        if let imageURL = savedImageURL() {
+            if let image = blueprintImage,
+               let imageData = image.jpegData(compressionQuality: 0.85) ?? image.pngData() {
+                try? imageData.write(to: imageURL, options: .atomic)
+            }
+        }
+        NotificationCenter.default.post(name: .didImportRoomPlanFloorplan, object: nil)
     }
 
     /// Restore the last editable plan once per view lifetime. Room geometry is

@@ -413,6 +413,18 @@ public struct ARVisionView: View {
     private var targetMountain: Mountain24 {
         return Mountain24Data.shared.mountain(for: targetCalculatedHeading)
     }
+
+    private var targetSanHeWater: SanHeWaterItem? {
+        let sitting = motion.headingState.sittingMountain
+        let mTarget = targetMountain
+        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting)
+        return waterItems.first(where: { $0.mountainName == mTarget.name })
+    }
+
+    private var isTargetHitBaSha: Bool {
+        let baSha = SanHeWaterEngine.shared.resolveBaSha(sitting: motion.headingState.sittingMountain)
+        return targetMountain.name == baSha.shaZhi
+    }
     
     // 八宫方位与主应形煞对应模型 (随镜头旋转自动联动推演)
     private func resolvedShaIndex(for heading: Double) -> Int {
@@ -496,8 +508,9 @@ public struct ARVisionView: View {
             targetBoundingBoxLayer()
             
             // 5. 顶栏悬浮与拍照存证控制栏
-            VStack {
+            VStack(spacing: 6) {
                 topStatusBar()
+                horizonCompassRibbon()
                 
                 Spacer()
                 
@@ -780,10 +793,13 @@ public struct ARVisionView: View {
             )
             let targetDist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: normPoint) : nil
 
+            let waterItem = targetSanHeWater
+            let hitBaSha = isTargetHitBaSha
+
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.yellow, lineWidth: 2)
-                    .frame(width: 184, height: 122)
+                    .stroke((hitBaSha || waterItem?.isHuangQuanSha == true) ? Color.red : Color.yellow, lineWidth: 2)
+                    .frame(width: 192, height: 132)
                     .background(Color.yellow.opacity(0.12))
 
                 VStack(spacing: 2) {
@@ -803,6 +819,15 @@ public struct ARVisionView: View {
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
+                    if let water = waterItem {
+                        let statusTag = hitBaSha
+                            ? "⚠️ 犯坐山八煞"
+                            : (water.isHuangQuanSha ? "⚠️ 犯八路黄泉" : "水法: \(water.stage)")
+                        Text(statusTag)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor((hitBaSha || water.isHuangQuanSha) ? .red : (water.isAuspicious ? .green : .yanCyan))
+                            .lineLimit(1)
+                    }
                     if let d = targetDist {
                         Text("\(fusionModel.lidarAvailable ? "LiDAR" : "AR") \(String(format: "%.2f m", d))")
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
@@ -963,6 +988,51 @@ public struct ARVisionView: View {
         .padding(8)
         .background(Color.black.opacity(0.65))
         .cornerRadius(10)
+    }
+
+    // MARK: - 全景天际二十四山与杨公十二长生消砂纳水标尺 (PRD 5.2 & 13)
+    private func horizonCompassRibbon() -> some View {
+        let baseHeading = motion.headingState.facingAngle
+        let sitting = motion.headingState.sittingMountain
+        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting)
+        let baShaZhi = SanHeWaterEngine.shared.resolveBaSha(sitting: sitting).shaZhi
+        let offsets: [Double] = [-30.0, -15.0, 0.0, 15.0, 30.0]
+
+        return HStack(spacing: 6) {
+            ForEach(offsets, id: \.self) { delta in
+                let angle = ((baseHeading + delta).truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+                let m = Mountain24Data.shared.mountain(for: angle)
+                let water = waterItems.first(where: { $0.mountainName == m.name })
+                let isCenter = abs(delta) < 0.1
+                let isBaSha = (m.name == baShaZhi)
+                let isHQ = (water?.isHuangQuanSha == true)
+
+                VStack(spacing: 1) {
+                    Text("\(m.localizedName)\(isCenter ? "▲" : "")")
+                        .font(.system(size: isCenter ? 11 : 10, weight: .bold))
+                        .foregroundColor(isCenter ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
+                    if let water = water {
+                        Text((isBaSha || isHQ) ? "煞·\(water.stage)" : water.stage)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor((isBaSha || isHQ) ? .red : (water.isAuspicious ? .green : .white.opacity(0.72)))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .background(isCenter ? Color.yanCyan.opacity(0.22) : Color.white.opacity(0.06))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isCenter ? Color.yanCyan.opacity(0.75) : Color.clear, lineWidth: 1)
+                )
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.58))
+        .cornerRadius(9)
+        .allowsHitTesting(false)
     }
     
     // MARK: - 底部形煞研判卡 (支持朝向智能跟随与手动点选)

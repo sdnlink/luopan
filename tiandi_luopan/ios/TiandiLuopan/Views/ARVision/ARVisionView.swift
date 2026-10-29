@@ -349,7 +349,7 @@ public struct CameraPreviewView: UIViewRepresentable {
 
 public struct ARVisionView: View {
     private enum CapturePurpose {
-        case aiScan
+        case aiScan(Int)
         case snapshot
     }
 
@@ -376,6 +376,7 @@ public struct ARVisionView: View {
     @State private var pendingCapturePurpose: CapturePurpose?
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
+    @State private var aiScanGeneration: Int = 0
     @State private var photoPermissionDenied: Bool = false
     @State private var showSpatialSurvey: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
@@ -446,9 +447,9 @@ public struct ARVisionView: View {
                     captureTrigger: captureTrigger,
                     onPhotoCaptured: { image in
                         switch pendingCapturePurpose {
-                        case .aiScan:
+                        case .aiScan(let generation):
                             pendingCapturePurpose = nil
-                            analyzeFrame(image)
+                            analyzeFrame(image, generation: generation)
                         case .snapshot:
                             pendingCapturePurpose = nil
                             guard let image = image else {
@@ -535,6 +536,7 @@ public struct ARVisionView: View {
                 showSpatialSurvey = false
                 pendingCapturePurpose = nil
                 isAIScanning = false
+                aiScanGeneration &+= 1
                 aiResult = nil
                 targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                 targetOffset = .zero
@@ -559,6 +561,7 @@ public struct ARVisionView: View {
             snapshotGeneration += 1
             pendingCapturePurpose = nil
             isAIScanning = false
+            aiScanGeneration &+= 1
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetOffset = .zero
@@ -987,17 +990,23 @@ public struct ARVisionView: View {
         photoPermissionDenied = false
         aiResult = nil
         isAIScanning = true
-        pendingCapturePurpose = .aiScan
+        aiScanGeneration &+= 1
+        pendingCapturePurpose = .aiScan(aiScanGeneration)
         captureTrigger += 1
     }
 
-    private func analyzeFrame(_ image: UIImage?) {
+    private func analyzeFrame(_ image: UIImage?, generation: Int) {
+        guard isActive, generation == aiScanGeneration else { return }
         guard let image = image else {
             isAIScanning = false
             aiError = lang.t("ar_ai_no_frame")
             return
         }
         OnDeviceShaAnalyzer.shared.analyze(image: image) { result in
+            // The generation is invalidated whenever the page is hidden or a
+            // newer scan starts. Do not rely on the captured View value for
+            // isActive because that value is a struct snapshot.
+            guard self.aiScanGeneration == generation else { return }
             isAIScanning = false
             switch result {
             case .success(let analysis):

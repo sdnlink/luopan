@@ -56,7 +56,7 @@ public struct XuanKongGridView: View {
                     BaZhaiView(isEmbedded: true, isActive: isActive && selectedSubTab == 1)
                 } else if selectedSubTab == 2 {
                     // 板块 3: 紫白飞星流年流月客星与太岁三煞
-                    PurpleWhiteView()
+                    PurpleWhiteView(isActive: isActive && selectedSubTab == 2)
                 } else {
                     // 板块 4: 三式绝学时家奇门遁甲全息排盘
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)

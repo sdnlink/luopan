@@ -4,6 +4,10 @@ import UIKit
 // MARK: - 紫白飞星流年流月客星动态气运与太岁三煞视图 (PRD 第12章)
 
 public struct PurpleWhiteView: View {
+    /// Whether the purple-white chart is currently visible.  The parent
+    /// analysis page keeps its subviews alive while switching tabs, so this
+    /// flag prevents hidden charts from reacting to every compass sample.
+    public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -12,15 +16,47 @@ public struct PurpleWhiteView: View {
     @State private var lastFacingSector: Int?
     @State private var lastCalendarDayKey: Int?
     
-    public init() {}
+    public init(isActive: Bool = true) {
+        self.isActive = isActive
+    }
     
     public var body: some View {
-        // Keep the expensive calendar and annual/monthly star calculation out
-        // of unrelated pitch, roll and magnetic-field redraws.
-        let chart = cachedChart ?? PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
-        
+        Group {
+            if isActive {
+                // Keep the expensive calendar and annual/monthly star
+                // calculation out of hidden sub-tab redraws.
+                let chart = cachedChart ?? PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+                chartContent(chart: chart)
+            } else {
+                Color.clear
+            }
+        }
+        .onAppear {
+            refreshChart(force: true)
+        }
+        .onChange(of: motion.headingState.facingAngle) { _ in
+            refreshChart()
+        }
+        .onChange(of: isActive) { active in
+            if active {
+                refreshChart(force: true)
+            }
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshChart(force: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            refreshChart(force: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshChart(force: true)
+        }
+    }
+
+    @ViewBuilder
+    private func chartContent(chart: PurpleWhiteChart) -> some View {
         let lang = LocalizationManager.shared
-        return VStack(spacing: 12) {
+        VStack(spacing: 12) {
             // 标题与太岁/三煞摘要栏
             HStack {
                 HStack(spacing: 6) {
@@ -70,24 +106,10 @@ public struct PurpleWhiteView: View {
                 .padding(.horizontal, 16)
             }
         }
-        .onAppear {
-            refreshChart(force: true)
-        }
-        .onChange(of: motion.headingState.facingAngle) { _ in
-            refreshChart()
-        }
-        .onChange(of: lang.effectiveLanguage) { _ in
-            refreshChart(force: true)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            refreshChart(force: true)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-            refreshChart(force: true)
-        }
     }
 
     private func refreshChart(force: Bool = false) {
+        guard isActive else { return }
         let sector = facingSector(for: motion.headingState.facingAngle)
         let components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
         let calendarDayKey = (components.year ?? 0) * 10_000

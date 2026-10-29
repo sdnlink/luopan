@@ -80,6 +80,14 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     public var canUseTianji: Bool {
         return hasUnlockedVIP || tianjiCreditsCount > 0
     }
+
+    /// Whether StoreKit has returned at least one valid product. Product
+    /// metadata requests can fail independently from payment transactions;
+    /// exposing this state lets paywalls offer an explicit retry instead of
+    /// leaving every price at the loading placeholder.
+    public var hasAvailableProducts: Bool {
+        !availableProducts.isEmpty
+    }
     
     private var productsRequest: SKProductsRequest?
     private var availableProducts: [String: SKProduct] = [:]

@@ -181,6 +181,21 @@ public struct VIPPaywallSheet: View {
                             )
                         }
                         .padding(.horizontal, 16)
+
+                        if !iap.isLoadingProducts && !iap.hasAvailableProducts {
+                            HStack(spacing: 8) {
+                                Text(LocalizationManager.shared.t("price_unavailable"))
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.orange.opacity(0.9))
+                                Spacer()
+                                Button(LocalizationManager.shared.t("reload_prices")) {
+                                    iap.refreshProductsIfNeeded(force: true)
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.yanCyan)
+                            }
+                            .padding(.horizontal, 16)
+                        }
                         
                         // 4. 购买与恢复操作按键
                         VStack(spacing: 10) {

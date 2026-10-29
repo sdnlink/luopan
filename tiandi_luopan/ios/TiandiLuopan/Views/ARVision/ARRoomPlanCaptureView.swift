@@ -29,6 +29,27 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
     private weak var captureView: RoomCaptureView?
 
+    /// Reports are user-created exports. Keep them in the app's support
+    /// directory instead of `temporaryDirectory`, which iOS may purge while
+    /// the share sheet is still open or as soon as the app is suspended.
+    private static func reportDirectory() throws -> URL {
+        guard let applicationSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw ARRoomPlanExportError.storageUnavailable
+        }
+        let directory = applicationSupport
+            .appendingPathComponent("TianJiYanXiang", isDirectory: true)
+            .appendingPathComponent("ARExports", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        return directory
+    }
+
     public func attach(to view: RoomCaptureView) {
         captureView = view
         view.captureSession.delegate = self
@@ -61,8 +82,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         ]
         do {
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("TianJiYanXiang-RoomPlan-\(Int(Date().timeIntervalSince1970)).json")
+            let url = try Self.reportDirectory()
+                .appendingPathComponent("TianJiYanXiang-RoomPlan-\(UUID().uuidString).json")
             try data.write(to: url, options: .atomic)
             return .success(url)
         } catch {
@@ -99,6 +120,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 @available(iOS 16.0, *)
 private enum ARRoomPlanExportError: Error {
     case captureNotFinished
+    case storageUnavailable
 }
 
 @available(iOS 16.0, *)

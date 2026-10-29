@@ -13,6 +13,7 @@ public struct PurpleWhiteView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     @State private var cachedChart: PurpleWhiteChart?
+    @State private var selectedPalaceId: Int? = nil
     @State private var lastFacingSector: Int?
     @State private var lastCalendarDayKey: Int?
     
@@ -102,10 +103,23 @@ public struct PurpleWhiteView: View {
                 // 3x3 九宫飞星网格 (流年客星与二五交加报警)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(chart.palaceItems) { item in
-                        palaceCellView(item: item, isFacing: item.palaceId == chart.currentFacingPalace)
+                        let activeId = selectedPalaceId ?? chart.currentFacingPalace
+                        palaceCellView(
+                            item: item,
+                            isFacing: item.palaceId == chart.currentFacingPalace,
+                            isSelected: item.palaceId == activeId
+                        )
+                        .onTapGesture {
+                            selectedPalaceId = item.palaceId
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
+                
+                if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
+                    palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
+                        .padding(.horizontal, 16)
+                }
             }
         }
     }
@@ -157,13 +171,44 @@ public struct PurpleWhiteView: View {
         .cornerRadius(6)
     }
     
-    private func palaceCellView(item: PurpleWhitePalaceItem, isFacing: Bool) -> some View {
+    private func palaceDetailCard(item: PurpleWhitePalaceItem, isFacing: Bool) -> some View {
+        let isDanger = item.isDanger25 || item.yearGuestStar == 5 || item.monthGuestStar == 5
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: isDanger ? "exclamationmark.triangle.fill" : "sparkles")
+                    .foregroundColor(isDanger ? .red : Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(item.palaceName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                Text("· \(item.starName)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isDanger ? .red : Color.yanCyan)
+                Spacer()
+                Text("\(item.yearGuestStar) / \(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+            }
+            Text(item.advice)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(3)
+        }
+        .padding(12)
+        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isDanger ? Color.red.opacity(0.5) : (isFacing ? Color.yanCyan.opacity(0.5) : Color.white.opacity(0.1)), lineWidth: 1)
+        )
+    }
+    
+    private func palaceCellView(item: PurpleWhitePalaceItem, isFacing: Bool, isSelected: Bool = false) -> some View {
         // Both annual and monthly Five Yellow can affect the current palace;
         // the chart's advice uses the same rule so the visual warning cannot
         // disagree with the detail text.
         let isDanger = item.isDanger25 || item.yearGuestStar == 5 || item.monthGuestStar == 5
         let isJi = [1, 4, 6, 8, 9].contains(item.yearGuestStar)
-        let strokeColor = isFacing ? Color.yanCyan : (isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12)))
+        let strokeColor = isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : (isFacing ? Color.yanCyan : (isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12))))
         let bgColor = isDanger ? Color.red.opacity(0.12) : (isJi ? Color.green.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         
         return VStack(spacing: 2) {

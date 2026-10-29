@@ -11,6 +11,7 @@ public struct QimenDunjiaView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
     @State private var cachedChart: QimenChart?
+    @State private var selectedPalaceId: Int? = nil
     @State private var lastChartHeading: Double?
     @State private var lastChartTimeKey: Int?
 
@@ -70,10 +71,38 @@ public struct QimenDunjiaView: View {
                 // 3x3 奇门九宫方阵 (天地人神四盘)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
                     ForEach(chart.cells) { cell in
-                        qimenCellView(cell: cell)
+                        let defaultId = chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6
+                        let activeId = selectedPalaceId ?? defaultId
+                        qimenCellView(cell: cell, isSelected: cell.palaceId == activeId)
+                            .onTapGesture {
+                                selectedPalaceId = cell.palaceId
+                            }
                     }
                 }
                 .padding(.horizontal, 16)
+                
+                if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
+                    let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
+                    HStack(spacing: 8) {
+                        Text("【\(activeCell.localizedPalaceName)】")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color.yanCyan)
+                        Text("\(activeCell.localizedDoorName) [\(doorObj.localizedLuckType)] · \(activeCell.localizedGodName) · \(activeCell.localizedStarName)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(activeCell.isDoorAuspicious ? .green : (activeCell.isDoorInauspicious ? .red : Color(red: 0.95, green: 0.85, blue: 0.45)))
+                        Spacer()
+                        Text(doorObj.localizedLore)
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 10)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 16)
+                }
                 
                 // 出行动身方位导航卡
                 VStack(alignment: .leading, spacing: 4) {
@@ -159,10 +188,10 @@ public struct QimenDunjiaView: View {
         cachedChart = QimenEngine.shared.calculateChart(heading: heading)
     }
     
-    private func qimenCellView(cell: QimenPalaceCell) -> some View {
+    private func qimenCellView(cell: QimenPalaceCell, isSelected: Bool = false) -> some View {
         let isJi = cell.isDoorAuspicious
         let isXiong = cell.isDoorInauspicious
-        let borderColor = isJi ? Color.green.opacity(0.5) : (isXiong ? Color.red.opacity(0.4) : Color.white.opacity(0.12))
+        let borderColor = isSelected ? Color.yanCyan : (isJi ? Color.green.opacity(0.5) : (isXiong ? Color.red.opacity(0.4) : Color.white.opacity(0.12)))
         let bgColor = isJi ? Color.green.opacity(0.08) : (isXiong ? Color.red.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         
         return VStack(spacing: 3) {

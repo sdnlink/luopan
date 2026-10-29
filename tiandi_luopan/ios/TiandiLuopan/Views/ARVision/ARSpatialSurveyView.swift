@@ -175,10 +175,18 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
 
         let currentSceneView = sceneView
-        DispatchQueue.main.async { [weak self, weak currentSceneView] in
+        let update: () -> Void = { [weak self, weak currentSceneView] in
             guard let self = self, let sceneView = currentSceneView else { return }
             self.trackingState = state
             self.updateMeasurements(frame: frame, sceneView: sceneView)
+        }
+        if Thread.isMainThread {
+            // ARSession uses the main queue by default. Processing the sample
+            // inline avoids retaining several ARFrame objects when SwiftUI is
+            // busy laying out the overlay.
+            update()
+        } else {
+            DispatchQueue.main.async(execute: update)
         }
     }
 

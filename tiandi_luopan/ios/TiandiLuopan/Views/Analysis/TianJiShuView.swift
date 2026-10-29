@@ -185,6 +185,14 @@ public struct TianJiShuView: View {
                 // language change so the page never mixes two locales.
                 beginRendering()
             }
+            .onChange(of: motion.headingState.facingMountain.id) { _ in
+                // A long scroll captures the measured sitting/facing
+                // direction. Refresh when the device crosses a 24-mountain
+                // boundary so an export cannot silently contain a previous
+                // orientation while the report sheet remains open.
+                guard !isExporting else { return }
+                beginRendering()
+            }
             .onDisappear {
                 // SwiftUI may dismiss the page while the worker is still
                 // rendering. Invalidate its completion and release any

@@ -49,6 +49,10 @@ public struct FloorplanView: View {
     @State private var lastAuditedHeading: Double?
     @State private var lastAuditedCentroid: CGPoint?
     @State private var didRestorePersistedLayout = false
+    // Room/center edits call persistLayout frequently. Keep the image
+    // identity so a large JPEG is encoded only when the imported image
+    // itself changes, rather than after every drag gesture.
+    @State private var persistedImageObjectID: ObjectIdentifier?
 
     private static let savedLayoutKey = "tiandi_floorplan_saved_layout_v1"
     private static let savedImageFileName = "floorplan-background.jpg"
@@ -265,12 +269,16 @@ public struct FloorplanView: View {
         }
 
         guard let imageURL = Self.savedImageURL() else { return }
+        let imageObjectID = userFloorplanImage.map { ObjectIdentifier($0) }
+        guard imageObjectID != persistedImageObjectID else { return }
         do {
             if let image = userFloorplanImage,
                let imageData = image.jpegData(compressionQuality: 0.82) ?? image.pngData() {
                 try imageData.write(to: imageURL, options: .atomic)
+                persistedImageObjectID = imageObjectID
             } else if FileManager.default.fileExists(atPath: imageURL.path) {
                 try FileManager.default.removeItem(at: imageURL)
+                persistedImageObjectID = nil
             }
         } catch {
             // A layout can still be restored without its optional background.

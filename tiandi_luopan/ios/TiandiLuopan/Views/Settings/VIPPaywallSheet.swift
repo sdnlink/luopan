@@ -246,6 +246,7 @@ public struct VIPPaywallSheet: View {
             })
         }
         .onAppear {
+            iap.clearTransientMessages()
             iap.refreshProductsIfNeeded()
         }
         .onReceive(iap.$isVIPUser) { isVip in

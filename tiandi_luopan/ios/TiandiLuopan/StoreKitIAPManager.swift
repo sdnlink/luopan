@@ -226,6 +226,20 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         isProcessingPurchase = true
         SKPaymentQueue.default().restoreCompletedTransactions()
     }
+
+    /// Clear one-shot UI feedback when a payment screen is presented again.
+    /// Entitlements and processed transaction IDs are persisted separately and
+    /// are intentionally left untouched.
+    public func clearTransientMessages() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.clearTransientMessages()
+            }
+            return
+        }
+        lastErrorMessage = nil
+        lastStatusMessage = nil
+    }
     
     // MARK: - SKPaymentTransactionObserver
     

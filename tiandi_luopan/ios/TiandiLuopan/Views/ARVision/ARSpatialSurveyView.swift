@@ -24,6 +24,7 @@ public enum ARSpatialSurveyError: Error, Equatable {
     case sessionUnavailable
     case mapUnavailable
     case archiveFailed
+    case storageUnavailable
 }
 
 /// Owns one AR session and throttles expensive mesh and raycast work.  The
@@ -48,6 +49,28 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var lastPlaneGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
     private var distanceSamples: [Float] = []
+
+    /// World maps can be large and are user-created survey data. Store them
+    /// in a durable app support directory so a background/suspension cycle or
+    /// a later share action does not lose a file written to the temporary
+    /// directory.
+    private static func worldMapDirectory() throws -> URL {
+        guard let applicationSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw ARSpatialSurveyError.storageUnavailable
+        }
+        let directory = applicationSupport
+            .appendingPathComponent("TianJiYanXiang", isDirectory: true)
+            .appendingPathComponent("ARExports", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        return directory
+    }
 
     public func attach(to sceneView: ARSCNView) {
         self.sceneView = sceneView
@@ -128,8 +151,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                         withRootObject: worldMap,
                         requiringSecureCoding: false
                     )
-                    let name = "TianJiYanXiang-\(Int(Date().timeIntervalSince1970)).arworldmap"
-                    let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+                    let name = "TianJiYanXiang-\(UUID().uuidString).arworldmap"
+                    let url = try Self.worldMapDirectory().appendingPathComponent(name)
                     try data.write(to: url, options: .atomic)
                     completion(.success(url))
                 } catch {

@@ -349,7 +349,7 @@ public struct CameraPreviewView: UIViewRepresentable {
 
 public struct ARVisionView: View {
     private enum CapturePurpose {
-        case aiScan(Int)
+        case aiScan(Int, Int)
         case snapshot
     }
 
@@ -377,6 +377,7 @@ public struct ARVisionView: View {
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var aiScanGeneration: Int = 0
+    @State private var aiScanFrames: [UIImage] = []
     @State private var photoPermissionDenied: Bool = false
     @State private var showSpatialSurvey: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
@@ -447,9 +448,9 @@ public struct ARVisionView: View {
                     captureTrigger: captureTrigger,
                     onPhotoCaptured: { image in
                         switch pendingCapturePurpose {
-                        case .aiScan(let generation):
+                        case .aiScan(let generation, let frameIndex):
                             pendingCapturePurpose = nil
-                            analyzeFrame(image, generation: generation)
+                            collectAIScanFrame(image, generation: generation, frameIndex: frameIndex)
                         case .snapshot:
                             pendingCapturePurpose = nil
                             guard let image = image else {
@@ -537,6 +538,7 @@ public struct ARVisionView: View {
                 pendingCapturePurpose = nil
                 isAIScanning = false
                 aiScanGeneration &+= 1
+                aiScanFrames.removeAll(keepingCapacity: true)
                 aiResult = nil
                 targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                 targetOffset = .zero
@@ -562,6 +564,7 @@ public struct ARVisionView: View {
             pendingCapturePurpose = nil
             isAIScanning = false
             aiScanGeneration &+= 1
+            aiScanFrames.removeAll(keepingCapacity: true)
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetOffset = .zero
@@ -807,7 +810,7 @@ public struct ARVisionView: View {
                 .foregroundColor(.white)
                 .cornerRadius(14)
             }
-            .disabled(pendingCapturePurpose != nil)
+            .disabled(isAIScanning || pendingCapturePurpose != nil)
             
             // 翻转镜头按钮
             Button(action: {
@@ -825,6 +828,7 @@ public struct ARVisionView: View {
                     .foregroundColor(.white)
                     .clipShape(Circle())
             }
+            .disabled(isAIScanning || pendingCapturePurpose != nil)
             
             // 勘测存证快照拍照按钮
             Button(action: {
@@ -854,7 +858,7 @@ public struct ARVisionView: View {
                 .foregroundColor(.black)
                 .cornerRadius(14)
             }
-            .disabled(pendingCapturePurpose != nil)
+            .disabled(isAIScanning || pendingCapturePurpose != nil)
             
             // 大师化解锦囊
             Button(action: {
@@ -917,6 +921,14 @@ public struct ARVisionView: View {
                         Button(action: {
                             isAutoFollowingDirection = false
                             selectedShaIndex = idx
+                            // Manual selection supersedes any prior AI
+                            // candidate. Keeping the old candidate label here
+                            // would associate the user's choice with a stale
+                            // frame and could mislead the scene assessment.
+                            aiResult = nil
+                            aiError = nil
+                            targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+                            targetOffset = .zero
                         }) {
                             Text(item.localizedName)
                                 .font(.system(size: 11, weight: isSelected ? .bold : .medium))
@@ -967,7 +979,7 @@ public struct ARVisionView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text("【\(sha.localizedName)】\(lang.t("ar_sha_analysis_prefix")):")
+                    Text("【\(sha.localizedName)】\(aiResult == nil ? lang.t("ar_manual_analysis") : lang.t("ar_ai_candidate")):")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
@@ -994,56 +1006,145 @@ public struct ARVisionView: View {
         aiError = nil
         photoPermissionDenied = false
         aiResult = nil
+        // Clear the previous candidate while the new frame is being checked;
+        // a stale marker can otherwise look like a fresh detection.
+        targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+        targetOffset = .zero
+        aiScanFrames.removeAll(keepingCapacity: true)
         isAIScanning = true
         aiScanGeneration &+= 1
-        pendingCapturePurpose = .aiScan(aiScanGeneration)
+        pendingCapturePurpose = .aiScan(aiScanGeneration, 0)
         captureTrigger += 1
     }
 
-    private func analyzeFrame(_ image: UIImage?, generation: Int) {
+    private func collectAIScanFrame(_ image: UIImage?, generation: Int, frameIndex: Int) {
         guard isActive, generation == aiScanGeneration else { return }
         guard let image = image else {
+            isAIScanning = false
+            aiScanFrames.removeAll(keepingCapacity: true)
+            aiError = lang.t("ar_ai_no_frame")
+            return
+        }
+        aiScanFrames.append(image)
+        let requiredFrames = 3
+        if frameIndex + 1 < requiredFrames {
+            // Give AVCapturePhotoOutput one run-loop turn between exposures so
+            // the sensor can settle. Each frame must independently support the
+            // same geometry before the UI receives an AI candidate.
+            DispatchQueue.main.async {
+                guard self.isActive, generation == self.aiScanGeneration else { return }
+                self.pendingCapturePurpose = .aiScan(generation, frameIndex + 1)
+                self.captureTrigger += 1
+            }
+            return
+        }
+        let frames = aiScanFrames
+        aiScanFrames.removeAll(keepingCapacity: true)
+        pendingCapturePurpose = nil
+        analyzeFrames(frames, generation: generation)
+    }
+
+    private func analyzeFrames(_ images: [UIImage], generation: Int) {
+        guard !images.isEmpty else {
             isAIScanning = false
             aiError = lang.t("ar_ai_no_frame")
             return
         }
-        OnDeviceShaAnalyzer.shared.analyze(image: image) { result in
-            // The generation is invalidated whenever the page is hidden or a
-            // newer scan starts. Do not rely on the captured View value for
-            // isActive because that value is a struct snapshot.
-            guard self.aiScanGeneration == generation else { return }
-            isAIScanning = false
+        // Vision work is intentionally serialized. Running three full image
+        // requests at once creates a short CPU/memory spike on older phones
+        // and can make the preview stutter or heat up.
+        analyzeNextFrame(
+            images,
+            index: 0,
+            generation: generation,
+            results: [],
+            failures: 0
+        )
+    }
+
+    private func analyzeNextFrame(
+        _ images: [UIImage],
+        index: Int,
+        generation: Int,
+        results: [ShaAnalysisResult],
+        failures: Int
+    ) {
+        guard isActive, generation == aiScanGeneration, index < images.count else { return }
+        OnDeviceShaAnalyzer.shared.analyze(image: images[index]) { result in
+            guard self.isActive, generation == self.aiScanGeneration else { return }
+            var nextResults = results
+            var nextFailures = failures
             switch result {
             case .success(let analysis):
-                aiResult = analysis
-                if let index = shaList.firstIndex(where: { $0.id == analysis.shaID }) {
-                    selectedShaIndex = index
-                    isAutoFollowingDirection = false
-                    // Keep Vision's normalized location separate from the
-                    // manual drag offset. The overlay maps it to its actual
-                    // container size, so the marker stays anchored on every
-                    // iPhone/iPad aspect ratio.
-                    targetNormalizedPoint = CGPoint(
-                        x: min(max(analysis.targetX, 0.0), 1.0),
-                        y: min(max(analysis.targetY, 0.0), 1.0)
-                    )
-                    targetOffset = .zero
-                }
-            case .failure(let error):
-                if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,
-                   case .noDetectableRegion = analysisError {
-                    aiError = lang.t("ar_ai_no_region")
-                } else if let analysisError = error as? OnDeviceShaAnalyzer.AnalysisError,
-                          case .ambiguousRegion = analysisError {
-                    // A rectangle detector cannot distinguish many ordinary
-                    // objects from a classical Sha. Keep the current manual
-                    // selection and explicitly ask for human confirmation
-                    // instead of changing the diagnosis on weak evidence.
-                    aiError = lang.t("ar_ai_ambiguous")
-                } else {
-                    aiError = lang.t("ar_ai_failed")
-                }
+                nextResults.append(analysis)
+            case .failure:
+                nextFailures += 1
             }
+            let nextIndex = index + 1
+            if nextIndex < images.count {
+                self.analyzeNextFrame(
+                    images,
+                    index: nextIndex,
+                    generation: generation,
+                    results: nextResults,
+                    failures: nextFailures
+                )
+            } else {
+                self.finishAIScan(
+                    results: nextResults,
+                    failures: nextFailures,
+                    generation: generation
+                )
+            }
+        }
+    }
+
+    private func finishAIScan(results: [ShaAnalysisResult], failures: Int, generation: Int) {
+        guard generation == aiScanGeneration else { return }
+        isAIScanning = false
+        // Require every captured frame to produce the same candidate. A single
+        // inconsistent frame is treated as environmental motion/occlusion,
+        // never as confirmation.
+        guard failures == 0, results.count == 3,
+              let first = results.first,
+              results.dropFirst().allSatisfy({ candidate in
+                  candidate.shaID == first.shaID &&
+                  hypot(candidate.targetX - first.targetX, candidate.targetY - first.targetY) <= 0.08 &&
+                  abs(candidate.confidence - first.confidence) <= 0.12
+              }) else {
+            aiResult = nil
+            targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetOffset = .zero
+            aiError = lang.t("ar_ai_temporal_ambiguous")
+            return
+        }
+        let confidence = results.map { $0.confidence }.reduce(0, +) / Double(results.count)
+        let targetX = results.map { $0.targetX }.reduce(0, +) / Double(results.count)
+        let targetY = results.map { $0.targetY }.reduce(0, +) / Double(results.count)
+        let candidate = ShaAnalysisResult(
+            shaID: first.shaID,
+            confidence: confidence,
+            targetX: targetX,
+            targetY: targetY,
+            detectedRegions: results.map { $0.detectedRegions }.min() ?? first.detectedRegions,
+            summary: "three-frame-temporal-consensus"
+        )
+        applyAIScanResult(candidate)
+    }
+
+    private func applyAIScanResult(_ analysis: ShaAnalysisResult) {
+        aiResult = analysis
+        if let index = shaList.firstIndex(where: { $0.id == analysis.shaID }) {
+            selectedShaIndex = index
+            isAutoFollowingDirection = false
+            // Keep Vision's normalized location separate from the manual drag
+            // offset. The overlay maps it to its actual container size, so the
+            // marker stays anchored on every iPhone/iPad aspect ratio.
+            targetNormalizedPoint = CGPoint(
+                x: min(max(analysis.targetX, 0.0), 1.0),
+                y: min(max(analysis.targetY, 0.0), 1.0)
+            )
+            targetOffset = .zero
         }
     }
     

@@ -40,6 +40,7 @@ public struct FloorplanView: View {
     @State private var auditedRooms: [FloorplanRoom] = []
     @State private var auditReport: [FloorplanAuditItem] = []
     @State private var isDetectingRooms: Bool = false
+    @State private var roomDetectionGeneration: Int = 0
     @State private var roomDetectionMessage: String?
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
@@ -155,6 +156,8 @@ public struct FloorplanView: View {
                 roomsBeforeDetection = nil
                 centroidBeforeDetection = nil
                 roomDetectionMessage = nil
+                roomDetectionGeneration &+= 1
+                isDetectingRooms = false
                 if !iap.hasUnlockedVIP {
                     guard iap.consumeFloorplanCredit() else {
                         // UIImagePickerController updates the binding before
@@ -204,9 +207,19 @@ public struct FloorplanView: View {
             restorePersistedLayoutIfNeeded()
             refreshAudit(force: true)
         }
+        .onDisappear {
+            // Vision callbacks may finish after the page is dismissed. The
+            // generation guard below prevents a late result from mutating a
+            // layout that is no longer on screen.
+            roomDetectionGeneration &+= 1
+            isDetectingRooms = false
+        }
         .onChange(of: isActive) { active in
             if active {
                 refreshAudit(force: true)
+            } else {
+                roomDetectionGeneration &+= 1
+                isDetectingRooms = false
             }
         }
         .onChange(of: effectiveHeading) { _ in
@@ -694,6 +707,9 @@ public struct FloorplanView: View {
         isDetectingRooms = true
         roomDetectionMessage = lang.t("floorplan_detecting")
         let orientation = Self.cgOrientation(for: image.imageOrientation)
+        roomDetectionGeneration &+= 1
+        let generation = roomDetectionGeneration
+        let sourceImage = image
         DispatchQueue.global(qos: .userInitiated).async {
             let request = VNDetectRectanglesRequest()
             request.minimumConfidence = 0.35
@@ -713,6 +729,8 @@ public struct FloorplanView: View {
                     from: request.results as? [VNRectangleObservation] ?? []
                 )
                 DispatchQueue.main.async { [self] in
+                    guard generation == roomDetectionGeneration,
+                          userFloorplanImage === sourceImage else { return }
                     isDetectingRooms = false
                     guard !candidates.isEmpty else {
                         roomDetectionMessage = lang.t("floorplan_detect_failed")
@@ -722,6 +740,8 @@ public struct FloorplanView: View {
                 }
             } catch {
                 DispatchQueue.main.async { [self] in
+                    guard generation == roomDetectionGeneration,
+                          userFloorplanImage === sourceImage else { return }
                     isDetectingRooms = false
                     roomDetectionMessage = lang.t("floorplan_detect_failed")
                 }

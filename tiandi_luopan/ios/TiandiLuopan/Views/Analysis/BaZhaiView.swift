@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 八宅明镜与三合水法全景研判视图 (BaZhai & SanHe Water View)
 
@@ -68,6 +69,12 @@ public struct BaZhaiView: View {
             refreshAnalysis()
         }
         .onChange(of: lang.effectiveLanguage) { _ in
+            refreshAnalysis()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshAnalysis()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             refreshAnalysis()
         }
     }

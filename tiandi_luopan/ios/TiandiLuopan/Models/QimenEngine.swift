@@ -32,7 +32,7 @@ public struct QimenDoor {
             return ["休门": "ประตูพัก", "生门": "ประตูเกิด", "伤门": "ประตูเจ็บ", "杜门": "ประตูซ่อน", "景门": "ประตูวิว", "死门": "ประตูตาย", "惊门": "ประตูตกใจ", "开门": "ประตูเปิด"][name] ?? name
         case .id:
             return ["休门": "Gerbang Istirahat", "生门": "Gerbang Kehidupan", "伤门": "Gerbang Luka", "杜门": "Gerbang Rintangan", "景门": "Gerbang Pemandangan", "死门": "Gerbang Kematian", "惊门": "Gerbang Terkejut", "开门": "Gerbang Pembuka"][name] ?? name
-        case .zhHans:
+        case .auto, .zhHans:
             return name
         }
     }
@@ -53,7 +53,7 @@ public struct QimenDoor {
             return ["大吉": "มงคลยิ่ง", "吉": "มงคล", "凶": "อัปมงคล", "大凶": "อัปมงคลยิ่ง", "平": "ปานกลาง"][luckType] ?? luckType
         case .id:
             return ["大吉": "Sangat Baik", "吉": "Baik", "凶": "Buruk", "大凶": "Sangat Buruk", "平": "Netral"][luckType] ?? luckType
-        case .zhHans:
+        case .auto, .zhHans:
             return luckType
         }
     }
@@ -109,7 +109,7 @@ public struct QimenDoor {
                 "景门": "Baik untuk urusan dokumen & ujian; hindari tergesa-gesa", "死门": "Hanya cocok upacara duka; hindari bepergian/konstruksi",
                 "惊门": "Waspadai perselisihan; cocok untuk menangkap pencuri", "开门": "Sangat baik untuk pembukaan bisnis, relokasi & sukses lancar"
             ][name] ?? lore
-        case .zhHans:
+        case .auto, .zhHans:
             return lore
         }
     }
@@ -148,7 +148,7 @@ public struct QimenPalaceCell: Identifiable {
             return ["天蓬": "เทียนเผิง", "天芮": "เทียนรุ่ย", "天冲": "เทียนชง", "天辅": "เทียนฝู่", "天禽": "เทียนฉิน", "天心": "เทียนซิน", "天柱": "เทียนจู้", "天任": "เทียนเยิ่น", "天英": "เทียนอิง"][starName] ?? starName
         case .id:
             return ["天蓬": "Tian Peng", "天芮": "Tian Rui", "天冲": "Tian Chong", "天辅": "Tian Fu", "天禽": "Tian Qin", "天心": "Tian Xin", "天柱": "Tian Zhu", "天任": "Tian Ren", "天英": "Tian Ying"][starName] ?? starName
-        case .zhHans:
+        case .auto, .zhHans:
             return starName
         }
     }
@@ -169,7 +169,7 @@ public struct QimenPalaceCell: Identifiable {
             return ["值符": "จื่อฝู", "螣蛇": "เถิงเสือ", "太阴": "ไท่อิน", "六合": "ลิ่วเหอ", "白虎": "ไป๋หู่", "玄武": "เสวียนอู่", "九地": "จิ่วตี้", "九天": "จิ่วเทียน", "元极": "ไท่จี๋"][godName] ?? godName
         case .id:
             return ["值符": "Panglima", "螣蛇": "Ular Api", "太阴": "Yin Sejati", "六合": "Enam Harmoni", "白虎": "Harimau Putih", "玄武": "Kura-kura Hitam", "九地": "Sembilan Bumi", "九天": "Sembilan Langit", "元极": "Titik Pusat"][godName] ?? godName
-        case .zhHans:
+        case .auto, .zhHans:
             return godName
         }
     }
@@ -231,7 +231,7 @@ public struct QimenPalaceCell: Identifiable {
             let parts = palaceName.split(separator: " ", maxSplits: 1).map(String.init)
             if parts.count == 2 { return "\(map[parts[0]] ?? parts[0]) (\(trigramEnMap[parts[1]] ?? parts[1]))" }
             return map[palaceName] ?? palaceName
-        case .zhHans:
+        case .auto, .zhHans:
             return palaceName
         }
     }
@@ -299,7 +299,7 @@ public class QimenEngine {
         case .vi: dunType = isYangDun ? "Dương Độn" : "Âm Độn"
         case .th: dunType = isYangDun ? "หยางตุ้น" : "อินตุ้น"
         case .id: dunType = isYangDun ? "Yang Dun" : "Yin Dun"
-        case .zhHans: dunType = isYangDun ? "阳遁" : "阴遁"
+        case .auto, .zhHans: dunType = isYangDun ? "阳遁" : "阴遁"
         }
         
         // 2. 拆补定局：按当前节气的前五日、中五日、后五日取上/中/下元。
@@ -330,7 +330,7 @@ public class QimenEngine {
         case .vi: yuanName = ["Thượng Nguyên", "Trung Nguyên", "Hạ Nguyên"][yuanIndex]
         case .th: yuanName = ["ง้วนบน", "ง้วนกลาง", "ง้วนล่าง"][yuanIndex]
         case .id: yuanName = ["Yuan Atas", "Yuan Tengah", "Yuan Bawah"][yuanIndex]
-        case .zhHans: yuanName = ["上元", "中元", "下元"][yuanIndex]
+        case .auto, .zhHans: yuanName = ["上元", "中元", "下元"][yuanIndex]
         }
         
         switch lang {
@@ -341,7 +341,7 @@ public class QimenEngine {
         case .vi: title = "【\(dunType) Cục \(juNumber) · \(yuanName)】"
         case .th: title = "【\(dunType) สำนัก \(juNumber) · \(yuanName)】"
         case .id: title = "【\(dunType) Pola \(juNumber) · \(yuanName)】"
-        case .zhHans: title = "【\(dunType)\(juNumber)局 · 拆补\(yuanName)】"
+        case .auto, .zhHans: title = "【\(dunType)\(juNumber)局 · 拆补\(yuanName)】"
         }
         
         // 3. 计算八门排布偏移 (结合局数与时支)。
@@ -380,7 +380,7 @@ public class QimenEngine {
         case .id:
             bestDirection = "Barat Laut (Qian - Gerbang Pembuka)"
             bestReason = "Gerbang Pembuka dinaungi Panglima Agung"
-        case .zhHans:
+        case .auto, .zhHans:
             bestDirection = "西北方 (乾宫开门)"
             bestReason = "开门乘吉神值符，天地德合"
         }
@@ -398,7 +398,7 @@ public class QimenEngine {
                 case .vi: centerName = "Trung Cung"; centerTrigram = "Thái Cực"
                 case .th: centerName = "จุดศูนย์กลาง"; centerTrigram = "ไท่จี๋"
                 case .id: centerName = "Pusat"; centerTrigram = "Taiji"
-                case .zhHans: centerName = "中宫"; centerTrigram = "太极"
+                case .auto, .zhHans: centerName = "中宫"; centerTrigram = "太极"
                 }
                 cells.append(QimenPalaceCell(
                     palaceId: 5,
@@ -465,7 +465,7 @@ public class QimenEngine {
                         case .id:
                             bestDirection = "\(pName) (\(dName))"
                             bestReason = "Dinaungi bintang \(sName) & dewa \(gName), \(lore)"
-                        case .zhHans:
+                        case .auto, .zhHans:
                             bestDirection = "\(p.name)方 (\(p.trigram)宫\(door.name))"
                             bestReason = "临\(star)星与\(god)神，\(door.lore)"
                         }
@@ -482,7 +482,7 @@ public class QimenEngine {
                     case .vi: tabooDirs.append("\(pName) (\(dName))")
                     case .th: tabooDirs.append("\(pName) (\(dName))")
                     case .id: tabooDirs.append("\(pName) (\(dName))")
-                    case .zhHans: tabooDirs.append("\(p.name)\(door.name)")
+                    case .auto, .zhHans: tabooDirs.append("\(p.name)\(door.name)")
                     }
                 }
                 
@@ -524,7 +524,7 @@ public class QimenEngine {
                     bestDirection += turn > 0 ? " · เลี้ยวขวาประมาณ \(degrees)°" : " · เลี้ยวซ้ายประมาณ \(degrees)°"
                 case .id:
                     bestDirection += turn > 0 ? " · belok kanan sekitar \(degrees)°" : " · belok kiri sekitar \(degrees)°"
-                case .zhHans:
+                case .auto, .zhHans:
                     bestDirection += turn > 0 ? " · 右转约\(degrees)°" : " · 左转约\(degrees)°"
                 }
             }

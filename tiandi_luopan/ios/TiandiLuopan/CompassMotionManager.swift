@@ -129,7 +129,6 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         locationManager.distanceFilter = 5.0
         // kCLHeadingFilterNone 确保硬件级所有微小方位角变化均实时上报，消除阶梯跳变与迟滞
         locationManager.headingFilter = kCLHeadingFilterNone
-        locationManager.showsDeviceMovementDisplay = true
         updateHeadingOrientation()
     }
 

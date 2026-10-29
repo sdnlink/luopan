@@ -134,6 +134,7 @@ public struct SettingsView: View {
                                 .foregroundColor(.secondary)
                                 .font(.system(size: 11))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
                         if motion.locationAuthorizationStatus == .denied || motion.locationAuthorizationStatus == .restricted {
                             Button(lang.t("open_system_settings")) {
@@ -156,6 +157,8 @@ public struct SettingsView: View {
                         Text(motion.solarTimeDesc)
                             .foregroundColor(.secondary)
                             .font(.system(size: 11))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 
@@ -284,6 +287,8 @@ public struct SettingsView: View {
                         Text(id.title)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         Text(tag)
                             .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 5)
@@ -291,6 +296,8 @@ public struct SettingsView: View {
                             .background(Color.yellow.opacity(0.25))
                             .foregroundColor(Color.yellow)
                             .cornerRadius(3)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     Text(id.desc)
                         .font(.system(size: 11))
@@ -301,6 +308,9 @@ public struct SettingsView: View {
                 Text(iap.localizedPrice(for: id))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(10)
             .background(isSelected ? Color(red: 0.22, green: 0.19, blue: 0.12) : Color(red: 0.12, green: 0.13, blue: 0.17))

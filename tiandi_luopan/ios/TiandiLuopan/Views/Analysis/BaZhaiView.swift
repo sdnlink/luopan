@@ -137,6 +137,8 @@ public struct BaZhaiView: View {
                     Text("\(lang.t("gate_facing_prefix"))：\(bz.localizedGateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.localizedName)】")
                         .font(.system(size: 13))
                         .foregroundColor(bz.gateStar.isAuspicious ? Color.green : Color.red)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 Spacer()
             }

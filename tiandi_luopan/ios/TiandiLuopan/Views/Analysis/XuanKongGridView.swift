@@ -237,6 +237,8 @@ public struct XuanKongGridView: View {
                 Text("\(chart.sittingMountain)\(lang.t("mountain_suffix"))\(chart.facingMountain)\(lang.t("facing_suffix"))")
                     .font(.system(size: 18, weight: .bold, design: .serif))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 Text(chart.patternType)
                     .font(.system(size: 12, weight: .bold))
@@ -245,6 +247,8 @@ public struct XuanKongGridView: View {
                     .background(Color.orange.opacity(0.2))
                     .foregroundColor(Color.orange)
                     .cornerRadius(6)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
     }

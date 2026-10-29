@@ -35,6 +35,8 @@ public struct VIPLockCardView: View {
                 Text(title)
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer()
                 Text(badge)
                     .font(.system(size: 10, weight: .bold))
@@ -43,6 +45,8 @@ public struct VIPLockCardView: View {
                     .background(Color.yellow.opacity(0.2))
                     .foregroundColor(Color.yellow)
                     .cornerRadius(4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             
             Text(featureDesc)
@@ -56,6 +60,8 @@ public struct VIPLockCardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
                         Text("\(LocalizationManager.shared.t("unlock_vip_now")) (\(iap.localizedPrice(for: targetProductId)))")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     .font(.system(size: 12, weight: .bold))
                     .frame(maxWidth: .infinity)
@@ -189,6 +195,8 @@ public struct VIPPaywallSheet: View {
                                             .padding(.trailing, 4)
                                     }
                                     Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(LocalizationManager.shared.t("unlock_vip_now")) (\(getSelectedProductTitle()))")
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
                                 }
                                 .font(.system(size: 14, weight: .bold))
                                 .frame(maxWidth: .infinity)
@@ -323,6 +331,8 @@ public struct VIPPaywallSheet: View {
                         Text(id.title)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                         Text(tag)
                             .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 4)
@@ -330,6 +340,8 @@ public struct VIPPaywallSheet: View {
                             .background(isSelected ? Color.yellow.opacity(0.3) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .yellow : .white.opacity(0.7))
                             .cornerRadius(3)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     Text(id.desc)
                         .font(.system(size: 10))
@@ -342,6 +354,9 @@ public struct VIPPaywallSheet: View {
                 Text(iap.localizedPrice(for: id))
                     .font(.system(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: true, vertical: false)
             }
             .padding(10)
             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.15) : Color.white.opacity(0.04))

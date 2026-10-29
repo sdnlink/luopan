@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "TianJi";
+"CFBundleName" = "TianJi";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "TianJi memakai lokasi untuk menghitung koordinat, ketinggian, dan waktu matahari.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi memakai lokasi untuk menghitung koordinat, ketinggian, dan waktu matahari.";
+"NSMotionUsageDescription" = "TianJi memakai sensor untuk mengukur kemiringan dan arah.";
+"NSCameraUsageDescription" = "TianJi memakai kamera untuk melihat arah di lokasi.";
+"NSPhotoLibraryAddUsageDescription" = "TianJi menyimpan gambar ringkasan ke galeri foto.";
+"NSPhotoLibraryUsageDescription" = "TianJi membuka foto denah dan menyimpan foto survei.";

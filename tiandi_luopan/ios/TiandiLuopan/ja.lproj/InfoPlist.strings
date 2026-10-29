@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "天機演象";
+"CFBundleName" = "天機演象";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "天機演象は、座標、高さ、真太陽時を出すために位置情報を使います。";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "天機演象は、座標、高さ、真太陽時を出すために位置情報を使います。";
+"NSMotionUsageDescription" = "天機演象は、傾きと方位を測るためにモーションセンサーを使います。";
+"NSCameraUsageDescription" = "天機演象は、現場で向きを見るためにカメラを使います。";
+"NSPhotoLibraryAddUsageDescription" = "天機演象は、まとめの画像を写真に保存します。";
+"NSPhotoLibraryUsageDescription" = "天機演象は、間取りの写真を開き、調査の写真を保存します。";

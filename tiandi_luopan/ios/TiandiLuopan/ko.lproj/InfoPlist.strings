@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "천기연상";
+"CFBundleName" = "천기연상";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "천기연상은 좌표, 높이, 진태양시를 계산하려고 위치를 사용합니다.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "천기연상은 좌표, 높이, 진태양시를 계산하려고 위치를 사용합니다.";
+"NSMotionUsageDescription" = "천기연상은 기울기와 방향을 재려고 동작 센서를 사용합니다.";
+"NSCameraUsageDescription" = "천기연상은 현장에서 방향을 보려고 카메라를 사용합니다.";
+"NSPhotoLibraryAddUsageDescription" = "천기연상은 요약 그림을 사진에 저장합니다.";
+"NSPhotoLibraryUsageDescription" = "천기연상은 평면도 사진을 열고, 조사 사진을 저장합니다.";

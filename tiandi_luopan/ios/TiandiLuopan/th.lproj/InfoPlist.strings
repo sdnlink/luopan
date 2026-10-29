@@ -1,0 +1,11 @@
+/* App Display Name */
+"CFBundleDisplayName" = "เทียนจี";
+"CFBundleName" = "เทียนจี";
+
+/* Privacy Descriptions */
+"NSLocationWhenInUseUsageDescription" = "เทียนจีใช้ตำแหน่งเพื่อคำนวณพิกัด ความสูง และเวลาพระอาทิตย์จริง";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "เทียนจีใช้ตำแหน่งเพื่อคำนวณพิกัด ความสูง และเวลาพระอาทิตย์จริง";
+"NSMotionUsageDescription" = "เทียนจีใช้เซนเซอร์เพื่อวัดความเอียงและทิศ";
+"NSCameraUsageDescription" = "เทียนจีใช้กล้องเพื่อดูทิศในสถานที่จริง";
+"NSPhotoLibraryAddUsageDescription" = "เทียนจีจะบันทึกภาพสรุปลงคลังรูปภาพ";
+"NSPhotoLibraryUsageDescription" = "เทียนจีจะเปิดรูปผังบ้าน และบันทึกภาพสำรวจ";

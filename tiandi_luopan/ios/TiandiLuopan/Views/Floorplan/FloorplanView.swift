@@ -32,6 +32,7 @@ public struct FloorplanView: View {
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
     @State private var showNewRoomTypePicker = false
+    @State private var roomForTypeEditing: FloorplanRoom?
     @State private var floorplanImageBeforePicker: UIImage?
     @State private var lastAuditedHeading: Double?
     @State private var lastAuditedCentroid: CGPoint?
@@ -104,6 +105,12 @@ public struct FloorplanView: View {
                     deleteRoom(roomID: room.id)
                 } : nil
             )
+        }
+        .sheet(item: $roomForTypeEditing) { room in
+            FloorplanRoomTypeEditor(room: room) { type in
+                updateRoomType(roomID: room.id, type: type)
+                roomForTypeEditing = nil
+            }
         }
         .sheet(isPresented: $showImagePicker) {
             FloorplanImagePicker(selectedImage: $userFloorplanImage) {
@@ -774,6 +781,12 @@ public struct FloorplanView: View {
             // available from a dedicated action inside the diagnostic sheet.
             if roomWasDragged {
                 roomWasDragged = false
+                return
+            }
+            // Room placement and type editing are local layout operations and
+            // should remain available before a paid diagnostic is unlocked.
+            if isEditingRooms {
+                roomForTypeEditing = room
                 return
             }
             // Layout editing is available before purchase, but room-level

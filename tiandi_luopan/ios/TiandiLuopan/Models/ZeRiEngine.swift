@@ -92,7 +92,8 @@ public final class ZeRiEngine {
         let hStem = stems[(hStemStart + hBranchIdx) % 10]
         
         let pillars: String
-        if lang == .en {
+        switch lang {
+        case .en:
             let pinyinStems = ["甲": "Jia", "乙": "Yi", "丙": "Bing", "丁": "Ding", "戊": "Wu", "己": "Ji", "庚": "Geng", "辛": "Xin", "壬": "Ren", "癸": "Gui"]
             let pinyinBranches = ["子": "Zi", "丑": "Chou", "寅": "Yin", "卯": "Mao", "辰": "Chen", "巳": "Si", "午": "Wu", "未": "Wei", "申": "Shen", "酉": "You", "戌": "Xu", "亥": "Hai"]
             let yStr = "\(pinyinStems[yearStem] ?? yearStem)-\(pinyinBranches[yearBranch] ?? yearBranch)"
@@ -100,7 +101,41 @@ public final class ZeRiEngine {
             let dStr = "\(pinyinStems[dayStem] ?? dayStem)-\(pinyinBranches[dayBranch] ?? dayBranch)"
             let hStr = "\(pinyinStems[hStem] ?? hStem)-\(pinyinBranches[hBranch] ?? hBranch)"
             pillars = "\(yStr) Year · \(mStr) Month · \(dStr) Day · \(hStr) Hour"
-        } else {
+        case .zhHant, .ja:
+            pillars = "\(yearStem)\(yearBranch)年 \(mStem)\(mBranch)月 \(dayStem)\(dayBranch)日 \(hStem)\(hBranch)時"
+        case .ko:
+            let koStems = ["甲": "갑", "乙": "을", "丙": "병", "丁": "정", "戊": "무", "己": "기", "庚": "경", "辛": "신", "壬": "임", "癸": "계"]
+            let koBranches = ["子": "자", "丑": "축", "寅": "인", "卯": "묘", "辰": "진", "巳": "사", "午": "오", "未": "미", "申": "신", "酉": "유", "戌": "술", "亥": "해"]
+            let yStr = "\(koStems[yearStem] ?? yearStem)\(koBranches[yearBranch] ?? yearBranch)년"
+            let mStr = "\(koStems[mStem] ?? mStem)\(koBranches[mBranch] ?? mBranch)월"
+            let dStr = "\(koStems[dayStem] ?? dayStem)\(koBranches[dayBranch] ?? dayBranch)일"
+            let hStr = "\(koStems[hStem] ?? hStem)\(koBranches[hBranch] ?? hBranch)시"
+            pillars = "\(yStr) \(mStr) \(dStr) \(hStr)"
+        case .vi:
+            let viStems = ["甲": "Giáp", "乙": "Ất", "丙": "Bính", "丁": "Đinh", "戊": "Mậu", "己": "Kỷ", "庚": "Canh", "辛": "Tân", "壬": "Nhâm", "癸": "Quý"]
+            let viBranches = ["子": "Tý", "丑": "Sửu", "寅": "Dần", "卯": "Mão", "辰": "Thìn", "巳": "Tỵ", "午": "Ngọ", "未": "Mùi", "申": "Thân", "酉": "Dậu", "戌": "Tuất", "亥": "Hợi"]
+            let yStr = "\(viStems[yearStem] ?? yearStem) \(viBranches[yearBranch] ?? yearBranch) năm"
+            let mStr = "\(viStems[mStem] ?? mStem) \(viBranches[mBranch] ?? mBranch) tháng"
+            let dStr = "\(viStems[dayStem] ?? dayStem) \(viBranches[dayBranch] ?? dayBranch) ngày"
+            let hStr = "\(viStems[hStem] ?? hStem) \(viBranches[hBranch] ?? hBranch) giờ"
+            pillars = "\(yStr) · \(mStr) · \(dStr) · \(hStr)"
+        case .th:
+            let thStems = ["甲": "เจี่ย", "乙": "อี้", "丙": "ปิ่ง", "丁": "ติง", "戊": "อู่", "己": "จี่", "庚": "เกิง", "辛": "ซิน", "壬": "เหริน", "癸": "กุ่ย"]
+            let thBranches = ["子": "จื่อ", "丑": "โฉ่ว", "寅": "หยิน", "卯": "เหมา", "辰": "เฉิน", "巳": "ซื่อ", "午": "อู่", "未": "เว่ย", "申": "เซิน", "酉": "โหย่ว", "戌": "ซวี", "亥": "ฮ่าย"]
+            let yStr = "ปี \(thStems[yearStem] ?? yearStem)-\(thBranches[yearBranch] ?? yearBranch)"
+            let mStr = "เดือน \(thStems[mStem] ?? mStem)-\(thBranches[mBranch] ?? mBranch)"
+            let dStr = "วัน \(thStems[dayStem] ?? dayStem)-\(thBranches[dayBranch] ?? dayBranch)"
+            let hStr = "ยาม \(thStems[hStem] ?? hStem)-\(thBranches[hBranch] ?? hBranch)"
+            pillars = "\(yStr) · \(mStr) · \(dStr) · \(hStr)"
+        case .id:
+            let pinyinStems = ["甲": "Jia", "乙": "Yi", "丙": "Bing", "丁": "Ding", "戊": "Wu", "己": "Ji", "庚": "Geng", "辛": "Xin", "壬": "Ren", "癸": "Gui"]
+            let pinyinBranches = ["子": "Zi", "丑": "Chou", "寅": "Yin", "卯": "Mao", "辰": "Chen", "巳": "Si", "午": "Wu", "未": "Wei", "申": "Shen", "酉": "You", "戌": "Xu", "亥": "Hai"]
+            let yStr = "Thn \(pinyinStems[yearStem] ?? yearStem)-\(pinyinBranches[yearBranch] ?? yearBranch)"
+            let mStr = "Bln \(pinyinStems[mStem] ?? mStem)-\(pinyinBranches[mBranch] ?? mBranch)"
+            let dStr = "Hr \(pinyinStems[dayStem] ?? dayStem)-\(pinyinBranches[dayBranch] ?? dayBranch)"
+            let hStr = "Jam \(pinyinStems[hStem] ?? hStem)-\(pinyinBranches[hBranch] ?? hBranch)"
+            pillars = "\(yStr) · \(mStr) · \(dStr) · \(hStr)"
+        default:
             pillars = "\(yearStem)\(yearBranch)年 \(mStem)\(mBranch)月 \(dayStem)\(dayBranch)日 \(hStem)\(hBranch)时"
         }
         
@@ -112,11 +147,22 @@ public final class ZeRiEngine {
         
         // 岁破冲煞：日支冲太岁年支
         if clashMap[dayBranch] == yearBranch {
-            if lang == .en {
+            switch lang {
+            case .en:
                 suiPo = "Day branch clashes with Year Grand Duke (\(yearBranch)); Year Clash Taboo."
-            } else if lang == .zhHant {
+            case .zhHant:
                 suiPo = "今日【\(dayBranch)日】直衝年支太歲【\(yearBranch)位】，犯【歲破大煞】，主百事不利。"
-            } else {
+            case .ja:
+                suiPo = "本日【\(dayBranch)日】が太歳【\(yearBranch)位】と直衝し、【歳破大煞】となります。"
+            case .ko:
+                suiPo = "오늘【\(dayBranch)일】이 세차 태세【\(yearBranch)위】와 직충하여 【세파대살】을 범합니다."
+            case .vi:
+                suiPo = "Hôm nay ngày 【\(dayBranch)】 trực xung Thái Tuế năm 【\(yearBranch)】 phạm 【Tuế Phá Đại Sát】."
+            case .th:
+                suiPo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะไท่ส่วยประจำปี 【\(yearBranch)】 ติดขัดเคราะห์【ส่วยพั่ว】"
+            case .id:
+                suiPo = "Cabang hari bentrok dengan Tai Sui tahunan (\(yearBranch)); Tabu Benturan Tahun."
+            default:
                 suiPo = "今日【\(dayBranch)日】直冲年支太岁【\(yearBranch)位】，犯【岁破大煞】，主百事不利。"
             }
             if let suiPo = suiPo { warnings.append(suiPo) }
@@ -124,18 +170,28 @@ public final class ZeRiEngine {
         
         // 月破冲煞：日支冲当令月支
         if clashMap[dayBranch] == mBranch {
-            if lang == .en {
+            switch lang {
+            case .en:
                 yuePo = "Day branch clashes with Month Commander (\(mBranch)); Month Clash Taboo."
-            } else if lang == .zhHant {
+            case .zhHant:
                 yuePo = "今日【\(dayBranch)日】直衝月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
-            } else {
+            case .ja:
+                yuePo = "本日【\(dayBranch)日】が月建【\(mBranch)位】と直衝し、【月破大耗】となります。"
+            case .ko:
+                yuePo = "오늘【\(dayBranch)일】이 월령 월건【\(mBranch)위】과 직충하여 【월파대모】를 범합니다."
+            case .vi:
+                yuePo = "Hôm nay ngày 【\(dayBranch)】 trực xung Nguyệt Lệnh 【\(mBranch)】 phạm 【Nguyệt Phá Đại Hao】."
+            case .th:
+                yuePo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะประจำเดือน 【\(mBranch)】 ติดขัดเคราะห์【เยว่พั่ว】"
+            case .id:
+                yuePo = "Cabang hari bentrok dengan Penguasa Bulan (\(mBranch)); Tabu Benturan Bulan."
+            default:
                 yuePo = "今日【\(dayBranch)日】直冲月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
             }
             if let yuePo = yuePo { warnings.append(yuePo) }
         }
         
-        // 坐山冲犯：二十四山要先归并到对应的十二地支，不能只匹配
-        // 子、丑、寅等十二个正支山；例如壬/癸山同属子山地支。
+        // 坐山冲犯：二十四山归并到对应十二地支
         let mountainBranch: [String: String] = [
             "壬": "子", "子": "子", "癸": "子",
             "丑": "丑", "艮": "丑", "寅": "丑",
@@ -148,11 +204,22 @@ public final class ZeRiEngine {
         ]
         let sittingBranch = mountainBranch[sitting.name] ?? sitting.name
         if let sClash = clashMap[sittingBranch], sClash == dayBranch {
-            if lang == .en {
-                sanSha = "Day branch clashes with House Sitting Mountain (\(sitting.pinyin)); Sitting Clash Taboo."
-            } else if lang == .zhHant {
+            switch lang {
+            case .en:
+                sanSha = "Day branch clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
+            case .zhHant:
                 sanSha = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.localizedName)山】，犯【衝山大忌】，切勿動土安門！"
-            } else {
+            case .ja:
+                sanSha = "本日の日支【\(dayBranch)】が坐山【\(sitting.localizedName)山】と直衝し、【衝山大忌】に該当します。"
+            case .ko:
+                sanSha = "오늘 일진【\(dayBranch)】이 좌산【\(sitting.localizedName)산】과 직충하여 【충산대기】를 범하니 동토와 안문을 피하세요!"
+            case .vi:
+                sanSha = "Hôm nay chi ngày 【\(dayBranch)】 trực xung Tọa sơn 【\(sitting.localizedName)】 phạm 【Xung Sơn Đại Kỵ】!"
+            case .th:
+                sanSha = "กิ่งดินวัน 【\(dayBranch)】 ปะทะทิศพิงบ้าน 【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
+            case .id:
+                sanSha = "Cabang hari bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
+            default:
                 sanSha = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }
             if let sanSha = sanSha { warnings.append(sanSha) }
@@ -160,21 +227,43 @@ public final class ZeRiEngine {
         
         let isAuspicious = warnings.isEmpty
         let status: String
-        if lang == .en {
+        switch lang {
+        case .en:
             status = isAuspicious ? "Auspicious Day" : "Clash Detected"
-        } else if lang == .zhHant {
+        case .zhHant:
             status = isAuspicious ? "今日日課吉" : "動土神煞有衝"
-        } else {
+        case .ja:
+            status = isAuspicious ? "本日吉日" : "神煞の衝あり"
+        case .ko:
+            status = isAuspicious ? "오늘의 일과 길" : "신살 충돌 감지"
+        case .vi:
+            status = isAuspicious ? "Nhật khóa cát lợi" : "Thần sát tương xung"
+        case .th:
+            status = isAuspicious ? "ฤกษ์วันนี้เป็นมงคล" : "มีดาวเทพปะทะ"
+        case .id:
+            status = isAuspicious ? "Hari Ini Menguntungkan" : "Benturan Sha Terdeteksi"
+        default:
             status = isAuspicious ? "今日日课吉" : "动土神煞有冲"
         }
         
         let details: String
         if isAuspicious {
-            if lang == .en {
+            switch lang {
+            case .en:
                 details = "Sitting Mountain Sha: Free from Year/Month clash. Harmonious Four Pillars, ideal for construction and door installation."
-            } else if lang == .zhHant {
+            case .zhHant:
                 details = "坐向神煞：無歲破、無月破、無坐向衝克。四柱比和合化，宜修造動土、安門立向。"
-            } else {
+            case .ja:
+                details = "坐向神煞：歳破・月破・坐向の衝克なし。四柱が調和し、改修や動土、門の設置に好適です。"
+            case .ko:
+                details = "좌향신살: 세파, 월파, 좌향 충극이 없습니다. 사주가 조화로워 동토, 안문, 수리에 이상적입니다."
+            case .vi:
+                details = "Thần sát tọa hướng: Không phạm Tuế Phá, Nguyệt Phá, Tọa Hướng tương xung. Tứ trụ hòa hợp, cát lợi cho động thổ an môn."
+            case .th:
+                details = "เทพดาวทิศพิง: ไร้เคราะห์ส่วยพั่วและเยว่พั่ว สี่เสาประสานกลมกลืน เหมาะแก่การลงเสาเอกและตั้งประตู"
+            case .id:
+                details = "Sha Gunung Sandaran: Bebas dari benturan tahun/bulan. Empat Pilar selaras, ideal untuk renovasi dan pasang pintu."
+            default:
                 details = "坐向神煞：无岁破、无月破、无坐向冲克。四柱比和合化，宜修造动土、安门立向。"
             }
         } else {
@@ -183,13 +272,29 @@ public final class ZeRiEngine {
         
         let yi: [String]
         let ji: [String]
-        if lang == .en {
+        switch lang {
+        case .en:
             yi = isAuspicious ? ["Groundbreaking", "Door Installation", "Housewarming", "Business Opening"] : ["Meditation", "Spiritual Cultivation"]
             ji = isAuspicious ? ["Excavation near graves", "Aggressive Acts"] : ["Construction", "Door Installation", "Moving In"]
-        } else if lang == .zhHant {
+        case .zhHant:
             yi = isAuspicious ? ["動土起造", "安門修方", "入宅安香", "開業祈福"] : ["靜思祈禱", "祭祀修心"]
             ji = isAuspicious ? ["破土開生墳", "暴烈行事"] : ["修造動土", "安門立向", "入宅開張"]
-        } else {
+        case .ja:
+            yi = isAuspicious ? ["地鎮祭・動土", "門の設置", "引越し入宅", "開店・祈福"] : ["静思・瞑想", "祭祀・修養"]
+            ji = isAuspicious ? ["墓地造成", "激しい争い"] : ["修繕・動土", "門の設置", "入宅・開業"]
+        case .ko:
+            yi = isAuspicious ? ["동토 기공", "안문 수방", "입택 안향", "개업 기복"] : ["정사 기도", "제사 수심"]
+            ji = isAuspicious ? ["파토 생분", "과격한 행동"] : ["수조 동토", "안문 입향", "입택 개업"]
+        case .vi:
+            yi = isAuspicious ? ["Động thổ khởi tạo", "An môn tu phương", "Nhập trạch an hương", "Khai trương cầu phúc"] : ["Tĩnh tâm cầu nguyện", "Tế tự tu tâm"]
+            ji = isAuspicious ? ["Phá thổ khai phần", "Hành sự bạo liệt"] : ["Tu tạo động thổ", "An môn lập hướng", "Nhập trạch khai trương"]
+        case .th:
+            yi = isAuspicious ? ["ลงเสาเอกก่อสร้าง", "ตั้งประตูมงคล", "ขึ้นบ้านใหม่", "เปิดกิจการ"] : ["สงบจิตทำสมาธิ", "ไหว้พระขอพร"]
+            ji = isAuspicious ? ["ขุดหลุมฝังศพ", "วิวาทรุนแรง"] : ["ก่อสร้างซ่อมแซม", "ตั้งประตู", "ย้ายเข้าอยู่"]
+        case .id:
+            yi = isAuspicious ? ["Peletakan Batu Pertama", "Pemasangan Pintu", "Pindah Rumah", "Pembukaan Usaha"] : ["Meditasi Tenang", "Ibadah Doa"]
+            ji = isAuspicious ? ["Gali Makam", "Tindakan Kasar"] : ["Konstruksi Rumah", "Pasang Pintu", "Pindah Masuk"]
+        default:
             yi = isAuspicious ? ["动土起造", "安门修方", "入宅安香", "开业祈福"] : ["静思祈祷", "祭祀修心"]
             ji = isAuspicious ? ["破土开生坟", "暴烈行事"] : ["修造动土", "安门立向", "入宅开张"]
         }

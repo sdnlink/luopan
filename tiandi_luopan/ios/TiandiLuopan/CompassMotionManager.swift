@@ -124,16 +124,12 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     
     private func setupLocationManager() {
         locationManager.delegate = self
-        // 降低 GPS 天线高发热射频功耗：罗盘仅需十米/百米级经度计算太阳时，无需高耗能Best硬件
-        locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        locationManager.distanceFilter = 20.0
-        // Core Location emits a new heading once this many degrees have
-        // changed. A 0.3° gate made slow turns feel unresponsive on devices
-        // whose sensor already applies its own internal smoothing.
-        // Core Location already performs sensor fusion. A tiny 0.05° gate
-        // forwards magnetometer noise directly into the UI; 0.2° retains
-        // sub-degree accuracy while giving the software filter stable samples.
-        locationManager.headingFilter = 0.2
+        // 采用最高精度位置与高灵敏传感器融合，确保罗盘与地理真北完全精准
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 5.0
+        // kCLHeadingFilterNone 确保硬件级所有微小方位角变化均实时上报，消除阶梯跳变与迟滞
+        locationManager.headingFilter = kCLHeadingFilterNone
+        locationManager.showsDeviceMovementDisplay = true
         updateHeadingOrientation()
     }
 
@@ -322,92 +318,57 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         if !hasInitializedFilter {
             hasInitializedFilter = true
             filteredContinuousHeading = newHeading
-            recentHeadingSamples = [newHeading]
             continuousHeading = newHeading
-            heading = newHeading
+            heading = (newHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
             return
         }
         
-        // Median pre-filter: a short median window removes isolated spikes
-        // without introducing the large lag of a long moving average. Samples
-        // are unwrapped around the current filtered angle, so north crossing
-        // (359° -> 0°) remains continuous.
-        let unwrappedSample = filteredContinuousHeading + Self.shortestAngleDelta(from: filteredContinuousHeading, to: newHeading)
-        let rawDiff = unwrappedSample - filteredContinuousHeading
-        if abs(rawDiff) > 2.0 {
-            // A deliberate turn must not wait for stale stationary samples to
-            // leave the median window; follow it immediately with high alpha.
-            recentHeadingSamples.removeAll(keepingCapacity: true)
-        }
-        recentHeadingSamples.append(unwrappedSample)
-        if recentHeadingSamples.count > 5 { recentHeadingSamples.removeFirst() }
-        let sortedSamples = recentHeadingSamples.sorted()
-        let medianSample = sortedSamples[sortedSamples.count / 2]
-        let medianDiff = medianSample - filteredContinuousHeading
-
-        // Adaptive EMA: stationary readings settle firmly; deliberate turns
-        // remain responsive and do not accumulate a visible angular offset.
-        let absDiff = abs(medianDiff)
+        let delta = Self.shortestAngleDelta(from: filteredContinuousHeading, to: newHeading)
+        let absDelta = abs(delta)
+        
+        // 高性能自适应响应滤波：大动作零延迟即时跟从，微动精密平滑抗抖动，且无死区截断
         let alpha: Double
-        if absDiff < 0.12 {
-            alpha = 0.12
-        } else if absDiff < 0.5 {
-            alpha = 0.4
-        } else if absDiff < 2.0 {
-            alpha = 0.7
-        } else {
+        if absDelta > 3.0 {
             alpha = 0.95
+        } else if absDelta > 1.0 {
+            alpha = 0.75
+        } else if absDelta > 0.3 {
+            alpha = 0.50
+        } else {
+            alpha = 0.35
         }
         
-        // Keep accumulating the filtered value even when the published
-        // heading is inside the deadband. This preserves slow, continuous
-        // turns without broadcasting stationary sensor noise every sample.
-        filteredContinuousHeading += medianDiff * alpha
-        if abs(filteredContinuousHeading - continuousHeading) < 0.05 {
-            return
-        }
+        filteredContinuousHeading += delta * alpha
         continuousHeading = filteredContinuousHeading
         let normalized = (filteredContinuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
         heading = normalized
     }
 
-    /// Keep an independent smooth magnetic bearing for the red/blue magnetic
-    /// needle. The main dial follows true north when available, so reusing its
-    /// filter would make the physical magnetic needle appear offset twice.
+    /// Keep an independent smooth magnetic bearing for the red/blue magnetic needle.
     private func updateContinuousMagneticHeading(newHeading: Double) {
         if !hasInitializedMagneticFilter {
             hasInitializedMagneticFilter = true
             filteredContinuousMagneticHeading = newHeading
-            recentMagneticSamples = [newHeading]
             continuousMagneticHeading = newHeading
+            magneticHeading = (newHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
             return
         }
 
-        let unwrappedSample = filteredContinuousMagneticHeading + Self.shortestAngleDelta(from: filteredContinuousMagneticHeading, to: newHeading)
-        if abs(unwrappedSample - filteredContinuousMagneticHeading) > 2.0 {
-            recentMagneticSamples.removeAll(keepingCapacity: true)
-        }
-        recentMagneticSamples.append(unwrappedSample)
-        if recentMagneticSamples.count > 5 { recentMagneticSamples.removeFirst() }
-        let sortedSamples = recentMagneticSamples.sorted()
-        let medianSample = sortedSamples[sortedSamples.count / 2]
-        let medianDiff = medianSample - filteredContinuousMagneticHeading
-        let absDiff = abs(medianDiff)
+        let delta = Self.shortestAngleDelta(from: filteredContinuousMagneticHeading, to: newHeading)
+        let absDelta = abs(delta)
         let alpha: Double
-        if absDiff < 0.12 {
-            alpha = 0.12
-        } else if absDiff < 0.5 {
-            alpha = 0.4
-        } else if absDiff < 2.0 {
-            alpha = 0.7
-        } else {
+        if absDelta > 3.0 {
             alpha = 0.95
+        } else if absDelta > 1.0 {
+            alpha = 0.75
+        } else if absDelta > 0.3 {
+            alpha = 0.50
+        } else {
+            alpha = 0.35
         }
-        filteredContinuousMagneticHeading += medianDiff * alpha
-        if abs(filteredContinuousMagneticHeading - continuousMagneticHeading) < 0.05 {
-            return
-        }
+        filteredContinuousMagneticHeading += delta * alpha
         continuousMagneticHeading = filteredContinuousMagneticHeading
+        magneticHeading = (filteredContinuousMagneticHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
     }
     
     private func updateResolvedState(force: Bool = false) {
@@ -418,11 +379,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
         
-        // 保留小步长实时广播：罗盘读数、户型、奇门和紫白等功能都依赖
-        // headingState；过大的阈值会让这些页面继续显示旧方位。
-        // Headings are circular.  A transition such as 359.9° -> 0.1° is a
-        // 0.2° movement and must not be treated as a 359.8° jump; otherwise
-        // the throttled state update fires on every north crossing.
+        // 采用 0.01° 高灵敏度更新门限，确保微动时度数绝不卡死
         let angleDelta: Double
         if lastResolvedHeading < 0 {
             angleDelta = .infinity
@@ -432,7 +389,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
         let pitchDelta = lastResolvedPitch.isFinite ? abs(pitch - lastResolvedPitch) : .infinity
         let rollDelta = lastResolvedRoll.isFinite ? abs(roll - lastResolvedRoll) : .infinity
-        if force || angleDelta >= 0.05 || pitchDelta >= 0.1 || rollDelta >= 0.1 {
+        if force || angleDelta >= 0.01 || pitchDelta >= 0.05 || rollDelta >= 0.05 {
             lastResolvedHeading = effective
             lastResolvedPitch = pitch
             lastResolvedRoll = roll
@@ -621,36 +578,27 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         
         DispatchQueue.main.async {
             self.updateHeadingOrientation()
-            if abs(mag - self.magneticHeading) >= 0.1 {
-                self.magneticHeading = mag
-            }
+            self.magneticHeading = mag
             
-            // Core Location's trueHeading is the same calibrated reference used
-            // by Apple's Compass app. Prefer it whenever the OS supplies a
-            // valid value; the offline WMM value is only a fallback for devices
-            // that cannot provide a true heading yet.
+            // Core Location's trueHeading 是系统最高精度传感器融合计算的地理真北。
+            // 当其有效时直接作为真北基准并校准磁偏角；当尚未获得时使用离线 WMM 模型补偿。
             if newHeading.trueHeading >= 0 {
                 self.trueHeading = newHeading.trueHeading
                 var declination = newHeading.trueHeading - newHeading.magneticHeading
-                if declination > 180.0 { declination -= 360.0 }
-                if declination < -180.0 { declination += 360.0 }
+                while declination > 180.0 { declination -= 360.0 }
+                while declination < -180.0 { declination += 360.0 }
                 self.currentDeclination = declination
                 self.hasDeclination = true
                 self.hasCoreLocationTrueHeading = true
-            }
-            if self.hasDeclination {
-                let resolvedTrueHeading = (mag + self.currentDeclination + 360.0)
+            } else if self.hasDeclination {
+                self.trueHeading = (mag + self.currentDeclination + 360.0)
                     .truncatingRemainder(dividingBy: 360.0)
-                if abs(resolvedTrueHeading - self.trueHeading) >= 0.1 {
-                    self.trueHeading = resolvedTrueHeading
-                }
+            } else {
+                self.trueHeading = mag
             }
             
             if !self.isLocked {
                 self.updateContinuousMagneticHeading(newHeading: mag)
-                // Use true north for the main dial and all direction-based
-                // calculations once Core Location/WMM has supplied a valid
-                // declination. Before then, magnetic north is the safe fallback.
                 let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
                 self.updateContinuousHeading(newHeading: referenceHeading)
                 self.updateResolvedState()

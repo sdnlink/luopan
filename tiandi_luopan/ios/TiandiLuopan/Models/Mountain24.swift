@@ -13,6 +13,19 @@ public enum Direction8: String, CaseIterable, Codable {
     case west = "正西"
     case northwest = "西北"
     
+    public var localizedName: String {
+        switch self {
+        case .north: return LocalizationManager.shared.t("dir_n")
+        case .northeast: return LocalizationManager.shared.t("dir_ne")
+        case .east: return LocalizationManager.shared.t("dir_e")
+        case .southeast: return LocalizationManager.shared.t("dir_se")
+        case .south: return LocalizationManager.shared.t("dir_s")
+        case .southwest: return LocalizationManager.shared.t("dir_sw")
+        case .west: return LocalizationManager.shared.t("dir_w")
+        case .northwest: return LocalizationManager.shared.t("dir_nw")
+        }
+    }
+    
     public var guaName: String {
         switch self {
         case .north: return "坎一宫"
@@ -26,6 +39,80 @@ public enum Direction8: String, CaseIterable, Codable {
         }
     }
     
+    public var localizedGuaName: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en, .id:
+            switch self {
+            case .north: return "Kan 1st Palace"
+            case .southwest: return "Kun 2nd Palace"
+            case .east: return "Zhen 3rd Palace"
+            case .southeast: return "Xun 4th Palace"
+            case .northwest: return "Qian 6th Palace"
+            case .west: return "Dui 7th Palace"
+            case .northeast: return "Gen 8th Palace"
+            case .south: return "Li 9th Palace"
+            }
+        case .ja:
+            switch self {
+            case .north: return "坎一宮"
+            case .southwest: return "坤二宮"
+            case .east: return "震三宮"
+            case .southeast: return "巽四宮"
+            case .northwest: return "乾六宮"
+            case .west: return "兌七宮"
+            case .northeast: return "艮八宮"
+            case .south: return "離九宮"
+            }
+        case .ko:
+            switch self {
+            case .north: return "감1궁"
+            case .southwest: return "곤2궁"
+            case .east: return "진3궁"
+            case .southeast: return "손4궁"
+            case .northwest: return "건6궁"
+            case .west: return "태7궁"
+            case .northeast: return "간8궁"
+            case .south: return "이9궁"
+            }
+        case .vi:
+            switch self {
+            case .north: return "Cung Khảm 1"
+            case .southwest: return "Cung Khôn 2"
+            case .east: return "Cung Chấn 3"
+            case .southeast: return "Cung Tốn 4"
+            case .northwest: return "Cung Càn 6"
+            case .west: return "Cung Đoài 7"
+            case .northeast: return "Cung Cấn 8"
+            case .south: return "Cung Ly 9"
+            }
+        case .th:
+            switch self {
+            case .north: return "วังขั่น 1"
+            case .southwest: return "วังคุน 2"
+            case .east: return "วังเจิ้น 3"
+            case .southeast: return "วังซวิ่น 4"
+            case .northwest: return "วังเฉียน 6"
+            case .west: return "วังตุ้ย 7"
+            case .northeast: return "วังเกิ้น 8"
+            case .south: return "วังหลี 9"
+            }
+        case .zhHant:
+            switch self {
+            case .north: return "坎一宮"
+            case .southwest: return "坤二宮"
+            case .east: return "震三宮"
+            case .southeast: return "巽四宮"
+            case .northwest: return "乾六宮"
+            case .west: return "兌七宮"
+            case .northeast: return "艮八宮"
+            case .south: return "離九宮"
+            }
+        default:
+            return guaName
+        }
+    }
+    
     public var element: String {
         switch self {
         case .north: return "水"
@@ -33,6 +120,53 @@ public enum Direction8: String, CaseIterable, Codable {
         case .east, .southeast: return "木"
         case .northwest, .west: return "金"
         case .south: return "火"
+        }
+    }
+    
+    public var localizedElement: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch self {
+            case .north: return "Water"
+            case .southwest, .northeast: return "Earth"
+            case .east, .southeast: return "Wood"
+            case .northwest, .west: return "Metal"
+            case .south: return "Fire"
+            }
+        case .id:
+            switch self {
+            case .north: return "Air"
+            case .southwest, .northeast: return "Tanah"
+            case .east, .southeast: return "Kayu"
+            case .northwest, .west: return "Logam"
+            case .south: return "Api"
+            }
+        case .ko:
+            switch self {
+            case .north: return "수"
+            case .southwest, .northeast: return "토"
+            case .east, .southeast: return "목"
+            case .northwest, .west: return "금"
+            case .south: return "화"
+            }
+        case .vi:
+            switch self {
+            case .north: return "Thủy"
+            case .southwest, .northeast: return "Thổ"
+            case .east, .southeast: return "Mộc"
+            case .northwest, .west: return "Kim"
+            case .south: return "Hỏa"
+            }
+        case .th:
+            switch self {
+            case .north: return "น้ำ"
+            case .southwest, .northeast: return "ดิน"
+            case .east, .southeast: return "ไม้"
+            case .northwest, .west: return "ทอง"
+            case .south: return "ไฟ"
+            }
+        default:
+            return element
         }
     }
 }
@@ -74,35 +208,103 @@ public struct Mountain24Item: Identifiable, Codable {
     
     public var localizedName: String {
         let language = LocalizationManager.shared.effectiveLanguage
-        if language == .en { return pinyin }
-        if language == .zhHant {
+        switch language {
+        case .en, .id:
+            return pinyin
+        case .ja:
             return name.replacingOccurrences(of: "兑", with: "兌")
                 .replacingOccurrences(of: "离", with: "離")
+        case .ko:
+            let koNames = ["壬": "임", "子": "자", "癸": "계", "丑": "축", "艮": "간", "寅": "인", "甲": "갑", "卯": "묘", "乙": "을", "辰": "진", "巽": "손", "巳": "사", "丙": "병", "午": "오", "丁": "정", "未": "미", "坤": "곤", "申": "신", "庚": "경", "酉": "유", "辛": "신", "戌": "술", "乾": "건", "亥": "해"]
+            return koNames[name] ?? name
+        case .vi:
+            let viNames = ["壬": "Nhâm", "子": "Tý", "癸": "Quý", "丑": "Sửu", "艮": "Cấn", "寅": "Dần", "甲": "Giáp", "卯": "Mão", "乙": "Ất", "辰": "Thìn", "巽": "Tốn", "巳": "Tỵ", "丙": "Bính", "午": "Ngọ", "丁": "Đinh", "未": "Mùi", "坤": "Khôn", "申": "Thân", "庚": "Canh", "酉": "Dậu", "辛": "Tân", "戌": "Tuất", "乾": "Càn", "亥": "Hợi"]
+            return viNames[name] ?? name
+        case .th:
+            let thNames = ["壬": "เหริน", "子": "จื่อ", "癸": "กุ่ย", "丑": "โฉ่ว", "艮": "เกิ้น", "寅": "หยิน", "甲": "เจี่ย", "卯": "เหมา", "乙": "อี้", "辰": "เฉิน", "巽": "ซวิ่น", "巳": "ซื่อ", "丙": "ปิ่ง", "午": "อู่", "丁": "ติง", "未": "เว่ย", "坤": "คุน", "申": "เซิน", "庚": "เกิง", "酉": "โหย่ว", "辛": "ซิน", "戌": "ซวี", "乾": "เฉียน", "亥": "ฮ่าย"]
+            return thNames[name] ?? name
+        case .zhHant:
+            return name.replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "离", with: "離")
+        default:
+            return name
         }
-        return name
     }
     
     public var localizedPalace: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        if lang == .en {
+        switch lang {
+        case .en, .id:
             let enPalaces = ["坎": "Kan", "坤": "Kun", "震": "Zhen", "巽": "Xun", "乾": "Qian", "兑": "Dui", "艮": "Gen", "离": "Li"]
             return enPalaces[palace] ?? palace
-        }
-        if lang == .zhHant {
+        case .ja:
+            let jaPalaces = ["坎": "坎", "坤": "坤", "震": "震", "巽": "巽", "乾": "乾", "兑": "兌", "艮": "艮", "离": "離"]
+            return jaPalaces[palace] ?? palace
+        case .ko:
+            let koPalaces = ["坎": "감", "坤": "곤", "震": "진", "巽": "손", "乾": "건", "兑": "태", "艮": "간", "离": "이"]
+            return koPalaces[palace] ?? palace
+        case .vi:
+            let viPalaces = ["坎": "Khảm", "坤": "Khôn", "震": "Chấn", "巽": "Tốn", "乾": "Càn", "兑": "Đoài", "艮": "Cấn", "离": "Ly"]
+            return viPalaces[palace] ?? palace
+        case .th:
+            let thPalaces = ["坎": "ขั่น", "坤": "คุน", "震": "เจิ้น", "巽": "ซวิ่น", "乾": "เฉียน", "兑": "ตุ้ย", "艮": "เกิ้น", "离": "หลี"]
+            return thPalaces[palace] ?? palace
+        case .zhHant:
             return ["兑": "兌", "离": "離"][palace] ?? palace
+        default:
+            return palace
         }
-        return palace
     }
 
     public var localizedElement: String {
-        guard LocalizationManager.shared.effectiveLanguage == .en else { return element }
-        switch element {
-        case "水": return "Water"
-        case "木": return "Wood"
-        case "火": return "Fire"
-        case "土": return "Earth"
-        case "金": return "Metal"
-        default: return element
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch element {
+            case "水": return "Water"
+            case "木": return "Wood"
+            case "火": return "Fire"
+            case "土": return "Earth"
+            case "金": return "Metal"
+            default: return element
+            }
+        case .id:
+            switch element {
+            case "水": return "Air"
+            case "木": return "Kayu"
+            case "火": return "Api"
+            case "土": return "Tanah"
+            case "金": return "Logam"
+            default: return element
+            }
+        case .ko:
+            switch element {
+            case "水": return "수"
+            case "木": return "목"
+            case "火": return "화"
+            case "土": return "토"
+            case "金": return "금"
+            default: return element
+            }
+        case .vi:
+            switch element {
+            case "水": return "Thủy"
+            case "木": return "Mộc"
+            case "火": return "Hỏa"
+            case "土": return "Thổ"
+            case "金": return "Kim"
+            default: return element
+            }
+        case .th:
+            switch element {
+            case "水": return "น้ำ"
+            case "木": return "ไม้"
+            case "火": return "ไฟ"
+            case "土": return "ดิน"
+            case "金": return "ทอง"
+            default: return element
+            }
+        default:
+            return element
         }
     }
 }
@@ -216,38 +418,61 @@ public final class Mountain24Data {
         let jianDeg = abs(diff)
         let isJian = jianDeg > 3.0
         
-        let isEn = LocalizationManager.shared.effectiveLanguage == .en
-        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
-        
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
+        let neighborM = mountain(for: neighborAngle)
+        let degStr = String(format: "%.1f", jianDeg)
         let fenJin: String
-        if isEn {
+        
+        switch lang {
+        case .en:
             if isJian {
-                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
-                let neighborM = mountain(for: neighborAngle)
-                fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Sub \(neighborM.pinyin) (offset \(String(format: "%.1f", jianDeg))°)"
+                fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Sub \(neighborM.pinyin) (offset \(degStr)°)"
             } else {
                 fenJin = "Sit \(sittingM.pinyin) Face \(facingM.pinyin) · Direct Alignment"
             }
-        } else if isHant {
-            var s = "\(sittingM.localizedName)山\(facingM.localizedName)向"
+        case .id:
             if isJian {
-                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
-                let neighborM = mountain(for: neighborAngle)
-                s += " 兼 \(neighborM.localizedName) (偏\(String(format: "%.1f", jianDeg))°)"
+                fenJin = "Duduk \(sittingM.pinyin) Hadap \(facingM.pinyin) · Condong \(neighborM.pinyin) (deviasi \(degStr)°)"
             } else {
-                s += " 正針下卦"
+                fenJin = "Duduk \(sittingM.pinyin) Hadap \(facingM.pinyin) · Arah Lurus"
             }
-            fenJin = s
-        } else {
-            var s = "\(sittingM.name)山\(facingM.name)向"
+        case .ja:
             if isJian {
-                let neighborAngle = diff > 0 ? (facingM.angleCenter + 15) : (facingM.angleCenter - 15)
-                let neighborM = mountain(for: neighborAngle)
-                s += " 兼 \(neighborM.name) (偏\(String(format: "%.1f", jianDeg))°)"
+                fenJin = "\(sittingM.localizedName)山\(facingM.localizedName)向 兼 \(neighborM.localizedName) (偏\(degStr)°)"
             } else {
-                s += " 正针下卦"
+                fenJin = "\(sittingM.localizedName)山\(facingM.localizedName)向 正針下卦"
             }
-            fenJin = s
+        case .ko:
+            if isJian {
+                fenJin = "\(sittingM.localizedName)산\(facingM.localizedName)향 겸 \(neighborM.localizedName) (편\(degStr)°)"
+            } else {
+                fenJin = "\(sittingM.localizedName)산\(facingM.localizedName)향 정침하괘"
+            }
+        case .vi:
+            if isJian {
+                fenJin = "Tọa \(sittingM.localizedName) Hướng \(facingM.localizedName) · Kiêm \(neighborM.localizedName) (lệch \(degStr)°)"
+            } else {
+                fenJin = "Tọa \(sittingM.localizedName) Hướng \(facingM.localizedName) · Chính Châm"
+            }
+        case .th:
+            if isJian {
+                fenJin = "นั่ง \(sittingM.localizedName) หัน \(facingM.localizedName) · เอียง \(neighborM.localizedName) (เบี่ยง \(degStr)°)"
+            } else {
+                fenJin = "นั่ง \(sittingM.localizedName) หัน \(facingM.localizedName) · ทิศตรง"
+            }
+        case .zhHant:
+            if isJian {
+                fenJin = "\(sittingM.localizedName)山\(facingM.localizedName)向 兼 \(neighborM.localizedName) (偏\(degStr)°)"
+            } else {
+                fenJin = "\(sittingM.localizedName)山\(facingM.localizedName)向 正針下卦"
+            }
+        default:
+            if isJian {
+                fenJin = "\(sittingM.name)山\(facingM.name)向 兼 \(neighborM.name) (偏\(degStr)°)"
+            } else {
+                fenJin = "\(sittingM.name)山\(facingM.name)向 正针下卦"
+            }
         }
         
         let isLevel = abs(pitch) < 2.5 && abs(roll) < 2.5

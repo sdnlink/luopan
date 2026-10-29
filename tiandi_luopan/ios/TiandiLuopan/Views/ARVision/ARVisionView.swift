@@ -357,7 +357,6 @@ public struct ARVisionView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
-    @StateObject private var spatialModel = ARSpatialSurveyModel()
     
     public var isActive: Bool = true
     
@@ -446,27 +445,15 @@ public struct ARVisionView: View {
             if isActive {
             // 1. 真机摄像头实时预览 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             if hasCameraPermission && isActive && !showSpatialSurvey {
-                if ARWorldTrackingConfiguration.isSupported {
-                    ARFusionCaptureView(
-                        model: spatialModel,
-                        isActive: isActive && !showSpatialSurvey,
-                        captureTrigger: captureTrigger,
-                        onFrameCaptured: { frame in
-                            handleCapturedFrame(frame)
-                        }
-                    )
-                    .ignoresSafeArea()
-                } else {
-                    CameraPreviewView(
-                        cameraPosition: cameraPosition,
-                        isActive: isActive && !showSpatialSurvey,
-                        captureTrigger: captureTrigger,
-                        onPhotoCaptured: { image in
-                            handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
-                        }
-                    )
-                    .ignoresSafeArea()
-                }
+                CameraPreviewView(
+                    cameraPosition: cameraPosition,
+                    isActive: isActive && !showSpatialSurvey,
+                    captureTrigger: captureTrigger,
+                    onPhotoCaptured: { image in
+                        handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
+                    }
+                )
+                .ignoresSafeArea()
             } else {
                 simulationCanvasLayer()
                     .ignoresSafeArea()
@@ -535,7 +522,6 @@ public struct ARVisionView: View {
             } else {
                 stopScanAnimation()
                 showSpatialSurvey = false
-                spatialModel.pause()
                 pendingCapturePurpose = nil
                 isAIScanning = false
                 aiScanGeneration &+= 1
@@ -554,11 +540,6 @@ public struct ARVisionView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             guard isActive else { return }
-            // ARKit may keep delivering frames while a SwiftUI tab is still
-            // mounted. Explicitly pause it and invalidate an in-flight scan
-            // so background camera/LiDAR work cannot continue or complete with
-            // stale evidence after the app returns.
-            spatialModel.pause()
             pendingCapturePurpose = nil
             isAIScanning = false
             aiScanGeneration &+= 1
@@ -567,7 +548,6 @@ public struct ARVisionView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             guard isActive, !showSpatialSurvey else { return }
             checkCameraPermission()
-            spatialModel.resume()
         }
         .sheet(isPresented: $showRemedySheet) {
             ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
@@ -580,7 +560,6 @@ public struct ARVisionView: View {
         }
         .onDisappear {
             showSpatialSurvey = false
-            spatialModel.stop()
             snapshotGeneration += 1
             pendingCapturePurpose = nil
             isAIScanning = false
@@ -861,7 +840,7 @@ public struct ARVisionView: View {
                     .foregroundColor(.white)
                     .clipShape(Circle())
             }
-            .disabled(ARWorldTrackingConfiguration.isSupported || isAIScanning || pendingCapturePurpose != nil)
+            .disabled(isAIScanning || pendingCapturePurpose != nil)
             
             // 勘测存证快照拍照按钮
             Button(action: {
@@ -1401,86 +1380,432 @@ public struct ARVisionView: View {
     }
 }
 
-// MARK: - 形煞深度剖析与化解弹窗
+// MARK: - 大师化解锦囊深度剖析与全案实操
 public struct ShaRemedyDetailSheet: View {
-    public let sha: ExteriorShaItem
+    public let initialSha: ExteriorShaItem
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
+    @State private var selectedShaId: String
     @State private var showPaywall: Bool = false
+    
+    private let database = ExteriorShaEngine.shared.database
+    
+    public init(sha: ExteriorShaItem) {
+        self.initialSha = sha
+        _selectedShaId = State(initialValue: sha.id)
+    }
+    
+    private var currentSha: ExteriorShaItem {
+        database.first(where: { $0.id == selectedShaId }) ?? initialSha
+    }
     
     public var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(sha.localizedName)
-                                .font(.system(size: 24, weight: .bold, design: .serif))
-                            Text(sha.localizedAliases)
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        Text(sha.severity.localizedTitle)
-                            .font(.system(size: 12, weight: .bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.red.opacity(0.15))
-                            .foregroundColor(.red)
-                            .cornerRadius(6)
-                    }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 18) {
+                    // 1. 八大形煞快速切换横向选择栏
+                    shaPickerSection
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(LocalizationManager.shared.t("ar_env_features"))
-                            .font(.system(size: 15, weight: .bold))
-                        Text(sha.localizedVisualFeature)
-                            .font(.system(size: 13))
-                            .foregroundColor(.primary)
-                    }
+                    // 2. 煞气核心诊断与古典赋文卡片
+                    shaDiagnosisCard
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(LocalizationManager.shared.t("ar_classic_lore"))
-                            .font(.system(size: 15, weight: .bold))
-                        Text(sha.localizedClassicalText)
-                            .font(.system(size: 13, weight: .medium, design: .serif))
-                            .foregroundColor(.yanBrown)
-                            .padding(10)
-                            .background(Color.yellow.opacity(0.1))
-                            .cornerRadius(8)
-                    }
+                    // 3. 锦囊第一策：生态屏障与玄关动线调和（免费开放 · 立即见效）
+                    ecoBarrierRemedyCard
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(LocalizationManager.shared.t("ar_remedy_title"))
-                            .font(.system(size: 15, weight: .bold))
-                        
-                        if !iap.hasUnlockedVIP {
-                            VIPLockCardView(
-                                title: LocalizationManager.shared.t("ar_vip_remedy_title"),
-                                featureDesc: LocalizationManager.shared.t("ar_vip_remedy_desc"),
-                                badge: LocalizationManager.shared.t("vip_badge_title"),
-                                targetProductId: .vipYearly,
-                                onUnlockTap: { showPaywall = true }
-                            )
-                        } else {
-                            Text(sha.localizedRemedySolution)
-                                .font(.system(size: 13))
-                                .foregroundColor(.primary)
-                                .padding(10)
-                                .background(Color.green.opacity(0.1))
-                                .cornerRadius(8)
-                        }
-                    }
+                    // 4. 锦囊第二策：镇宅开光法物秘宝与方位要领（VIP专属 / 核心真传）
+                    talismanRemedyCard
+                    
+                    // 5. 锦囊第三策：玄空理气与五行生克调化（形理兼治）
+                    xuanKongElementsRemedyCard
+                    
+                    // 6. 锦囊第四策：杨公择日安放良辰秘法（全套安放仪轨）
+                    auspiciousTimingRemedyCard
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
-            .navigationBarTitle(LocalizationManager.shared.t("sha_report"), displayMode: .inline)
-            .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
+            .background(Color(red: 0.08, green: 0.08, blue: 0.1).ignoresSafeArea())
+            .navigationBarTitle(lang.t("remedy_guide"), displayMode: .inline)
+            .navigationBarItems(trailing: Button(lang.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
             .sheet(isPresented: $showPaywall) {
                 VIPPaywallSheet(defaultProductId: .vipYearly)
             }
+        }
+    }
+    
+    // MARK: - 1. 八大形煞快速切换栏
+    private var shaPickerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(lang.t("ar_sha_analysis_prefix"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Color.yanCyan)
+                Spacer()
+                Text("8大经典形煞锦囊库")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(database) { item in
+                        let isSelected = item.id == currentSha.id
+                        Button(action: {
+                            selectedShaId = item.id
+                        }) {
+                            HStack(spacing: 4) {
+                                if isSelected {
+                                    Circle()
+                                        .fill(Color(red: 0.95, green: 0.8, blue: 0.3))
+                                        .frame(width: 5, height: 5)
+                                }
+                                Text(item.localizedName)
+                                    .font(.system(size: 12, weight: isSelected ? .bold : .medium))
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(isSelected ? Color(red: 0.85, green: 0.7, blue: 0.2).opacity(0.25) : Color.white.opacity(0.08))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(isSelected ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.clear, lineWidth: 1)
+                            )
+                            .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white.opacity(0.8))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - 2. 煞气核心诊断与古典赋文卡片
+    private var shaDiagnosisCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(currentSha.localizedName)
+                        .font(.system(size: 22, weight: .bold, design: .serif))
+                        .foregroundColor(Color(red: 0.96, green: 0.88, blue: 0.55))
+                    Text(currentSha.localizedAliases)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.65))
+                }
+                Spacer()
+                Text(currentSha.severity.localizedTitle)
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
+                    .background(Color.red.opacity(0.2))
+                    .foregroundColor(Color(red: 1.0, green: 0.4, blue: 0.4))
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.red.opacity(0.4), lineWidth: 1))
+            }
+            
+            Divider().background(Color.white.opacity(0.12))
+            
+            // 现场特征
+            VStack(alignment: .leading, spacing: 4) {
+                Label(lang.t("ar_env_features"), systemImage: "eye.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.yanCyan)
+                Text(currentSha.localizedVisualFeature)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineSpacing(2)
+            }
+            
+            // 玄学危害机理
+            VStack(alignment: .leading, spacing: 4) {
+                Label("⚡ 玄学危害机理剖析", systemImage: "bolt.trianglebranch.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color.orange)
+                Text(currentSha.localizedMetaphysicsHarm)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineSpacing(2)
+            }
+            
+            // 古籍赋文
+            VStack(alignment: .leading, spacing: 4) {
+                Label(lang.t("ar_classic_lore"), systemImage: "book.closed.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(red: 0.9, green: 0.75, blue: 0.35))
+                Text(currentSha.localizedClassicalText)
+                    .font(.system(size: 12, weight: .medium, design: .serif))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.65))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(red: 0.22, green: 0.17, blue: 0.08).opacity(0.6))
+                    .cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(red: 0.8, green: 0.65, blue: 0.25).opacity(0.35), lineWidth: 1))
+            }
+        }
+        .padding(14)
+        .background(Color(red: 0.13, green: 0.13, blue: 0.16))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+    }
+    
+    // MARK: - 3. 锦囊第一策：生态屏障与玄关动线调和（免费开放）
+    private var ecoBarrierRemedyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("🌿 第一策 · 绿色生态与玄关屏风法", systemImage: "leaf.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.green)
+                Spacer()
+                Text("即刻落地 · 全员免费")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.18))
+                    .foregroundColor(.green)
+                    .cornerRadius(6)
+            }
+            
+            Text("无需动土破土，通过环境植被与室内动线重塑，以柔克刚化解外部冲击气场：")
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.7))
+            
+            VStack(alignment: .leading, spacing: 8) {
+                ecoDetailRow(
+                    icon: "tree.fill",
+                    title: "阳台与窗前植被防护林",
+                    desc: ecoPlantDesc(for: currentSha.id)
+                )
+                
+                ecoDetailRow(
+                    icon: "rectangle.split.2x1.fill",
+                    title: "室内玄关九曲回流格局",
+                    desc: "正对冲煞方向设立双面透光山水屏风或半高玄关隔断柜，将直冲强气转化为'曲折有情'之徐缓生气，藏风聚气而不阻滞光线。"
+                )
+                
+                ecoDetailRow(
+                    icon: "curtains.closed",
+                    title: "双层Low-E隔音透光布艺",
+                    desc: "窗边配置双层厚质隔音透光窗帘或百叶帘，物理阻绝外部视线与急煞风刃直透宅心，保全家中私密安稳气场。"
+                )
+            }
+        }
+        .padding(14)
+        .background(Color(red: 0.12, green: 0.15, blue: 0.13))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.3), lineWidth: 1))
+    }
+    
+    // MARK: - 4. 锦囊第二策：镇宅开光法物秘宝（VIP专属/核心真传）
+    private var talismanRemedyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("🛡️ 第二策 · 镇宅开光法物秘宝", systemImage: "shield.checkered")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.8, blue: 0.3))
+                Spacer()
+                Text("开光真品 · 形煞克星")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.yellow.opacity(0.15))
+                    .foregroundColor(Color(red: 0.95, green: 0.8, blue: 0.3))
+                    .cornerRadius(6)
+            }
+            
+            if !iap.hasUnlockedVIP {
+                VIPLockCardView(
+                    title: lang.t("ar_vip_remedy_title"),
+                    featureDesc: "形煞本物克制真传、特选纯铜开光重器规制、悬挂倾角严训与邻里相合禁忌，解锁 VIP 尊享完整全案。",
+                    badge: lang.t("vip_badge_title"),
+                    targetProductId: .vipYearly,
+                    onUnlockTap: { showPaywall = true }
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    talismanItemRow(
+                        title: "核心克制法物推荐",
+                        content: currentSha.localizedRemedySolution
+                    )
+                    
+                    talismanItemRow(
+                        title: "法器材质规制要求",
+                        content: "必须选用正品高密度压铸纯铜（镇金辟阴）、天然黑曜石（化煞纳水）或纯天然黄玉石（厚德载物）。严禁使用塑料电镀仿品，仿制品不仅无抗煞磁场，反招邪气反噬。"
+                    )
+                    
+                    talismanItemRow(
+                        title: "悬挂朝向与邻里和睦禁忌",
+                        content: "八卦镜或山海镇务必镜面朝外，向煞源微仰3至5度纳气消峰；严禁正对对面邻家门窗，遵循堪舆大师'化己之灾、莫害他人'的慈悲守和法则。"
+                    )
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(red: 0.16, green: 0.14, blue: 0.10))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.85, green: 0.7, blue: 0.25).opacity(0.35), lineWidth: 1))
+    }
+    
+    // MARK: - 5. 锦囊第三策：玄空理气与五行飞星调治
+    private var xuanKongElementsRemedyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("🧭 第三策 · 玄空理气与五行飞星调化", systemImage: "safari.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color.cyan)
+                Spacer()
+                Text("形理兼治")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.cyan.opacity(0.18))
+                    .foregroundColor(Color.cyan)
+                    .cornerRadius(6)
+            }
+            
+            VStack(alignment: .leading, spacing: 7) {
+                Text("“峦头无理气不灵，理气无峦头不验”。形峦凶煞若逢二黑病符星或五黄廉贞大煞飞临，凶应加倍：")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineSpacing(2)
+                
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.yellow)
+                    Text("【避煞要诀】冲煞方若为二黑巨门或五黄廉贞位，严禁动土穿凿与安放红色暖光灯，宜挂一具纯铜静安风铃或特制铜葫芦，以金泄土化解燥烈之气。")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+                
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color.cyan)
+                    Text("【借势生旺】配合罗盘实测向首，若当运一白贪狼水星或八白左辅、九紫右弼当令吉星飞临，可在此方布置水生植物或紫水晶洞，化煞气为权柄，转凶为大吉。")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(red: 0.10, green: 0.13, blue: 0.16))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
+    }
+    
+    // MARK: - 6. 锦囊第四策：杨公择日安放良辰秘法
+    private var auspiciousTimingRemedyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("📅 第四策 · 杨公择日安放良辰秘法", systemImage: "calendar.badge.clock")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 1.0, green: 0.6, blue: 0.3))
+                Spacer()
+                Text("天时吉课")
+                    .font(.system(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.18))
+                    .foregroundColor(.orange)
+                    .cornerRadius(6)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                timingPointRow(
+                    tag: "择日避忌",
+                    content: "严禁岁破日、月破日、四废四绝日安放，且吉日地支不得与本宅坐向或户主本命生肖直冲（如子午相冲、丑未相冲）。"
+                )
+                
+                timingPointRow(
+                    tag: "推荐良辰",
+                    content: "首选【天德】、【月德】、【天赦】、【青龙】吉日。时辰宜选辰时（7:00-9:00 朝阳升腾）、巳时（9:00-11:00 阳火得令）或午时（11:00-13:00 至阳化阴）。"
+                )
+                
+                timingPointRow(
+                    tag: "安放净仪",
+                    content: "1. 净手焚一柱天然降真香或檀香熏沐法器；\n2. 法物原用红布严密封裹，至所选吉时良辰面向煞源启封揭彩；\n3. 端正放置于指定点位，心中默诵吉祥安康、家宅平顺之善念。"
+                )
+            }
+        }
+        .padding(14)
+        .background(Color(red: 0.16, green: 0.12, blue: 0.10))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.35), lineWidth: 1))
+    }
+    
+    // MARK: - 辅助子组件
+    private func ecoDetailRow(icon: String, title: String, desc: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(.green)
+                .frame(width: 18)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(desc)
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineSpacing(2)
+            }
+        }
+    }
+    
+    private func talismanItemRow(title: String, content: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+            Text(content)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.9))
+                .lineSpacing(2)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(6)
+    }
+    
+    private func timingPointRow(tag: String, content: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(tag)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.orange.opacity(0.18))
+                .cornerRadius(4)
+            Text(content)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(2)
+        }
+    }
+    
+    private func ecoPlantDesc(for id: String) -> String {
+        switch id {
+        case "tianzhan", "chuanxin":
+            return "在阳台或对冲窗台排布茂密的阔叶常绿植物（如大叶散尾葵、琴叶榕、龟背竹），枝叶彼此交叠形成天然生态气盾，软化高速风刃。"
+        case "luchong":
+            return "在门前或对正路冲的窗下放置圆叶富贵竹或发财树盆景，使外部车流直冲之气化作回环温润之风。"
+        case "fangong":
+            return "在窗台安置半圆型绿色植被弧阵，顺应离心力缓冲向外甩甩的煞气，守住财水不失。"
+        case "tantou":
+            return "在视线对冲窗口种植长春藤或常青绿植阻断窥视，辅以常闭微透光百叶帘化解阴邪暗窥。"
+        case "huoxing":
+            return "窗台摆设水培常春藤或小型水养植物，借水生木、木生火之循环，以水润燥调和火煞燥烈。"
+        case "baihu":
+            return "在住宅左侧青龙方多摆放茂盛高大植物（如富贵椰子、绿宝），以青翠生机助旺青龙，压制白虎张扬。"
+        case "gejiao":
+            return "在阳台下沿筑造厚重高盆花坛灌木，构筑人工厚实台座，阻绝急流与贴地快速车道下拔地气。"
+        default:
+            return "窗台排布阔叶常绿盆景，构建绿色生态缓冲屏障，调和外部急煞气流。"
         }
     }
 }

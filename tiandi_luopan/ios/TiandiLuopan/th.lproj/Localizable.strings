@@ -1,4 +1,4 @@
-/* In-app strings. The running UI reads LocalizationManager. */
+/* Localizable.strings (th) - Auto-synced from LocalizationManager.swift */
 
 "tab_compass" = "เข็มทิศ";
 "tab_ar" = "ดูสภาพ";

@@ -21,8 +21,64 @@ public struct FenjinItem: Identifiable {
         return mountainName
     }
 
+    public var localizedJiaziName: String {
+        guard jiaziName.count >= 2 else { return jiaziName }
+        let stemChar = String(jiaziName.prefix(1))
+        let branchChar = String(jiaziName.suffix(1))
+        let lang = LocalizationManager.shared.effectiveLanguage
+
+        let stemMap: [String: [AppLanguage: String]] = [
+            "甲": [.en: "Jia", .ja: "甲", .ko: "갑", .vi: "Giáp", .th: "เจี่ย", .id: "Jia"],
+            "乙": [.en: "Yi", .ja: "乙", .ko: "을", .vi: "Ất", .th: "อี่", .id: "Yi"],
+            "丙": [.en: "Bing", .ja: "丙", .ko: "병", .vi: "Bính", .th: "ปิ่ง", .id: "Bing"],
+            "丁": [.en: "Ding", .ja: "丁", .ko: "정", .vi: "Đinh", .th: "ติง", .id: "Ding"],
+            "戊": [.en: "Wu", .ja: "戊", .ko: "무", .vi: "Mậu", .th: "อู้", .id: "Wu"],
+            "己": [.en: "Ji", .ja: "己", .ko: "기", .vi: "Kỷ", .th: "จี่", .id: "Ji"],
+            "庚": [.en: "Geng", .ja: "庚", .ko: "경", .vi: "Canh", .th: "เกิง", .id: "Geng"],
+            "辛": [.en: "Xin", .ja: "辛", .ko: "신", .vi: "Tân", .th: "ซิน", .id: "Xin"],
+            "壬": [.en: "Ren", .ja: "壬", .ko: "임", .vi: "Nhâm", .th: "เหริน", .id: "Ren"],
+            "癸": [.en: "Gui", .ja: "癸", .ko: "계", .vi: "Quý", .th: "กุ่ย", .id: "Gui"]
+        ]
+        let branchMap: [String: [AppLanguage: String]] = [
+            "子": [.en: "Zi", .ja: "子", .ko: "자", .vi: "Tý", .th: "จื่อ", .id: "Zi"],
+            "丑": [.en: "Chou", .ja: "丑", .ko: "축", .vi: "Sửu", .th: "โฉ่ว", .id: "Chou"],
+            "寅": [.en: "Yin", .ja: "寅", .ko: "인", .vi: "Dần", .th: "อิ๋น", .id: "Yin"],
+            "卯": [.en: "Mao", .ja: "卯", .ko: "묘", .vi: "Mão", .th: "เหมา", .id: "Mao"],
+            "辰": [.en: "Chen", .ja: "辰", .ko: "진", .vi: "Thìn", .th: "เฉิน", .id: "Chen"],
+            "巳": [.en: "Si", .ja: "巳", .ko: "사", .vi: "Tỵ", .th: "ซื่อ", .id: "Si"],
+            "午": [.en: "Wu", .ja: "午", .ko: "오", .vi: "Ngọ", .th: "อู่", .id: "Wu"],
+            "未": [.en: "Wei", .ja: "未", .ko: "미", .vi: "Mùi", .th: "เว่ย", .id: "Wei"],
+            "申": [.en: "Shen", .ja: "申", .ko: "신", .vi: "Thân", .th: "เซิน", .id: "Shen"],
+            "酉": [.en: "You", .ja: "酉", .ko: "유", .vi: "Dậu", .th: "โหย่ว", .id: "You"],
+            "戌": [.en: "Xu", .ja: "戌", .ko: "술", .vi: "Tuất", .th: "ซีว์", .id: "Xu"],
+            "亥": [.en: "Hai", .ja: "亥", .ko: "해", .vi: "Hợi", .th: "ไฮ่", .id: "Hai"]
+        ]
+
+        if lang == .zhHans || lang == .zhHant {
+            return jiaziName
+        }
+        let s = stemMap[stemChar]?[lang] ?? stemChar
+        let b = branchMap[branchChar]?[lang] ?? branchChar
+        switch lang {
+        case .en, .id: return "\(s)-\(b)"
+        case .vi: return "\(s) \(b)"
+        case .ko: return "\(s)\(b) (\(jiaziName))"
+        case .ja: return "\(jiaziName) (\(s)\(b))"
+        case .th: return "\(s)-\(b)"
+        default: return jiaziName
+        }
+    }
+
     public var localizedGrade: String {
         switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans:
+            return grade
+        case .zhHant:
+            return grade.replacingOccurrences(of: "孤虚", with: "孤虛")
+                .replacingOccurrences(of: "差错", with: "差錯")
+                .replacingOccurrences(of: "退财", with: "退財")
+                .replacingOccurrences(of: "龟", with: "龜")
+                .replacingOccurrences(of: "平稳", with: "平穩")
         case .en:
             switch grade {
             case "旺相大吉": return "Auspicious Prosperity"
@@ -30,31 +86,66 @@ public struct FenjinItem: Identifiable {
             case "差错退财": return "Error · Wealth Drain"
             case "龟甲空亡": return "Turtle-Shell Void"
             case "差错退气": return "Error · Retreating Qi"
-            default: return "Balanced"
+            default: return "Balanced & Neutral"
             }
-        case .zhHant:
-            return grade.replacingOccurrences(of: "旺相大吉", with: "旺相大吉")
-                .replacingOccurrences(of: "孤虚", with: "孤虛")
-                .replacingOccurrences(of: "差错", with: "差錯")
-                .replacingOccurrences(of: "退财", with: "退財")
-                .replacingOccurrences(of: "空亡", with: "空亡")
-                .replacingOccurrences(of: "龟", with: "龜")
-        default: return grade
+        case .ja:
+            switch grade {
+            case "旺相大吉": return "旺相大吉"
+            case "孤虚差错": return "孤虚差錯"
+            case "差错退财": return "差錯退財"
+            case "龟甲空亡": return "亀甲空亡"
+            case "差错退气": return "差錯退気"
+            default: return "平穏"
+            }
+        case .ko:
+            switch grade {
+            case "旺相大吉": return "왕상대길 (旺相大吉)"
+            case "孤虚差错": return "고허착오 (孤虛差錯)"
+            case "差错退财": return "착오퇴재 (差錯退財)"
+            case "龟甲空亡": return "귀갑공망 (龜甲空亡)"
+            case "差错退气": return "착오퇴기 (差錯退氣)"
+            default: return "평온 (平穩)"
+            }
+        case .vi:
+            switch grade {
+            case "旺相大吉": return "Vượng Tướng Đại Cát"
+            case "孤虚差错": return "Cô Hư Sai Thất"
+            case "差错退财": return "Sai Thất Thoái Tài"
+            case "龟甲空亡": return "Quy Giáp Không Vong"
+            case "差错退气": return "Sai Thất Thoái Khí"
+            default: return "Bình Ổn"
+            }
+        case .th:
+            switch grade {
+            case "旺相大吉": return "มหามงคลรุ่งเรืองยิ่ง"
+            case "孤虚差错": return "พลังโดดเดี่ยวว่างเปล่าผิดพลาด"
+            case "差错退财": return "ผิดพลาดทรัพย์รั่วไหล"
+            case "龟甲空亡": return "ช่องว่างกระดองเต่าอวมงคล"
+            case "差错退气": return "ผิดพลาดพลังถดถอย"
+            default: return "ราบเรียบสมดุล"
+            }
+        case .id:
+            switch grade {
+            case "旺相大吉": return "Sangat Menguntungkan & Makmur"
+            case "孤虚差错": return "Kekosongan Terasing & Kekeliruan"
+            case "差错退财": return "Kekeliruan Menguras Rezeki"
+            case "龟甲空亡": return "Kekosongan Cangkang Kura-kura"
+            case "差错退气": return "Kekeliruan Energi Melemah"
+            default: return "Stabil & Seimbang"
+            }
+        default:
+            return grade
         }
     }
 
     public var localizedLore: String {
-        switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
-            switch grade {
-            case "旺相大吉": return "Prosperous and well-timed; supports wealth, harmony and lasting fortune."
-            case "孤虚差错": return "Lone-void error qi; associated with retreat and wealth loss. Avoid establishing a facing here."
-            case "差错退财": return "Excess yin and hidden drain make it difficult to gather qi or retain wealth."
-            case "龟甲空亡": return "Turtle-shell void; a depleted degree associated with setbacks and illness. Avoid using it."
-            case "差错退气": return "Retreating qi makes it difficult to sustain momentum or responsibility."
-            default: return "The qi is balanced; use ordinary orientation judgment."
-            }
-        case .zhHant:
+        let firstStem = String(jiaziName.prefix(1))
+        let lang = LocalizationManager.shared.effectiveLanguage
+        
+        if lang == .zhHans {
+            return lore
+        }
+        if lang == .zhHant {
             return lore.replacingOccurrences(of: "差错", with: "差錯")
                 .replacingOccurrences(of: "退财", with: "退財")
                 .replacingOccurrences(of: "旺相", with: "旺相")
@@ -70,7 +161,95 @@ public struct FenjinItem: Identifiable {
                 .replacingOccurrences(of: "绝", with: "絕")
                 .replacingOccurrences(of: "横", with: "橫")
                 .replacingOccurrences(of: "发", with: "發")
-        default: return lore
+        }
+        
+        switch lang {
+        case .en:
+            switch firstStem {
+            case "甲": return "Lone-void sha qi; indicates financial decline and weakened vitality. Avoid using this facing."
+            case "乙": return "Excess yin qi; causes covert wealth drainage and makes qi gathering difficult."
+            case "丙": return "True needle yang fire in prosperity; brings wealth and enduring fortune, highly auspicious."
+            case "丁": return "Yin fire well-positioned; flourishing prosperity and honor, highly auspicious."
+            case "戊": return "Yellow 5 turtle-shell void; brings misfortune and prolonged illness, strictly avoid!"
+            case "己": return "Yin earth void; leads to loss and decline, geomancers should never select this line."
+            case "庚": return "Yang metal in prosperity; martial nobility and broad authority, highly auspicious."
+            case "辛": return "Pure yin metal; refined culture and great abundance, highly auspicious."
+            case "壬": return "Floating water lone-void sha; loss of both family vitality and wealth, do not violate."
+            case "癸": return "Degree of retreating qi; difficult to prosper or maintain responsibility."
+            default: return "Neutral balanced qi; use standard judgment."
+            }
+        case .ja:
+            switch firstStem {
+            case "甲": return "孤虚の煞気、冷退破財を招き人丁凋零す。立向に適さず。"
+            case "乙": return "陰気過重、密かな損財を招き集気困難なり。"
+            case "丙": return "正針陽火旺相、招財進宝にして富貴久遠、大吉として活用可。"
+            case "丁": return "陰火得位、人財両旺、科甲連登にして大吉活用可。"
+            case "戊": return "五黄土煞亀甲大空亡、横禍官非・病気衰弱を招く。厳禁すべし！"
+            case "己": return "陰土空亡衰絶、後継衰退を主る。地師慎んで用いるべからず！"
+            case "庚": return "陽金生旺、武貴栄達にして威勢四方に轟く、大吉活用可。"
+            case "辛": return "陰金純正、文雅富厚にして金玉満堂、大吉活用可。"
+            case "壬": return "水泛木浮の孤虚煞、人財倶に空亡す。慎みて犯すなかれ。"
+            case "癸": return "退気の度、発展困難にして大任に耐え難し。"
+            default: return "気場平穏にして常規の判定に従う。"
+            }
+        case .ko:
+            switch firstStem {
+            case "甲": return "고허살기(孤虛煞氣), 냉퇴파재와 인구 조령을 주관하므로 입향에 불가함."
+            case "乙": return "음기가 지나쳐 암암리에 재물을 소모하고 기를 모으기 어려움."
+            case "丙": return "정침 양화가 왕상하여 재물을 부르고 부귀가 영원하여 대길함."
+            case "丁": return "음화가 득위하여 인재와 재물이 모두 번창하고 과거급제하여 대길함."
+            case "戊": return "오황토살 귀갑대공망으로 재화와 관재, 오랜 병환을 부르니 엄히 피할 것!"
+            case "己": return "음토 공망패절로 후손 단절과 쇠락을 부르니 지사는 결코 놓지 말 것!"
+            case "庚": return "양금이 생왕하여 무귀로 현달하고 사방에 위세를 떨치니 대길함."
+            case "辛": return "음금이 순정하여 문아부후하고 금옥이 만당하니 대길함."
+            case "壬": return "수범목부 고허살로 인재와 재물이 모두 비니 범하지 말 것."
+            case "癸": return "퇴기의 도수로 발전하기 어렵고 큰 책임을 감당하기 어려움."
+            default: return "기운이 평온하여 일반적인 판단을 따름."
+            }
+        case .vi:
+            switch firstStem {
+            case "甲": return "Sát khí cô hư, chủ thoái tài tổn đinh, suy bại không nên lập hướng."
+            case "乙": return "Âm khí quá nặng, chủ hao tán tài lộc, khó tụ khí lành."
+            case "丙": return "Chính châm dương hỏa vượng tướng, chiêu tài tiến bảo, phú quý trường cửu, đại cát khả dụng."
+            case "丁": return "Âm hỏa đắc vị, đinh tài lưỡng vượng, khoa giáp liên đăng, đại cát khả dụng."
+            case "戊": return "Ngũ hoàng thổ sát quy giáp đại không vong, chủ hoạn nạn quan phi, bệnh tật triền miên, tối kỵ!"
+            case "己": return "Âm thổ không vong bại tuyệt, chủ tuyệt tự suy bại, thầy phong thủy chớ khinh suất!"
+            case "庚": return "Dương kim sinh vượng, võ quý hiển đạt, uy chấn bốn phương, đại cát khả dụng."
+            case "辛": return "Âm kim thuần chính, văn nhã phú hậu, kim ngọc mãn đường, đại cát khả dụng."
+            case "壬": return "Thủy phiếm mộc phù cô hư sát, đinh tài lưỡng không, cẩn thận chớ phạm."
+            case "癸": return "Độ số thoái khí, khó nỗi phát vinh, khó đảm đương việc lớn."
+            default: return "Khí trường bình ổn, vận dụng bình thường."
+            }
+        case .th:
+            switch firstStem {
+            case "甲": return "ไอพลังโดดเดี่ยวว่างเปล่า นำพาความเสื่อมถอยและสูญเสียทรัพย์ ไม่ควรตั้งทิศ"
+            case "乙": return "พลังหยินหนักเกินไป ทำให้ทรัพย์สินรั่วไหลอย่างเงียบๆ กักเก็บพลังยาก"
+            case "丙": return "ธาตุไฟหยางเข็มตรงรุ่งเรือง เรียกทรัพย์สินเงินทอง ร่ำรวยยั่งยืน มหามงคลใช้ได้"
+            case "丁": return "ธาตุไฟหยินได้ตำแหน่ง ทรัพย์และครอบครัวเจริญรุ่งเรือง มหามงคลใช้ได้"
+            case "戊": return "ดาวเบญจดินกระดองเต่าอวมงคล เกิดคดีความและเจ็บป่วยเรื้อรัง ต้องหลีกเลี่ยงเด็ดขาด!"
+            case "己": return "ธาตุดินหยินสูญสิ้น ดับสูญและเสื่อมถอย ซินแสพึงระวังอย่าใช้!"
+            case "庚": return "ธาตุทองหยางรุ่งเรือง เจริญในยศศักดิ์และอำนาจ มหามงคลใช้ได้"
+            case "辛": return "ธาตุทองหยินบริสุทธิ์ สง่างามร่ำรวย เงินทองเต็มเรือน มหามงคลใช้ได้"
+            case "壬": return "น้ำพัดไม้ลอยพลังโดดเดี่ยว ทั้งคนและทรัพย์สูญเปล่า ระวังอย่าละเมิด"
+            case "癸": return "องศาพลังถดถอย เติบโตยาก ไม่อาจแบกรับภาระใหญ่หลวงได้"
+            default: return "พลังงานสมดุล ใช้การประเมินทิศตามปกติ"
+            }
+        case .id:
+            switch firstStem {
+            case "甲": return "Energi sha kesepian kosong; menandakan kemunduran rezeki dan kelemahan keluarga. Hindari arah ini."
+            case "乙": return "Energi yin berlebihan; menyebabkan kebocoran rezeki tersembunyi dan sulit mengumpulkan qi."
+            case "丙": return "Jarum sejati api yang makmur; menarik kemakmuran dan kekayaan abadi, sangat menguntungkan."
+            case "丁": return "Api yin pada posisi tepat; keluarga dan rezeki makmur, sangat menguntungkan."
+            case "戊": return "Bintang 5 tanah kekosongan kura-kura; membawa musibah dan penyakit berkepanjangan, hindari keras!"
+            case "己": return "Tanah yin kehancuran; membawa kepunahan dan kemunduran, geomancer jangan gunakan!"
+            case "庚": return "Logam yang makmur; kemuliaan keberanian dan kewibawaan besar, sangat menguntungkan."
+            case "辛": return "Logam yin murni; elegan, makmur, dan berlimpah emas permata, sangat menguntungkan."
+            case "壬": return "Air banjir sha terasing; kehilangan keluarga dan rezeki, berhati-hatilah."
+            case "癸": return "Derajat energi mundur; sulit berkembang dan menanggung tanggung jawab besar."
+            default: return "Energi seimbang; gunakan penilaian biasa."
+            }
+        default:
+            return lore
         }
     }
 }

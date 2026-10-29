@@ -289,7 +289,7 @@ public struct XuanKongGridView: View {
     
     private func palaceCellView(cell: XuanKongPalace) -> some View {
         let isDanger25 = (cell.sittingStar == 2 && cell.facingStar == 5) || (cell.sittingStar == 5 && cell.facingStar == 2)
-        let isDouble9 = cell.sittingStar == 9 && cell.facingStar == 9
+        let isDouble9 = cell.sittingStar == cell.activePeriod && cell.facingStar == cell.activePeriod
         let borderColor = isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12))
         let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
         
@@ -344,9 +344,9 @@ public struct XuanKongGridView: View {
             Divider().background(Color.white.opacity(0.1))
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(lang.t("xuankong_wealth_advice"))
-                Text(lang.t("xuankong_health_advice"))
-                Text(lang.t("xuankong_remedy_advice"))
+                Text(chart.wealthAdvice)
+                Text(chart.healthAdvice)
+                Text(chart.remedyAdvice)
             }
             .font(.system(size: 11))
             .foregroundColor(.white.opacity(0.7))

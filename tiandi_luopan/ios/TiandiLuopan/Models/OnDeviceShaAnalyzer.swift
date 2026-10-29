@@ -24,12 +24,20 @@ public final class OnDeviceShaAnalyzer {
         evidence: ARSceneEvidence? = nil,
         completion: @escaping (Result<ShaAnalysisResult, Error>) -> Void
     ) {
-        // When AR evidence is available, use it to improve FOV and confidence.
-        // Avoid strictly requiring indoor vertical wall planes, so outdoor scenes
-        // (roads, buildings, viaducts) can be reliably analyzed.
+        // When AR evidence is available, validate tracking and LiDAR depth
+        // quality first, then fuse 3D depth topology into the classifier.
         if let evidence = evidence {
             if !evidence.trackingIsNormal && !evidence.mappingIsUsable {
-                // Only reject if tracking completely failed
+                DispatchQueue.main.async {
+                    completion(.failure(AnalysisError.arTrackingLimited))
+                }
+                return
+            }
+            if evidence.lidarAvailable && evidence.depthStreamAvailable && evidence.depthCoverage < 0.08 {
+                DispatchQueue.main.async {
+                    completion(.failure(AnalysisError.arDepthUnavailable))
+                }
+                return
             }
         }
         guard let cgImage = image.cgImage else {
@@ -85,8 +93,8 @@ public final class OnDeviceShaAnalyzer {
                     minimumConfidence: 0.70,
                     quadratureTolerance: 18.0
                 )
-                guard let relaxed = Self.classify(relaxedRegions, minimumConfidence: 0.60),
-                      let strict = Self.classify(strictRegions, minimumConfidence: 0.68),
+                guard let relaxed = Self.classify(relaxedRegions, minimumConfidence: 0.60, evidence: evidence),
+                      let strict = Self.classify(strictRegions, minimumConfidence: 0.68, evidence: evidence),
                       Self.isConsistent(relaxed, strict) else {
                     let hasRegions = !relaxedRegions.isEmpty || !strictRegions.isEmpty
                     let error: AnalysisError = hasRegions ? .ambiguousRegion : .noDetectableRegion
@@ -95,9 +103,11 @@ public final class OnDeviceShaAnalyzer {
                 }
                 let spatialBonus: Double
                 if let evidence = evidence {
-                    // Semantic walls/vertical planes strengthen the geometry
-                    // candidate, but never create one by themselves.
-                    spatialBonus = (evidence.wallFaceCount > 0 || evidence.verticalPlaneCount > 0) ? 0.03 : 0
+                    // Semantic walls/vertical planes and valid LiDAR depth coverage
+                    // strengthen the geometry candidate.
+                    let meshBonus = (evidence.wallFaceCount > 0 || evidence.verticalPlaneCount > 0) ? 0.03 : 0.0
+                    let depthBonus = (evidence.lidarAvailable && evidence.depthCoverage >= 0.40) ? 0.03 : 0.0
+                    spatialBonus = meshBonus + depthBonus
                 } else {
                     spatialBonus = 0
                 }
@@ -107,7 +117,7 @@ public final class OnDeviceShaAnalyzer {
                     targetX: (relaxed.targetX + strict.targetX) * 0.5,
                     targetY: (relaxed.targetY + strict.targetY) * 0.5,
                     detectedRegions: min(relaxed.detectedRegions, strict.detectedRegions),
-                    summary: "multi-pass-paired-vertical-structures",
+                    summary: relaxed.summary,
                     horizontalFOVDegrees: evidence?.horizontalFOVDegrees
                 )
                 DispatchQueue.main.async { completion(.success(result)) }
@@ -150,78 +160,229 @@ public final class OnDeviceShaAnalyzer {
 
     private static func classify(
         _ regions: [VNRectangleObservation],
-        minimumConfidence: Float
+        minimumConfidence: Float,
+        evidence: ARSceneEvidence? = nil
     ) -> ShaAnalysisResult? {
-        // VNDetectRectanglesRequest finds edges, not objects. A single
-        // rectangle cannot tell a road from a floor, a window from a wall, or
-        // a tower gap from a door. Reject the common full-frame and low
-        // confidence detections instead of turning them into a dramatic Sha
-        // diagnosis.
         let usable = regions.filter { region in
             let box = region.boundingBox
             let area = box.width * box.height
             let touchesWholeFrame = box.minX < 0.02 && box.minY < 0.02 && box.maxX > 0.98 && box.maxY > 0.98
-            return region.confidence >= minimumConfidence && area >= 0.025 && area <= 0.45 && !touchesWholeFrame
+            return region.confidence >= minimumConfidence && area >= 0.020 && area <= 0.65 && !touchesWholeFrame
         }
-        guard usable.count >= 2 else { return nil }
+        guard !usable.isEmpty else { return nil }
 
-        // Only report a possible Tian Zhan when two independently detected,
-        // tall structures flank the same central gap. The previous classifier
-        // labelled any narrow object (including a door or a lamp post) as this
-        // severe Sha. A paired observation is a much safer minimum signal.
+        var candidates: [ShaAnalysisResult] = []
+
+        // 1. 天斩煞 (tianzhan) & 白虎煞 (baihu): 成对竖直建筑体量分析 + LiDAR 深度裂缝校验
         let tall = usable.filter { region in
             let box = region.boundingBox
             let aspect = max(box.width, box.height) / max(0.001, min(box.width, box.height))
             let verticality = Self.verticality(of: region)
-            return aspect >= 4.0 && box.width <= 0.22 && box.height >= 0.28 &&
-                verticality >= 0.90 && box.midX > 0.08 && box.midX < 0.92
+            return aspect >= 2.2 && box.width <= 0.36 && box.height >= 0.24 &&
+                verticality >= 0.85 && box.midX > 0.05 && box.midX < 0.95
         }
-        var selectedPair: (VNRectangleObservation, VNRectangleObservation)?
-        var bestPairScore = -Double.infinity
         for leftIndex in 0..<tall.count {
             for rightIndex in (leftIndex + 1)..<tall.count {
-                let left = tall[leftIndex]
-                let right = tall[rightIndex]
+                let first = tall[leftIndex]
+                let second = tall[rightIndex]
+                let left = first.boundingBox.midX <= second.boundingBox.midX ? first : second
+                let right = first.boundingBox.midX <= second.boundingBox.midX ? second : first
                 let leftBox = left.boundingBox
                 let rightBox = right.boundingBox
-                guard leftBox.midX < 0.5, rightBox.midX > 0.5 else { continue }
+                guard leftBox.midX < 0.52, rightBox.midX > 0.48 else { continue }
                 let separation = rightBox.midX - leftBox.midX
                 let gap = rightBox.minX - leftBox.maxX
-                guard separation >= 0.24, separation <= 0.78,
-                      gap >= 0.08, gap <= 0.45 else { continue }
                 let overlap = min(leftBox.maxY, rightBox.maxY) - max(leftBox.minY, rightBox.minY)
                 let baselineDelta = abs(leftBox.minY - rightBox.minY)
                 let heightRatio = min(leftBox.height, rightBox.height) / max(leftBox.height, rightBox.height)
-                guard overlap >= 0.28, baselineDelta <= 0.18, heightRatio >= 0.55 else { continue }
 
-                // A candidate must look like two comparable vertical masses
-                // with a real gap, rather than two unrelated narrow objects.
-                let confidence = Double(left.confidence + right.confidence) * 0.5
-                let heightScore = min(1.0, Double(min(leftBox.height, rightBox.height)) / 0.55)
-                let verticalScore = (Self.verticality(of: left) + Self.verticality(of: right)) * 0.5
-                let gapScore = min(1.0, max(0.0, Double(gap - 0.08) / 0.22))
-                let score = confidence * 0.45 + heightScore * 0.25 + verticalScore * 0.20 + gapScore * 0.10
-                if score > bestPairScore {
-                    bestPairScore = score
-                    selectedPair = (left, right)
+                // (1a) 天斩煞: 左右双高楼夹窄缝，且排斥室内近距离平整门框伪影
+                if separation >= 0.24, separation <= 0.78,
+                   gap >= 0.06, gap <= 0.45,
+                   overlap >= 0.26, baselineDelta <= 0.18, heightRatio >= 0.55,
+                   leftBox.width <= 0.24, rightBox.width <= 0.24 {
+                    var lidarDepthAdjustment = 0.0
+                    var isFlatCloseIndoorSurface = false
+                    if let ev = evidence,
+                       let centerD = ev.depthSampleMeters,
+                       let leftD = ev.leftDepthMeters,
+                       let rightD = ev.rightDepthMeters {
+                        let flankMean = (leftD + rightD) * 0.5
+                        if centerD < 1.8 && flankMean < 1.8 && abs(centerD - flankMean) < 0.12 {
+                            // 距离小于 1.8m 且中心与两侧深度几乎处于同一平面（如室内门框或墙饰），拒绝误判为天斩煞
+                            isFlatCloseIndoorSurface = true
+                        } else if centerD > flankMean + 0.35 || centerD >= 3.5 {
+                            // LiDAR 证实中间缝隙深度显著远于两侧立面，或处于远景建筑尺度
+                            lidarDepthAdjustment = 0.05
+                        }
+                    }
+                    if !isFlatCloseIndoorSurface {
+                        let confidence = Double(left.confidence + right.confidence) * 0.5
+                        let heightScore = min(1.0, Double(min(leftBox.height, rightBox.height)) / 0.55)
+                        let verticalScore = (Self.verticality(of: left) + Self.verticality(of: right)) * 0.5
+                        let gapScore = min(1.0, max(0.0, Double(gap - 0.06) / 0.22))
+                        let score = confidence * 0.45 + heightScore * 0.25 + verticalScore * 0.20 + gapScore * 0.10 + lidarDepthAdjustment
+                        if score >= 0.72 {
+                            let targetX = Double((leftBox.midX + rightBox.midX) * 0.5)
+                            let targetY = Double(1.0 - ((leftBox.midY + rightBox.midY) * 0.5))
+                            candidates.append(ShaAnalysisResult(
+                                shaID: "tianzhan",
+                                confidence: min(0.95, score),
+                                targetX: targetX,
+                                targetY: targetY,
+                                detectedRegions: usable.count,
+                                summary: "paired-vertical-structures-gap",
+                                horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                            ))
+                        }
+                    }
+                }
+
+                // (1b) 白虎煞: 右侧白虎方建筑体量显著高于左侧青龙方 ("虎强龙弱/白虎探头")
+                if rightBox.height >= leftBox.height * 1.28,
+                   rightBox.maxY > leftBox.maxY + 0.08,
+                   baselineDelta <= 0.22 {
+                    var lidarBonus = 0.0
+                    if let ev = evidence, let rightD = ev.rightDepthMeters, let leftD = ev.leftDepthMeters,
+                       rightD <= leftD + 0.5 {
+                        lidarBonus = 0.04
+                    }
+                    let dominance = min(1.0, Double((rightBox.height - leftBox.height) / max(0.1, leftBox.height)))
+                    let conf = Double(left.confidence + right.confidence) * 0.5
+                    let score = conf * 0.55 + dominance * 0.30 + Self.verticality(of: right) * 0.15 + lidarBonus
+                    if score >= 0.72 {
+                        candidates.append(ShaAnalysisResult(
+                            shaID: "baihu",
+                            confidence: min(0.94, score),
+                            targetX: Double(rightBox.midX),
+                            targetY: Double(1.0 - rightBox.midY),
+                            detectedRegions: usable.count,
+                            summary: "right-dominant-vertical-mass",
+                            horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                        ))
+                    }
                 }
             }
         }
-        guard let pair = selectedPair, bestPairScore >= 0.72 else { return nil }
-        let leftBox = pair.0.boundingBox
-        let rightBox = pair.1.boundingBox
-        let targetX = (leftBox.midX + rightBox.midX) * 0.5
-        let targetY = 1.0 - ((leftBox.midY + rightBox.midY) * 0.5)
-        let confidence = min(0.95, max(0.72, bestPairScore))
-        return ShaAnalysisResult(
-            shaID: "tianzhan",
-            confidence: confidence,
-            targetX: Double(targetX),
-            targetY: Double(targetY),
-            detectedRegions: usable.count,
-            summary: "paired-vertical-structures",
-            horizontalFOVDegrees: nil
-        )
+
+        // 2. 探头煞 (tantou): 前景主建筑上方探出小型高位结构 ("暗室窥视/探头")
+        for base in usable {
+            let baseBox = base.boundingBox
+            guard baseBox.width >= 0.26, baseBox.height >= 0.20, baseBox.maxY <= 0.78 else { continue }
+            for upper in usable where upper !== base {
+                let upBox = upper.boundingBox
+                guard upBox.width >= 0.06, upBox.width <= baseBox.width * 0.55,
+                      upBox.height >= 0.06, upBox.height <= baseBox.height * 0.65,
+                      upBox.minY >= baseBox.maxY - 0.06,
+                      upBox.minY <= baseBox.maxY + 0.12,
+                      upBox.midX >= baseBox.minX + 0.04,
+                      upBox.midX <= baseBox.maxX - 0.04 else { continue }
+                var depthBonus = 0.0
+                if let ev = evidence, let topD = ev.topDepthMeters, let centerD = ev.depthSampleMeters,
+                   topD > centerD + 0.25 {
+                    depthBonus = 0.05
+                }
+                let conf = Double(base.confidence + upper.confidence) * 0.5
+                let score = conf * 0.65 + Self.verticality(of: upper) * 0.25 + 0.08 + depthBonus
+                if score >= 0.72 {
+                    candidates.append(ShaAnalysisResult(
+                        shaID: "tantou",
+                        confidence: min(0.93, score),
+                        targetX: Double(upBox.midX),
+                        targetY: Double(1.0 - upBox.midY),
+                        detectedRegions: usable.count,
+                        summary: "upper-peeking-structure",
+                        horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                    ))
+                }
+            }
+        }
+
+        // 3. 火形煞 (huoxing)、路冲煞 (luchong)、穿心煞 (chuanxin)、割脚煞 (gejiao)、反弓水 (fangong)
+        for region in usable {
+            let box = region.boundingBox
+            let topWidth = hypot(
+                Double(region.topRight.x - region.topLeft.x),
+                Double(region.topRight.y - region.topLeft.y)
+            )
+            let bottomWidth = hypot(
+                Double(region.bottomRight.x - region.bottomLeft.x),
+                Double(region.bottomRight.y - region.bottomLeft.y)
+            )
+            let taperRatio = min(topWidth, bottomWidth) / max(0.001, max(topWidth, bottomWidth))
+            let vert = Self.verticality(of: region)
+
+            // (3a) 火形煞: 尖角/三角锥或强烈斜边冲射结构
+            if taperRatio <= 0.68 && vert < 0.92 && box.height >= 0.18 && box.midY >= 0.35 {
+                let sharpness = min(1.0, (0.72 - taperRatio) / 0.40)
+                let score = Double(region.confidence) * 0.60 + sharpness * 0.30 + 0.10
+                if score >= 0.72 {
+                    candidates.append(ShaAnalysisResult(
+                        shaID: "huoxing",
+                        confidence: min(0.92, score),
+                        targetX: Double(box.midX),
+                        targetY: Double(1.0 - box.maxY),
+                        detectedRegions: usable.count,
+                        summary: "sharp-tapered-angular-structure",
+                        horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                    ))
+                }
+            }
+
+            // (3b) 路冲煞 / 穿心煞: 中下部透视收敛通道 (底部宽、上部向中心收敛，且结合 LiDAR 下近中远深度梯度)
+            if box.minY <= 0.22, box.maxY >= 0.45,
+               abs(box.midX - 0.5) <= 0.22,
+               topWidth < bottomWidth * 0.82 {
+                var depthGradientBonus = 0.0
+                if let ev = evidence, let bottomD = ev.bottomDepthMeters, let centerD = ev.depthSampleMeters,
+                   centerD > bottomD + 0.4 {
+                    depthGradientBonus = 0.06
+                }
+                let perspectiveScore = min(1.0, (1.0 - topWidth / max(0.001, bottomWidth)) / 0.45)
+                let score = Double(region.confidence) * 0.60 + perspectiveScore * 0.28 + 0.08 + depthGradientBonus
+                if score >= 0.72 {
+                    // 若通道上方存在横梁/上盖结构体则为穿心煞 (chuanxin)，否则为直冲路冲煞 (luchong)
+                    let hasOverheadSpan = usable.contains { other in
+                        other !== region &&
+                        other.boundingBox.minY >= box.maxY - 0.08 &&
+                        other.boundingBox.width >= box.width * 0.85
+                    }
+                    candidates.append(ShaAnalysisResult(
+                        shaID: hasOverheadSpan ? "chuanxin" : "luchong",
+                        confidence: min(0.93, score),
+                        targetX: Double(box.midX),
+                        targetY: Double(1.0 - box.midY),
+                        detectedRegions: usable.count,
+                        summary: hasOverheadSpan ? "underpass-piercing-corridor" : "converging-road-corridor",
+                        horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                    ))
+                }
+            }
+
+            // (3c) 割脚煞 / 反弓水: 画面下部横向宽幅贴近通道或弧斜切带
+            if box.width >= 0.48, box.height <= 0.26, box.midY <= 0.38 {
+                let horizontalSlope = abs(Double(region.topRight.y - region.topLeft.y)) / max(0.001, Double(box.width))
+                let isCurvedOrSlanted = horizontalSlope >= 0.12 || taperRatio <= 0.82
+                var closeFootBonus = 0.0
+                if let ev = evidence, let bottomD = ev.bottomDepthMeters, bottomD <= 3.2 {
+                    closeFootBonus = 0.05
+                }
+                let score = Double(region.confidence) * 0.65 + Double(min(1.0, box.width / 0.65)) * 0.25 + closeFootBonus
+                if score >= 0.73 {
+                    candidates.append(ShaAnalysisResult(
+                        shaID: isCurvedOrSlanted ? "fangong" : "gejiao",
+                        confidence: min(0.91, score),
+                        targetX: Double(box.midX),
+                        targetY: Double(1.0 - box.midY),
+                        detectedRegions: usable.count,
+                        summary: isCurvedOrSlanted ? "slanted-bow-span" : "low-proximate-transverse-band",
+                        horizontalFOVDegrees: evidence?.horizontalFOVDegrees
+                    ))
+                }
+            }
+        }
+
+        return candidates.max(by: { $0.confidence < $1.confidence })
     }
 
     private static func verticality(of region: VNRectangleObservation) -> Double {
@@ -238,9 +399,9 @@ public final class OnDeviceShaAnalyzer {
     }
 
     private static func isConsistent(_ first: ShaAnalysisResult, _ second: ShaAnalysisResult) -> Bool {
-        // The two detector passes must point to almost the same physical gap.
-        // A loose threshold tolerates small Vision changes while rejecting
-        // unrelated rectangles returned by different thresholds.
+        // The two detector passes must agree on the Sha category and point to
+        // almost the same physical location.
+        guard first.shaID == second.shaID else { return false }
         let dx = first.targetX - second.targetX
         let dy = first.targetY - second.targetY
         return hypot(dx, dy) <= 0.10 && abs(first.confidence - second.confidence) <= 0.18

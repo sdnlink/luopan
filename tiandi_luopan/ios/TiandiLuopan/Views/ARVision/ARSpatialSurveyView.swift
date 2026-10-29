@@ -42,6 +42,10 @@ public struct ARSceneEvidence {
     public let verticalPlaneCount: Int
     public let wallFaceCount: Int
     public let depthSampleMeters: Float?
+    public let leftDepthMeters: Float?
+    public let rightDepthMeters: Float?
+    public let topDepthMeters: Float?
+    public let bottomDepthMeters: Float?
     public let timestamp: TimeInterval
 
     public init(
@@ -54,6 +58,10 @@ public struct ARSceneEvidence {
         verticalPlaneCount: Int,
         wallFaceCount: Int,
         depthSampleMeters: Float?,
+        leftDepthMeters: Float? = nil,
+        rightDepthMeters: Float? = nil,
+        topDepthMeters: Float? = nil,
+        bottomDepthMeters: Float? = nil,
         timestamp: TimeInterval
     ) {
         self.trackingIsNormal = trackingIsNormal
@@ -65,6 +73,10 @@ public struct ARSceneEvidence {
         self.verticalPlaneCount = verticalPlaneCount
         self.wallFaceCount = wallFaceCount
         self.depthSampleMeters = depthSampleMeters
+        self.leftDepthMeters = leftDepthMeters
+        self.rightDepthMeters = rightDepthMeters
+        self.topDepthMeters = topDepthMeters
+        self.bottomDepthMeters = bottomDepthMeters
         self.timestamp = timestamp
     }
 }
@@ -94,6 +106,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     // Objective-C enum and is not Hashable on every iOS SDK generation.
     @Published public private(set) var semanticCounts: [Int: Int] = [:]
     @Published public private(set) var lidarAvailable = false
+    @Published public private(set) var hasSavedWorldMap = false
 
     private weak var sceneView: ARSCNView?
     private var lastMeasurementTimestamp: TimeInterval = 0
@@ -204,6 +217,65 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         semanticCounts = [:]
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
+        refreshSavedWorldMapState()
+    }
+
+    public func refreshSavedWorldMapState() {
+        guard let directory = try? Self.worldMapDirectory(),
+              let files = try? FileManager.default.contentsOfDirectory(
+                  at: directory,
+                  includingPropertiesForKeys: nil,
+                  options: [.skipsHiddenFiles]
+              ) else {
+            hasSavedWorldMap = false
+            return
+        }
+        hasSavedWorldMap = files.contains {
+            $0.pathExtension == "arworldmap" && $0.lastPathComponent.hasPrefix("TianJiYanXiang-")
+        }
+    }
+
+    public func loadLatestWorldMap(completion: @escaping (Result<URL, Error>) -> Void) {
+        guard let sceneView = sceneView, let baseConfig = activeConfiguration else {
+            completion(.failure(ARSpatialSurveyError.sessionUnavailable))
+            return
+        }
+        do {
+            let directory = try Self.worldMapDirectory()
+            let files = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.creationDateKey],
+                options: [.skipsHiddenFiles]
+            )
+            let latestURL = files
+                .filter { $0.pathExtension == "arworldmap" && $0.lastPathComponent.hasPrefix("TianJiYanXiang-") }
+                .compactMap { url -> (url: URL, date: Date)? in
+                    guard let date = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate else { return nil }
+                    return (url, date)
+                }
+                .max(by: { $0.date < $1.date })?.url
+            guard let mapURL = latestURL else {
+                completion(.failure(ARSpatialSurveyError.mapUnavailable))
+                return
+            }
+            let data = try Data(contentsOf: mapURL)
+            guard let worldMap = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) else {
+                completion(.failure(ARSpatialSurveyError.archiveFailed))
+                return
+            }
+            guard let configuration = baseConfig.copy() as? ARWorldTrackingConfiguration else {
+                completion(.failure(ARSpatialSurveyError.sessionUnavailable))
+                return
+            }
+            configuration.initialWorldMap = worldMap
+            trackingState = .initializing
+            mappingState = .extending
+            sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+            activeConfiguration = configuration
+            completion(.success(mapURL))
+        } catch {
+            completion(.failure(error))
+        }
     }
 
     public func resetSurvey() {
@@ -257,19 +329,29 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         case .notAvailable, .limited: frameMappingIsUsable = false
         @unknown default: frameMappingIsUsable = false
         }
+        let depthMap: CVPixelBuffer?
+        if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth?.depthMap {
+            depthMap = smoothed
+        } else {
+            depthMap = frame.sceneDepth?.depthMap
+        }
         let evidence = ARSceneEvidence(
             trackingIsNormal: frameTrackingIsNormal,
             mappingIsUsable: frameMappingIsUsable,
             lidarAvailable: lidarAvailable,
-            depthStreamAvailable: frame.sceneDepth != nil,
-            depthCoverage: Self.depthCoverage(from: frame.sceneDepth?.depthMap),
+            depthStreamAvailable: depthMap != nil,
+            depthCoverage: Self.depthCoverage(from: depthMap),
             horizontalFOVDegrees: Self.portraitHorizontalFOV(for: frame),
             verticalPlaneCount: frame.anchors
                 .compactMap { $0 as? ARPlaneAnchor }
                 .filter { $0.alignment == .vertical }
                 .count,
             wallFaceCount: Self.wallFaceCount(in: frame.anchors),
-            depthSampleMeters: Self.centerDepthSample(from: frame.sceneDepth?.depthMap),
+            depthSampleMeters: Self.centerDepthSample(from: depthMap),
+            leftDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.25, portraitNormY: 0.5),
+            rightDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.75, portraitNormY: 0.5),
+            topDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.25),
+            bottomDepthMeters: Self.regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.78),
             timestamp: frame.timestamp
         )
         DispatchQueue.main.async {
@@ -312,6 +394,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                     let url = directory.appendingPathComponent(name)
                     try data.write(to: url, options: .atomic)
                     Self.pruneWorldMapExports(in: directory)
+                    self.refreshSavedWorldMapState()
                     completion(.success(url))
                 } catch {
                     completion(.failure(error))
@@ -518,6 +601,18 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     private static func centerDepthSample(from depthMap: CVPixelBuffer?) -> Float? {
+        return regionalDepthSample(from: depthMap, portraitNormX: 0.5, portraitNormY: 0.5)
+    }
+
+    /// Samples a median depth in a 3x3 neighborhood around a portrait-normalized
+    /// point `(portraitNormX, portraitNormY) in [0, 1]^2`. Because ARKit's camera
+    /// and depth buffers are landscape-right oriented while the UI is portrait,
+    /// portrait X maps to buffer Y and portrait Y maps to inverted buffer X.
+    private static func regionalDepthSample(
+        from depthMap: CVPixelBuffer?,
+        portraitNormX: Float,
+        portraitNormY: Float
+    ) -> Float? {
         guard let depthMap = depthMap else { return nil }
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
@@ -526,12 +621,24 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let height = CVPixelBufferGetHeight(depthMap)
         guard width > 0, height > 0 else { return nil }
         let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
-        let centerX = width / 2
-        let centerY = height / 2
-        let row = baseAddress.advanced(by: centerY * bytesPerRow)
-            .assumingMemoryBound(to: Float32.self)
-        let value = row[centerX]
-        return value.isFinite && value > 0 ? value : nil
+        let bufferX = min(width - 1, max(0, Int(Float(width) * (1.0 - portraitNormY))))
+        let bufferY = min(height - 1, max(0, Int(Float(height) * portraitNormX)))
+        var samples: [Float] = []
+        for dy in -1...1 {
+            let y = min(height - 1, max(0, bufferY + dy))
+            let row = baseAddress.advanced(by: y * bytesPerRow)
+                .assumingMemoryBound(to: Float32.self)
+            for dx in -1...1 {
+                let x = min(width - 1, max(0, bufferX + dx))
+                let val = row[x]
+                if val.isFinite && val > 0.05 && val < 60.0 {
+                    samples.append(val)
+                }
+            }
+        }
+        guard !samples.isEmpty else { return nil }
+        samples.sort()
+        return samples[samples.count / 2]
     }
 
     private static func depthCoverage(from depthMap: CVPixelBuffer?) -> Float {
@@ -794,8 +901,15 @@ public struct ARFusionCaptureView: UIViewRepresentable {
 
     public func updateUIView(_ uiView: ARSCNView, context: Context) {
         if !isActive {
-            model.pause()
+            if context.coordinator.lastActive {
+                context.coordinator.lastActive = false
+                model.pause()
+            }
             return
+        }
+        if !context.coordinator.lastActive {
+            context.coordinator.lastActive = true
+            model.resume()
         }
         if context.coordinator.lastCaptureTrigger != captureTrigger {
             context.coordinator.lastCaptureTrigger = captureTrigger
@@ -806,12 +920,14 @@ public struct ARFusionCaptureView: UIViewRepresentable {
     }
 
     public func makeCoordinator() -> Coordinator {
-        Coordinator(captureTrigger: captureTrigger)
+        Coordinator(isActive: isActive, captureTrigger: captureTrigger)
     }
 
     public final class Coordinator {
+        var lastActive: Bool
         var lastCaptureTrigger: Int
-        init(captureTrigger: Int) {
+        init(isActive: Bool, captureTrigger: Int) {
+            self.lastActive = isActive
             self.lastCaptureTrigger = captureTrigger
         }
     }
@@ -975,6 +1091,18 @@ public struct ARSpatialSurveyView: View {
                     .clipShape(Circle())
             }
             .accessibilityLabel(lang.t("ar_spatial_reset"))
+            if model.hasSavedWorldMap {
+                Button(action: restoreLatestMap) {
+                    Image(systemName: "arrow.down.doc.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.yanCyan)
+                        .padding(9)
+                        .background(Color.black.opacity(0.55))
+                        .clipShape(Circle())
+                }
+                .disabled(isSavingMap)
+                .accessibilityLabel(lang.t("ar_spatial_map_ready"))
+            }
             Button(action: saveMap) {
                 Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
                     .font(.system(size: 13, weight: .bold))
@@ -1108,6 +1236,18 @@ public struct ARSpatialSurveyView: View {
                 } else {
                     saveMessage = lang.t("ar_spatial_save_failed")
                 }
+            }
+        }
+    }
+
+    private func restoreLatestMap() {
+        guard !isSavingMap else { return }
+        model.loadLatestWorldMap { result in
+            switch result {
+            case .success:
+                saveMessage = lang.t("ar_spatial_map_ready")
+            case .failure:
+                saveMessage = lang.t("ar_spatial_save_failed")
             }
         }
     }

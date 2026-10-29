@@ -38,6 +38,18 @@ public struct LubanRulerEvaluation: Equatable {
     public let yinIndex: Int
     public let yinIsAuspicious: Bool
 
+    public var yangSegmentName: String {
+        Self.yangNamesHans[yangGateIndex]
+    }
+
+    public var yinSegmentName: String {
+        Self.yinNamesHans[yinIndex]
+    }
+
+    public static func evaluate(meters: Double) -> LubanRulerEvaluation {
+        return evaluate(meters: Float(meters))
+    }
+
     private static let yangNamesHans = ["财", "病", "离", "义", "官", "劫", "害", "本"]
     private static let yangNamesHant = ["財", "病", "離", "義", "官", "劫", "害", "本"]
     private static let yangNamesEn = ["Wealth", "Illness", "Separation", "Righteous", "Official", "Robbery", "Harm", "Origin"]

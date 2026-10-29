@@ -30,6 +30,10 @@ public final class ZeRiEngine {
         "巳": "亥", "亥": "巳"
     ]
     
+    public func analyze(sitting: Mountain24Item, date: Date = Date()) -> ZeRiAnalysis {
+        return analyze(date: date, sitting: sitting)
+    }
+
     public func analyze(date: Date = Date(), sitting: Mountain24Item) -> ZeRiAnalysis {
         var calendar = Calendar(identifier: .gregorian)
         // Date is an absolute instant; all selectable-day pillars must use

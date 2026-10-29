@@ -50,6 +50,34 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         return directory
     }
 
+    /// Room reports are exported for sharing and can be generated repeatedly
+    /// during a survey. Retain a small rolling history so abandoned exports
+    /// cannot grow the app's support directory forever.
+    private static func pruneReports(in directory: URL) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        var reports = files.filter { $0.pathExtension == "json" && $0.lastPathComponent.hasPrefix("TianJiYanXiang-RoomPlan-") }
+            .compactMap { url -> (url: URL, date: Date, size: Int)? in
+                guard let values = try? url.resourceValues(forKeys: [.creationDateKey, .fileSizeKey]),
+                      let date = values.creationDate,
+                      let size = values.fileSize else { return nil }
+                return (url, date, size)
+            }
+            .sorted { $0.date < $1.date }
+        let maxFiles = 20
+        let maxBytes = 10 * 1024 * 1024
+        var totalBytes = reports.reduce(0) { $0 + $1.size }
+        while reports.count > maxFiles || totalBytes > maxBytes {
+            guard let oldest = reports.first else { break }
+            try? FileManager.default.removeItem(at: oldest.url)
+            totalBytes -= oldest.size
+            reports.removeFirst()
+        }
+    }
+
     public func attach(to view: RoomCaptureView) {
         captureView = view
         view.captureSession.delegate = self
@@ -82,9 +110,10 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         ]
         do {
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
-            let url = try Self.reportDirectory()
-                .appendingPathComponent("TianJiYanXiang-RoomPlan-\(UUID().uuidString).json")
+            let directory = try Self.reportDirectory()
+            let url = directory.appendingPathComponent("TianJiYanXiang-RoomPlan-\(UUID().uuidString).json")
             try data.write(to: url, options: .atomic)
+            Self.pruneReports(in: directory)
             return .success(url)
         } catch {
             return .failure(error)

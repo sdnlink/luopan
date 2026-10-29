@@ -250,8 +250,19 @@ public struct FloorplanView: View {
         guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
               let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data) else { return }
 
+        var restoredIDs = Set<String>()
         let restoredRooms = saved.rooms.map { room -> FloorplanRoom in
             var restored = Self.sanitizedRoom(room)
+            // UserDefaults can contain records written by older builds or
+            // imported data with an empty/duplicated identifier. SwiftUI's
+            // ForEach and the edit/delete actions both rely on these IDs, so
+            // repair them before the layout enters live state.
+            var roomID = restored.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            if roomID.isEmpty || restoredIDs.contains(roomID) {
+                repeat { roomID = UUID().uuidString } while restoredIDs.contains(roomID)
+            }
+            restored.id = roomID
+            restoredIDs.insert(roomID)
             // Room labels are generated from the selected type, so restore
             // them in the current app language instead of showing text from
             // the language used when the layout was saved.

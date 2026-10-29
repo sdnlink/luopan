@@ -72,6 +72,34 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return directory
     }
 
+    /// Keep user exports useful without allowing repeated scans to consume an
+    /// unbounded amount of on-device storage. Only files created by this
+    /// feature are considered; files shared elsewhere remain untouched.
+    private static func pruneWorldMapExports(in directory: URL) {
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        var maps = files.filter { $0.pathExtension == "arworldmap" && $0.lastPathComponent.hasPrefix("TianJiYanXiang-") }
+            .compactMap { url -> (url: URL, date: Date, size: Int)? in
+                guard let values = try? url.resourceValues(forKeys: [.creationDateKey, .fileSizeKey]),
+                      let date = values.creationDate,
+                      let size = values.fileSize else { return nil }
+                return (url, date, size)
+            }
+            .sorted { $0.date < $1.date }
+        var totalBytes = maps.reduce(0) { $0 + $1.size }
+        let maxFiles = 12
+        let maxBytes = 80 * 1024 * 1024
+        while maps.count > maxFiles || totalBytes > maxBytes {
+            guard let oldest = maps.first else { break }
+            try? FileManager.default.removeItem(at: oldest.url)
+            totalBytes -= oldest.size
+            maps.removeFirst()
+        }
+    }
+
     public func attach(to sceneView: ARSCNView) {
         self.sceneView = sceneView
         sceneView.session.delegate = self
@@ -152,8 +180,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                         requiringSecureCoding: false
                     )
                     let name = "TianJiYanXiang-\(UUID().uuidString).arworldmap"
-                    let url = try Self.worldMapDirectory().appendingPathComponent(name)
+                    let directory = try Self.worldMapDirectory()
+                    let url = directory.appendingPathComponent(name)
                     try data.write(to: url, options: .atomic)
+                    Self.pruneWorldMapExports(in: directory)
                     completion(.success(url))
                 } catch {
                     completion(.failure(error))

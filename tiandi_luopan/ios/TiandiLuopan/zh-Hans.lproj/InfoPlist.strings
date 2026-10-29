@@ -8,4 +8,4 @@
 "NSMotionUsageDescription" = "天机演象需要使用高精度运动传感器以驱动双轴太极水准仪与指南针。";
 "NSCameraUsageDescription" = "天机演象需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。";
 "NSPhotoLibraryAddUsageDescription" = "天机演象需要将实景勘测长图与水印存证快照保存至您的相册。";
-"NSPhotoLibraryUsageDescription" = "天机演象需要访问相册以保存实景勘测长图与水印存证相片。";
+"NSPhotoLibraryUsageDescription" = "天机演象需要访问相册以导入户型图，并保存实景勘测长图与水印存证相片。";

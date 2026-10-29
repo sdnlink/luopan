@@ -28,12 +28,15 @@ public struct QimenDunjiaView: View {
     }
     
     public var body: some View {
-        // Motion publishes tilt and magnetic-field samples independently of
-        // the heading. Reuse the chart across those updates; Qimen only needs
-        // a new result when the heading or language changes.
-        let chart = cachedChart ?? QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
-        
-        return VStack(spacing: 12) {
+        return Group {
+            if isActive {
+                // Motion publishes tilt and magnetic-field samples
+                // independently of the heading. Reuse the chart across
+                // those updates; Qimen only needs a new result when the
+                // heading or language changes.
+                let chart = cachedChart ?? QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+
+                VStack(spacing: 12) {
             // 局数标题栏
             HStack {
                 HStack(spacing: 6) {
@@ -106,6 +109,10 @@ public struct QimenDunjiaView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal, 16)
+            }
+                }
+            } else {
+                Color.clear
             }
         }
         .onAppear {

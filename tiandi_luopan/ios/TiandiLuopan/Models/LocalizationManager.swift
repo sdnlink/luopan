@@ -147,6 +147,7 @@ public class LocalizationManager: ObservableObject {
             "import_plan": "导入图纸",
             "change_plan": "更换图纸",
             "reset_sample": "重置示例",
+            "floorplan_reset_confirm": "当前导入图纸和自定义房间布局将被清除，确定继续吗？",
             "audit_checklist": "全屋风水格局体检清单",
             "room_details": "功能区诊断报告",
             
@@ -608,6 +609,7 @@ public class LocalizationManager: ObservableObject {
             "import_plan": "導入圖紙",
             "change_plan": "更換圖紙",
             "reset_sample": "重置示例",
+            "floorplan_reset_confirm": "目前導入圖紙和自訂房間佈局將被清除，確定繼續嗎？",
             "audit_checklist": "全屋風水格局體檢清單",
             "room_details": "功能區診斷報告",
             
@@ -1067,6 +1069,7 @@ public class LocalizationManager: ObservableObject {
             "import_plan": "Import Plan",
             "change_plan": "Change Plan",
             "reset_sample": "Reset Sample",
+            "floorplan_reset_confirm": "The imported plan and custom room layout will be cleared. Continue?",
             "audit_checklist": "Comprehensive Audit Checklist",
             "room_details": "Room Diagnostic Report",
             

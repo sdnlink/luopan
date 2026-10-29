@@ -19,6 +19,7 @@ public struct FloorplanView: View {
     @State private var userFloorplanImage: UIImage? = nil
     @State private var showImagePicker: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var showResetConfirmation: Bool = false
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
     @State private var activeRoomStartRect: CGRect? = nil
@@ -273,20 +274,7 @@ public struct FloorplanView: View {
             }
             
             Button(action: {
-                userFloorplanImage = nil
-                // Reset both the imported background and any custom room edits
-                // so a demo layout can always be restored, even when the user
-                // started from the built-in sample without importing an image.
-                rooms = FloorplanEngine.shared.generateSampleRooms()
-                centroid = CGPoint(x: 0.5, y: 0.5)
-                roomsBeforeDetection = nil
-                centroidBeforeDetection = nil
-                roomDetectionMessage = nil
-                isEditingRooms = false
-                activeRoomDragID = nil
-                activeRoomStartRect = nil
-                roomWasDragged = false
-                refreshAudit(force: true)
+                showResetConfirmation = true
             }) {
                 Text(lang.t("reset_sample"))
                     .font(.system(size: 10))
@@ -295,6 +283,16 @@ public struct FloorplanView: View {
                     .background(Color.white.opacity(0.1))
                     .foregroundColor(.white)
                     .cornerRadius(6)
+            }
+            .alert(isPresented: $showResetConfirmation) {
+                Alert(
+                    title: Text(lang.t("reset_sample")),
+                    message: Text(lang.t("floorplan_reset_confirm")),
+                    primaryButton: .destructive(Text(lang.t("reset_sample"))) {
+                        resetToSampleLayout()
+                    },
+                    secondaryButton: .cancel()
+                )
             }
             
             // 罗盘联动 / 手动微调
@@ -439,6 +437,24 @@ public struct FloorplanView: View {
             x: max(0.05, min(0.95, weightedX / totalArea)),
             y: max(0.05, min(0.95, weightedY / totalArea))
         )
+    }
+
+    private func resetToSampleLayout() {
+        userFloorplanImage = nil
+        // Reset both the imported background and any custom room edits so a
+        // demo layout can always be restored after explicit confirmation.
+        rooms = FloorplanEngine.shared.generateSampleRooms()
+        centroid = CGPoint(x: 0.5, y: 0.5)
+        roomsBeforeDetection = nil
+        centroidBeforeDetection = nil
+        roomDetectionMessage = nil
+        isEditingRooms = false
+        activeRoomDragID = nil
+        activeRoomStartRect = nil
+        activeRoomScaleID = nil
+        activeRoomScaleStartRect = nil
+        roomWasDragged = false
+        refreshAudit(force: true)
     }
 
     @ViewBuilder

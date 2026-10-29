@@ -181,6 +181,9 @@ public struct FloorplanView: View {
                     rooms = FloorplanEngine.shared.generateSampleRooms()
                     centroid = CGPoint(x: 0.5, y: 0.5)
                     isEditingRooms = true
+                    selectedRoom = nil
+                    selectedEditingRoomID = nil
+                    roomForTypeEditing = nil
                 }
                 floorplanImageBeforePicker = nil
                 persistLayout()
@@ -752,7 +755,12 @@ public struct FloorplanView: View {
         activeRoomScaleID = nil
         activeRoomScaleStartRect = nil
         roomWasDragged = false
+        selectedRoom = nil
+        selectedEditingRoomID = nil
+        roomForTypeEditing = nil
+        showEditingRoomDeleteConfirmation = false
         didConsumeFloorplanCredit = false
+        persistedImageObjectID = nil
         if let imageURL = Self.savedImageURL(), FileManager.default.fileExists(atPath: imageURL.path) {
             try? FileManager.default.removeItem(at: imageURL)
         }

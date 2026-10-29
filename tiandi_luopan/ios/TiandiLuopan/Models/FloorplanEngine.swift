@@ -370,17 +370,20 @@ public class FloorplanEngine {
         guard sectorArea > 0 else { return [] }
 
         var results: [FloorplanAuditItem] = []
+        // A custom layout can contain several small rooms in one corner and
+        // can also have a shifted Tai Ji point that maps two geometric
+        // corners to the same eight-gua sector. Keep the emitted gua set
+        // stable so a SwiftUI ForEach never receives duplicate report IDs.
+        var emittedGua = excludingGua
         for sector in sectors {
-            let occupied = footprintRooms.contains { room in
-                let overlap = room.rect.intersection(sector)
-                guard !overlap.isNull else { return false }
-                return (overlap.width * overlap.height) / sectorArea >= 0.18
-            }
+            let occupiedArea = coveredArea(of: sector, by: footprintRooms)
+            let occupied = occupiedArea / sectorArea >= 0.18
             guard !occupied else { continue }
 
             let center = CGPoint(x: sector.midX, y: sector.midY)
             let palace = palaceForPoint(center, centroid: centroid, heading: heading)
-            guard !excludingGua.contains(palace.gua) else { continue }
+            guard !emittedGua.contains(palace.gua) else { continue }
+            emittedGua.insert(palace.gua)
             let content = missingCornerContent(gua: palace.gua)
             results.append(FloorplanAuditItem(
                 id: "missing-corner-\(palace.gua)",
@@ -392,6 +395,59 @@ public class FloorplanEngine {
             ))
         }
         return results
+    }
+
+    /// Returns the exact union area of axis-aligned room rectangles clipped to
+    /// one corner sector. Summing each overlap would count overlapping custom
+    /// rooms twice, while checking only one room misses a corner assembled from
+    /// several smaller rooms. A sweep over the rectangles' x breakpoints keeps
+    /// this calculation deterministic and inexpensive (only four sectors).
+    private func coveredArea(of sector: CGRect, by rooms: [FloorplanRoom]) -> CGFloat {
+        let clipped = rooms.compactMap { room -> CGRect? in
+            let intersection = room.rect.intersection(sector)
+            guard !intersection.isNull,
+                  intersection.width > 0,
+                  intersection.height > 0 else { return nil }
+            return intersection
+        }
+        guard !clipped.isEmpty else { return 0 }
+
+        var xBreakpoints: [CGFloat] = [sector.minX, sector.maxX]
+        for rect in clipped {
+            xBreakpoints.append(rect.minX)
+            xBreakpoints.append(rect.maxX)
+        }
+        xBreakpoints.sort()
+
+        var area: CGFloat = 0
+        for index in 0..<(xBreakpoints.count - 1) {
+            let x0 = xBreakpoints[index]
+            let x1 = xBreakpoints[index + 1]
+            let width = x1 - x0
+            guard width > 0 else { continue }
+            let x = (x0 + x1) / 2
+            let yIntervals = clipped.compactMap { rect -> (CGFloat, CGFloat)? in
+                guard x > rect.minX, x < rect.maxX else { return nil }
+                return (rect.minY, rect.maxY)
+            }.sorted { $0.0 < $1.0 }
+            guard !yIntervals.isEmpty else { continue }
+
+            var coveredHeight: CGFloat = 0
+            var currentStart = yIntervals[0].0
+            var currentEnd = yIntervals[0].1
+            for interval in yIntervals.dropFirst() {
+                if interval.0 <= currentEnd {
+                    currentEnd = max(currentEnd, interval.1)
+                } else {
+                    coveredHeight += currentEnd - currentStart
+                    currentStart = interval.0
+                    currentEnd = interval.1
+                }
+            }
+            coveredHeight += currentEnd - currentStart
+            area += width * coveredHeight
+        }
+        return area
     }
 
     private func missingCornerContent(gua: String) -> (title: String, lore: String, solution: String) {

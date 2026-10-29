@@ -255,6 +255,168 @@ public struct XuanKongChart {
     public let summaryAnalysis: String   // 综合格局断语
     public var patternDesc: String { summaryAnalysis }
     public let periodMeta: PeriodMeta    // 动态历法元信息
+    
+    /// 基于九宫飞星排盘动态推导的【催财旺气建议】
+    public var wealthAdvice: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let wangPalace = palaces.first(where: { $0.facingStar == period })
+        let nextStar = (period % 9) + 1
+        let shengQiPalace = palaces.first(where: { !$0.isCenter && $0.facingStar == nextStar }) ?? palaces.first(where: { $0.facingStar == nextStar })
+        let wenchangPalace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 1 && $0.facingStar == 4) || ($0.mountainStar == 4 && $0.facingStar == 1) || ($0.mountainStar == 1 && $0.facingStar == 6) || ($0.mountainStar == 6 && $0.facingStar == 1)) })
+        
+        let wangName = wangPalace?.localizedPalaceName ?? ""
+        let wangCombo = wangPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(period)"
+        let sqName = shengQiPalace?.localizedPalaceName ?? ""
+        let sqCombo = shengQiPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(nextStar)"
+        let wcName = wenchangPalace?.localizedPalaceName
+        
+        switch lang {
+        case .en:
+            let wcNote = wcName != nil ? " Wenchang/Harmony star gathers at [\(wcName!)]." : ""
+            return "• Wealth & Prosperity: Current Period-\(period) facing star lands at [\(wangName)] (Star \(wangCombo)), and future Sheng-Qi Star \(nextStar) reaches [\(sqName)] (Star \(sqCombo)). Keep these sectors bright, open, or place moving water to activate wealth.\(wcNote)"
+        case .zhHant:
+            let wcNote = wcName != nil ? "另【\(wcName!)】逢文昌吉星會聚，利書房策劃。" : ""
+            return "• 催財旺位：當令\(period)運向星飛臨【\(wangName)】（山向\(wangCombo)），生氣\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂開闊、安設動水或長明燈催旺財源。\(wcNote)"
+        case .ja:
+            let wcNote = wcName != nil ? "また【\(wcName!)】は文昌吉星が会聚し書斎に吉。" : ""
+            return "• 催財旺位：当令\(period)運の向星が【\(wangName)】（山向\(wangCombo)）に飛臨し、生気\(nextStar)星が【\(sqName)】（山向\(sqCombo)）に到ります。採光や動水を設けて財気を催旺してください。\(wcNote)"
+        case .ko:
+            return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오."
+        case .vi:
+            return "• Cung kích tài: Hướng tinh đương vận \(period) bay tới 【\(wangName)】 (Sơn Hướng \(wangCombo)), sinh khí tinh \(nextStar) đáo 【\(sqName)】 (Sơn Hướng \(sqCombo)), nên mở thoáng, tăng ánh sáng hoặc đặt thủy động kích hoạt tài lộc."
+        case .th:
+            return "• ตำแหน่งเรียกทรัพย์: ดาวหันประจำยุค \(period) สถิตที่ 【\(wangName)】 (ดาว \(wangCombo)) และดาวพลัง生气 \(nextStar) อยู่ที่ 【\(sqName)】 (ดาว \(sqCombo)) ควรเปิดโล่งรับแสงหรือตั้งน้ำพุกระตุ้นโชคลาภ"
+        case .id:
+            return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki."
+        case .auto, .zhHans:
+            let wcNote = wcName != nil ? "另【\(wcName!)】逢文昌吉星会聚，利书房策划。" : ""
+            return "• 催财旺位：当令\(period)运向星飞临【\(wangName)】（山向\(wangCombo)），生气\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂开阔、安设动水或长明灯催旺财源。\(wcNote)"
+        }
+    }
+    
+    /// 基于九宫飞星排盘动态推导的【五黄二黑病符防煞建议】
+    public var healthAdvice: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let clash25Palace = palaces.first(where: { ($0.mountainStar == 2 && $0.facingStar == 5) || ($0.mountainStar == 5 && $0.facingStar == 2) || ($0.mountainStar == 5 && $0.facingStar == 5) })
+        let wuHuangPalace = palaces.first(where: { $0.facingStar == 5 }) ?? palaces.first(where: { $0.mountainStar == 5 })
+        let erHeiPalace = palaces.first(where: { $0.facingStar == 2 }) ?? palaces.first(where: { $0.mountainStar == 2 })
+        
+        let wuName = wuHuangPalace?.localizedPalaceName ?? ""
+        let wuCombo = wuHuangPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "5"
+        let erName = erHeiPalace?.localizedPalaceName ?? ""
+        let erCombo = erHeiPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "2"
+        
+        switch lang {
+        case .en:
+            if let clash = clash25Palace {
+                return "• Health & Sha Caution: Critical 2–5 / Double-5 Earth Sha converges at [\(clash.localizedPalaceName)] (Star \(clash.mountainStar)-\(clash.facingStar)), with 5-Yellow at [\(wuName)] and 2-Black at [\(erName)]. Keep quiet, avoid renovation or red items, and place a copper gourd or 6-coin Metal cure."
+            }
+            return "• Health & Sha Caution: 5-Yellow Sha lands at [\(wuName)] (Star \(wuCombo)) and 2-Black Sickness Star at [\(erName)] (Star \(erCombo)). Avoid loud noise, drilling, or fire elements here; use copper/Metal ornaments to drain Earth Sha."
+        case .zhHant:
+            if let clash = clash25Palace {
+                return "• 病符防煞：【\(clash.localizedPalaceName)】逢山向\(clash.mountainStar)-\(clash.facingStar)二五交加/五黃疊臨重煞（五黃位【\(wuName)】、二黑位【\(erName)】），切忌動土裝修與紅紫火物，務必安放銅葫蘆或六帝錢洩土化煞。"
+            }
+            return "• 病符防煞：五黃廉貞煞飛臨【\(wuName)】（山向\(wuCombo)），二黑病符星到【\(erName)】（山向\(erCombo)），此二宮宜靜不宜動，忌見紅火動土，宜掛銅葫蘆或六帝銅錢化洩凶性。"
+        case .ja:
+            if let clash = clash25Palace {
+                return "• 病符防煞：【\(clash.localizedPalaceName)】に山向\(clash.mountainStar)-\(clash.facingStar)の二五交加・五黄重煞が集結（五黄【\(wuName)】・二黒【\(erName)】）。改修や赤色物を避け、銅瓢箪や六帝銭で土煞を泄化してください。"
+            }
+            return "• 病符防煞：五黄廉貞煞が【\(wuName)】（山向\(wuCombo)）、二黒病符星が【\(erName)】（山向\(erCombo)）に飛臨。静寂を保ち、銅瓢箪や金属置物で凶気を化泄すると吉。"
+        case .ko:
+            return "• 병부 방살: 오황살이 【\(wuName)】(산향 \(wuCombo))에, 이흑 병부성이 【\(erName)】(산향 \(erCombo))에 위치합니다. 공사와 붉은색 배치를 피하고 동호리병이나 육제전(금속)으로 토살을 설기하십시오."
+        case .vi:
+            return "• Phòng bệnh hóa sát: Ngũ Hoàng sát临 【\(wuName)】 (Sơn Hướng \(wuCombo)), Nhị Hắc bệnh phù đáo 【\(erName)】 (Sơn Hướng \(erCombo)). Kỵ động thổ và vật màu đỏ, nên treo hồ lô đồng hoặc lục đế tiền để tiết thổ hóa sát."
+        case .th:
+            return "• ป้องกันโรคและเคราะห์: ดาวห้าเหลืองอยู่ที่ 【\(wuName)】 (ดาว \(wuCombo)) และดาวสองดำโรคภัยอยู่ที่ 【\(erName)】 (ดาว \(erCombo)) หลีกเลี่ยงการต่อเติมและสีแดง แนะนำแขวนน้ำเต้าทองเหลืองหรือเหรียญจีน 6 เหรียญแก้เคล็ด"
+        case .id:
+            return "• Kesehatan & Penangkal Sha: Bintang 5-Kuning berada di [\(wuName)] (Bintang \(wuCombo)) & 2-Hitam di [\(erName)] (Bintang \(erCombo)); hindari renovasi atau warna merah menyala, gunakan labu tembaga/logam untuk menetralkan."
+        case .auto, .zhHans:
+            if let clash = clash25Palace {
+                return "• 病符防煞：【\(clash.localizedPalaceName)】逢山向\(clash.mountainStar)-\(clash.facingStar)二五交加/五黄叠临重煞（五黄位【\(wuName)】、二黑位【\(erName)】），切忌动土装修与红紫火物，务必安放铜葫芦或六帝钱泄土化煞。"
+            }
+            return "• 病符防煞：五黄廉贞煞飞临【\(wuName)】（山向\(wuCombo)），二黑病符星到【\(erName)】（山向\(erCombo)），此二宫宜静不宜动，忌见红火动土，宜挂铜葫芦或六帝铜钱化泄凶性。"
+        }
+    }
+    
+    /// 基于九宫飞星排盘动态推导的【山向调候与五行通关建议】
+    public var remedyAdvice: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let dingPalace = palaces.first(where: { $0.mountainStar == period })
+        let caiPalace = palaces.first(where: { $0.facingStar == period })
+        let clash37Palace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 3 && $0.facingStar == 7) || ($0.mountainStar == 7 && $0.facingStar == 3)) })
+        let clash79Palace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 7 && $0.facingStar == 9) || ($0.mountainStar == 9 && $0.facingStar == 7)) })
+        
+        let dingName = dingPalace?.localizedPalaceName ?? ""
+        let caiName = caiPalace?.localizedPalaceName ?? ""
+        let samePalace = (dingPalace?.id != nil && dingPalace?.id == caiPalace?.id)
+        
+        switch lang {
+        case .en:
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = " At [\(c37.localizedPalaceName)] (3–7 Metal-Wood clash), place still water to harmonize."
+            } else if let c79 = clash79Palace {
+                extra = " At [\(c79.localizedPalaceName)] (7–9 Fire-Metal clash), place ceramic/earth decor to balance."
+            }
+            if samePalace {
+                return "• Five-Element Remedy: Double Period-\(period) stars converge at [\(caiName)]; combine open water in front with a solid backing/stone ornament behind to secure both people and wealth.\(extra)"
+            }
+            return "• Five-Element Remedy: Place solid furniture or mountain ornament at sitting star sector [\(dingName)] (Mountain \(period)) to support health, and keep [\(caiName)] (Facing \(period)) open with water to gather Qi.\(extra)"
+        case .zhHant:
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = "【\(c37.localizedPalaceName)】見三七交劍煞，宜設靜水通關金木。"
+            } else if let c79 = clash79Palace {
+                extra = "【\(c79.localizedPalaceName)】見七九火金相戰，宜置黃玉陶瓷洩火生金。"
+            }
+            if samePalace {
+                return "• 五行調候：當運山向雙\(period)星同聚【\(caiName)】，宜採用「水外有山」佈局（前設明水納財、後立泰山石或高櫃固丁）以兼收財丁。\(extra)"
+            }
+            return "• 五行調候：當運丁星飛臨【\(dingName)】（山星\(period)）宜設高櫃或山石穩固人丁；當運財星在【\(caiName)】（向星\(period)）宜虛明見水引氣。\(extra)"
+        case .ja:
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = "【\(c37.localizedPalaceName)】の三七交剣煞には静水で金木を通関。"
+            } else if let c79 = clash79Palace {
+                extra = "【\(c79.localizedPalaceName)】の七九火金相克には陶器・土器で調和。"
+            }
+            if samePalace {
+                return "• 五行調候：当運の山向双\(period)星が【\(caiName)】に同聚するため、前方に水・後方に山石を配する「水外有山」の配置で財丁を兼収してください。\(extra)"
+            }
+            return "• 五行調候：当運丁星の【\(dingName)】（山星\(period)）には高い家具や山石を置いて人丁を固め、当運財星の【\(caiName)】（向星\(period)）は明るく水気を配して納気してください。\(extra)"
+        case .ko:
+            if samePalace {
+                return "• 오행 조후: 당운 산향 쌍\(period)성이 【\(caiName)】에 회취하니 앞에 물을 두고 뒤에 산석을 배치하여 재물과 인정을 함께 거두십시오."
+            }
+            return "• 오행 조후: 당운 정성이 머무는 【\(dingName)】(산성 \(period))에는 높은 가구나 산석을 두어 인정을 굳히고, 재성이 머무는 【\(caiName)】(향성 \(period))은 밝고 트이게 하여 기운을 갈무리하십시오."
+        case .vi:
+            if samePalace {
+                return "• Ngũ hành điều hầu: Song tinh vận \(period) hội tụ tại 【\(caiName)】, nên bố trí 'ngoài thủy có sơn' (trước đặt nước, sau tựa đá/tủ cao) để vượng cả tài lẫn đinh."
+            }
+            return "• Ngũ hành điều hầu: Đinh tinh vận \(period) đáo 【\(dingName)】 nên đặt tủ cao/đá phong thủy固 nhân đinh; Tài tinh đáo 【\(caiName)】 nên để thoáng sáng見 thủy nạp khí."
+        case .th:
+            if samePalace {
+                return "• ปรับสมดุลธาตุทั้งห้า: ดาวคู่ยุค \(period) รวมอยู่ที่ 【\(caiName)】 ควรจัดวางน้ำด้านหน้าและมีตู้สูงหรือหินมงคลด้านหลังเพื่อเสริมทั้งทรัพย์และบริวาร"
+            }
+            return "• ปรับสมดุลธาตุทั้งห้า: ตำแหน่งดาวคน 【\(dingName)】 (ดาวภูเขา \(period)) ควรตั้งตู้สูงหรือหินมงคลเสริมความมั่นคง ส่วนตำแหน่งดาวทรัพย์ 【\(caiName)】 (ดาวหัน \(period)) ควรเปิดโล่งมีน้ำหล่อเลี้ยง"
+        case .id:
+            if samePalace {
+                return "• Harmoni Lima Unsur: Bintang kembar periode \(period) berkumpul di [\(caiName)]; kombinasikan unsur air di depan dan sandaran kokoh di belakang untuk menjaga kemakmuran & kesehatan."
+            }
+            return "• Harmoni Lima Unsur: Perkuat sektor bintang gunung \(period) di [\(dingName)] dengan kabinet/batu kokoh untuk ketentraman keluarga, dan buka aliran air/cahaya di sektor bintang hadap \(period) [\(caiName)]."
+        case .auto, .zhHans:
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = "【\(c37.localizedPalaceName)】见三七交剑煞，宜设静水通关金木。"
+            } else if let c79 = clash79Palace {
+                extra = "【\(c79.localizedPalaceName)】见七九火金相战，宜置黄玉陶瓷泄火生金。"
+            }
+            if samePalace {
+                return "• 五行调候：当运山向双\(period)星同聚【\(caiName)】，宜采用“水外有山”布局（前设明水纳财、后立泰山石或高柜固丁）以兼收财丁。\(extra)"
+            }
+            return "• 五行调候：当运丁星飞临【\(dingName)】（山星\(period)）宜设高柜或山石稳固人丁；当运财星在【\(caiName)】（向星\(period)）宜虚明见水引气。\(extra)"
+        }
+    }
 }
 
 public final class FlyingStarsEngine {
@@ -597,8 +759,8 @@ public final class FlyingStarsEngine {
             sittingMountain: sittingName,
             facingMountain: facingName,
             patternType: pattern,
-            isSanBanGua: false,
-            isQiXingDaJie: false,
+            isSanBanGua: Self.checkSanBanGua(cells: cells),
+            isQiXingDaJie: Self.checkQiXingDaJie(cells: cells, activePeriod: activePeriod, facingPalaceIdx: sittingFacingIdx),
             palaces: cells,
             summaryAnalysis: summary,
             periodMeta: meta
@@ -617,5 +779,33 @@ public final class FlyingStarsEngine {
         case "离": return 8
         default: return 4
         }
+    }
+    
+    /// 判定是否为父母三般卦（各宫运、山、向星均属 147 / 258 / 369）或连珠三般卦
+    private static func checkSanBanGua(cells: [PalaceCell]) -> Bool {
+        let fumuSets: [Set<Int>] = [Set([1, 4, 7]), Set([2, 5, 8]), Set([3, 6, 9])]
+        let lianzhuSets: [Set<Int>] = [
+            Set([1, 2, 3]), Set([2, 3, 4]), Set([3, 4, 5]),
+            Set([4, 5, 6]), Set([5, 6, 7]), Set([6, 7, 8]),
+            Set([7, 8, 9]), Set([8, 9, 1]), Set([9, 1, 2])
+        ]
+        let allFumu = cells.allSatisfy { c in
+            let s = Set([c.periodStar, c.mountainStar, c.facingStar])
+            return fumuSets.contains(s)
+        }
+        if allFumu { return true }
+        return cells.allSatisfy { c in
+            let s = Set([c.periodStar, c.mountainStar, c.facingStar])
+            return lianzhuSets.contains(s)
+        }
+    }
+    
+    /// 判定是否构成七星打劫局（离震乾或坎兑巽三宫向星合成 147 / 258 / 369 且当旺向星到向）
+    private static func checkQiXingDaJie(cells: [PalaceCell], activePeriod: Int, facingPalaceIdx: Int) -> Bool {
+        guard cells.count == 9, cells[facingPalaceIdx].facingStar == activePeriod else { return false }
+        let fumuSets: [Set<Int>] = [Set([1, 4, 7]), Set([2, 5, 8]), Set([3, 6, 9])]
+        let zhenQiSet = Set([cells[8].facingStar, cells[2].facingStar, cells[5].facingStar]) // 离9、震3、乾6
+        let jiaQiSet = Set([cells[0].facingStar, cells[6].facingStar, cells[3].facingStar])  // 坎1、兑7、巽4
+        return fumuSets.contains(zhenQiSet) || fumuSets.contains(jiaQiSet)
     }
 }

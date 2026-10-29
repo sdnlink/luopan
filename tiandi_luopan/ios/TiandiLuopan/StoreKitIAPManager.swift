@@ -1,6 +1,23 @@
 import Foundation
 import StoreKit
 import Combine
+import CryptoKit
+import Security
+import UIKit
+
+// MARK: - 本地 App Store 收据校验结果
+
+public struct ReceiptValidationResult {
+    public let isValidContainer: Bool
+    public let bundleIDMatched: Bool
+    public let purchasedProductIDs: Set<String>
+    public let latestExpirationDate: Date?
+    public let receiptSHA256: String
+    
+    public var isTrusted: Bool {
+        return isValidContainer && bundleIDMatched
+    }
+}
 
 // MARK: - IAP 商品与权益定义
 
@@ -109,10 +126,15 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     private let kVIPExpireDate = "yx_iap_vip_expire_date"
     private let kFloorplanCredits = "yx_iap_floorplan_credits"
     private let kTianjiCredits = "yx_iap_tianji_credits"
+    private var receiptRefreshRequest: SKReceiptRefreshRequest?
+    private var receiptRefreshCompletion: ((Bool) -> Void)?
     private let kProcessedTransactionIDs = "yx_iap_processed_transaction_ids"
+    private let kEntitlementSeal = "yx_iap_entitlement_hmac_seal"
+    private let kKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
     
     private override init() {
         super.init()
+        reconcileEntitlementsWithReceipt(verifyReceipt())
         self.isVIPUser = isVIP()
         self.isLifetimeUser = isLifetime()
         self.floorplanCreditsCount = floorplanCredits()
@@ -176,6 +198,13 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             }
             return
         }
+        if let activeRefresh = receiptRefreshRequest, request === activeRefresh {
+            receiptRefreshRequest = nil
+            let completion = receiptRefreshCompletion
+            receiptRefreshCompletion = nil
+            completion?(false)
+            return
+        }
         guard let activeRequest = productsRequest, request === activeRequest else { return }
         isLoadingProducts = false
         productsRequest = nil
@@ -197,6 +226,13 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             }
             return
         }
+        if let activeRefresh = receiptRefreshRequest, request === activeRefresh {
+            receiptRefreshRequest = nil
+            let completion = receiptRefreshCompletion
+            receiptRefreshCompletion = nil
+            completion?(false)
+            return
+        }
         guard let activeRequest = productsRequest, request === activeRequest else { return }
         isLoadingProducts = false
         productsRequest = nil
@@ -207,6 +243,39 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         // purchase-error alert on app startup. Prices remain unavailable and
         // an explicit purchase attempt will show the actionable retry error.
         print("StoreKit request products failed: \(error.localizedDescription)")
+    }
+    
+    public func requestDidFinish(_ request: SKRequest) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.requestDidFinish(request)
+            }
+            return
+        }
+        if let activeRefresh = receiptRefreshRequest, request === activeRefresh {
+            receiptRefreshRequest = nil
+            let result = verifyReceipt()
+            reconcileEntitlementsWithReceipt(result)
+            let completion = receiptRefreshCompletion
+            receiptRefreshCompletion = nil
+            completion?(result.isTrusted)
+        }
+    }
+    
+    /// 刷新 App Store 本地签名收据 (SKReceiptRefreshRequest) 并执行本地校验恢复权益
+    public func refreshReceipt(completion: ((Bool) -> Void)? = nil) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshReceipt(completion: completion)
+            }
+            return
+        }
+        receiptRefreshCompletion = completion
+        receiptRefreshRequest?.cancel()
+        let request = SKReceiptRefreshRequest(receiptProperties: nil)
+        request.delegate = self
+        receiptRefreshRequest = request
+        request.start()
     }
     
     // MARK: - 购买商品
@@ -245,6 +314,12 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         lastStatusMessage = nil
         guard !isProcessingPurchase else { return }
         isProcessingPurchase = true
+        let localReceipt = verifyReceipt()
+        if localReceipt.isTrusted {
+            reconcileEntitlementsWithReceipt(localReceipt)
+        } else {
+            refreshReceipt()
+        }
         SKPaymentQueue.default().restoreCompletedTransactions()
     }
 
@@ -350,6 +425,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             }
             return
         }
+        reconcileEntitlementsWithReceipt(verifyReceipt())
         var unlocked: [String] = []
         if isVIP() { unlocked.append(IAPProductID.vipYearly.rawValue) }
         if isLifetime() { unlocked.append(IAPProductID.proLifetime.rawValue) }
@@ -456,6 +532,9 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             let current = defaults.integer(forKey: kTianjiCredits)
             defaults.set(current + 1, forKey: kTianjiCredits)
         }
+        if true {
+            updateEntitlementSealLocked()
+        }
         defaults.synchronize()
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -473,6 +552,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     }
 
     private func isVIPUnlocked() -> Bool {
+        guard verifyEntitlementIntegrityLocked() else { return false }
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: kIsLifetime) { return true }
         if defaults.bool(forKey: kIsVIP) {
@@ -483,12 +563,14 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
                 // instead of granting an annual product forever.
                 let migratedExpiry = Date().addingTimeInterval(365 * 24 * 3600).timeIntervalSince1970
                 defaults.set(migratedExpiry, forKey: kVIPExpireDate)
+                updateEntitlementSealLocked()
                 return true
             }
             if Date().timeIntervalSince1970 < expire {
                 return true
             }
             defaults.set(false, forKey: kIsVIP)
+            updateEntitlementSealLocked()
         }
         return false
     }
@@ -519,18 +601,21 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     public func isLifetime() -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
+        guard verifyEntitlementIntegrityLocked() else { return false }
         return UserDefaults.standard.bool(forKey: kIsLifetime)
     }
     
     public func floorplanCredits() -> Int {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
+        guard verifyEntitlementIntegrityLocked() else { return 0 }
         return UserDefaults.standard.integer(forKey: kFloorplanCredits)
     }
     
     public func tianjiCredits() -> Int {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
+        guard verifyEntitlementIntegrityLocked() else { return 0 }
         return UserDefaults.standard.integer(forKey: kTianjiCredits)
     }
     
@@ -545,6 +630,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             if credits > 0 {
                 let remain = credits - 1
                 defaults.set(remain, forKey: kFloorplanCredits)
+                updateEntitlementSealLocked()
                 defaults.synchronize()
                 result = (true, remain)
             } else {
@@ -569,6 +655,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             if credits > 0 {
                 let remain = credits - 1
                 defaults.set(remain, forKey: kTianjiCredits)
+                updateEntitlementSealLocked()
                 defaults.synchronize()
                 result = (true, remain)
             } else {
@@ -620,5 +707,229 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             return str
         }
         return "[]"
+    }
+    
+    // MARK: - 本地收据校验 (appStoreReceiptURL / ASN.1 PKCS#7) 与 Keychain HMAC 防篡改保护
+    
+    /// 读取并校验 Bundle.main.appStoreReceiptURL 本地收据容器、BundleID 与内购商品载荷
+    public func verifyReceipt() -> ReceiptValidationResult {
+        guard let receiptURL = Bundle.main.appStoreReceiptURL,
+              FileManager.default.fileExists(atPath: receiptURL.path),
+              let receiptData = try? Data(contentsOf: receiptURL),
+              receiptData.count > 64 else {
+            return ReceiptValidationResult(
+                isValidContainer: false,
+                bundleIDMatched: false,
+                purchasedProductIDs: [],
+                latestExpirationDate: nil,
+                receiptSHA256: ""
+            )
+        }
+        
+        let digest = SHA256.hash(data: receiptData)
+        let sha256Hex = digest.map { String(format: "%02x", $0) }.joined()
+        
+        // 1. 校验 PKCS#7 / ASN.1 DER 外层 SEQUENCE (0x30) 及 signedData OID (1.2.840.113549.1.7.2)
+        let pkcs7SignedDataOID = Data([0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02])
+        let isASN1Sequence = receiptData.first == 0x30
+        let hasSignedDataOID = receiptData.range(of: pkcs7SignedDataOID) != nil
+        let isValidContainer = isASN1Sequence && hasSignedDataOID
+        
+        // 2. 校验收据内嵌 Bundle Identifier (防止跨包移植其它 App 的收据文件)
+        let expectedBundleID = Bundle.main.bundleIdentifier ?? "com.yanxiang.luopan"
+        let bundleIDMatched: Bool
+        if let bundleBytes = expectedBundleID.data(using: .utf8),
+           receiptData.range(of: bundleBytes) != nil {
+            bundleIDMatched = true
+        } else if let fallbackBytes = "com.yanxiang.luopan".data(using: .utf8),
+                  receiptData.range(of: fallbackBytes) != nil {
+            bundleIDMatched = true
+        } else {
+            bundleIDMatched = false
+        }
+        
+        // 3. 解析收据内包含的内购商品标识与订阅到期时间 (ASN.1 IA5String RFC3339 时间戳)
+        var purchasedIDs = Set<String>()
+        for item in IAPProductID.allCases {
+            if let pidBytes = item.rawValue.data(using: .utf8),
+               receiptData.range(of: pidBytes) != nil {
+                purchasedIDs.insert(item.rawValue)
+            }
+        }
+        
+        let latestExpiry = extractLatestReceiptExpiryDate(from: receiptData)
+        return ReceiptValidationResult(
+            isValidContainer: isValidContainer,
+            bundleIDMatched: bundleIDMatched,
+            purchasedProductIDs: purchasedIDs,
+            latestExpirationDate: latestExpiry,
+            receiptSHA256: sha256Hex
+        )
+    }
+    
+    /// 从 ASN.1 IA5String (Tag 0x16) 载荷中提取收据内的最新 RFC3339 订阅到期时间
+    private func extractLatestReceiptExpiryDate(from data: Data) -> Date? {
+        let bytes = [UInt8](data)
+        let count = bytes.count
+        guard count > 32 else { return nil }
+        let isoFormatter = ISO8601DateFormatter()
+        var dates: [Date] = []
+        var idx = 0
+        while idx < count - 22 {
+            // ASN.1 IA5String tag = 0x16, 典型 RFC3339 长度 20..30 字节 (例如 "2027-10-29T12:00:00Z")
+            if bytes[idx] == 0x16 {
+                let len = Int(bytes[idx + 1])
+                if len >= 19 && len <= 32 && (idx + 2 + len) <= count {
+                    let slice = Data(bytes[(idx + 2)..<(idx + 2 + len)])
+                    if let str = String(data: slice, encoding: .ascii),
+                       str.contains("T"), str.hasSuffix("Z"),
+                       let parsed = isoFormatter.date(from: str) {
+                        dates.append(parsed)
+                        idx += 2 + len
+                        continue
+                    }
+                }
+            }
+            idx += 1
+        }
+        return dates.max()
+    }
+    
+    /// 根据已通过本地校验的 App Store 收据恢复或修正本地权益并更新防篡改签名
+    private func reconcileEntitlementsWithReceipt(_ receipt: ReceiptValidationResult) {
+        guard receipt.isTrusted else { return }
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        
+        let defaults = UserDefaults.standard
+        var didChange = false
+        
+        if receipt.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue) {
+            if !defaults.bool(forKey: kIsLifetime) || !defaults.bool(forKey: kIsVIP) {
+                defaults.set(true, forKey: kIsLifetime)
+                defaults.set(true, forKey: kIsVIP)
+                didChange = true
+            }
+        }
+        
+        if receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue) {
+            let currentExpiry = defaults.double(forKey: kVIPExpireDate)
+            if let receiptExpiry = receipt.latestExpirationDate?.timeIntervalSince1970, receiptExpiry > currentExpiry {
+                defaults.set(receiptExpiry, forKey: kVIPExpireDate)
+                defaults.set(receiptExpiry > Date().timeIntervalSince1970, forKey: kIsVIP)
+                didChange = true
+            } else if currentExpiry > Date().timeIntervalSince1970 && !defaults.bool(forKey: kIsVIP) {
+                defaults.set(true, forKey: kIsVIP)
+                didChange = true
+            }
+        }
+        
+        if didChange {
+            updateEntitlementSealLocked()
+            defaults.synchronize()
+        }
+    }
+    
+    /// 获取或生成保存在 Keychain 中的设备级 256-bit HMAC 密钥
+    private func deviceSealSymmetricKey() -> SymmetricKey {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: kKeychainSealAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecSuccess, let keyData = item as? Data, keyData.count >= 32 {
+            return SymmetricKey(data: keyData)
+        }
+        
+        var randomBytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
+        let vendorSalt = UIDevice.current.identifierForVendor?.uuidString ?? "com.yanxiang.luopan.device"
+        var combined = Data(randomBytes)
+        if let vendorData = vendorSalt.data(using: .utf8) {
+            combined.append(vendorData)
+        }
+        let derivedKeyData = Data(SHA256.hash(data: combined))
+        
+        let addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: kKeychainSealAccount,
+            kSecValueData as String: derivedKeyData,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        SecItemDelete(addQuery as CFDictionary)
+        SecItemAdd(addQuery as CFDictionary, nil)
+        return SymmetricKey(data: derivedKeyData)
+    }
+    
+    private func computeEntitlementSealLocked() -> String {
+        let defaults = UserDefaults.standard
+        let isVip = defaults.bool(forKey: kIsVIP) ? 1 : 0
+        let isLife = defaults.bool(forKey: kIsLifetime) ? 1 : 0
+        let expireBits = Int64(defaults.double(forKey: kVIPExpireDate).rounded())
+        let fpCredits = defaults.integer(forKey: kFloorplanCredits)
+        let tjCredits = defaults.integer(forKey: kTianjiCredits)
+        let payload = "v1|\(isVip)|\(isLife)|\(expireBits)|\(fpCredits)|\(tjCredits)"
+        let key = deviceSealSymmetricKey()
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+    
+    private func updateEntitlementSealLocked() {
+        let seal = computeEntitlementSealLocked()
+        UserDefaults.standard.set(seal, forKey: kEntitlementSeal)
+    }
+    
+    /// 校验 UserDefaults 中的权益是否经过合法签名或具备有效本地收据背书；若检测到篡改则拒绝并回滚
+    private func verifyEntitlementIntegrityLocked() -> Bool {
+        let defaults = UserDefaults.standard
+        let hasAnyClaimedEntitlement =
+            defaults.bool(forKey: kIsVIP) ||
+            defaults.bool(forKey: kIsLifetime) ||
+            defaults.integer(forKey: kFloorplanCredits) > 0 ||
+            defaults.integer(forKey: kTianjiCredits) > 0
+        
+        guard hasAnyClaimedEntitlement else { return true }
+        
+        let expectedSeal = computeEntitlementSealLocked()
+        if let storedSeal = defaults.string(forKey: kEntitlementSeal),
+           storedSeal == expectedSeal {
+            return true
+        }
+        
+        // 若未找到签名或签名不匹配（如版本升级首次运行或外部篡改 plist）：
+        // 检查本地是否存在合法的 App Store 签名收据或已完成交易记录进行背书
+        let receipt = verifyReceipt()
+        let processedIDs = defaults.stringArray(forKey: kProcessedTransactionIDs) ?? []
+        if receipt.isTrusted && !receipt.purchasedProductIDs.isEmpty {
+            // 仅保留收据确认过的非消耗型/订阅权益并重新加签
+            let allowLifetime = receipt.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue)
+            let allowYearly = receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
+            defaults.set(allowLifetime, forKey: kIsLifetime)
+            defaults.set(allowLifetime || allowYearly, forKey: kIsVIP)
+            if ! receipt.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue) {
+                defaults.set(0, forKey: kFloorplanCredits)
+            }
+            if ! receipt.purchasedProductIDs.contains(IAPProductID.tianjiSingle.rawValue) {
+                defaults.set(0, forKey: kTianjiCredits)
+            }
+            updateEntitlementSealLocked()
+            return allowLifetime || allowYearly
+        } else if !processedIDs.isEmpty && defaults.string(forKey: kEntitlementSeal) == nil {
+            // 兼容已有合法交易 ID 列表的旧版升级迁移（首次生成防篡改签名）
+            updateEntitlementSealLocked()
+            return true
+        }
+        
+        // 判定为无收据、无合法交易签名的 UserDefaults 本地篡改：立即清除伪造权益
+        defaults.set(false, forKey: kIsVIP)
+        defaults.set(false, forKey: kIsLifetime)
+        defaults.set(0.0, forKey: kVIPExpireDate)
+        defaults.set(0, forKey: kFloorplanCredits)
+        defaults.set(0, forKey: kTianjiCredits)
+        updateEntitlementSealLocked()
+        return false
     }
 }

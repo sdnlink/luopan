@@ -18,7 +18,28 @@ public final class OnDeviceShaAnalyzer {
     public static let shared = OnDeviceShaAnalyzer()
     private init() {}
 
-    public func analyze(image: UIImage, completion: @escaping (Result<ShaAnalysisResult, Error>) -> Void) {
+    public func analyze(
+        image: UIImage,
+        evidence: ARSceneEvidence? = nil,
+        completion: @escaping (Result<ShaAnalysisResult, Error>) -> Void
+    ) {
+        if let evidence = evidence {
+            guard evidence.trackingIsNormal else {
+                DispatchQueue.main.async { completion(.failure(AnalysisError.arTrackingLimited)) }
+                return
+            }
+            if evidence.lidarAvailable &&
+                (!evidence.depthStreamAvailable || evidence.depthCoverage < 0.15) {
+                DispatchQueue.main.async { completion(.failure(AnalysisError.arDepthUnavailable)) }
+                return
+            }
+            let hasSpatialStructure = evidence.mappingIsUsable ||
+                evidence.verticalPlaneCount > 0 || evidence.wallFaceCount > 0
+            if !hasSpatialStructure {
+                DispatchQueue.main.async { completion(.failure(AnalysisError.arSceneUnmapped)) }
+                return
+            }
+        }
         guard let cgImage = image.cgImage else {
             DispatchQueue.main.async {
                 completion(.failure(AnalysisError.invalidImage))
@@ -80,9 +101,17 @@ public final class OnDeviceShaAnalyzer {
                     DispatchQueue.main.async { completion(.failure(error)) }
                     return
                 }
+                let spatialBonus: Double
+                if let evidence = evidence {
+                    // Semantic walls/vertical planes strengthen the geometry
+                    // candidate, but never create one by themselves.
+                    spatialBonus = (evidence.wallFaceCount > 0 || evidence.verticalPlaneCount > 0) ? 0.03 : 0
+                } else {
+                    spatialBonus = 0
+                }
                 let result = ShaAnalysisResult(
                     shaID: relaxed.shaID,
-                    confidence: min(0.95, (relaxed.confidence + strict.confidence) * 0.5),
+                    confidence: min(0.95, (relaxed.confidence + strict.confidence) * 0.5 + spatialBonus),
                     targetX: (relaxed.targetX + strict.targetX) * 0.5,
                     targetY: (relaxed.targetY + strict.targetY) * 0.5,
                     detectedRegions: min(relaxed.detectedRegions, strict.detectedRegions),
@@ -227,12 +256,18 @@ public final class OnDeviceShaAnalyzer {
         case invalidImage
         case noDetectableRegion
         case ambiguousRegion
+        case arTrackingLimited
+        case arDepthUnavailable
+        case arSceneUnmapped
         public var errorDescription: String? {
             let lang = LocalizationManager.shared
             switch self {
             case .invalidImage: return lang.t("ar_ai_no_frame")
             case .noDetectableRegion: return lang.t("ar_ai_no_region")
             case .ambiguousRegion: return lang.t("ar_ai_ambiguous")
+            case .arTrackingLimited: return lang.t("ar_ai_tracking_limited")
+            case .arDepthUnavailable: return lang.t("ar_ai_depth_unavailable")
+            case .arSceneUnmapped: return lang.t("ar_ai_scene_unmapped")
             }
         }
     }

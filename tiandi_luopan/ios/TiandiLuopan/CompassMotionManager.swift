@@ -219,6 +219,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         headingUpdatesEnabled = enabled
         guard isRunning else { return }
         if enabled && CLLocationManager.headingAvailable() {
+            // The interface may have rotated while heading updates were
+            // paused (for example after leaving Settings). Apply the current
+            // scene orientation before the first resumed sample so the first
+            // displayed bearing cannot be off by 90° or 180°.
+            updateHeadingOrientation()
             locationManager.startUpdatingHeading()
         } else {
             locationManager.stopUpdatingHeading()
@@ -583,6 +588,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             if status == .authorizedWhenInUse || status == .authorizedAlways {
                 manager.startUpdatingLocation()
                 if self.headingUpdatesEnabled && CLLocationManager.headingAvailable() {
+                    self.updateHeadingOrientation()
                     manager.startUpdatingHeading()
                 }
             }

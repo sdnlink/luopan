@@ -34,7 +34,7 @@ public final class ZeRiEngine {
         return analyze(date: date, sitting: sitting)
     }
 
-    public func analyze(date: Date = Date(), sitting: Mountain24Item) -> ZeRiAnalysis {
+    public func analyze(date: Date, sitting: Mountain24Item) -> ZeRiAnalysis {
         var calendar = Calendar(identifier: .gregorian)
         // Date is an absolute instant; all selectable-day pillars must use
         // the user's civil time zone so a late-night local date is not shifted

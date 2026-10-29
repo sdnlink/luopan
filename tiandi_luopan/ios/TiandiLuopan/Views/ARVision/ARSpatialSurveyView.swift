@@ -551,8 +551,12 @@ public struct ARSpatialSurveyView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Resume only when the survey is still presented. If it was
             // dismissed while the app was backgrounded, stop() cleared the
-            // configuration and this call safely becomes a no-op.
-            model.resume()
+            // configuration and this call safely becomes a no-op. RoomPlan
+            // owns the camera while its full-screen capture is presented, so
+            // never resume the spatial session underneath that screen.
+            if !showRoomPlan {
+                model.resume()
+            }
         }
 #if canImport(RoomPlan)
         .onChange(of: showRoomPlan) { isPresented in

@@ -473,6 +473,8 @@ public class LocalizationManager: ObservableObject {
             "preset_minimalist": "极简勘测盘",
             "solar_eq_time": "均时差",
             "minute_unit": "分",
+            "year_suffix": "年",
+            "month_suffix": "月",
             "solar_calib_title": "真太阳时校准",
 
             // 70个精准补充补丁 (彻底消除英文键名遗漏)
@@ -937,6 +939,8 @@ public class LocalizationManager: ObservableObject {
             "preset_minimalist": "極簡勘測盤",
             "solar_eq_time": "均時差",
             "minute_unit": "分",
+            "year_suffix": "年",
+            "month_suffix": "月",
             "solar_calib_title": "真太陽時校準",
 
             // 70個繁體精準補充補丁 (徹底消除英文鍵名遺漏)
@@ -1399,6 +1403,8 @@ public class LocalizationManager: ObservableObject {
             "preset_minimalist": "Minimalist Survey",
             "solar_eq_time": "Eq of Time",
             "minute_unit": "m",
+            "year_suffix": "",
+            "month_suffix": "",
             "solar_calib_title": "True Solar Time Calibrated",
             "altitude_unit": "m",
             "mountain_suffix": " Mountain",

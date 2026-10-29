@@ -260,8 +260,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             depthStreamAvailable: frame.sceneDepth != nil,
             depthCoverage: Self.depthCoverage(from: frame.sceneDepth?.depthMap),
             horizontalFOVDegrees: Self.portraitHorizontalFOV(for: frame),
-            verticalPlaneCount: verticalPlaneCount,
-            wallFaceCount: semanticCounts[ARMeshClassification.wall.rawValue] ?? 0,
+            verticalPlaneCount: frame.anchors
+                .compactMap { $0 as? ARPlaneAnchor }
+                .filter { $0.alignment == .vertical }
+                .count,
+            wallFaceCount: Self.wallFaceCount(in: frame.anchors),
             depthSampleMeters: Self.centerDepthSample(from: frame.sceneDepth?.depthMap),
             timestamp: frame.timestamp
         )
@@ -538,6 +541,28 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let radians = 2.0 * atan(pixelHeight / (2.0 * focalY))
         let degrees = radians * 180.0 / .pi
         return degrees.isFinite && degrees >= 20 && degrees <= 120 ? degrees : nil
+    }
+
+    private static func wallFaceCount(in anchors: [ARAnchor]) -> Int {
+        var count = 0
+        var inspectedFaces = 0
+        for anchor in anchors {
+            guard let meshAnchor = anchor as? ARMeshAnchor else { continue }
+            let geometry = meshAnchor.geometry
+            for faceIndex in 0..<geometry.faces.count {
+                if inspectedFaces >= 2000 { return count }
+                if let source = geometry.classification {
+                    let byteOffset = source.offset + faceIndex * source.stride
+                    guard byteOffset >= 0, byteOffset < source.buffer.length else { continue }
+                    let pointer = source.buffer.contents().advanced(by: byteOffset)
+                    if Int(pointer.load(as: UInt8.self)) == ARMeshClassification.wall.rawValue {
+                        count += 1
+                    }
+                }
+                inspectedFaces += 1
+            }
+        }
+        return count
     }
 
     // Plane outlines provide immediate visual feedback while ARKit builds the

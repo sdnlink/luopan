@@ -3,7 +3,7 @@ import CoreGraphics
 
 // MARK: - 户型空间立极与全屋风水体检引擎 (PRD 5.3 & 第7章)
 
-public enum FloorplanRoomType: String, CaseIterable, Identifiable {
+public enum FloorplanRoomType: String, CaseIterable, Identifiable, Codable {
     case door = "大门"
     case livingRoom = "客厅"
     case masterBedroom = "主卧"
@@ -72,7 +72,7 @@ public enum FloorplanRoomType: String, CaseIterable, Identifiable {
     }
 }
 
-public struct FloorplanRoom: Identifiable {
+public struct FloorplanRoom: Identifiable, Codable {
     public var id: String
     public var name: String
     public var type: FloorplanRoomType

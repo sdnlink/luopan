@@ -5,6 +5,15 @@ import ImageIO
 
 // MARK: - 户型空间立极与全屋风水体检视图 (Floorplan View - PRD 5.3)
 
+private struct SavedFloorplanLayout: Codable {
+    let rooms: [FloorplanRoom]
+    let centroidX: Double
+    let centroidY: Double
+    let compassRotation: Double
+    let isSyncWithCompass: Bool
+    let hasFloorplanAccess: Bool
+}
+
 public struct FloorplanView: View {
     public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
@@ -39,6 +48,10 @@ public struct FloorplanView: View {
     @State private var floorplanImageBeforePicker: UIImage?
     @State private var lastAuditedHeading: Double?
     @State private var lastAuditedCentroid: CGPoint?
+    @State private var didRestorePersistedLayout = false
+
+    private static let savedLayoutKey = "tiandi_floorplan_saved_layout_v1"
+    private static let savedImageFileName = "floorplan-background.jpg"
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -158,6 +171,7 @@ public struct FloorplanView: View {
                     isEditingRooms = true
                 }
                 floorplanImageBeforePicker = nil
+                persistLayout()
                 refreshAudit(force: true)
             }
         }
@@ -183,6 +197,7 @@ public struct FloorplanView: View {
             refreshAudit(force: true)
         }
         .onAppear {
+            restorePersistedLayoutIfNeeded()
             refreshAudit(force: true)
         }
         .onChange(of: isActive) { active in
@@ -196,6 +211,112 @@ public struct FloorplanView: View {
         .onChange(of: centroid) { _ in
             refreshAudit()
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            persistLayout()
+        }
+    }
+
+    /// Restore the last editable plan once per view lifetime. Room geometry is
+    /// normalized on load so a corrupted or stale local record cannot place a
+    /// room outside the canvas or produce invalid SwiftUI frames.
+    private func restorePersistedLayoutIfNeeded() {
+        guard !didRestorePersistedLayout else { return }
+        didRestorePersistedLayout = true
+        guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
+              let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data),
+              !saved.rooms.isEmpty else { return }
+
+        let restoredRooms = saved.rooms.map { room -> FloorplanRoom in
+            var restored = Self.sanitizedRoom(room)
+            // Room labels are generated from the selected type, so restore
+            // them in the current app language instead of showing text from
+            // the language used when the layout was saved.
+            restored.name = restored.type.localizedName
+            return restored
+        }
+        guard !restoredRooms.isEmpty else { return }
+        rooms = restoredRooms
+        centroid = CGPoint(
+            x: Self.clampedUnit(saved.centroidX, fallback: 0.5),
+            y: Self.clampedUnit(saved.centroidY, fallback: 0.5)
+        )
+        compassRotation = Self.normalizedHeading(saved.compassRotation)
+        isSyncWithCompass = saved.isSyncWithCompass
+        didConsumeFloorplanCredit = saved.hasFloorplanAccess
+
+        if let imageURL = Self.savedImageURL(),
+           let image = UIImage(contentsOfFile: imageURL.path) {
+            userFloorplanImage = image
+        }
+    }
+
+    /// Keep the image outside UserDefaults and store only the small editable
+    /// layout model there. This avoids a large synchronous defaults write when
+    /// a user imports a camera photo or a high-resolution floor plan.
+    private func persistLayout() {
+        let saved = SavedFloorplanLayout(
+            rooms: rooms,
+            centroidX: Double(centroid.x),
+            centroidY: Double(centroid.y),
+            compassRotation: Self.normalizedHeading(compassRotation),
+            isSyncWithCompass: isSyncWithCompass,
+            hasFloorplanAccess: didConsumeFloorplanCredit
+        )
+        if let data = try? JSONEncoder().encode(saved) {
+            UserDefaults.standard.set(data, forKey: Self.savedLayoutKey)
+        }
+
+        guard let imageURL = Self.savedImageURL() else { return }
+        do {
+            if let image = userFloorplanImage,
+               let imageData = image.jpegData(compressionQuality: 0.82) ?? image.pngData() {
+                try imageData.write(to: imageURL, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: imageURL.path) {
+                try FileManager.default.removeItem(at: imageURL)
+            }
+        } catch {
+            // A layout can still be restored without its optional background.
+            // Do not interrupt editing just because the sandbox is full.
+            print("Unable to persist floorplan image: \(error.localizedDescription)")
+        }
+    }
+
+    private static func savedImageURL() -> URL? {
+        guard let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        } catch {
+            return nil
+        }
+        return directory.appendingPathComponent(savedImageFileName, isDirectory: false)
+    }
+
+    private static func clampedUnit(_ value: Double, fallback: Double) -> CGFloat {
+        guard value.isFinite else { return CGFloat(fallback) }
+        return CGFloat(max(0.0, min(1.0, value)))
+    }
+
+    private static func normalizedHeading(_ value: Double) -> Double {
+        guard value.isFinite else { return 0.0 }
+        let normalized = value.truncatingRemainder(dividingBy: 360.0)
+        return normalized >= 0 ? normalized : normalized + 360.0
+    }
+
+    private static func sanitizedRoom(_ room: FloorplanRoom) -> FloorplanRoom {
+        var result = room
+        let width = room.rect.width.isFinite ? max(0.04, min(1.0, room.rect.width)) : 0.2
+        let height = room.rect.height.isFinite ? max(0.04, min(1.0, room.rect.height)) : 0.2
+        let x = room.rect.origin.x.isFinite ? room.rect.origin.x : 0.0
+        let y = room.rect.origin.y.isFinite ? room.rect.origin.y : 0.0
+        result.rect = CGRect(
+            x: max(0.0, min(1.0 - width, x)),
+            y: max(0.0, min(1.0 - height, y)),
+            width: width,
+            height: height
+        )
+        return result
     }
 
     /// Keep an already-presented room sheet aligned with the same audit input
@@ -245,6 +366,7 @@ public struct FloorplanView: View {
             return false
         }
         didConsumeFloorplanCredit = true
+        persistLayout()
         return true
     }
     
@@ -314,6 +436,7 @@ public struct FloorplanView: View {
                     compassRotation = motion.headingState.facingAngle
                 }
                 isSyncWithCompass.toggle()
+                persistLayout()
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: isSyncWithCompass ? "location.fill" : "hand.draw.fill")
@@ -447,6 +570,7 @@ public struct FloorplanView: View {
             x: max(0.05, min(0.95, weightedX / totalArea)),
             y: max(0.05, min(0.95, weightedY / totalArea))
         )
+        persistLayout()
     }
 
     private func resetToSampleLayout() {
@@ -464,6 +588,11 @@ public struct FloorplanView: View {
         activeRoomScaleID = nil
         activeRoomScaleStartRect = nil
         roomWasDragged = false
+        didConsumeFloorplanCredit = false
+        if let imageURL = Self.savedImageURL(), FileManager.default.fileExists(atPath: imageURL.path) {
+            try? FileManager.default.removeItem(at: imageURL)
+        }
+        UserDefaults.standard.removeObject(forKey: Self.savedLayoutKey)
         refreshAudit(force: true)
     }
 
@@ -508,6 +637,7 @@ public struct FloorplanView: View {
                     .foregroundColor(.white)
                 Button(action: {
                     compassRotation = motion.headingState.facingAngle
+                    persistLayout()
                     refreshAudit(force: true)
                 }) {
                     Text(lang.t("floorplan_heading_use_compass"))
@@ -641,10 +771,13 @@ public struct FloorplanView: View {
         rooms = updatedRooms
         isEditingRooms = true
 
-        let union = orderedCandidates.dropFirst().reduce(orderedCandidates.first ?? .zero) { $0.union($1) }
-        if !union.isNull {
-            centroid = CGPoint(x: union.midX, y: union.midY)
+        if let firstCandidate = orderedCandidates.first {
+            let union = orderedCandidates.dropFirst().reduce(firstCandidate) { $0.union($1) }
+            if !union.isNull, union.width > 0, union.height > 0 {
+                centroid = CGPoint(x: union.midX, y: union.midY)
+            }
         }
+        persistLayout()
         roomDetectionMessage = "\(lang.t("floorplan_detected")) \(orderedCandidates.count)"
         refreshAudit(force: true)
     }
@@ -658,6 +791,7 @@ public struct FloorplanView: View {
         self.roomsBeforeDetection = nil
         self.centroidBeforeDetection = nil
         roomDetectionMessage = nil
+        persistLayout()
         refreshAudit(force: true)
     }
 
@@ -667,6 +801,7 @@ public struct FloorplanView: View {
         rooms[index].name = type.localizedName
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
+        persistLayout()
         refreshAudit(force: true)
         selectedRoom = nil
     }
@@ -683,6 +818,7 @@ public struct FloorplanView: View {
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
         isEditingRooms = true
+        persistLayout()
         refreshAudit(force: true)
     }
 
@@ -722,10 +858,10 @@ public struct FloorplanView: View {
     }
 
     private func deleteRoom(roomID: String) {
-        guard rooms.count > 1 else { return }
         rooms.removeAll { $0.id == roomID }
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
+        persistLayout()
         refreshAudit(force: true)
         selectedRoom = nil
     }
@@ -733,6 +869,7 @@ public struct FloorplanView: View {
     private func adjustManualHeading(by delta: Double) {
         compassRotation = (compassRotation + delta).truncatingRemainder(dividingBy: 360)
         if compassRotation < 0 { compassRotation += 360 }
+        persistLayout()
         refreshAudit(force: true)
     }
 
@@ -927,6 +1064,7 @@ public struct FloorplanView: View {
                     DispatchQueue.main.async {
                         roomWasDragged = false
                     }
+                    persistLayout()
                     refreshAudit(force: true)
                 }
         )
@@ -967,6 +1105,7 @@ public struct FloorplanView: View {
                 .onEnded { _ in
                     activeRoomScaleID = nil
                     activeRoomScaleStartRect = nil
+                    persistLayout()
                     refreshAudit(force: true)
                 }
         )
@@ -1037,6 +1176,7 @@ public struct FloorplanView: View {
                 }
                 .onEnded { _ in
                     centroidDragStart = nil
+                    persistLayout()
                 }
         )
     }

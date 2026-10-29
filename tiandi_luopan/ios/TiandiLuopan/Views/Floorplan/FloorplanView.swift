@@ -22,6 +22,8 @@ public struct FloorplanView: View {
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
     @State private var activeRoomStartRect: CGRect? = nil
+    @State private var activeRoomScaleID: String? = nil
+    @State private var activeRoomScaleStartRect: CGRect? = nil
     @State private var roomWasDragged = false
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
@@ -305,6 +307,8 @@ public struct FloorplanView: View {
                 isEditingRooms.toggle()
                 activeRoomDragID = nil
                 activeRoomStartRect = nil
+                activeRoomScaleID = nil
+                activeRoomScaleStartRect = nil
                 roomWasDragged = false
             }) {
                 HStack(spacing: 3) {
@@ -871,6 +875,44 @@ public struct FloorplanView: View {
                     DispatchQueue.main.async {
                         roomWasDragged = false
                     }
+                    refreshAudit(force: true)
+                }
+        )
+        .simultaneousGesture(
+            MagnificationGesture()
+                .onChanged { scale in
+                    guard isEditingRooms, scale.isFinite else { return }
+                    roomWasDragged = true
+                    if activeRoomScaleID != room.id {
+                        activeRoomScaleID = room.id
+                        activeRoomScaleStartRect = room.rect
+                    }
+                    guard let startRect = activeRoomScaleStartRect,
+                          let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }
+
+                    let minWidth: CGFloat = 0.08
+                    let minHeight: CGFloat = 0.06
+                    let newWidth = max(minWidth, min(0.9, startRect.width * scale))
+                    let newHeight = max(minHeight, min(0.9, startRect.height * scale))
+                    let maxX = max(0.0, 1.0 - newWidth)
+                    let maxY = max(0.0, 1.0 - newHeight)
+                    var updated = rooms[index]
+                    updated.rect = CGRect(
+                        x: min(max(0.0, startRect.origin.x), maxX),
+                        y: min(max(0.0, startRect.origin.y), maxY),
+                        width: newWidth,
+                        height: newHeight
+                    )
+                    rooms[index] = updated
+                    if let auditedIndex = auditedRooms.firstIndex(where: { $0.id == room.id }) {
+                        var audited = auditedRooms[auditedIndex]
+                        audited.rect = updated.rect
+                        auditedRooms[auditedIndex] = audited
+                    }
+                }
+                .onEnded { _ in
+                    activeRoomScaleID = nil
+                    activeRoomScaleStartRect = nil
                     refreshAudit(force: true)
                 }
         )

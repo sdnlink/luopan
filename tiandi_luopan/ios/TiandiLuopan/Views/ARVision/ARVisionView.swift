@@ -1654,14 +1654,14 @@ public struct ShaRemedyDetailSheet: View {
             HStack {
                 Label("🧭 第三策 · 玄空理气与五行飞星调化", systemImage: "safari.fill")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(Color.cyan)
+                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
                 Spacer()
                 Text("形理兼治")
                     .font(.system(size: 10, weight: .medium))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.cyan.opacity(0.18))
-                    .foregroundColor(Color.cyan)
+                    .background(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.18))
+                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
                     .cornerRadius(6)
             }
             
@@ -1683,7 +1683,7 @@ public struct ShaRemedyDetailSheet: View {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11))
-                        .foregroundColor(Color.cyan)
+                        .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
                     Text("【借势生旺】配合罗盘实测向首，若当运一白贪狼水星或八白左辅、九紫右弼当令吉星飞临，可在此方布置水生植物或紫水晶洞，化煞气为权柄，转凶为大吉。")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.9))
@@ -1693,7 +1693,7 @@ public struct ShaRemedyDetailSheet: View {
         .padding(14)
         .background(Color(red: 0.10, green: 0.13, blue: 0.16))
         .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.cyan.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.3), lineWidth: 1))
     }
     
     // MARK: - 6. 锦囊第四策：杨公择日安放良辰秘法

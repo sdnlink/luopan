@@ -28,7 +28,7 @@ public enum ShaSeverity: String, Codable {
             case .vi: return "Cực Hung (Đại Sát Phá Cục)"
             case .th: return "อัปมงคลยิ่ง (เคราะห์ใหญ่ทำลายล้าง)"
             case .id: return "Sangat Buruk (Bencana Besar)"
-            case .zhHans: return "极凶 (大煞破局)"
+            case .auto, .zhHans: return "极凶 (大煞破局)"
             }
         case .warning:
             switch lang {
@@ -38,7 +38,7 @@ public enum ShaSeverity: String, Codable {
             case .vi: return "Trung Hung (Tổn Đinh Hao Tài)"
             case .th: return "อัปมงคลปานกลาง (สูญเสียทรัพย์และคน)"
             case .id: return "Cukup Buruk (Kerugian Finansial & Keluarga)"
-            case .zhHans: return "中凶 (损丁耗财)"
+            case .auto, .zhHans: return "中凶 (损丁耗财)"
             }
         case .minor:
             switch lang {
@@ -49,7 +49,7 @@ public enum ShaSeverity: String, Codable {
             case .vi: return "Khinh Vi (Khí Trường Nhiễu)"
             case .th: return "เล็กน้อย (พลังงานแปรปรวน)"
             case .id: return "Ringan (Gangguan Energi)"
-            case .zhHans: return "轻微 (气场受扰)"
+            case .auto, .zhHans: return "轻微 (气场受扰)"
             }
         case .notice:
             switch lang {
@@ -59,7 +59,7 @@ public enum ShaSeverity: String, Codable {
             case .vi: return "Cát Tượng (Minh Đường Thanh Tú)"
             case .th: return "มงคล (ลานหน้างดงามบริสุทธิ์)"
             case .id: return "Pertanda Baik (Halaman Cerah & Seimbang)"
-            case .zhHans: return "吉象 (明堂清秀)"
+            case .auto, .zhHans: return "吉象 (明堂清秀)"
             }
         }
     }
@@ -162,7 +162,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
             case "gejiao":   return "Sha Pemotong Kaki"
             default: return name
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return name
         }
     }
@@ -254,7 +254,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
             case "gejiao":   return "Air Pemotong Pondasi"
             default: return aliases
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return aliases
         }
     }
@@ -346,7 +346,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
             case "gejiao":   return "Jalan raya berkecepatan tinggi atau aliran air deras langsung menyapu kaki gedung."
             default: return visualFeature
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return visualFeature
         }
     }
@@ -438,7 +438,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
             case "gejiao":   return "1. Buat kotak tanaman tinggi dan semak di balkon sebagai penyangga;\n2. Tempatkan sepasang Pixiu kuningan menghadap aliran air untuk menjaga rezeki;\n3. Pasang jendela kaca ganda Low-E kedap suara."
             default: return remedySolution
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return remedySolution
         }
     }

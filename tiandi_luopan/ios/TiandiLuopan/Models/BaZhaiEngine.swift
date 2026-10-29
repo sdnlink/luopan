@@ -99,7 +99,7 @@ public enum StarLuckType: String, Codable {
             case .liuSha:  return "Liu Sha (Enam Petaka - Cukup Buruk)"
             case .huoHai:  return "Huo Hai (Malapetaka - Sedikit Buruk)"
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return rawValue
         }
     }
@@ -188,7 +188,7 @@ public enum StarLuckType: String, Codable {
             case .liuSha:  return "Kekacauan emosi dan ketidakharmonisan; cocok untuk gudang atau dinetralkan."
             case .huoHai:  return "Rintangan dan pertengkaran kecil; lebih baik dijaga tetap tenang tanpa aktivitas dinamis."
             }
-        case .zhHans:
+        case .auto, .zhHans:
             switch self {
             case .shengQi: return "最利求财进职、开大门、置主卧、安动气之源"
             case .yanNian: return "利健康长寿、夫妻和睦、人际关系，宜主卧客堂"
@@ -228,7 +228,7 @@ public struct BaZhaiPalaceItem: Identifiable {
             case .vi: return viDirs[id]
             case .th: return thDirs[id]
             case .id: return idDirs[id]
-            case .zhHans: return direction
+            case .auto, .zhHans: return direction
             }
         }
         return direction
@@ -266,7 +266,7 @@ public struct BaZhaiAnalysis {
         case .id:
             let map = ["坎宅": "Rumah Kan", "坤宅": "Rumah Kun", "震宅": "Rumah Zhen", "巽宅": "Rumah Xun", "乾宅": "Rumah Qian", "兑宅": "Rumah Dui", "艮宅": "Rumah Gen", "离宅": "Rumah Li"]
             return map[houseGua] ?? houseGua
-        case .zhHans:
+        case .auto, .zhHans:
             return houseGua
         }
     }
@@ -288,7 +288,7 @@ public struct BaZhaiAnalysis {
             return houseType == "东四宅" ? "บ้านทิศตะวันออก" : "บ้านทิศตะวันตก"
         case .id:
             return houseType == "东四宅" ? "Rumah Empat Timur" : "Rumah Empat Barat"
-        case .zhHans:
+        case .auto, .zhHans:
             return houseType
         }
     }
@@ -317,7 +317,7 @@ public struct BaZhaiAnalysis {
         case .id:
             let map = ["坎": "Utara (Kan)", "坤": "Barat Daya (Kun)", "震": "Timur (Zhen)", "巽": "Tenggara (Xun)", "乾": "Barat Laut (Qian)", "兑": "Barat (Dui)", "艮": "Timur Laut (Gen)", "离": "Selatan (Li)"]
             return map[gateDirection] ?? gateDirection
-        case .zhHans:
+        case .auto, .zhHans:
             return gateDirection
         }
     }

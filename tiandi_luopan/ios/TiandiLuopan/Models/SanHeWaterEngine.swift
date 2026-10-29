@@ -124,7 +124,7 @@ public enum ChangShengPhase: String, CaseIterable {
             case .tai:        return "Janin (Tai)"
             case .yang:       return "Pengasuhan (Yang)"
             }
-        case .zhHans:
+        case .auto, .zhHans:
             return rawValue
         }
     }
@@ -199,7 +199,7 @@ public enum ChangShengPhase: String, CaseIterable {
             case .muYu:                return "Air asmara/bunga persik; masuk maupun keluar harus dihindari"
             case .bing, .si, .tai, .yang: return "Posisi netral dan tenang; pertahankan aliran air yang lambat dan damai"
             }
-        case .zhHans:
+        case .auto, .zhHans:
             switch self {
             case .changSheng, .diWang: return "来水吉，大发富贵；去水凶，损丁破财"
             case .linGuan, .guanDai:   return "贵人来水，催官发甲；出水不利"
@@ -251,7 +251,7 @@ public struct HuangQuanWaterResult {
         case .vi: return "Canh Đinh Khôn thượng thị Hoàng Tuyền, Ất Bính tu phòng Tốn thủy tiên. Giáp Quý hướng trung hưu kiến Cấn, Tân Nhâm thủy lộ phạ đương Càn."
         case .th: return "เกิ้งติงทิศคุนคือหวงเฉวียน อี้ปิ่งระวังน้ำทิศซวิ่น เจี่ยกุ่ยอย่าพบทิศเกิ้น ซินเหรินระวังน้ำทิศเฉียน"
         case .id: return "Geng dan Ding hindari Huangquan di Kun; Yi dan Bing waspadai air Xun. Jia dan Gui hindari Gen; Xin dan Ren waspadai jalan air Qian."
-        case .zhHans: return quote
+        case .auto, .zhHans: return quote
         }
     }
 }
@@ -275,7 +275,7 @@ public struct BaShaResult {
         case .vi: return "Khảm Long Khôn Thố Chấn sơn hầu, Tốn Kê Càn Mã Đoài xà đầu, Cấn Hổ Ly Trư vi sát diệu."
         case .th: return "ข่านมังกร คุนกระต่าย เจิ้นลิง ซวิ่นไก่ เฉียนม้า ตุ้ยงู เกิ้นเสือ หลีหมู เป็นดาวพิฆาต"
         case .id: return "Naga Kan, Kelinci Kun, Monyet Zhen; Ayam Xun, Kuda Qian, Ular Dui; Harimau Gen dan Babi Li adalah Bintang Sha."
-        case .zhHans: return song
+        case .auto, .zhHans: return song
         }
     }
 
@@ -288,7 +288,7 @@ public struct BaShaResult {
         case .vi: return "Sinh ngã vi Sinh Sa (trợ quý), đồng ngã vi Vượng Sa (vượng nhân đinh tài lộc), khắc ngã vi Sát Sa (đại hung huyết quang), ngã khắc vi Nô Sa (đắc tài bạch), ngã sinh vi Tiết Sa (tiêu hao hư thoát)."
         case .th: return "ธาตุเกื้อหนุนคือเซิงซา (เสริมบารมี); ธาตุเดียวกันคือวั่งซา (บริบูรณ์ทรัพย์และคน); ธาตุข่มคือชาซา (เคราะห์ใหญ่เลือดตก); เราข่มคือหนูซา (ได้ลาภทรัพย์); เราก่อกำเนิดคือเซี่ยซา (รั่วไหลสูญเปล่า)"
         case .id: return "Menghidupkan adalah Sheng Sha (penolong bangsawan); seunsur adalah Wang Sha (keluarga & kekayaan); menaklukkan saya adalah Sifat Sha (bahaya besar); saya taklukkan adalah Budak Sha (kekayaan); saya hidupkan adalah Boros Sha (pemborosan)."
-        case .zhHans: return xiaoShaRule
+        case .auto, .zhHans: return xiaoShaRule
         }
     }
     
@@ -331,7 +331,7 @@ public struct BaShaResult {
             let dirId = ["东南": "Tenggara", "正东": "Timur", "西南": "Barat Daya", "正西": "Barat", "正南": "Selatan", "东北": "Timur Laut", "西北": "Barat Laut"]
             let d = dirId[shaDir] ?? shaDir
             return "\(d) (\(shaZhi))"
-        case .zhHans:
+        case .auto, .zhHans:
             return "\(shaDir)\(shaZhi)"
         }
     }
@@ -630,7 +630,7 @@ public final class SanHeWaterEngine {
                 desc = "Arah Hadap: [\(pName)]. Bebas dari pantangan Delapan Jalur Huangquan; sesuaikan dengan Dua Belas Siklus Changsheng untuk keberuntungan optimal."
                 badge = "Aliran Air Murni Harmonis"
             }
-        case .zhHans:
+        case .auto, .zhHans:
             badge = "正针合度纯清"
             if name == "庚" || name == "丁" {
                 desc = "向首为【\(name)山向】。水法大忌：坤方出水为杀人大黄泉（损人丁、伤小口、败退产业）；若坤方见来水反为催官水。"
@@ -719,7 +719,7 @@ public final class SanHeWaterEngine {
         case .id:
             remedy = "Netralisasi Sha: Jika terdapat tiang listrik tegangan tinggi atau sudut tajam dinding di arah ini, gantung cermin Shan Hai Zhen atau jimat pelindung."
             lore = "Sha Posisi Duduk berada di \(info.dir) (\(info.zhi)). Hindari menara listrik, batu tajam, atau genangan air kotor di sektor ini."
-        case .zhHans:
+        case .auto, .zhHans:
             remedy = "消砂法则：该方若见高压电线塔、壁刀尖角，急需悬挂山海镇或五岳真形图予以遮挡化解。"
             lore = info.lore
         }

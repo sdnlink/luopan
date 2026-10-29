@@ -87,7 +87,7 @@ public class PurpleWhiteEngine {
                 "5-Kuning Bintang Petaka Tanah", "6-Putih Bintang Militer Logam", "7-Merah Bintang Tentara Logam", "8-Putih Bintang Rezeki Tanah", "9-Ungu Bintang Semarak Api"
             ]
             return names[star]
-        case .zhHans:
+        case .auto, .zhHans:
             let names = [
                 "", "一白贪狼水星", "二黑巨门土星(病符)", "三碧禄存木星", "四绿文曲木星",
                 "五黄廉贞土星(大煞)", "六白武曲金星", "七赤破军金星", "八白左辅土星", "九紫右弼火星"
@@ -120,7 +120,7 @@ public class PurpleWhiteEngine {
         case .id:
             let dirs = [1: "Utara", 2: "Barat Daya", 3: "Timur", 4: "Tenggara", 5: "Pusat", 6: "Barat Laut", 7: "Barat", 8: "Timur Laut", 9: "Selatan"]
             return dirs[palaceId] ?? "Pusat"
-        case .zhHans:
+        case .auto, .zhHans:
             let dirs = [1: "正北", 2: "西南", 3: "正东", 4: "东南", 5: "中宫", 6: "西北", 7: "正西", 8: "东北", 9: "正南"]
             return dirs[palaceId] ?? "中宫"
         }
@@ -150,7 +150,7 @@ public class PurpleWhiteEngine {
         case .id:
             let full = [1: "Utara (Kan)", 2: "Barat Daya (Kun)", 3: "Timur (Zhen)", 4: "Tenggara (Xun)", 5: "Pusat (Taiji)", 6: "Barat Laut (Qian)", 7: "Barat (Dui)", 8: "Timur Laut (Gen)", 9: "Selatan (Li)"]
             return full[palaceId] ?? "Pusat (Taiji)"
-        case .zhHans:
+        case .auto, .zhHans:
             let full = [1: "正北 坎宫", 2: "西南 坤宫", 3: "正东 震宫", 4: "东南 巽宫", 5: "中央 太极", 6: "西北 乾宫", 7: "正西 兑宫", 8: "东北 艮宫", 9: "正南 离宫"]
             return full[palaceId] ?? "中央 太极"
         }
@@ -363,7 +363,7 @@ public class PurpleWhiteEngine {
             ]
             let c = idConfig[zhiIndex] ?? ("Selatan", "Utara", "Utara")
             taiSuiDesc = c.ts; suiPoDesc = c.sp; sanShaDesc = c.ss
-        case .zhHans:
+        case .auto, .zhHans:
             let hansConfig: [Int: (ts: String, sp: String, ss: String)] = [
                 0: ("正北 (子方)", "正南 (午方)", "正南 (巳午未方)"),
                 1: ("东北 (丑方)", "西南 (未方)", "正东 (寅卯辰方)"),
@@ -510,7 +510,7 @@ public class PurpleWhiteEngine {
                 } else {
                     advice = "Energi seimbang dan tenang; pertahankan penataan ruangan yang harmonis."
                 }
-            case .zhHans:
+            case .auto, .zhHans:
                 if isDanger25 {
                     advice = "【二五交加重煞】病符逢五黄，宜悬挂六帝古钱与铜葫芦化解"
                 } else if hasFiveYellow {

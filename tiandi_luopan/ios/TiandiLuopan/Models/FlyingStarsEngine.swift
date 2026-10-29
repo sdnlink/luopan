@@ -77,7 +77,7 @@ public struct PalaceCell: Identifiable {
             case "金": return "Logam"
             default: return element
             }
-        case .zhHans, .zhHant, .ja:
+        case .auto, .zhHans, .zhHant, .ja:
             return element
         }
     }
@@ -134,7 +134,7 @@ public struct PalaceCell: Identifiable {
             if isShaWuHuang || isShaErHei { return "Benturan 5 Kuning & 2 Hitam · Tenang & gunakan obat logam" }
             if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Harmoni Satu–Enam · Mendukung prestasi akademis" }
             return "Campuran peruntungan · Posisi seimbang"
-        case .zhHans:
+        case .auto, .zhHans:
             return evaluation
         }
     }
@@ -208,7 +208,7 @@ public struct PalaceCell: Identifiable {
                 result = result.replacingOccurrences(of: source, with: localized)
             }
             return result
-        case .zhHans:
+        case .auto, .zhHans:
             return palaceName
         }
     }
@@ -328,7 +328,7 @@ public final class FlyingStarsEngine {
             let stars = ["", "1 Putih TanLang", "2 Hitam JuMen", "3 Giok LuCun", "4 Hijau WenQu", "5 Kuning LianZhen", "6 Putih WuQu", "7 Merah PoJun", "8 Putih ZuoFu", "9 Ungu YouBi"]
             let elements = ["", "Air", "Tanah", "Kayu", "Kayu", "Tanah", "Logam", "Logam", "Tanah", "Api"]
             yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
-        case .zhHans:
+        case .auto, .zhHans:
             let yuans = ["", "上元", "上元", "上元", "中元", "中元", "中元", "下元", "下元", "下元"]
             let trigrams = ["", "坎", "坤", "震", "巽", "中", "乾", "兑", "艮", "离"]
             let stars = ["", "一白贪狼", "二黑巨门", "三碧禄存", "四绿文曲", "五黄廉贞", "六白武曲", "七赤破军", "八白左辅", "九紫右弼"]
@@ -353,7 +353,7 @@ public final class FlyingStarsEngine {
             label = isCur ? "ปัจจุบันยุค \(p) \(yuan) (\(startY)—\(endY), ดาว\(starName) ธาตุ\(element))" : "ยุค \(p) \(yuan) (\(startY)—\(endY), ดาว\(starName) ธาตุ\(element))"
         case .id:
             label = isCur ? "Periode Saat Ini \(p) (\(startY)–\(endY), \(yuan) · \(element))" : "Periode \(p) (\(startY)–\(endY), \(yuan) · \(element))"
-        case .zhHans:
+        case .auto, .zhHans:
             label = isCur ? "当前\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）" : "\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）"
         }
         
@@ -529,7 +529,7 @@ public final class FlyingStarsEngine {
             } else {
                 pattern = "Peta Harmonis Seimbang"
             }
-        case .zhHans:
+        case .auto, .zhHans:
             if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
                 pattern = "到山到向 (旺丁旺财最吉)"
             } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
@@ -588,7 +588,7 @@ public final class FlyingStarsEngine {
             summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล"
         case .id:
             summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)–\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga."
-        case .zhHans:
+        case .auto, .zhHans:
             summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
         }
         

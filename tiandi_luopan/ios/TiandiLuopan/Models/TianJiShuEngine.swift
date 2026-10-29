@@ -443,7 +443,7 @@ public class TianJiShuEngine {
             curY += 65
             
             let pwChart = PurpleWhiteEngine.shared.calculateChart(date: reportDate, heading: heading)
-            let zeri = ZeRiEngine.shared.analyze(sitting: mSitting, date: reportDate)
+            let zeri = ZeRiEngine.shared.analyze(date: reportDate, sitting: mSitting)
             let annualNote = tr8(
                 "• 岁运太岁与择日：太岁在\(pwChart.taiSuiDescription)、岁破在\(pwChart.suiPoDescription)、三煞在\(pwChart.sanShaDescription)；当前四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",
                 "• 歲運太歲與擇日：太歲在\(pwChart.taiSuiDescription)、歲破在\(pwChart.suiPoDescription)、三煞在\(pwChart.sanShaDescription)；當前四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",

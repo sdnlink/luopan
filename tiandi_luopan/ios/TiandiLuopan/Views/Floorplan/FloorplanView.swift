@@ -1577,7 +1577,7 @@ public struct FloorplanView: View {
         let renderer = UIGraphicsImageRenderer(size: canvasSize)
         let roomsToDraw = auditedRooms.isEmpty ? rooms : auditedRooms
         let state = floorplanHeadingState
-        let solarInfo = TrueSolarTimeEngine.shared.computeNow(longitude: motion.longitude)
+        let solarInfo = SolarTimeCalculator.shared.calculate(date: Date(), longitude: motion.longitude)
 
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
@@ -1599,7 +1599,7 @@ public struct FloorplanView: View {
             ]
             "演象 · 户型空间立极与全屋堪舆全案".draw(at: CGPoint(x: 70, y: 64), withAttributes: titleAttrs)
 
-            let subText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", effectiveHeading)) · \(state.kongWangLevel.localizedTitle) · \(solarInfo.dayPillar)\(lang.t("day_unit")) \(solarInfo.trueSolarTimeStr)"
+            let subText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", effectiveHeading)) · \(state.kongWangLevel.localizedTitle) · \(solarInfo.dayPillar)\(lang.t("day_unit")) \(solarInfo.trueSolarTimeString)"
             subText.draw(at: CGPoint(x: 70, y: 116), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 21, weight: .semibold),
                 .foregroundColor: UIColor.cyan

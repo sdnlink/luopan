@@ -359,6 +359,42 @@ public struct CompassHeadingState {
     }
 }
 
+// MARK: - 空亡等级 (Kong Wang / Void Line Diagnosis)
+
+public enum KongWangLevel {
+    case pure          // 正针纯清
+    case jianXiang     // 兼针兼向 (替卦)
+    case smallVoid     // 差错小空亡
+    case largeVoid     // 出卦大空亡
+
+    public var localizedTitle: String {
+        switch self {
+        case .pure:      return LocalizationManager.shared.t("kw_pure_title")
+        case .jianXiang: return LocalizationManager.shared.t("kw_sub_title")
+        case .smallVoid: return LocalizationManager.shared.t("kw_small_title")
+        case .largeVoid: return LocalizationManager.shared.t("kw_large_title")
+        }
+    }
+}
+
+public extension CompassHeadingState {
+    /// 空亡等级。判级口径与 KongWangDetailSheet 保持一致：
+    /// 大空亡 = 偏差 ≥ 6.8° 且落在子午卯酉两宫交界缝 (subIndex 1/3/5/7)；
+    /// 小空亡 = 偏差 ≥ 6.5°；兼向 = 1.5°~6.5°；其余为正向纯清。
+    public var kongWangLevel: KongWangLevel {
+        let rawDelta = abs(facingAngle - facingMountain.centerAngle)
+        let delta = min(rawDelta, 360.0 - rawDelta)
+        if delta >= 6.8 && [1, 3, 5, 7].contains(facingMountain.subIndex) {
+            return .largeVoid
+        } else if delta >= 6.5 {
+            return .smallVoid
+        } else if delta >= 1.5 {
+            return .jianXiang
+        }
+        return .pure
+    }
+}
+
 public final class Mountain24Data {
     public static let shared = Mountain24Data()
     

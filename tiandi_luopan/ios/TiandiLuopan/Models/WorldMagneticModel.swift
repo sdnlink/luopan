@@ -39,7 +39,12 @@ public final class WorldMagneticModel {
     /// become singular. Longitude is normalized internally by trigonometry.
     public func field(latitude: Double, longitude: Double, altitudeMeters: Double = 0, date: Date = Date()) -> GeomagneticField {
         let latDeg = min(90.0 - 1e-5, max(-90.0 + 1e-5, latitude.isFinite ? latitude : 0))
-        let lonDeg = longitude.isFinite ? longitude : 0
+        // Core Location normally supplies [-180, 180], but callers can also
+        // provide an unwrapped longitude. Normalize it before evaluating the
+        // harmonics so very large values do not lose precision in sin/cos.
+        let rawLon = longitude.isFinite ? longitude : 0
+        let wrappedLon = rawLon.truncatingRemainder(dividingBy: 360.0)
+        let lonDeg = wrappedLon > 180.0 ? wrappedLon - 360.0 : (wrappedLon < -180.0 ? wrappedLon + 360.0 : wrappedLon)
         let altitudeKm = (altitudeMeters.isFinite ? altitudeMeters : 0) / 1000.0
         let a2 = semiMajorAxis * semiMajorAxis
         let b2 = semiMinorAxis * semiMinorAxis
@@ -76,7 +81,10 @@ public final class WorldMagneticModel {
             }
         }
         let inverseCosLatitude = 1.0 / cos(centerLat)
-        let years = date.timeIntervalSince(baseDate) / (365.0 * 24.0 * 60.0 * 60.0)
+        // WMM secular-variation coefficients are expressed per Julian year
+        // (365.25 days). Using 365 days accumulates a small but avoidable date
+        // error and makes the offline correction drift faster over time.
+        let years = date.timeIntervalSince(baseDate) / (365.25 * 24.0 * 60.0 * 60.0)
         var gcX = 0.0, gcY = 0.0, gcZ = 0.0
         for n in 1..<maxN {
             for m in 0...n {

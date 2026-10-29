@@ -136,9 +136,10 @@ public final class OnDeviceShaAnalyzer {
         case invalidImage
         case noDetectableRegion
         public var errorDescription: String? {
+            let lang = LocalizationManager.shared
             switch self {
-            case .invalidImage: return "Unable to read the camera image."
-            case .noDetectableRegion: return "No clear geometric region was detected. Try pointing at the scene again."
+            case .invalidImage: return lang.t("ar_ai_no_frame")
+            case .noDetectableRegion: return lang.t("ar_ai_no_region")
             }
         }
     }

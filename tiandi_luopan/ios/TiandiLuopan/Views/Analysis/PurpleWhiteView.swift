@@ -10,6 +10,7 @@ public struct PurpleWhiteView: View {
     @State private var showPaywall: Bool = false
     @State private var cachedChart: PurpleWhiteChart?
     @State private var lastFacingSector: Int?
+    @State private var lastCalendarDayKey: Int?
     
     public init() {}
     
@@ -79,12 +80,20 @@ public struct PurpleWhiteView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             refreshChart(force: true)
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshChart(force: true)
+        }
     }
 
     private func refreshChart(force: Bool = false) {
         let sector = facingSector(for: motion.headingState.facingAngle)
-        if !force, lastFacingSector == sector { return }
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let calendarDayKey = (components.year ?? 0) * 10_000
+            + (components.month ?? 0) * 100
+            + (components.day ?? 0)
+        if !force, lastFacingSector == sector, lastCalendarDayKey == calendarDayKey { return }
         lastFacingSector = sector
+        lastCalendarDayKey = calendarDayKey
         cachedChart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
     }
 

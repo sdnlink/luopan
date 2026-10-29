@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 三式绝学 · 时家奇门遁甲全息排盘与出行导航视图 (PRD 第11章)
 
@@ -9,6 +10,7 @@ public struct QimenDunjiaView: View {
     @State private var showPaywall: Bool = false
     @State private var cachedChart: QimenChart?
     @State private var lastChartHeading: Double?
+    @State private var lastChartTimeKey: Int?
     
     public init() {}
     
@@ -100,11 +102,22 @@ public struct QimenDunjiaView: View {
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshChart(force: true)
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshChart(force: true)
+        }
     }
 
     private func refreshChart(force: Bool = false) {
         let heading = motion.headingState.facingAngle
-        if !force, let lastHeading = lastChartHeading {
+        let now = Date()
+        let components = Calendar.current.dateComponents([.year, .month, .day, .hour], from: now)
+        let timeKey = (components.year ?? 0) * 1_000_000
+            + (components.month ?? 0) * 10_000
+            + (components.day ?? 0) * 24
+            + (components.hour ?? 0)
+        if !force, let lastHeading = lastChartHeading,
+           let lastTimeKey = lastChartTimeKey,
+           lastTimeKey == timeKey {
             let rawDelta = abs(heading - lastHeading)
             let delta = min(rawDelta, 360.0 - rawDelta)
             // The chart's actionable turn instruction is displayed in whole
@@ -113,6 +126,7 @@ public struct QimenDunjiaView: View {
             if delta < 1.0 { return }
         }
         lastChartHeading = heading
+        lastChartTimeKey = timeKey
         cachedChart = QimenEngine.shared.calculateChart(heading: heading)
     }
     

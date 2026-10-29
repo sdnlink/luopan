@@ -35,6 +35,8 @@ public struct FloorplanView: View {
     @State private var activeRoomScaleID: String? = nil
     @State private var activeRoomScaleStartRect: CGRect? = nil
     @State private var roomWasDragged = false
+    @State private var selectedEditingRoomID: String?
+    @State private var showEditingRoomDeleteConfirmation = false
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
     @State private var auditedRooms: [FloorplanRoom] = []
@@ -109,6 +111,9 @@ public struct FloorplanView: View {
 
                 if isEditingRooms {
                     roomLayoutTools()
+                    if let editingRoom = editingRoom {
+                        roomResizeTools(room: editingRoom)
+                    }
                 }
                 
                 // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
@@ -480,6 +485,9 @@ public struct FloorplanView: View {
                 activeRoomScaleID = nil
                 activeRoomScaleStartRect = nil
                 roomWasDragged = false
+                if !isEditingRooms {
+                    selectedEditingRoomID = nil
+                }
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: isEditingRooms ? "checkmark.circle.fill" : "rectangle.3.group")
@@ -570,6 +578,140 @@ public struct FloorplanView: View {
                 addRoom(type: type)
             }
         }
+    }
+
+    private var editingRoom: FloorplanRoom? {
+        guard let selectedEditingRoomID = selectedEditingRoomID else { return nil }
+        return rooms.first(where: { $0.id == selectedEditingRoomID })
+    }
+
+    /// A selected-room control panel is easier to use than a tiny pinch handle
+    /// on a dense floor plan. Width and height are adjusted independently in
+    /// small steps, keeping the room centered and inside the canvas.
+    private func roomResizeTools(room: FloorplanRoom) -> some View {
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .foregroundColor(.yanCyan)
+                Text("\(lang.t("floorplan_selected_room")): \(room.name)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Spacer()
+                Button {
+                    roomForTypeEditing = room
+                } label: {
+                    Label(lang.t("floorplan_room_type"), systemImage: "tag")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .foregroundColor(.yanCyan)
+                Button {
+                    showEditingRoomDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundColor(.red)
+                .accessibilityLabel(lang.t("floorplan_delete_room"))
+            }
+
+            VStack(spacing: 4) {
+                resizeAxisRow(
+                    title: lang.t("floorplan_width"),
+                    value: String(format: "%.0f%%", room.rect.width * 100),
+                    decreaseLabel: lang.t("floorplan_width_shrink"),
+                    increaseLabel: lang.t("floorplan_width_expand"),
+                    decrease: { adjustSelectedRoomSize(widthDelta: -0.02) },
+                    increase: { adjustSelectedRoomSize(widthDelta: 0.02) }
+                )
+                resizeAxisRow(
+                    title: lang.t("floorplan_height"),
+                    value: String(format: "%.0f%%", room.rect.height * 100),
+                    decreaseLabel: lang.t("floorplan_height_shrink"),
+                    increaseLabel: lang.t("floorplan_height_expand"),
+                    decrease: { adjustSelectedRoomSize(heightDelta: -0.02) },
+                    increase: { adjustSelectedRoomSize(heightDelta: 0.02) }
+                )
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.black.opacity(0.35))
+        .cornerRadius(8)
+        .padding(.horizontal, 16)
+        .alert(isPresented: $showEditingRoomDeleteConfirmation) {
+            Alert(
+                title: Text(lang.t("floorplan_delete_room")),
+                message: Text(lang.t("floorplan_delete_confirm")),
+                primaryButton: .destructive(Text(lang.t("floorplan_delete_room"))) {
+                    deleteSelectedEditingRoom()
+                },
+                secondaryButton: .cancel()
+            )
+        }
+    }
+
+    private func resizeButton(symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .frame(width: 24, height: 22)
+                .background(Color.white.opacity(0.12))
+                .cornerRadius(5)
+        }
+        .foregroundColor(.yanCyan)
+        .accessibilityLabel(label)
+    }
+
+    private func resizeAxisRow(
+        title: String,
+        value: String,
+        decreaseLabel: String,
+        increaseLabel: String,
+        decrease: @escaping () -> Void,
+        increase: @escaping () -> Void
+    ) -> some View {
+        return HStack(spacing: 8) {
+            Text(title)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(.white.opacity(0.75))
+                .frame(width: 38, alignment: .leading)
+            resizeButton(symbol: "minus", label: decreaseLabel, action: decrease)
+            Text(value)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundColor(.white)
+                .frame(width: 42)
+            resizeButton(symbol: "plus", label: increaseLabel, action: increase)
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func adjustSelectedRoomSize(widthDelta: CGFloat = 0, heightDelta: CGFloat = 0) {
+        guard let selectedEditingRoomID = selectedEditingRoomID,
+              let index = rooms.firstIndex(where: { $0.id == selectedEditingRoomID }) else { return }
+        let original = rooms[index].rect
+        let width = max(0.08, min(0.9, original.width + widthDelta))
+        let height = max(0.06, min(0.9, original.height + heightDelta))
+        let centerX = original.midX
+        let centerY = original.midY
+        let rect = CGRect(
+            x: max(0, min(1 - width, centerX - width / 2)),
+            y: max(0, min(1 - height, centerY - height / 2)),
+            width: width,
+            height: height
+        )
+        rooms[index].rect = rect
+        if let auditedIndex = auditedRooms.firstIndex(where: { $0.id == selectedEditingRoomID }) {
+            auditedRooms[auditedIndex].rect = rect
+        }
+        persistLayout()
+        refreshAudit(force: true)
+    }
+
+    private func deleteSelectedEditingRoom() {
+        guard let selectedEditingRoomID = selectedEditingRoomID else { return }
+        deleteRoom(roomID: selectedEditingRoomID)
+        self.selectedEditingRoomID = nil
     }
 
     private func centerFromRoomLayout() {
@@ -896,6 +1038,9 @@ public struct FloorplanView: View {
         rooms.removeAll { $0.id == roomID }
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
+        if selectedEditingRoomID == roomID {
+            selectedEditingRoomID = nil
+        }
         persistLayout()
         refreshAudit(force: true)
         selectedRoom = nil
@@ -996,7 +1141,10 @@ public struct FloorplanView: View {
         let isBad = room.isBad
         let isGood = room.isGood
         let isMissingCorner = room.type == .missingCorner
-        let strokeColor = isMissingCorner ? Color.red : (isBad ? Color.red : (isGood ? Color.green : Color.white.opacity(0.25)))
+        let isSelectedForEditing = isEditingRooms && selectedEditingRoomID == room.id
+        let strokeColor = isSelectedForEditing
+            ? Color.yanCyan
+            : (isMissingCorner ? Color.red : (isBad ? Color.red : (isGood ? Color.green : Color.white.opacity(0.25))))
         let bgColor = isMissingCorner ? Color.red.opacity(0.12) : (isBad ? Color.red.opacity(0.15) : (isGood ? Color.green.opacity(0.12) : Color.white.opacity(0.05)))
         
         return Button(action: {
@@ -1010,7 +1158,7 @@ public struct FloorplanView: View {
             // Room placement and type editing are local layout operations and
             // should remain available before a paid diagnostic is unlocked.
             if isEditingRooms {
-                roomForTypeEditing = room
+                selectedEditingRoomID = room.id
                 return
             }
             // Layout editing is available before purchase, but room-level
@@ -1057,6 +1205,7 @@ public struct FloorplanView: View {
             DragGesture()
                 .onChanged { value in
                     guard isEditingRooms else { return }
+                    selectedEditingRoomID = room.id
                     // A two-finger pinch can also emit a drag translation.
                     // Once scaling has started, keep the room anchored and
                     // let only the magnification gesture change its size.

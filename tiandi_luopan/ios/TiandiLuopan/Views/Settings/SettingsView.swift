@@ -1,5 +1,26 @@
 import SwiftUI
 
+private enum LegalDocument: String, Identifiable {
+    case terms
+    case privacy
+
+    var id: String { rawValue }
+
+    var titleKey: String {
+        switch self {
+        case .terms: return "legal_terms_title"
+        case .privacy: return "legal_privacy_title"
+        }
+    }
+
+    var bodyKey: String {
+        switch self {
+        case .terms: return "legal_terms_body"
+        case .privacy: return "legal_privacy_body"
+        }
+    }
+}
+
 // MARK: - 系统设置与专业版会员中心视图 (Settings & Member Center View)
 
 public struct SettingsView: View {
@@ -11,8 +32,7 @@ public struct SettingsView: View {
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var paymentError: String = ""
     @State private var showPaymentError: Bool = false
-    @State private var showTerms: Bool = false
-    @State private var showPrivacy: Bool = false
+    @State private var legalDocument: LegalDocument?
 
     private static let appearanceConfigured: Void = {
         UITableView.appearance().backgroundColor = UIColor(red: 18/255.0, green: 18/255.0, blue: 22/255.0, alpha: 1.0)
@@ -242,13 +262,13 @@ public struct SettingsView: View {
                     }
                     HStack(spacing: 16) {
                         Button(lang.t("legal_terms_button")) {
-                            showTerms = true
+                            legalDocument = .terms
                         }
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                         Spacer()
                         Button(lang.t("legal_privacy_button")) {
-                            showPrivacy = true
+                            legalDocument = .privacy
                         }
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
@@ -267,16 +287,10 @@ public struct SettingsView: View {
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet(keepsMotionActive: true)
             }
-            .sheet(isPresented: $showTerms) {
+            .sheet(item: $legalDocument) { document in
                 LegalDocumentSheet(
-                    title: lang.t("legal_terms_title"),
-                    bodyText: lang.t("legal_terms_body")
-                )
-            }
-            .sheet(isPresented: $showPrivacy) {
-                LegalDocumentSheet(
-                    title: lang.t("legal_privacy_title"),
-                    bodyText: lang.t("legal_privacy_body")
+                    title: lang.t(document.titleKey),
+                    bodyText: lang.t(document.bodyKey)
                 )
             }
         .onReceive(iap.$lastErrorMessage) { message in

@@ -627,7 +627,7 @@ public struct FloorplanView: View {
         } else {
             referenceText = lang.t("floorplan_manual_heading")
         }
-        VStack(alignment: .leading, spacing: 3) {
+        return VStack(alignment: .leading, spacing: 3) {
             Text("\(lang.t("floorplan_heading_reference")): \(referenceText)")
                 .font(.system(size: 9, weight: .medium))
                 .foregroundColor(.white.opacity(0.65))

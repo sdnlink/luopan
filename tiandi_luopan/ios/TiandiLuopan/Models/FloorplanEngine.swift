@@ -387,20 +387,26 @@ public class FloorplanEngine {
         case "乾", "Qian":
             return (
                 tr("户型缺角 · 西北乾位", "戶型缺角 · 西北乾位", "Missing Corner · Northwest Qian"),
-                tr("房屋外接轮廓在西北乾位出现空缺，可能影响整体边界完整性；当前结果基于房间框近似。", "房屋外接輪廓在西北乾位出現空缺，可能影響整體邊界完整性；當前結果基於房間框近似。", "The inferred footprint is open at the northwest Qian corner; this result is an approximation based on room boxes."),
-                tr("核对西北外墙、阳台和设备平台是否实际缺失，再决定是否需要补足或调整布局。", "核對西北外牆、陽台和設備平台是否實際缺失，再決定是否需要補足或調整布局。", "Verify the northwest exterior wall, balcony and service platform before changing the layout.")
+                tr("西北乾位缺角常被用于提示家中长辈、男主人、事业支持和居住稳定性方面需要关注；当前判断基于房间框，需先核对真实外墙。", "西北乾位缺角常被用於提示家中長輩、男主人、事業支持和居住穩定性方面需要關注；當前判斷基於房間框，需先核對真實外牆。", "A northwest Qian gap is traditionally associated with elder support, the male householder, career backing and stability; verify the actual exterior wall because this result is inferred from room boxes."),
+                tr("首选补足真实外墙或封闭式储物/设备空间；无法改造时，可用圆形金属灯具、白色或金色圆器、稳固高柜作视觉补足，保持干燥明亮，避免以大型水景或杂物堆积代替。", "首選補足真實外牆或封閉式儲物／設備空間；無法改造時，可用圓形金屬燈具、白色或金色圓器、穩固高櫃作視覺補足，保持乾燥明亮，避免以大型水景或雜物堆積代替。", "Prefer completing the exterior wall or using an enclosed storage/service space. If construction is impossible, use a round metal light, white or gold circular decor, or a stable tall cabinet as a visual countermeasure; keep it dry and bright, and avoid a large water feature or clutter.")
             )
         case "艮", "Gen":
             return (
                 tr("户型缺角 · 东北艮位", "戶型缺角 · 東北艮位", "Missing Corner · Northeast Gen"),
-                tr("房屋外接轮廓在东北艮位出现空缺，可能使户型边界不完整；当前结果基于房间框近似。", "房屋外接輪廓在東北艮位出現空缺，可能使戶型邊界不完整；當前結果基於房間框近似。", "The inferred footprint is open at the northeast Gen corner; this result is an approximation based on room boxes."),
-                tr("核对东北外墙、入户平台和设备空间，确认空缺是否属于真实外墙形状。", "核對東北外牆、入戶平台和設備空間，確認空缺是否屬於真實外牆形狀。", "Check the northeast exterior wall, entry platform and service area to confirm the actual outline.")
+                tr("东北艮位缺角常被用于提示家庭稳定、子女成长、学习专注和储藏空间方面需要关注；当前判断基于房间框，需先核对真实外墙。", "東北艮位缺角常被用於提示家庭穩定、子女成長、學習專注和儲藏空間方面需要關注；當前判斷基於房間框，需先核對真實外牆。", "A northeast Gen gap is traditionally associated with household stability, children, study focus and storage; verify the actual exterior wall because this result is inferred from room boxes."),
+                tr("首选补足墙体或设置封闭、整洁的储物柜；无法改造时，可放置黄色陶瓷、天然石材、方形地毯或暖色灯光作稳定补足，保持安静干燥，避免潮湿和杂乱。", "首選補足牆體或設置封閉、整潔的儲物櫃；無法改造時，可放置黃色陶瓷、天然石材、方形地毯或暖色燈光作穩定補足，保持安靜乾燥，避免潮濕和雜亂。", "Prefer completing the wall or adding a closed, orderly cabinet. If construction is impossible, use yellow ceramic, natural stone, a square rug or warm lighting to add visual stability; keep the area quiet and dry.")
             )
         case "巽", "Xun":
             return (
                 tr("户型缺角 · 东南巽位", "戶型缺角 · 東南巽位", "Missing Corner · Southeast Xun"),
-                tr("房屋外接轮廓在东南巽位出现空缺，可能影响户型完整性；当前结果基于房间框近似。", "房屋外接輪廓在東南巽位出現空缺，可能影響戶型完整性；當前結果基於房間框近似。", "The inferred footprint is open at the southeast Xun corner; this result is an approximation based on room boxes."),
-                tr("核对东南阳台、飘窗和外墙线，避免把未绘制区域误判为缺角。", "核對東南陽台、飄窗和外牆線，避免把未繪製區域誤判為缺角。", "Check the southeast balcony, bay window and exterior wall line so an unmarked area is not mistaken for a missing corner.")
+                tr("东南巽位缺角常被用于提示财务规划、资源流动、沟通关系和通风采光方面需要关注；当前判断基于房间框，需先核对真实外墙。", "東南巽位缺角常被用於提示財務規劃、資源流動、溝通關係和通風採光方面需要關注；當前判斷基於房間框，需先核對真實外牆。", "A southeast Xun gap is traditionally associated with financial planning, resource flow, relationships, ventilation and daylight; verify the actual exterior wall because this result is inferred from room boxes."),
+                tr("首选补足外墙或设置连续的木质收纳/绿化界面；无法改造时，可用健康阔叶植物、木质柜体、青绿色软装和柔和照明作替代，保持通风，避免尖角、破损和堆物。", "首選補足外牆或設置連續的木質收納／綠化界面；無法改造時，可用健康闊葉植物、木質櫃體、青綠色軟裝和柔和照明作替代，保持通風，避免尖角、破損和堆物。", "Prefer completing the exterior wall or adding a continuous wood storage or planting boundary. If construction is impossible, use healthy broad-leaf plants, wood cabinetry, teal-green textiles and soft lighting; keep ventilation clear and avoid sharp corners, damage and clutter.")
+            )
+        case "坤", "Kun":
+            return (
+                tr("户型缺角 · 西南坤位", "戶型缺角 · 西南坤位", "Missing Corner · Southwest Kun"),
+                tr("西南坤位缺角常被用于提示家庭照料、伴侣关系、生活承托和居住安定方面需要关注；当前判断基于房间框，需先核对真实外墙。", "西南坤位缺角常被用於提示家庭照料、伴侶關係、生活承托和居住安定方面需要關注；當前判斷基於房間框，需先核對真實外牆。", "A southwest Kun gap is traditionally associated with caregiving, partnership, household support and stability; verify the actual exterior wall because this result is inferred from room boxes."),
+                tr("首选补足墙体或设置低矮、稳定的封闭柜体；无法改造时，可用黄色或米色陶瓷、天然石材、方形地垫和暖光作替代，保持整洁稳定，避免空置、漏水和尖锐杂物。", "首選補足牆體或設置低矮、穩定的封閉櫃體；無法改造時，可用黃色或米色陶瓷、天然石材、方形地墊和暖光作替代，保持整潔穩定，避免空置、漏水和尖銳雜物。", "Prefer completing the wall or adding a low, stable closed cabinet. If construction is impossible, use yellow or beige ceramic, natural stone, a square mat and warm light; keep it orderly and stable, avoiding leaks and sharp clutter.")
             )
         default:
             return (

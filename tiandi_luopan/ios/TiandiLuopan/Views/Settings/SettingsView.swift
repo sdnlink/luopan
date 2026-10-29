@@ -244,6 +244,7 @@ public struct SettingsView: View {
             .preferredColorScheme(.dark)
             .onAppear {
                 guard isActive else { return }
+                showPaymentError = false
                 iap.clearTransientMessages()
                 iap.refreshProductsIfNeeded()
             }
@@ -263,6 +264,7 @@ public struct SettingsView: View {
                 )
             }
         .onReceive(iap.$lastErrorMessage) { message in
+            guard isActive else { return }
             if let message = message {
                 paymentError = message
                 showPaymentError = true

@@ -33,6 +33,8 @@ public struct FloorplanView: View {
     @State private var centroidBeforeDetection: CGPoint?
     @State private var showNewRoomTypePicker = false
     @State private var floorplanImageBeforePicker: UIImage?
+    @State private var lastAuditedHeading: Double?
+    @State private var lastAuditedCentroid: CGPoint?
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -141,14 +143,14 @@ public struct FloorplanView: View {
                let refreshedRoom = rooms.first(where: { $0.id == selectedID }) {
                 selectedRoom = refreshedRoom
             }
-            refreshAudit()
+            refreshAudit(force: true)
         }
         .onAppear {
-            refreshAudit()
+            refreshAudit(force: true)
         }
         .onChange(of: isActive) { active in
             if active {
-                refreshAudit()
+                refreshAudit(force: true)
             }
         }
         .onChange(of: effectiveHeading) { _ in
@@ -163,8 +165,24 @@ public struct FloorplanView: View {
     /// used by the canvas and report list. Without this, rotating the compass
     /// or dragging the Tai Ji point updated the page behind the sheet while
     /// the detail card continued to show stale palace/severity text.
-    private func refreshAudit() {
+    private func refreshAudit(force: Bool = false) {
         guard isActive else { return }
+        if !force,
+           let previousHeading = lastAuditedHeading,
+           let previousCentroid = lastAuditedCentroid {
+            let rawHeadingDelta = abs(effectiveHeading - previousHeading)
+            let headingDelta = min(rawHeadingDelta, 360.0 - rawHeadingDelta)
+            let centroidDX = Double(centroid.x - previousCentroid.x)
+            let centroidDY = Double(centroid.y - previousCentroid.y)
+            let centroidDelta = sqrt(centroidDX * centroidDX + centroidDY * centroidDY)
+            // Room palace assignments only change at 45° boundaries. A
+            // sub-degree gate keeps sensor noise and tiny Tai Ji drags from
+            // rebuilding every report row while the live overlay remains
+            // responsive.
+            if headingDelta < 0.5 && centroidDelta < 0.005 {
+                return
+            }
+        }
         let result = FloorplanEngine.shared.auditFloorplan(
             rooms: rooms,
             centroid: centroid,
@@ -172,6 +190,8 @@ public struct FloorplanView: View {
         )
         auditedRooms = result.auditedRooms
         auditReport = result.report
+        lastAuditedHeading = effectiveHeading
+        lastAuditedCentroid = centroid
         if let selectedID = selectedRoom?.id {
             selectedRoom = result.auditedRooms.first(where: { $0.id == selectedID })
         }
@@ -240,7 +260,7 @@ public struct FloorplanView: View {
                 activeRoomDragID = nil
                 activeRoomStartRect = nil
                 roomWasDragged = false
-                refreshAudit()
+                refreshAudit(force: true)
             }) {
                 Text(lang.t("reset_sample"))
                     .font(.system(size: 10))
@@ -429,7 +449,7 @@ public struct FloorplanView: View {
                     .foregroundColor(.white)
                 Button(action: {
                     compassRotation = motion.headingState.facingAngle
-                    refreshAudit()
+                    refreshAudit(force: true)
                 }) {
                     Text(lang.t("floorplan_heading_use_compass"))
                         .font(.system(size: 9, weight: .bold))
@@ -567,7 +587,7 @@ public struct FloorplanView: View {
             centroid = CGPoint(x: union.midX, y: union.midY)
         }
         roomDetectionMessage = "\(lang.t("floorplan_detected")) \(orderedCandidates.count)"
-        refreshAudit()
+        refreshAudit(force: true)
     }
 
     private func undoRoomDetection() {
@@ -579,7 +599,7 @@ public struct FloorplanView: View {
         self.roomsBeforeDetection = nil
         self.centroidBeforeDetection = nil
         roomDetectionMessage = nil
-        refreshAudit()
+        refreshAudit(force: true)
     }
 
     private func updateRoomType(roomID: String, type: FloorplanRoomType) {
@@ -588,7 +608,7 @@ public struct FloorplanView: View {
         rooms[index].name = type.localizedName
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
-        refreshAudit()
+        refreshAudit(force: true)
         selectedRoom = nil
     }
 
@@ -609,7 +629,7 @@ public struct FloorplanView: View {
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
         isEditingRooms = true
-        refreshAudit()
+        refreshAudit(force: true)
     }
 
     private func deleteRoom(roomID: String) {
@@ -617,14 +637,14 @@ public struct FloorplanView: View {
         rooms.removeAll { $0.id == roomID }
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
-        refreshAudit()
+        refreshAudit(force: true)
         selectedRoom = nil
     }
 
     private func adjustManualHeading(by delta: Double) {
         compassRotation = (compassRotation + delta).truncatingRemainder(dividingBy: 360)
         if compassRotation < 0 { compassRotation += 360 }
-        refreshAudit()
+        refreshAudit(force: true)
     }
 
     private var activeNorthReference: CompassNorthReference {
@@ -773,7 +793,7 @@ public struct FloorplanView: View {
                     DispatchQueue.main.async {
                         roomWasDragged = false
                     }
-                    refreshAudit()
+                    refreshAudit(force: true)
                 }
         )
     }

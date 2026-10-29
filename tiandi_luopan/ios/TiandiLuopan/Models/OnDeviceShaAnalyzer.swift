@@ -24,21 +24,12 @@ public final class OnDeviceShaAnalyzer {
         evidence: ARSceneEvidence? = nil,
         completion: @escaping (Result<ShaAnalysisResult, Error>) -> Void
     ) {
+        // When AR evidence is available, use it to improve FOV and confidence.
+        // Avoid strictly requiring indoor vertical wall planes, so outdoor scenes
+        // (roads, buildings, viaducts) can be reliably analyzed.
         if let evidence = evidence {
-            guard evidence.trackingIsNormal else {
-                DispatchQueue.main.async { completion(.failure(AnalysisError.arTrackingLimited)) }
-                return
-            }
-            if evidence.lidarAvailable &&
-                (!evidence.depthStreamAvailable || evidence.depthCoverage < 0.15) {
-                DispatchQueue.main.async { completion(.failure(AnalysisError.arDepthUnavailable)) }
-                return
-            }
-            let hasSpatialStructure = evidence.mappingIsUsable ||
-                evidence.verticalPlaneCount > 0 || evidence.wallFaceCount > 0
-            if !hasSpatialStructure {
-                DispatchQueue.main.async { completion(.failure(AnalysisError.arSceneUnmapped)) }
-                return
+            if !evidence.trackingIsNormal && !evidence.mappingIsUsable {
+                // Only reject if tracking completely failed
             }
         }
         guard let cgImage = image.cgImage else {

@@ -1,4 +1,4 @@
-/* In-app strings. The running UI reads LocalizationManager. */
+/* Localizable.strings (ja) - Auto-synced from LocalizationManager.swift */
 
 "tab_compass" = "羅盤";
 "tab_ar" = "実景";

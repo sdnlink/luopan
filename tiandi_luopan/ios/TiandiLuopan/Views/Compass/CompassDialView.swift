@@ -72,21 +72,17 @@ public struct CompassDialView: View {
                 .frame(width: dialCanvasSize, height: dialCanvasSize)
                 .drawingGroup() // 启用 Metal GPU 纹理光栅化，彻底消除旋转时几百个图层的 CPU 测量与重绘负荷
                 .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
-                .animation(.linear(duration: 0.05), value: motion.continuousHeading)
                 
                 // 2. 固定不动的十字天心线 (Crosshair)
                 crosshairLayer(size: size)
                 
                 // 3. 地理真北金针 (根据当地磁偏角偏转，双指针系统)
-                if layers.showTrueNorthNeedle && motion.hasDeclination && motion.northReference == .trueNorth {
+                if layers.showTrueNorthNeedle && motion.hasDeclination {
                     trueNorthNeedleLayer(radius: radius * 0.28)
                 }
                 
                 // 4. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
                 magneticNeedleLayer(radius: radius * 0.26)
-                    // The needle is drawn in the fixed screen coordinate
-                    // space, so it must follow the physical magnetic-north
-                    // bearing while the dial card rotates underneath it.
                     .rotationEffect(.degrees(-motion.continuousMagneticHeading - motion.manualOffset))
                 
                 // 5. 天池中央水平仪双轴气泡 (Level Bubble)
@@ -440,6 +436,12 @@ public struct CompassDialView: View {
     // MARK: - 地理真北金针 (根据当地磁偏角偏转，双指针系统)
     private func trueNorthNeedleLayer(radius: CGFloat) -> some View {
         let center = radius
+        let rotationAngle: Double
+        if motion.northReference == .trueNorth {
+            rotationAngle = -motion.continuousHeading - motion.manualOffset
+        } else {
+            rotationAngle = -(motion.continuousMagneticHeading + motion.currentDeclination) - motion.manualOffset
+        }
 
         return ZStack {
             Path { path in
@@ -465,9 +467,7 @@ public struct CompassDialView: View {
                 .offset(y: -radius * 0.72)
         }
         .frame(width: radius * 2, height: radius * 2)
-        // The main dial filter already follows Core Location trueHeading (or
-        // WMM fallback), so the true-north needle shares that same bearing.
-        .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset))
+        .rotationEffect(.degrees(rotationAngle))
         .allowsHitTesting(false)
     }
     

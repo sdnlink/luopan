@@ -171,6 +171,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal, .vertical]
+        configuration.environmentTexturing = .automatic
         lidarAvailable = false
 
         if #available(iOS 13.4, *),
@@ -179,7 +180,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             lidarAvailable = true
         }
 
-        if #available(iOS 13.4, *),
+        if #available(iOS 14.0, *),
+           ARWorldTrackingConfiguration.supportsFrameSemantics(.smoothedSceneDepth) {
+            configuration.frameSemantics.insert(.smoothedSceneDepth)
+        } else if #available(iOS 13.4, *),
            ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
             configuration.frameSemantics.insert(.sceneDepth)
         }
@@ -415,34 +419,57 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             largestPlaneDepth = nil
         }
 
-        let center = CGPoint(x: sceneView.bounds.midX, y: sceneView.bounds.midY)
-        let target: ARRaycastQuery.Target = lidarAvailable ? .existingPlaneGeometry : .estimatedPlane
-        let raycastResult = sceneView.raycastQuery(from: center, allowing: target, alignment: .any)
-            .flatMap { sceneView.session.raycast($0).first }
-            ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .any)
-                .flatMap { sceneView.session.raycast($0).first }
-        if let result = raycastResult {
-            let cameraPosition = SIMD3<Float>(
-                frame.camera.transform.columns.3.x,
-                frame.camera.transform.columns.3.y,
-                frame.camera.transform.columns.3.z
-            )
-            let hitPosition = SIMD3<Float>(
-                result.worldTransform.columns.3.x,
-                result.worldTransform.columns.3.y,
-                result.worldTransform.columns.3.z
-            )
-            let measuredDistance = simd_distance(cameraPosition, hitPosition)
-            if measuredDistance.isFinite, measuredDistance > 0 {
-                distanceSamples.append(measuredDistance)
-                if distanceSamples.count > 5 {
-                    distanceSamples.removeFirst()
-                }
-                distance = distanceSamples.sorted()[distanceSamples.count / 2]
+        let center = CGPoint(
+            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
+            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
+        )
+
+        var measuredDistance: Float? = nil
+
+        // 1. 优先使用 LiDAR 硬件直接测距（Time-of-Flight 激光毫米级点测）
+        if lidarAvailable {
+            let depthMap: CVPixelBuffer?
+            if #available(iOS 14.0, *), let smoothed = frame.smoothedSceneDepth?.depthMap {
+                depthMap = smoothed
             } else {
-                distanceSamples.removeAll(keepingCapacity: true)
-                distance = nil
+                depthMap = frame.sceneDepth?.depthMap
             }
+            if let depthVal = Self.centerDepthSample(from: depthMap), depthVal > 0.05, depthVal < 60.0 {
+                measuredDistance = depthVal
+            }
+        }
+
+        // 2. 若无 LiDAR 硬件直接深度或尚未锁定，通过 ARRaycast 进行平面碰撞测距
+        if measuredDistance == nil {
+            let target: ARRaycastQuery.Target = lidarAvailable ? .existingPlaneGeometry : .estimatedPlane
+            let raycastResult = sceneView.raycastQuery(from: center, allowing: target, alignment: .any)
+                .flatMap { sceneView.session.raycast($0).first }
+                ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .any)
+                    .flatMap { sceneView.session.raycast($0).first }
+            if let result = raycastResult {
+                let cameraPosition = SIMD3<Float>(
+                    frame.camera.transform.columns.3.x,
+                    frame.camera.transform.columns.3.y,
+                    frame.camera.transform.columns.3.z
+                )
+                let hitPosition = SIMD3<Float>(
+                    result.worldTransform.columns.3.x,
+                    result.worldTransform.columns.3.y,
+                    result.worldTransform.columns.3.z
+                )
+                let dist = simd_distance(cameraPosition, hitPosition)
+                if dist.isFinite, dist > 0.05, dist < 60.0 {
+                    measuredDistance = dist
+                }
+            }
+        }
+
+        if let d = measuredDistance {
+            distanceSamples.append(d)
+            if distanceSamples.count > 5 {
+                distanceSamples.removeFirst()
+            }
+            distance = distanceSamples.sorted()[distanceSamples.count / 2]
         } else {
             distanceSamples.removeAll(keepingCapacity: true)
             distance = nil

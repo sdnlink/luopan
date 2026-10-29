@@ -30,41 +30,119 @@ public struct PalaceCell: Identifiable {
     }
 
     public var localizedElement: String {
-        guard LocalizationManager.shared.effectiveLanguage == .en else { return element }
-        switch element {
-        case "水": return "Water"
-        case "木": return "Wood"
-        case "火": return "Fire"
-        case "土": return "Earth"
-        case "金": return "Metal"
-        default: return element
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en:
+            switch element {
+            case "水": return "Water"
+            case "木": return "Wood"
+            case "火": return "Fire"
+            case "土": return "Earth"
+            case "金": return "Metal"
+            default: return element
+            }
+        case .ko:
+            switch element {
+            case "水": return "수"
+            case "木": return "목"
+            case "火": return "화"
+            case "土": return "토"
+            case "金": return "금"
+            default: return element
+            }
+        case .vi:
+            switch element {
+            case "水": return "Thủy"
+            case "木": return "Mộc"
+            case "火": return "Hỏa"
+            case "土": return "Thổ"
+            case "金": return "Kim"
+            default: return element
+            }
+        case .th:
+            switch element {
+            case "水": return "น้ำ"
+            case "木": return "ไม้"
+            case "火": return "ไฟ"
+            case "土": return "ดิน"
+            case "金": return "ทอง"
+            default: return element
+            }
+        case .id:
+            switch element {
+            case "水": return "Air"
+            case "木": return "Kayu"
+            case "火": return "Api"
+            case "土": return "Tanah"
+            case "金": return "Logam"
+            default: return element
+            }
+        case .zhHans, .zhHant, .ja:
+            return element
         }
     }
 
     public var localizedEvaluation: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        if lang == .en {
+        switch lang {
+        case .en:
             if mountainStar == activePeriod && facingStar == activePeriod { return "Double Current Stars · Wealth and people prosper" }
             if facingStar == activePeriod { return "Current Wealth Star at Facing · Open and receive qi" }
             if mountainStar == activePeriod { return "Current Mountain Star returns · People prosper" }
             if isShaWuHuang || isShaErHei { return "Five Yellow and Two Black clash · Calm and use Metal remedy" }
             if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "One–Six harmony · Clear Water and Wood nourish Wenchang" }
             return "Mixed fortune · Balanced position"
-        }
-        if lang == .zhHant {
+        case .zhHant:
             if mountainStar == activePeriod && facingStar == activePeriod { return "當運雙星會聚 · 財丁兩旺" }
             if facingStar == activePeriod { return "當旺財星照臨 · 宜開門納氣" }
             if mountainStar == activePeriod { return "當運丁星歸位 · 人丁興旺" }
             if isShaWuHuang || isShaErHei { return "五黃二黑交加 · 宜靜安銅化解" }
             if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "一六共宗 · 水清木秀催文昌" }
             return "吉凶相參 · 平和之位"
+        case .ja:
+            if mountainStar == activePeriod && facingStar == activePeriod { return "当運の双星会聚 · 財丁両旺" }
+            if facingStar == activePeriod { return "当旺の財星照臨 · 開門納気に適す" }
+            if mountainStar == activePeriod { return "当運の丁星帰位 · 子孫繁栄" }
+            if isShaWuHuang || isShaErHei { return "五黄二黒交加 · 静寂と銅器で化解" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "一六共宗 · 文昌栄達を促す" }
+            return "吉凶相半 · 平和の気場"
+        case .ko:
+            if mountainStar == activePeriod && facingStar == activePeriod { return "당운 쌍성 회취 · 재물과 자손 모두 번창" }
+            if facingStar == activePeriod { return "당왕 재성 조림 · 문을 열어 기를 받음" }
+            if mountainStar == activePeriod { return "당운 정성 귀위 · 자손 번창" }
+            if isShaWuHuang || isShaErHei { return "오황 이흑 교가 · 고요히 동기로 화해" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "일육공종 · 문창 학업 성취" }
+            return "길흉 상참 · 평화로운 방위"
+        case .vi:
+            if mountainStar == activePeriod && facingStar == activePeriod { return "Đương vận song tinh hội tụ · Tài đinh lưỡng vượng" }
+            if facingStar == activePeriod { return "Đương vượng tài tinh chiếu lâm · Lợi mở cửa nạp khí" }
+            if mountainStar == activePeriod { return "Đương vận đinh tinh quy vị · Nhân đinh hưng vượng" }
+            if isShaWuHuang || isShaErHei { return "Ngũ Hoàng Nhị Hắc giao gia · Nên tĩnh an đồng hóa giải" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Nhất Lục cộng tông · Văn Xương học nghiệp đại cát" }
+            return "Cát hung tương tham · Vị trí bình hòa"
+        case .th:
+            if mountainStar == activePeriod && facingStar == activePeriod { return "สองดาวมงคลชุมนุม · ร่ำรวยและลูกหลานรุ่งเรือง" }
+            if facingStar == activePeriod { return "ดาวโชคลาภส่องสว่าง · เปิดรับพลังงานมงคล" }
+            if mountainStar == activePeriod { return "ดาวบุญบารมีคืนตำแหน่ง · ลูกหลานเจริญรุ่งเรือง" }
+            if isShaWuHuang || isShaErHei { return "ดาวห้าเหลืองปะทะดาวสองดำ · รักษาความสงบใช้โลหะแก้" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "หนึ่งหกเกื้อหนุน · ส่งเสริมสติปัญญาการเรียน" }
+            return "ดีร้ายปะปน · ตำแหน่งสมดุลสงบ"
+        case .id:
+            if mountainStar == activePeriod && facingStar == activePeriod { return "Bintang Kembar Hadir · Kekayaan & keluarga makmur" }
+            if facingStar == activePeriod { return "Bintang Rezeki Menyinari · Sambut sirkulasi energi" }
+            if mountainStar == activePeriod { return "Bintang Manusia Kembali · Keturunan berkembang pesat" }
+            if isShaWuHuang || isShaErHei { return "Benturan 5 Kuning & 2 Hitam · Tenang & gunakan obat logam" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Harmoni Satu–Enam · Mendukung prestasi akademis" }
+            return "Campuran peruntungan · Posisi seimbang"
+        case .zhHans:
+            return evaluation
         }
-        return evaluation
     }
 
     public var localizedPalaceName: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        if lang == .en {
+        switch lang {
+        case .en:
             let directionMap = [
                 "正北": "North", "西南": "Southwest", "正东": "East", "东南": "Southeast",
                 "中宫": "Center", "西北": "Northwest", "正西": "West", "东北": "Northeast", "正南": "South"
@@ -74,15 +152,65 @@ public struct PalaceCell: Identifiable {
                 result = result.replacingOccurrences(of: source, with: localized)
             }
             return result
-        }
-        if lang == .zhHant {
+        case .zhHant:
             return palaceName
                 .replacingOccurrences(of: "东", with: "東")
                 .replacingOccurrences(of: "兑", with: "兌")
                 .replacingOccurrences(of: "离", with: "離")
                 .replacingOccurrences(of: "宫", with: "宮")
+        case .ja:
+            return palaceName
+                .replacingOccurrences(of: "东南", with: "南東")
+                .replacingOccurrences(of: "西南", with: "南西")
+                .replacingOccurrences(of: "东北", with: "北東")
+                .replacingOccurrences(of: "西北", with: "北西")
+                .replacingOccurrences(of: "东", with: "東")
+                .replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "离", with: "離")
+                .replacingOccurrences(of: "宫", with: "宮")
+        case .ko:
+            let koMap = [
+                "正北": "정북", "西南": "남서", "正东": "정동", "东南": "동남",
+                "中宫": "중궁", "西北": "북서", "正西": "정서", "东北": "북동", "正南": "정남"
+            ]
+            var result = palaceName
+            for (source, localized) in koMap {
+                result = result.replacingOccurrences(of: source, with: localized)
+            }
+            return result
+        case .vi:
+            let viMap = [
+                "正北": "Chính Bắc", "西南": "Tây Nam", "正东": "Chính Đông", "东南": "Đông Nam",
+                "中宫": "Trung Cung", "西北": "Tây Bắc", "正西": "Chính Tây", "东北": "Đông Bắc", "正南": "Chính Nam"
+            ]
+            var result = palaceName
+            for (source, localized) in viMap {
+                result = result.replacingOccurrences(of: source, with: localized)
+            }
+            return result
+        case .th:
+            let thMap = [
+                "正北": "ทิศเหนือ", "西南": "ทิศตะวันตกเฉียงใต้", "正东": "ทิศตะวันออก", "东南": "ทิศตะวันออกเฉียงใต้",
+                "中宫": "จุดศูนย์กลาง", "西北": "ทิศตะวันตกเฉียงเหนือ", "正西": "ทิศตะวันตก", "东北": "ทิศตะวันออกเฉียงเหนือ", "正南": "ทิศใต้"
+            ]
+            var result = palaceName
+            for (source, localized) in thMap {
+                result = result.replacingOccurrences(of: source, with: localized)
+            }
+            return result
+        case .id:
+            let idMap = [
+                "正北": "Utara", "西南": "Barat Daya", "正东": "Timur", "东南": "Tenggara",
+                "中宫": "Pusat", "西北": "Barat Laut", "正西": "Barat", "东北": "Timur Laut", "正南": "Selatan"
+            ]
+            var result = palaceName
+            for (source, localized) in idMap {
+                result = result.replacingOccurrences(of: source, with: localized)
+            }
+            return result
+        case .zhHans:
+            return palaceName
         }
-        return palaceName
     }
     
     public var evaluation: String {
@@ -150,74 +278,82 @@ public final class FlyingStarsEngine {
         let startY = currentCycleStart + (p - 1) * 20
         let endY = startY + 19
         
-        let isEn = LocalizationManager.shared.effectiveLanguage == .en
-        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        let lang = LocalizationManager.shared.effectiveLanguage
         
         let yuan: String
         let trigram: String
         let starName: String
         let element: String
         
-        switch p {
-        case 1:
-            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
-            trigram = isEn ? "Kan" : "坎"
-            starName = isEn ? "1 White TanLang" : (isHant ? "一白貪狼" : "一白贪狼")
-            element = isEn ? "Water" : "水"
-        case 2:
-            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
-            trigram = isEn ? "Kun" : "坤"
-            starName = isEn ? "2 Black JuMen" : (isHant ? "二黑巨門" : "二黑巨门")
-            element = isEn ? "Earth" : "土"
-        case 3:
-            yuan = isEn ? "Upper Yuan" : (isHant ? "上元" : "上元")
-            trigram = isEn ? "Zhen" : "震"
-            starName = isEn ? "3 Jade LuCun" : (isHant ? "三碧祿存" : "三碧禄存")
-            element = isEn ? "Wood" : "木"
-        case 4:
-            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
-            trigram = isEn ? "Xun" : "巽"
-            starName = isEn ? "4 Green WenQu" : (isHant ? "四綠文曲" : "四绿文曲")
-            element = isEn ? "Wood" : "木"
-        case 5:
-            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
-            trigram = isEn ? "Center" : "中"
-            starName = isEn ? "5 Yellow LianZhen" : (isHant ? "五黃廉貞" : "五黄廉贞")
-            element = isEn ? "Earth" : "土"
-        case 6:
-            yuan = isEn ? "Middle Yuan" : (isHant ? "中元" : "中元")
-            trigram = isEn ? "Qian" : "乾"
-            starName = isEn ? "6 White WuQu" : (isHant ? "六白武曲" : "六白武曲")
-            element = isEn ? "Metal" : "金"
-        case 7:
-            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
-            trigram = isEn ? "Dui" : (isHant ? "兌" : "兑")
-            starName = isEn ? "7 Red PoJun" : (isHant ? "七赤破軍" : "七赤破军")
-            element = isEn ? "Metal" : "金"
-        case 8:
-            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
-            trigram = isEn ? "Gen" : "艮"
-            starName = isEn ? "8 White ZuoFu" : (isHant ? "八白左輔" : "八白左辅")
-            element = isEn ? "Earth" : "土"
-        case 9:
-            yuan = isEn ? "Lower Yuan" : (isHant ? "下元" : "下元")
-            trigram = isEn ? "Li" : (isHant ? "離" : "离")
-            starName = isEn ? "9 Purple YouBi" : (isHant ? "九紫右弼" : "九紫右弼")
-            element = isEn ? "Fire" : "火"
-        default:
-            yuan = ""
-            trigram = ""
-            starName = ""
-            element = ""
+        switch lang {
+        case .en:
+            let yuans = ["", "Upper Yuan", "Upper Yuan", "Upper Yuan", "Middle Yuan", "Middle Yuan", "Middle Yuan", "Lower Yuan", "Lower Yuan", "Lower Yuan"]
+            let trigrams = ["", "Kan", "Kun", "Zhen", "Xun", "Center", "Qian", "Dui", "Gen", "Li"]
+            let stars = ["", "1 White TanLang", "2 Black JuMen", "3 Jade LuCun", "4 Green WenQu", "5 Yellow LianZhen", "6 White WuQu", "7 Red PoJun", "8 White ZuoFu", "9 Purple YouBi"]
+            let elements = ["", "Water", "Earth", "Wood", "Wood", "Earth", "Metal", "Metal", "Earth", "Fire"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .zhHant:
+            let yuans = ["", "上元", "上元", "上元", "中元", "中元", "中元", "下元", "下元", "下元"]
+            let trigrams = ["", "坎", "坤", "震", "巽", "中", "乾", "兌", "艮", "離"]
+            let stars = ["", "一白貪狼", "二黑巨門", "三碧祿存", "四綠文曲", "五黃廉貞", "六白武曲", "七赤破軍", "八白左輔", "九紫右弼"]
+            let elements = ["", "水", "土", "木", "木", "土", "金", "金", "土", "火"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .ja:
+            let yuans = ["", "上元", "上元", "上元", "中元", "中元", "中元", "下元", "下元", "下元"]
+            let trigrams = ["", "坎", "坤", "震", "巽", "中", "乾", "兌", "艮", "離"]
+            let stars = ["", "一白貪狼", "二黒巨門", "三碧禄存", "四緑文曲", "五黄廉貞", "六白武曲", "七赤破軍", "八白左輔", "九紫右弼"]
+            let elements = ["", "水", "土", "木", "木", "土", "金", "金", "土", "火"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .ko:
+            let yuans = ["", "상원", "상원", "상원", "중원", "중원", "중원", "하원", "하원", "하원"]
+            let trigrams = ["", "감", "곤", "진", "손", "중", "건", "태", "간", "이"]
+            let stars = ["", "일백탐랑", "이흑거문", "삼벽녹존", "사록문곡", "오황염정", "육백무곡", "칠적파군", "팔백좌보", "구자우필"]
+            let elements = ["", "수", "토", "목", "목", "토", "금", "금", "토", "화"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .vi:
+            let yuans = ["", "Thượng Nguyên", "Thượng Nguyên", "Thượng Nguyên", "Trung Nguyên", "Trung Nguyên", "Trung Nguyên", "Hạ Nguyên", "Hạ Nguyên", "Hạ Nguyên"]
+            let trigrams = ["", "Khảm", "Khôn", "Chấn", "Tốn", "Trung", "Càn", "Đoài", "Cấn", "Ly"]
+            let stars = ["", "Nhất Bạch Tham Lang", "Nhị Hắc Cự Môn", "Tam Bích Lộc Tồn", "Tứ Lục Văn Khúc", "Ngũ Hoàng Liêm Trinh", "Lục Bạch Vũ Khúc", "Thất Xích Phá Quân", "Bát Bạch Tả Phụ", "Cửu Tử Hữu Bật"]
+            let elements = ["", "Thủy", "Thổ", "Mộc", "Mộc", "Thổ", "Kim", "Kim", "Thổ", "Hỏa"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .th:
+            let yuans = ["", "ง้วนบน", "ง้วนบน", "ง้วนบน", "ง้วนกลาง", "ง้วนกลาง", "ง้วนกลาง", "ง้วนล่าง", "ง้วนล่าง", "ง้วนล่าง"]
+            let trigrams = ["", "ข่าน", "คุน", "เจิ้น", "ซวิ่น", "กลาง", "เฉียน", "ตุ้ย", "เกิ้น", "หลี"]
+            let stars = ["", "หนึ่งขาว ทานหลาง", "สองดำ จวี้เหมิน", "สามเขียว ลู่ฉุน", "สี่เขียว เหวินชวี", "ห้าเหลือง เหลียนเจิน", "หกขาว อู่ชวี", "เจ็ดแดง โพ่จวิน", "แปดขาว จั่วฝู่", "เก้าม่วง โยวปี้"]
+            let elements = ["", "น้ำ", "ดิน", "ไม้", "ไม้", "ดิน", "ทอง", "ทอง", "ดิน", "ไฟ"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .id:
+            let yuans = ["", "Yuan Atas", "Yuan Atas", "Yuan Atas", "Yuan Tengah", "Yuan Tengah", "Yuan Tengah", "Yuan Bawah", "Yuan Bawah", "Yuan Bawah"]
+            let trigrams = ["", "Kan", "Kun", "Zhen", "Xun", "Pusat", "Qian", "Dui", "Gen", "Li"]
+            let stars = ["", "1 Putih TanLang", "2 Hitam JuMen", "3 Giok LuCun", "4 Hijau WenQu", "5 Kuning LianZhen", "6 Putih WuQu", "7 Merah PoJun", "8 Putih ZuoFu", "9 Ungu YouBi"]
+            let elements = ["", "Air", "Tanah", "Kayu", "Kayu", "Tanah", "Logam", "Logam", "Tanah", "Api"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
+        case .zhHans:
+            let yuans = ["", "上元", "上元", "上元", "中元", "中元", "中元", "下元", "下元", "下元"]
+            let trigrams = ["", "坎", "坤", "震", "巽", "中", "乾", "兑", "艮", "离"]
+            let stars = ["", "一白贪狼", "二黑巨门", "三碧禄存", "四绿文曲", "五黄廉贞", "六白武曲", "七赤破军", "八白左辅", "九紫右弼"]
+            let elements = ["", "水", "土", "木", "木", "土", "金", "金", "土", "火"]
+            yuan = yuans[p]; trigram = trigrams[p]; starName = stars[p]; element = elements[p]
         }
         
         let isCur = (p == curPeriod)
         let label: String
-        if isEn {
+        switch lang {
+        case .en:
             label = isCur ? "Current Period \(p) (\(startY)–\(endY), \(yuan) · \(element))" : "Period \(p) (\(startY)–\(endY), \(yuan) · \(element))"
-        } else if isHant {
+        case .zhHant:
             label = isCur ? "當前\(yuan)\(p)運（\(startY)—\(endY)年，\(starName)\(element)星當令）" : "\(yuan)\(p)運（\(startY)—\(endY)年，\(starName)\(element)星當令）"
-        } else {
+        case .ja:
+            label = isCur ? "現在\(yuan)\(p)運（\(startY)—\(endY)年、\(starName)\(element)星当令）" : "\(yuan)\(p)運（\(startY)—\(endY)年、\(starName)\(element)星当令）"
+        case .ko:
+            label = isCur ? "현재 \(yuan) \(p)운 (\(startY)—\(endY)년, \(starName) \(element)성 당령)" : "\(yuan) \(p)운 (\(startY)—\(endY)년, \(starName) \(element)성 당령)"
+        case .vi:
+            label = isCur ? "Hiện tại \(yuan) Vận \(p) (\(startY)—\(endY), \(starName) \(element) tinh đương lệnh)" : "\(yuan) Vận \(p) (\(startY)—\(endY), \(starName) \(element) tinh đương lệnh)"
+        case .th:
+            label = isCur ? "ปัจจุบันยุค \(p) \(yuan) (\(startY)—\(endY), ดาว\(starName) ธาตุ\(element))" : "ยุค \(p) \(yuan) (\(startY)—\(endY), ดาว\(starName) ธาตุ\(element))"
+        case .id:
+            label = isCur ? "Periode Saat Ini \(p) (\(startY)–\(endY), \(yuan) · \(element))" : "Periode \(p) (\(startY)–\(endY), \(yuan) · \(element))"
+        case .zhHans:
             label = isCur ? "当前\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）" : "\(yuan)\(p)运（\(startY)—\(endY)年，\(starName)\(element)星当令）"
         }
         
@@ -256,9 +392,7 @@ public final class FlyingStarsEngine {
     public func calculateChart(period: Int? = nil, sitting: Mountain24Item, facing: Mountain24Item, date: Date = Date()) -> XuanKongChart {
         let activePeriod = period ?? currentPeriod(for: date)
         let meta = periodMeta(period: activePeriod, for: date)
-        
-        let isEn = LocalizationManager.shared.effectiveLanguage == .en
-        let isHant = LocalizationManager.shared.effectiveLanguage == .zhHant
+        let lang = LocalizationManager.shared.effectiveLanguage
         
         // 1. 排运盘：将当运数字入中顺飞九宫
         var basePeriod = [Int](repeating: 0, count: 9)
@@ -310,7 +444,8 @@ public final class FlyingStarsEngine {
         let facingStarAtMount = facingStars[sittingMountIdx]
         
         let pattern: String
-        if isEn {
+        switch lang {
+        case .en:
             if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
                 pattern = "Wang Shan Wang Xiang (Supreme Wealth & Health)"
             } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
@@ -322,7 +457,7 @@ public final class FlyingStarsEngine {
             } else {
                 pattern = "Balanced Harmony Chart"
             }
-        } else if isHant {
+        case .zhHant:
             if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
                 pattern = "到山到向 (旺丁旺財最吉)"
             } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
@@ -334,7 +469,67 @@ public final class FlyingStarsEngine {
             } else {
                 pattern = "吉凶平和局"
             }
-        } else {
+        case .ja:
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "到山到向 (旺丁旺財の大吉)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "双星到向 (旺財不旺丁 · 前方に水、後方に山が吉)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "双星到坐 (旺丁不旺財 · 後方に水、その奥に山が吉)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "上山下水 (敗財損丁の凶局 · 顛倒勢の借用が必要)"
+            } else {
+                pattern = "吉凶相半の平和局"
+            }
+        case .ko:
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "도산도향 (왕정왕재 대길)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "쌍성도향 (재물 번창 · 앞에 물 뒤에 산이 길함)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "쌍성도좌 (자손 번창 · 뒤에 물과 산이 길함)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "동산하수 (손재패가 흉국 · 전도법 응용 필요)"
+            } else {
+                pattern = "길흉 평화국"
+            }
+        case .vi:
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Đáo Sơn Đáo Hướng (Vượng đinh vượng tài đại cát)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Song Tinh Đáo Hướng (Vượng tài · Trước có nước sau có núi)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Song Tinh Đáo Tọa (Vượng đinh · Sau có nước sau nước có núi)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Thượng Sơn Hạ Thủy (Bại tài tổn đinh hung cục · Cần phép điên đảo)"
+            } else {
+                pattern = "Cát hung bình hòa cục"
+            }
+        case .th:
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "ถึงเขาถึงทิศ (เจริญทั้งคนและทรัพย์ มงคลยิ่ง)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "สองดาวสู่ทิศหน้า (รุ่งเรืองทรัพย์สิน · หน้าควรมีน้ำหลังมีเขา)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "สองดาวสู่หลังพิง (ลูกหลานรุ่งเรือง · หลังควรมีน้ำและมีเขา)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "ขึ้นเขาลงน้ำ (สูญเสียทรัพย์และคน เคราะห์ร้าย · ต้องกลับทิศแก้เคล็ด)"
+            } else {
+                pattern = "สมดุลปานกลาง"
+            }
+        case .id:
+            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Wang Shan Wang Xiang (Makmur Keluarga & Harta)"
+            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Bintang Kembar di Hadap (Kaya Harta · Air di Depan, Gunung di Belakang)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+                pattern = "Bintang Kembar di Duduk (Banyak Keturunan · Air & Gunung di Belakang)"
+            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+                pattern = "Shang Shan Xia Shui (Peta Terbalik · Rawan Kerugian Harta & Fisik)"
+            } else {
+                pattern = "Peta Harmonis Seimbang"
+            }
+        case .zhHans:
             if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
                 pattern = "到山到向 (旺丁旺财最吉)"
             } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
@@ -356,13 +551,10 @@ public final class FlyingStarsEngine {
             let isWuHuang = mountainStars[i] == 5 || facingStars[i] == 5
             let isErHei = mountainStars[i] == 2 || facingStars[i] == 2
             
-            let pName = isEn ? "Palace \(i + 1) (\(palaceDirections[i]))" : (isHant ? palaceNames[i].replacingOccurrences(of: "宫", with: "宮") : palaceNames[i])
-            let trigramStr = isEn ? "Palace \(i + 1)" : palaceNames[i].prefix(1).description
-            
             let cell = PalaceCell(
                 id: i,
-                palaceName: pName,
-                trigram: trigramStr,
+                palaceName: palaceNames[i],
+                trigram: palaceNames[i].prefix(1).description,
                 direction: palaceDirections[i],
                 periodStar: basePeriod[i],
                 activePeriod: activePeriod,
@@ -377,20 +569,33 @@ public final class FlyingStarsEngine {
             cells.append(cell)
         }
         
-        // 6. 综合格局断语：完全根据当前历法元信息动态生成，杜绝任何硬编码
+        // 6. 综合格局断语
         let summary: String
-        if isEn {
-            summary = "\(meta.label). Sitting \(sitting.pinyin) Facing \(facing.pinyin) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
-        } else if isHant {
-            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sitting.localizedName)山\(facing.localizedName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
-        } else {
-            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sitting.name)山\(facing.name)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
+        let sittingName = sitting.localizedName
+        let facingName = facing.localizedName
+        switch lang {
+        case .en:
+            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
+        case .zhHant:
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
+        case .ja:
+            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。"
+        case .ko:
+            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다."
+        case .vi:
+            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh."
+        case .th:
+            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล"
+        case .id:
+            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)–\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga."
+        case .zhHans:
+            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
         }
         
         return XuanKongChart(
             period: activePeriod,
-            sittingMountain: isEn ? sitting.pinyin : (isHant ? sitting.localizedName : sitting.name),
-            facingMountain: isEn ? facing.pinyin : (isHant ? facing.localizedName : facing.name),
+            sittingMountain: sittingName,
+            facingMountain: facingName,
             patternType: pattern,
             isSanBanGua: false,
             isQiXingDaJie: false,

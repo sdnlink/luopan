@@ -197,22 +197,57 @@ public final class SolarTimeCalculator {
         let hourStem = positiveModulo((dayStem % 5) * 2 + hourBranch, 10)
 
         let language = LocalizationManager.shared.effectiveLanguage
-        if language == .en {
+        switch language {
+        case .en:
             let stemPinyin = ["Jia", "Yi", "Bing", "Ding", "Wu", "Ji", "Geng", "Xin", "Ren", "Gui"]
             let branchPinyin = ["Zi", "Chou", "Yin", "Mao", "Chen", "Si", "Wu", "Wei", "Shen", "You", "Xu", "Hai"]
             return "\(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) Year · "
                 + "\(stemPinyin[monthStem])-\(branchPinyin[monthBranch]) Month · "
                 + "\(stemPinyin[dayStem])-\(branchPinyin[dayBranch]) Day · "
                 + "\(stemPinyin[hourStem])-\(branchPinyin[hourBranch]) Hour"
+        case .id:
+            let stemPinyin = ["Jia", "Yi", "Bing", "Ding", "Wu", "Ji", "Geng", "Xin", "Ren", "Gui"]
+            let branchPinyin = ["Zi", "Chou", "Yin", "Mao", "Chen", "Si", "Wu", "Wei", "Shen", "You", "Xu", "Hai"]
+            return "Thn \(stemPinyin[yearStem])-\(branchPinyin[yearBranch]) · "
+                + "Bln \(stemPinyin[monthStem])-\(branchPinyin[monthBranch]) · "
+                + "Hr \(stemPinyin[dayStem])-\(branchPinyin[dayBranch]) · "
+                + "Jam \(stemPinyin[hourStem])-\(branchPinyin[hourBranch])"
+        case .ja:
+            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+                + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
+                + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時"
+        case .ko:
+            let koStems = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
+            let koBranches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
+            return "\(koStems[yearStem])\(koBranches[yearBranch])년 "
+                + "\(koStems[monthStem])\(koBranches[monthBranch])월 "
+                + "\(koStems[dayStem])\(koBranches[dayBranch])일 "
+                + "\(koStems[hourStem])\(koBranches[hourBranch])시"
+        case .vi:
+            let viStems = ["Giáp", "Ất", "Bính", "Đinh", "Mậu", "Kỷ", "Canh", "Tân", "Nhâm", "Quý"]
+            let viBranches = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+            return "\(viStems[yearStem]) \(viBranches[yearBranch]) năm · "
+                + "\(viStems[monthStem]) \(viBranches[monthBranch]) tháng · "
+                + "\(viStems[dayStem]) \(viBranches[dayBranch]) ngày · "
+                + "\(viStems[hourStem]) \(viBranches[hourBranch]) giờ"
+        case .th:
+            let thStems = ["เจี่ย", "อี้", "ปิ่ง", "ติง", "อู่", "จี่", "เกิง", "ซิน", "เหริน", "กุ่ย"]
+            let thBranches = ["จื่อ", "โฉ่ว", "หยิน", "เหมา", "เฉิน", "ซื่อ", "อู่", "เว่ย", "เซิน", "โหย่ว", "ซวี", "ฮ่าย"]
+            return "ปี \(thStems[yearStem])-\(thBranches[yearBranch]) · "
+                + "เดือน \(thStems[monthStem])-\(thBranches[monthBranch]) · "
+                + "วัน \(thStems[dayStem])-\(thBranches[dayBranch]) · "
+                + "ยาม \(thStems[hourStem])-\(thBranches[hourBranch])"
+        case .zhHant:
+            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+                + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
+                + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])時"
+        default:
+            return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])年 "
+                + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])月 "
+                + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])日 "
+                + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])时"
         }
-
-        let yearSuffix = "年"
-        let monthSuffix = "月"
-        let daySuffix = "日"
-        let hourSuffix = language == .zhHant ? "時" : "时"
-        return "\(heavenlyStems[yearStem])\(earthlyBranches[yearBranch])\(yearSuffix) "
-            + "\(heavenlyStems[monthStem])\(earthlyBranches[monthBranch])\(monthSuffix) "
-            + "\(heavenlyStems[dayStem])\(earthlyBranches[dayBranch])\(daySuffix) "
-            + "\(heavenlyStems[hourStem])\(earthlyBranches[hourBranch])\(hourSuffix)"
     }
 }

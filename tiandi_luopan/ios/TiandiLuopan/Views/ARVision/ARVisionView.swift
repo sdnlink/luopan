@@ -1059,7 +1059,8 @@ public struct ARVisionView: View {
                         .font(.system(size: isCenter ? 11 : 10, weight: .bold))
                         .foregroundColor(isCenter ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
                     if let water = water {
-                        Text((isBaSha || isHQ) ? "煞·\(water.stage)" : water.stage)
+                        let shaPrefix = lang.effectiveLanguage == .en ? "Sha · " : "煞·"
+                        Text((isBaSha || isHQ) ? "\(shaPrefix)\(water.stage)" : water.stage)
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundColor((isBaSha || isHQ) ? .red : (water.isAuspicious ? .green : .white.opacity(0.72)))
                             .lineLimit(1)

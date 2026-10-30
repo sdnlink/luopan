@@ -750,14 +750,18 @@ public final class SanHeWaterEngine {
         // This is different from simply assigning every mountain to its
         // nearest earthly branch; doing that misclassifies 乙、辛、癸、丁.
         let branchByMountain: [String: Int] = [
-            "壬": 0, "子": 0, "癸": 0,
-            "丑": 1, "艮": 2, "寅": 2,
-            "甲": 3, "卯": 3, "乙": 3,
-            "辰": 4, "巽": 5, "巳": 5,
-            "丙": 6, "午": 6, "丁": 6,
-            "未": 7, "坤": 8, "申": 8,
-            "庚": 9, "酉": 9, "辛": 9,
-            "戌": 10, "乾": 11, "亥": 11
+            "壬": 0, "子": 0,
+            "癸": 1, "丑": 1,
+            "艮": 2, "寅": 2,
+            "甲": 3, "卯": 3,
+            "乙": 4, "辰": 4,
+            "巽": 5, "巳": 5,
+            "丙": 6, "午": 6,
+            "丁": 7, "未": 7,
+            "坤": 8, "申": 8,
+            "庚": 9, "酉": 9,
+            "辛": 10, "戌": 10,
+            "乾": 11, "亥": 11
         ]
         let branchIndexForMountain: (Mountain24Item) -> Int = { mountain in
             branchByMountain[mountain.name] ?? 0

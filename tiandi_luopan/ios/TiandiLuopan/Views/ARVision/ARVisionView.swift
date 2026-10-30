@@ -291,13 +291,22 @@ public struct CameraPreviewView: UIViewRepresentable {
         public func stopSession() {
             wantsRunning = false
             cancelPendingCapture()
+            sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            sessionObservers.removeAll()
             guard let sessionToStop = captureSession else { return }
-            sessionQueue.async { [weak self] in
-                if let self = self, self.captureSession !== sessionToStop {
-                    return
-                }
+            captureSession = nil
+            previewLayer?.removeFromSuperlayer()
+            previewLayer = nil
+            photoCaptureOutput = nil
+            sessionQueue.sync {
                 if sessionToStop.isRunning {
                     sessionToStop.stopRunning()
+                }
+                for input in sessionToStop.inputs {
+                    sessionToStop.removeInput(input)
+                }
+                for output in sessionToStop.outputs {
+                    sessionToStop.removeOutput(output)
                 }
             }
         }
@@ -504,6 +513,7 @@ public struct ARVisionView: View {
                             handleCapturedFrame(frame)
                         }
                     )
+                    .id("ar_fusion_back")
                     .ignoresSafeArea()
                 } else {
                     CameraPreviewView(
@@ -515,6 +525,7 @@ public struct ARVisionView: View {
                             handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
                         }
                     )
+                    .id("camera_preview_\(cameraPosition.rawValue)")
                     .ignoresSafeArea()
                 }
             } else {
@@ -934,6 +945,11 @@ public struct ARVisionView: View {
                     guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) != nil else {
                         aiError = lang.t("ar_ai_camera_required")
                         return
+                    }
+                    if cameraPosition == .front {
+                        cameraModel.stopSession()
+                    } else {
+                        fusionModel.pause()
                     }
                     cameraPosition = nextPosition
                 }) {

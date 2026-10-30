@@ -306,13 +306,23 @@ public struct VIPPaywallSheet: View {
             showAlert = true
             iap.clearTransientMessages()
         }
-        .alert(isPresented: $showAlert) {
-            Alert(title: Text(alertIsError
-                              ? LocalizationManager.shared.t("payment_failed_title")
-                              : LocalizationManager.shared.t("payment_status_title")),
-                  message: Text(alertMsg),
-                  dismissButton: .default(Text(LocalizationManager.shared.t("done"))))
-        }
+        .overlay(
+            Group {
+                if showAlert {
+                    FloorplanConfirmDialog(
+                        title: alertIsError
+                            ? LocalizationManager.shared.t("payment_failed_title")
+                            : LocalizationManager.shared.t("payment_status_title"),
+                        message: alertMsg,
+                        confirmTitle: LocalizationManager.shared.t("done"),
+                        cancelTitle: nil,
+                        confirmColor: Color(red: 0.83, green: 0.68, blue: 0.21),
+                        onConfirm: { showAlert = false },
+                        onCancel: { showAlert = false }
+                    )
+                }
+            }
+        )
     }
     
     private func getSelectedProductTitle() -> String {

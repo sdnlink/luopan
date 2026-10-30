@@ -251,6 +251,8 @@ public struct XuanKongChart {
     public let patternType: String       // 到山到向 / 上山下水 / 双星到向 / 双星到坐
     public let isSanBanGua: Bool         // 父母三般卦或连珠三般卦
     public let isQiXingDaJie: Bool       // 七星打劫局
+    public let isTiGua: Bool             // 是否为兼向替卦排盘
+    public let chartModeTitle: String    // 排盘模式 (下卦 / 替卦)
     public let palaces: [PalaceCell]     // 九宫格数据
     public let summaryAnalysis: String   // 综合格局断语
     public var patternDesc: String { summaryAnalysis }
@@ -551,27 +553,56 @@ public final class FlyingStarsEngine {
     private let palaceNames = ["坎一宫 (正北)", "坤二宫 (西南)", "震三宫 (正东)", "巽四宫 (东南)", "天心五 (中宫)", "乾六宫 (西北)", "兑七宫 (正西)", "艮八宫 (东北)", "离九宫 (正南)"]
     private let palaceDirections = ["正北", "西南", "正东", "东南", "中宫", "西北", "正西", "东北", "正南"]
     
-    /// 根据入中之星与坐向元龙判定顺逆飞性（玄空风水正统排盘法：
-    /// 依坐向山之元龙，查入中星本宫对应同元龙之山的阴阳；阳顺阴逆。五黄随坐向本山之元龙阴阳）。
-    private func resolveFlightPolarity(starInCentral: Int, baseMountain: Mountain24Item) -> Bool {
-        if starInCentral == 5 {
-            return baseMountain.polarity > 0
+    /// 24山正统替卦口诀映射表 (沈氏玄空替卦诀)：
+    /// 子癸并甲申，贪狼一路行 (1)；壬卯乙未坤，五位为巨门 (2)；
+    /// 乾戌辰巽巳亥，尽是武曲位 (6)；艮丙酉辛丑，全归破军位 (7)；
+    /// 寅午庚丁上，右弼九星迎 (9)。
+    private static let tiGuaStarMap: [String: Int] = [
+        "子": 1, "癸": 1, "甲": 1, "申": 1,
+        "壬": 2, "卯": 2, "乙": 2, "未": 2, "坤": 2,
+        "乾": 6, "戌": 6, "辰": 6, "巽": 6, "巳": 6, "亥": 6,
+        "艮": 7, "丙": 7, "酉": 7, "辛": 7, "丑": 7,
+        "寅": 9, "午": 9, "庚": 9, "丁": 9
+    ]
+
+    /// 计算入中之星与顺逆飞性（支持正向下卦与兼向替卦）：
+    /// - 下卦：运星直接入中，依坐向山元龙查运星本宫同元龙之山阴阳定顺逆。
+    /// - 替卦：查运星本宫同元龙之山，依替卦口诀取替星入中；顺逆仍以原所对应之山阴阳判定。
+    private func resolveStarAndPolarity(
+        periodStarInPalace: Int,
+        baseMountain: Mountain24Item,
+        useTiGua: Bool
+    ) -> (starInCentral: Int, isForward: Bool) {
+        if periodStarInPalace == 5 {
+            // 五黄到宫：无替，随坐向本山之元龙阴阳顺逆
+            let subStar = useTiGua ? (Self.tiGuaStarMap[baseMountain.name] ?? 5) : 5
+            return (subStar, baseMountain.polarity > 0)
         }
+        
         let palaceNameByStar: [Int: String] = [
             1: "坎", 2: "坤", 3: "震", 4: "巽",
             6: "乾", 7: "兑", 8: "艮", 9: "离"
         ]
-        guard let homePalace = palaceNameByStar[starInCentral] else {
-            return baseMountain.polarity > 0
+        guard let homePalace = palaceNameByStar[periodStarInPalace] else {
+            return (periodStarInPalace, baseMountain.polarity > 0)
         }
         let homeMountains = Mountain24Data.shared.mountains.filter { $0.palace == homePalace }
-        if let matched = homeMountains.first(where: { $0.yuan == baseMountain.yuan }) {
-            return matched.polarity > 0
+        guard let matched = homeMountains.first(where: { $0.yuan == baseMountain.yuan }) else {
+            return (periodStarInPalace, baseMountain.polarity > 0)
         }
-        return baseMountain.polarity > 0
+        
+        let star = useTiGua ? (Self.tiGuaStarMap[matched.name] ?? periodStarInPalace) : periodStarInPalace
+        let isForward = matched.polarity > 0
+        return (star, isForward)
     }
 
-    public func calculateChart(period: Int? = nil, sitting: Mountain24Item, facing: Mountain24Item, date: Date = Date()) -> XuanKongChart {
+    public func calculateChart(
+        period: Int? = nil,
+        sitting: Mountain24Item,
+        facing: Mountain24Item,
+        useTiGua: Bool = false,
+        date: Date = Date()
+    ) -> XuanKongChart {
         let activePeriod = period ?? currentPeriod(for: date)
         let meta = periodMeta(period: activePeriod, for: date)
         let lang = LocalizationManager.shared.effectiveLanguage
@@ -586,16 +617,20 @@ public final class FlyingStarsEngine {
             basePeriod[nextPalace] = star
         }
         
-        // 2. 查坐山与向山所在宫位的运盘星，定山星与向星入中
+        // 2. 查坐山与向山所在宫位的运盘星，定山星与向星入中 (支持正向下卦与兼向替卦)
         let sittingPalaceIdx = palaceIndex(for: sitting.palace)
         let facingPalaceIdx = palaceIndex(for: facing.palace)
         
-        let sittingInCentral = basePeriod[sittingPalaceIdx]
-        let facingInCentral = basePeriod[facingPalaceIdx]
+        let sittingPeriodStar = basePeriod[sittingPalaceIdx]
+        let facingPeriodStar = basePeriod[facingPalaceIdx]
         
-        // 3. 判断山星与向星顺飞/逆飞性 (严格遵循正统沈氏玄空元龙本宫阴阳顺逆法则)
-        let sittingIsForward = resolveFlightPolarity(starInCentral: sittingInCentral, baseMountain: sitting)
-        let facingIsForward = resolveFlightPolarity(starInCentral: facingInCentral, baseMountain: facing)
+        // 3. 计算山向星入中数字与顺逆飞性 (下卦正针 vs 兼向替卦)
+        let sittingResult = resolveStarAndPolarity(periodStarInPalace: sittingPeriodStar, baseMountain: sitting, useTiGua: useTiGua)
+        let facingResult = resolveStarAndPolarity(periodStarInPalace: facingPeriodStar, baseMountain: facing, useTiGua: useTiGua)
+        let sittingInCentral = sittingResult.starInCentral
+        let sittingIsForward = sittingResult.isForward
+        let facingInCentral = facingResult.starInCentral
+        let facingIsForward = facingResult.isForward
         
         var mountainStars = [Int](repeating: 0, count: 9)
         var facingStars = [Int](repeating: 0, count: 9)
@@ -774,6 +809,10 @@ public final class FlyingStarsEngine {
             summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
         }
         
+        let modeTitle = useTiGua
+            ? LocalizationManager.shared.t("chart_mode_tigua")
+            : LocalizationManager.shared.t("chart_mode_xiagua")
+
         return XuanKongChart(
             period: activePeriod,
             sittingMountain: sittingName,
@@ -781,6 +820,8 @@ public final class FlyingStarsEngine {
             patternType: pattern,
             isSanBanGua: Self.checkSanBanGua(cells: cells),
             isQiXingDaJie: Self.checkQiXingDaJie(cells: cells, activePeriod: activePeriod, facingPalaceIdx: sittingFacingIdx),
+            isTiGua: useTiGua,
+            chartModeTitle: modeTitle,
             palaces: cells,
             summaryAnalysis: summary,
             periodMeta: meta

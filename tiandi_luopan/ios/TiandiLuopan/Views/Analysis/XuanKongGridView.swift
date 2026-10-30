@@ -9,6 +9,7 @@ public struct XuanKongGridView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedSubTab: Int = 0 // 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门
     @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
+    @State private var useTiGua: Bool = false
     @State private var showTianJiShuSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var cachedChart: XuanKongChart?
@@ -35,7 +36,8 @@ public struct XuanKongGridView: View {
             ? (cachedChart ?? FlyingStarsEngine.shared.calculateChart(
                 period: selectedPeriod,
                 sitting: motion.headingState.sittingMountain,
-                facing: motion.headingState.facingMountain
+                facing: motion.headingState.facingMountain,
+                useTiGua: useTiGua
             ))
             : nil
         
@@ -86,6 +88,13 @@ public struct XuanKongGridView: View {
         .onChange(of: selectedPeriod) { _ in
             refreshChart()
         }
+        .onChange(of: useTiGua) { _ in
+            refreshChart()
+        }
+        .onChange(of: motion.headingState.isJianXiang) { isJian in
+            useTiGua = isJian
+            refreshChart()
+        }
         .onChange(of: motion.headingState.sittingMountain.id) { _ in
             refreshChart()
         }
@@ -117,7 +126,8 @@ public struct XuanKongGridView: View {
         cachedChart = FlyingStarsEngine.shared.calculateChart(
             period: selectedPeriod,
             sitting: motion.headingState.sittingMountain,
-            facing: motion.headingState.facingMountain
+            facing: motion.headingState.facingMountain,
+            useTiGua: useTiGua
         )
     }
     
@@ -249,9 +259,9 @@ public struct XuanKongGridView: View {
         }
     }
     
-    // MARK: - 格局徽章
+    // MARK: - 格局徽章与下卦/替卦切换
     private func patternBadgeView(chart: XuanKongChart) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             HStack(spacing: 8) {
                 Text("\(chart.sittingMountain)\(lang.t("mountain_suffix"))\(chart.facingMountain)\(lang.t("facing_suffix"))")
                     .font(.system(size: 18, weight: .bold, design: .serif))
@@ -268,6 +278,22 @@ public struct XuanKongGridView: View {
                     .cornerRadius(6)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                
+                Button(action: {
+                    useTiGua.toggle()
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 9, weight: .bold))
+                        Text(chart.chartModeTitle)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(useTiGua ? Color.purple.opacity(0.25) : Color.blue.opacity(0.2))
+                    .foregroundColor(useTiGua ? Color(red: 0.85, green: 0.65, blue: 1.0) : Color.yanCyan)
+                    .cornerRadius(6)
+                }
             }
             if chart.isSanBanGua || chart.isQiXingDaJie {
                 HStack(spacing: 6) {

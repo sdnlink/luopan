@@ -318,6 +318,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView.session.pause()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
+        retryCount = 0
         refreshSavedWorldMapState()
     }
 
@@ -1183,10 +1184,12 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private func retryStart(failedSession: ARSession) {
         guard let sceneView = sceneView, sceneView.session === failedSession,
               let configuration = activeConfiguration else { return }
-        guard retryCount < 3 else {
-            retryCount = 0
-            return
-        }
+        // Give up after 3 attempts for this session.  Do NOT reset the counter
+        // here: a persistent failure (e.g. camera stays busy) would otherwise
+        // restart the retry ladder on every didFailWithError, resetting
+        // tracking on the main thread forever and freezing the UI.  A fresh
+        // start() resets the counter, so the next lens flip gets full retries.
+        guard retryCount < 3 else { return }
         retryCount += 1
         let delay = Double(retryCount) * 0.4
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in

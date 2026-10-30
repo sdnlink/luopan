@@ -1045,6 +1045,16 @@ public struct ARVisionView: View {
         let baShaZhi = SanHeWaterEngine.shared.resolveBaSha(sitting: sitting).shaZhi
         let offsets: [Double] = [-30.0, -15.0, 0.0, 15.0, 30.0]
 
+        // 煞位前缀按语言本地化：中文 煞·、日文 煞・、韩文 살·，
+        // 其余语言用风水术语拼音音译 Sha ·（避免非中文环境显示中文硬编码）。
+        let shaPrefix: String
+        switch lang.effectiveLanguage {
+        case .zhHant, .zhHans: shaPrefix = "煞·"
+        case .ja: shaPrefix = "煞・"
+        case .ko: shaPrefix = "살·"
+        default: shaPrefix = "Sha · "
+        }
+
         return HStack(spacing: 6) {
             ForEach(offsets, id: \.self) { delta in
                 let angle = ((baseHeading + delta).truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
@@ -1059,15 +1069,6 @@ public struct ARVisionView: View {
                         .font(.system(size: isCenter ? 11 : 10, weight: .bold))
                         .foregroundColor(isCenter ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
                     if let water = water {
-                        // 煞位前缀按语言本地化：中文 煞·、日文 煞・、韩文 살·，
-                        // 其余语言用风水术语拼音音译 Sha ·（避免非中文环境显示中文硬编码）。
-                        let shaPrefix: String
-                        switch lang.effectiveLanguage {
-                        case .zhHant, .zhHans: shaPrefix = "煞·"
-                        case .ja: shaPrefix = "煞・"
-                        case .ko: shaPrefix = "살·"
-                        default: shaPrefix = "Sha · "
-                        }
                         Text((isBaSha || isHQ) ? "\(shaPrefix)\(water.stage)" : water.stage)
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundColor((isBaSha || isHQ) ? .red : (water.isAuspicious ? .green : .white.opacity(0.72)))

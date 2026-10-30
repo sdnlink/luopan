@@ -217,26 +217,31 @@ public struct TianJiShuView: View {
             .sheet(isPresented: $showPaywall) {
                 VIPPaywallSheet(defaultProductId: .tianjiSingle)
             }
-            .alert(isPresented: $showSaveError) {
-                if showPhotoSettings {
-                    return Alert(
-                        title: Text(lang.t("save_failed")),
-                        message: Text(saveErrorMessage ?? lang.t("save_failed")),
-                        primaryButton: .default(Text(lang.t("open_system_settings"))) {
-                            guard let url = URL(string: UIApplication.openSettingsURLString),
-                                  UIApplication.shared.canOpenURL(url) else { return }
-                            UIApplication.shared.open(url)
+        }
+        // Stable overlay instead of a system alert: this page observes the
+        // high-frequency compass stream, which tore down the alert.
+        .overlay(
+            Group {
+                if showSaveError {
+                    FloorplanConfirmDialog(
+                        title: lang.t("save_failed"),
+                        message: saveErrorMessage ?? lang.t("save_failed"),
+                        confirmTitle: showPhotoSettings ? lang.t("open_system_settings") : lang.t("done"),
+                        cancelTitle: showPhotoSettings ? lang.t("done") : nil,
+                        confirmColor: Color(red: 0.83, green: 0.68, blue: 0.21),
+                        onConfirm: {
+                            showSaveError = false
+                            if showPhotoSettings,
+                               let url = URL(string: UIApplication.openSettingsURLString),
+                               UIApplication.shared.canOpenURL(url) {
+                                UIApplication.shared.open(url)
+                            }
                         },
-                        secondaryButton: .cancel(Text(lang.t("done")))
+                        onCancel: { showSaveError = false }
                     )
                 }
-                return Alert(
-                    title: Text(lang.t("save_failed")),
-                    message: Text(saveErrorMessage ?? lang.t("save_failed")),
-                    dismissButton: .default(Text(lang.t("done")))
-                )
             }
-        }
+        )
     }
 
     private func beginRendering() {

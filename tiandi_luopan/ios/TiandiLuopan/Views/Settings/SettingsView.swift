@@ -329,13 +329,6 @@ public struct SettingsView: View {
                 iap.clearTransientMessages()
             }
         }
-        .alert(isPresented: $showPaymentError) {
-            Alert(
-                title: Text(paymentAlertIsError ? lang.t("payment_failed_title") : lang.t("payment_status_title")),
-                message: Text(paymentError),
-                dismissButton: .default(Text(lang.t("done")))
-            )
-        }
         }
 
                 .preferredColorScheme(.dark)
@@ -343,6 +336,24 @@ public struct SettingsView: View {
                 Color.clear.ignoresSafeArea()
             }
         }
+        // Settings re-renders with every sensor sample; a system alert
+        // attached to the list was torn down and its button stopped
+        // responding, so payment results use a stable overlay.
+        .overlay(
+            Group {
+                if showPaymentError {
+                    FloorplanConfirmDialog(
+                        title: paymentAlertIsError ? lang.t("payment_failed_title") : lang.t("payment_status_title"),
+                        message: paymentError,
+                        confirmTitle: lang.t("done"),
+                        cancelTitle: nil,
+                        confirmColor: Color(red: 0.83, green: 0.68, blue: 0.21),
+                        onConfirm: { showPaymentError = false },
+                        onCancel: { showPaymentError = false }
+                    )
+                }
+            }
+        )
     }
     
     private func productRow(id: IAPProductID, tag: String) -> some View {

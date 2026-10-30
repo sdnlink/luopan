@@ -1813,11 +1813,12 @@ private struct FloorplanRoomTypeEditor: View {
 /// Self-contained confirmation dialog. It does not depend on UIKit alert
 /// presentation, so it keeps working while the host view is re-rendered by
 /// high-frequency sensor updates.
-private struct FloorplanConfirmDialog: View {
+struct FloorplanConfirmDialog: View {
     let title: String
     let message: String
     let confirmTitle: String
-    let cancelTitle: String
+    let cancelTitle: String?
+    var confirmColor: Color = Color.red.opacity(0.85)
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -1836,16 +1837,18 @@ private struct FloorplanConfirmDialog: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 10) {
-                    Button(action: onCancel) {
-                        Text(cancelTitle)
-                            .font(.system(size: 14, weight: .semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.12))
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
+                    if let cancelTitle = cancelTitle {
+                        Button(action: onCancel) {
+                            Text(cancelTitle)
+                                .font(.system(size: 14, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color.white.opacity(0.12))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
                     Button(action: onConfirm) {
                         Text(confirmTitle)
                             .font(.system(size: 14, weight: .semibold))
@@ -1853,7 +1856,7 @@ private struct FloorplanConfirmDialog: View {
                             .minimumScaleFactor(0.7)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color.red.opacity(0.85))
+                            .background(confirmColor)
                             .foregroundColor(.white)
                             .cornerRadius(8)
                     }

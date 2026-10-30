@@ -677,6 +677,21 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         }
     }
     
+    /// Required by `requestLocation()`: Core Location raises an exception when
+    /// a one-shot request fails and the delegate cannot receive the error.
+    public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let clError = error as? CLError
+        // kCLErrorLocationUnknown is transient; Core Location keeps trying.
+        if clError?.code == .locationUnknown { return }
+        DispatchQueue.main.async {
+            let status = manager.authorizationStatus
+            self.locationAuthorizationStatus = status
+            if status == .denied || status == .restricted {
+                self.hasLocationFix = false
+            }
+        }
+    }
+
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
         

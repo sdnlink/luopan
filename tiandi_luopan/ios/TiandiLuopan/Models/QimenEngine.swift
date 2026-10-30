@@ -280,16 +280,65 @@ public class QimenEngine {
     
     private init() {}
     
+    // 洛书飞布顺序（阳遁顺、阴遁逆）。包含中宫(5)用于九星，跳过中宫用于八门/八神。
+    private let luoOrderFull = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    private let luoOrderSkip = [1, 2, 3, 4, 6, 7, 8, 9]
+
+    private func stepFull(_ p: Int, forward: Bool) -> Int {
+        guard let i = luoOrderFull.firstIndex(of: p) else { return p }
+        let n = luoOrderFull.count
+        return luoOrderFull[(i + (forward ? 1 : -1) + n) % n]
+    }
+    private func stepSkip(_ p: Int, forward: Bool) -> Int {
+        guard let i = luoOrderSkip.firstIndex(of: p) else { return p }
+        let n = luoOrderSkip.count
+        return luoOrderSkip[(i + (forward ? 1 : -1) + n) % n]
+    }
+    private func flyFull(start: Int, steps: Int, forward: Bool) -> Int {
+        var cur = start
+        let s = ((steps % 9) + 9) % 9
+        for _ in 0..<s { cur = stepFull(cur, forward: forward) }
+        return cur
+    }
+    private func flySkip(start: Int, steps: Int, forward: Bool) -> Int {
+        var cur = start
+        let s = ((steps % 8) + 8) % 8
+        for _ in 0..<s { cur = stepSkip(cur, forward: forward) }
+        return cur
+    }
+    private func flightFull(from start: Int, forward: Bool) -> [Int] {
+        var seq = [Int](); var cur = start
+        for _ in 0..<9 { seq.append(cur); cur = stepFull(cur, forward: forward) }
+        return seq
+    }
+    private func flightSkip(from start: Int, forward: Bool) -> [Int] {
+        var seq = [Int](); var cur = start
+        for _ in 0..<8 { seq.append(cur); cur = stepSkip(cur, forward: forward) }
+        return seq
+    }
+
+    /// 日干支序号 (0..59)。与 SolarTimeCalculator 的 (JDN+49)%60 口径一致。
+    private func dayGanZhiIndex(for date: Date) -> Int {
+        let cal = Calendar.current
+        let comps = cal.dateComponents([.year, .month, .day], from: date)
+        let y = comps.year ?? 2000, m = comps.month ?? 1, d = comps.day ?? 1
+        let a = Int((14 - m) / 12)
+        let yy = y + 4800 - a
+        let mm = m + 12 * a - 3
+        let jdn = d + (153 * mm + 2) / 5 + 365 * yy + yy / 4 - yy / 100 + yy / 400 - 32045
+        return ((jdn + 49) % 60 + 60) % 60
+    }
+
     public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> QimenChart {
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: date)
+        let cal = Calendar.current
+        let hour = cal.component(.hour, from: date)
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
-        
+
         // 1. 阴遁/阳遁按节气切换：夏至至大雪为阴遁，冬至至芒种为阳遁。
-        // 使用太阳黄经而非固定公历日期，覆盖不同年份节气时刻的变化。
         let isYangDun = solarTermIndex < 11 || solarTermIndex >= 23
         let lang = LocalizationManager.shared.effectiveLanguage
-        
+        let forward = isYangDun // 阳遁顺飞，阴遁逆飞
+
         let dunType: String
         switch lang {
         case .en: dunType = isYangDun ? "Yang Dun" : "Yin Dun"
@@ -301,12 +350,18 @@ public class QimenEngine {
         case .id: dunType = isYangDun ? "Yang Dun" : "Yin Dun"
         case .auto, .zhHans: dunType = isYangDun ? "阳遁" : "阴遁"
         }
-        
-        // 2. 拆补定局：按当前节气的前五日、中五日、后五日取上/中/下元。
-        // Each row is [upper, middle, lower] for one solar term.  The term
-        // index is 0=小寒 ... 22=大雪, 23=冬至.
-        let progress = SolarTimeCalculator.shared.solarTermProgress(for: date)
-        let yuanIndex = min(2, max(0, Int(progress / 5.0)))
+
+        // 2. 拆补法定局：以"符头"（甲/己日）确定上/中/下元。
+        //    符头干支 % 15：0→上元，5→下元，10→中元。
+        let dayGz = dayGanZhiIndex(for: date)
+        let fuHead = dayGz - (dayGz % 5)
+        let yuanIndex: Int
+        switch fuHead % 15 {
+        case 0:  yuanIndex = 0
+        case 5:  yuanIndex = 2
+        case 10: yuanIndex = 1
+        default: yuanIndex = 0
+        }
         let yangBureaus: [Int: [Int]] = [
             23: [1, 7, 4], 0: [2, 8, 5], 1: [3, 9, 6],
             2: [8, 5, 2], 3: [9, 6, 3], 4: [1, 7, 4],
@@ -321,7 +376,6 @@ public class QimenEngine {
         ]
         let bureauTable = isYangDun ? yangBureaus : yinBureaus
         let juNumber = bureauTable[solarTermIndex]?[yuanIndex] ?? 1
-        let title: String
         let yuanName: String
         switch lang {
         case .en: yuanName = ["Upper Yuan", "Middle Yuan", "Lower Yuan"][yuanIndex]
@@ -332,7 +386,7 @@ public class QimenEngine {
         case .id: yuanName = ["Yuan Atas", "Yuan Tengah", "Yuan Bawah"][yuanIndex]
         case .auto, .zhHans: yuanName = ["上元", "中元", "下元"][yuanIndex]
         }
-        
+        let title: String
         switch lang {
         case .en: title = "【\(dunType) Bureau \(juNumber) · \(yuanName)】"
         case .zhHant: title = "【\(dunType)\(juNumber)局 · 拆補\(yuanName)】"
@@ -343,193 +397,231 @@ public class QimenEngine {
         case .id: title = "【\(dunType) Pola \(juNumber) · \(yuanName)】"
         case .auto, .zhHans: title = "【\(dunType)\(juNumber)局 · 拆补\(yuanName)】"
         }
-        
-        // 3. 计算八门排布偏移 (结合局数与时支)。
-        // `hour / 2` 会把 23:00 算成序号 11，并在每个偶数小时边界
-        // 错开一支；奇门按子时 23:00 起，应使用标准十二时辰索引。
-        let hourBranch = ((hour + 1) / 2) % 12
-        let shift = (juNumber + hourBranch) % 8
-        
-        var cells: [QimenPalaceCell] = []
-        var nonCenterIndex = 0
-        var bestDirection: String
-        var bestReason: String
-        // Keep the absolute bearing of the selected gate so the caller can
-        // turn the current device heading into actionable left/right guidance.
-        // `heading` is a clockwise magnetic/true bearing in degrees.
-        var bestBearing: Double? = nil
-        switch lang {
-        case .en:
-            bestDirection = "Northwest (Qian - Open Gate)"
-            bestReason = "Auspicious Open Gate with Chief Deity"
-        case .zhHant:
-            bestDirection = "西北方 (乾宮開門)"
-            bestReason = "開門乘吉神值符，天地德合"
-        case .ja:
-            bestDirection = "北西方 (乾宮 開門)"
-            bestReason = "開門に直符神が臨み、万事亨通"
-        case .ko:
-            bestDirection = "북서방 (건궁 개문)"
-            bestReason = "개문에 직부신이 임하여 천지덕합"
-        case .vi:
-            bestDirection = "Tây Bắc (Càn Cung Khai Môn)"
-            bestReason = "Khai Môn thừa cát thần Trực Phù, thiên địa đức hợp"
-        case .th:
-            bestDirection = "ทิศตะวันตกเฉียงเหนือ (เฉียน - ประตูเปิด)"
-            bestReason = "ประตูเปิดสถิตร่วมเทพจื่อฝู ราบรื่นมงคลยิ่ง"
-        case .id:
-            bestDirection = "Barat Laut (Qian - Gerbang Pembuka)"
-            bestReason = "Gerbang Pembuka dinaungi Panglima Agung"
-        case .auto, .zhHans:
-            bestDirection = "西北方 (乾宫开门)"
-            bestReason = "开门乘吉神值符，天地德合"
-        }
-        var bestScore = -1
-        var tabooDirs: [String] = []
-        
-        for p in displayPalaceDefs {
-            if p.id == 5 {
-                let centerName: String
-                let centerTrigram: String
-                switch lang {
-                case .en: centerName = "Center"; centerTrigram = "TaiJi"
-                case .zhHant, .ja: centerName = "中宮"; centerTrigram = "太極"
-                case .ko: centerName = "중궁"; centerTrigram = "태극"
-                case .vi: centerName = "Trung Cung"; centerTrigram = "Thái Cực"
-                case .th: centerName = "จุดศูนย์กลาง"; centerTrigram = "ไท่จี๋"
-                case .id: centerName = "Pusat"; centerTrigram = "Taiji"
-                case .auto, .zhHans: centerName = "中宫"; centerTrigram = "太极"
-                }
-                cells.append(QimenPalaceCell(
-                    palaceId: 5,
-                    palaceName: centerName,
-                    trigram: centerTrigram,
-                    doorName: centerName,
-                    doorLuck: lang == .en ? "Fair" : (lang == .zhHans ? "平" : "平"),
-                    starName: lang == .en ? "TianQin" : (lang == .ko ? "천금성" : (lang == .vi ? "Thiên Cầm" : "天禽星")),
-                    godName: lang == .en ? "Center" : (lang == .ko ? "원극" : (lang == .vi ? "Nguyên Cực" : "元极")),
-                    tianStem: "戊",
-                    diStem: "戊",
-                    isTaiJiCenter: true,
-                    // The center palace has no door. Mark it neutral so the
-                    // grid does not render the placeholder as an auspicious
-                    // travel gate.
-                    isDoorAuspicious: false
-                ))
-            } else {
-                // `displayPalaceDefs` includes the center at index 4.  Using
-                // the raw grid index here skips door 5 and repeats door 1;
-                // keep a separate eight-palace counter so every door appears
-                // exactly once.
-                let doorIdx = (nonCenterIndex + shift) % 8
-                let door = eightDoors[doorIdx]
-                let star = nineStars[(nonCenterIndex + juNumber) % 9]
-                let god = eightGods[(nonCenterIndex + shift) % 8]
-                let tianStem = sixYiStems[(nonCenterIndex + juNumber) % 9]
-                let diStem = sixYiStems[(nonCenterIndex + 3) % 9]
-                
-                let cellProbe = QimenPalaceCell(
-                    palaceId: p.id, palaceName: "\(p.name) \(p.trigram)", trigram: p.trigram,
-                    doorName: door.name, doorLuck: door.luckType,
-                    starName: star, godName: god, tianStem: "", diStem: "",
-                    isTaiJiCenter: false, isDoorAuspicious: door.isAuspicious
-                )
-                let pName = cellProbe.localizedPalaceName
-                let dName = door.localizedName
-                let sName = cellProbe.localizedStarName
-                let gName = cellProbe.localizedGodName
-                let lore = door.localizedLore
 
-                if door.name == "生门" || door.name == "开门" {
-                    let candidateScore = door.name == "开门" ? 4 : 3
-                    if candidateScore > bestScore {
-                        switch lang {
-                        case .en:
-                            bestDirection = "\(pName) · \(dName)"
-                            bestReason = "Protected by \(sName) & \(gName), \(lore)"
-                        case .zhHant:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "臨\(sName)星與\(gName)神，\(lore)"
-                        case .ja:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "\(sName)星と\(gName)神が臨み、\(lore)"
-                        case .ko:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "\(sName)성과 \(gName)신이 임하여, \(lore)"
-                        case .vi:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "Lâm \(sName) tinh cùng \(gName) thần, \(lore)"
-                        case .th:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "สถิตดาว \(sName) และเทพ \(gName), \(lore)"
-                        case .id:
-                            bestDirection = "\(pName) (\(dName))"
-                            bestReason = "Dinaungi bintang \(sName) & dewa \(gName), \(lore)"
-                        case .auto, .zhHans:
-                            bestDirection = "\(p.name)方 (\(p.trigram)宫\(door.name))"
-                            bestReason = "临\(star)星与\(god)神，\(door.lore)"
-                        }
-                        bestBearing = Self.bearing(for: p.name)
-                        bestScore = candidateScore
-                    }
-                }
-                if door.name == "死门" || door.name == "惊门" {
-                    switch lang {
-                    case .en: tabooDirs.append("\(pName) · \(dName)")
-                    case .zhHant: tabooDirs.append("\(pName)\(dName)")
-                    case .ja: tabooDirs.append("\(pName) \(dName)")
-                    case .ko: tabooDirs.append("\(pName) \(dName)")
-                    case .vi: tabooDirs.append("\(pName) (\(dName))")
-                    case .th: tabooDirs.append("\(pName) (\(dName))")
-                    case .id: tabooDirs.append("\(pName) (\(dName))")
-                    case .auto, .zhHans: tabooDirs.append("\(p.name)\(door.name)")
-                    }
-                }
-                
-                cells.append(QimenPalaceCell(
-                    palaceId: p.id,
-                    palaceName: "\(p.name) \(p.trigram)",
-                    trigram: p.trigram,
-                    doorName: door.name,
-                    doorLuck: door.luckType,
-                    starName: star,
-                    godName: god,
-                    tianStem: tianStem,
-                    diStem: diStem,
-                    isTaiJiCenter: false,
-                    isDoorAuspicious: door.isAuspicious
-                ))
-                nonCenterIndex += 1
+        // 3. 时辰干支（晚子时 23:00 归次日，与八字日柱口径一致）。
+        let dayRef = cal.date(byAdding: .hour, value: 1, to: date) ?? date
+        let effDayGz = dayGanZhiIndex(for: dayRef)
+        let dayStem = effDayGz % 10
+        let hourBranch = ((hour + 1) / 2) % 12
+        let hourStem = ((dayStem % 5) * 2 + hourBranch) % 10
+        let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+        let hourStemChar = stems[hourStem]
+        let shichenGz = ((effDayGz * 12 + hourBranch) % 60 + 60) % 60
+        let xun = shichenGz / 10
+
+        // 4. 地盘（固定）：坎戊、坤己、震庚、巽辛、中壬(天禽寄)、乾癸、兑丁、艮丙、离乙。
+        let diPanStem: [Int: String] = [1: "戊", 2: "己", 3: "庚", 4: "辛", 5: "壬", 6: "癸", 7: "丁", 8: "丙", 9: "乙"]
+        let stemToPalace: [String: Int] = ["戊": 1, "己": 2, "庚": 3, "辛": 4, "壬": 5, "癸": 6, "丁": 7, "丙": 8, "乙": 9]
+        let xunToSixYi = ["戊", "己", "庚", "辛", "壬", "癸"]
+        let xunHeadSixYi = xunToSixYi[xun]
+        let zhiFuPalace = stemToPalace[xunHeadSixYi]! // 值符/值使本宫（旬首六仪所在）
+        // 八门本宫：休坎、死坤、伤震、杜巽、景离、生艮、惊兑、开乾（中宫无门）。
+        let doorPalaceToName: [Int: String] = [1: "休门", 2: "死门", 3: "伤门", 4: "杜门", 9: "景门", 8: "生门", 7: "惊门", 6: "开门"]
+        let doorInfo: [String: (luck: String, ausp: Bool)] = Dictionary(
+            uniqueKeysWithValues: eightDoors.map { ($0.name, (luck: $0.luckType, ausp: $0.isAuspicious)) }
+        )
+
+        // 5. 值符（天盘九星）落宫 = 地盘时干宫；时干为甲则落旬首本宫。
+        let zhiFuStarStart: Int = (hourStemChar == "甲") ? zhiFuPalace : (stemToPalace[hourStemChar] ?? zhiFuPalace)
+        // 值使（天盘八门）落宫 = 旬首本宫起，按旬内时辰数顺/逆飞。
+        let stepsIntoXun = shichenGz % 10
+        let zhiShiStart = flySkip(start: zhiFuPalace, steps: stepsIntoXun, forward: forward)
+
+        // 6. 天盘九星 + 三奇六仪（含中宫）。
+        let starOrigin = flightFull(from: zhiFuPalace, forward: forward)
+        let starDest = flightFull(from: zhiFuStarStart, forward: forward)
+        var tianStar = [Int: String](), tianStem = [Int: String]()
+        for k in 0..<9 {
+            let dest = starDest[k], origin = starOrigin[k]
+            tianStar[dest] = nineStars[origin - 1]
+            tianStem[dest] = sixYiStems[origin - 1]
+        }
+
+        // 7. 天盘八门（不入中宫）。
+        let doorOrigin = flightSkip(from: zhiFuPalace, forward: forward)
+        let doorDest = flightSkip(from: zhiShiStart, forward: forward)
+        var tianDoor = [Int: String]()
+        for k in 0..<8 {
+            tianDoor[doorDest[k]] = doorPalaceToName[doorOrigin[k]]
+        }
+
+        // 8. 八神（不入中宫）。阳遁顺、阴遁逆（白虎/玄武换位）。
+        let godOrder = isYangDun
+            ? ["值符", "螣蛇", "太阴", "六合", "白虎", "玄武", "九地", "九天"]
+            : ["值符", "螣蛇", "太阴", "六合", "玄武", "白虎", "九地", "九天"]
+        let godDest = flightSkip(from: zhiFuStarStart, forward: forward)
+        var tianGod = [Int: String]()
+        for k in 0..<8 { tianGod[godDest[k]] = godOrder[k] }
+
+        // 9. 组装九宫数据。
+        let centerName: String
+        switch lang {
+        case .en: centerName = "Center"
+        case .zhHant, .ja: centerName = "中宮"
+        case .ko: centerName = "중궁"
+        case .vi: centerName = "Trung Cung"
+        case .th: centerName = "จุดศูนย์กลาง"
+        case .id: centerName = "Pusat"
+        case .auto, .zhHans: centerName = "中宫"
+        }
+        let centerGod: String
+        switch lang {
+        case .en: centerGod = "Center"
+        case .ko: centerGod = "원극"
+        case .vi: centerGod = "Nguyên Cực"
+        case .zhHant: centerGod = "太極"
+        case .ja: centerGod = "太極"
+        case .id: centerGod = "Titik Pusat"
+        case .auto, .zhHans: centerGod = "元极"
+        default: centerGod = "元极"
+        }
+        let centerStar: String
+        switch lang {
+        case .en: centerStar = "Tian Qin"
+        case .ko: centerStar = "천금성"
+        case .vi: centerStar = "Thiên Cầm"
+        case .zhHant: centerStar = "天禽星"
+        case .ja: centerStar = "天禽星"
+        case .id: centerStar = "Tian Qin"
+        case .auto, .zhHans: centerStar = "天禽星"
+        default: centerStar = "天禽星"
+        }
+
+        var byPalace = [Int: (door: String, luck: String, ausp: Bool, star: String, god: String, tian: String, di: String)]()
+        for p in 1...9 {
+            if p == 5 {
+                byPalace[5] = (door: centerName, luck: lang == .en ? "Fair" : "平", ausp: false,
+                               star: tianStar[5] ?? "天禽", god: tianGod[5] ?? centerGod,
+                               tian: tianStem[5] ?? "戊", di: diPanStem[5] ?? "壬")
+            } else {
+                let door = tianDoor[p] ?? "休门"
+                let info = doorInfo[door] ?? (luck: "平", ausp: false)
+                byPalace[p] = (door: door, luck: info.luck, ausp: info.ausp,
+                               star: tianStar[p] ?? nineStars[p - 1], god: tianGod[p] ?? centerGod,
+                               tian: tianStem[p] ?? "戊", di: diPanStem[p] ?? "戊")
             }
         }
 
-        // Add a turn instruction to the absolute best direction.
-        if let targetBearing = bestBearing,
-           heading.isFinite {
+        // 10. 出行吉方 / 避忌方。
+        let defById = Dictionary(uniqueKeysWithValues: displayPalaceDefs.map { ($0.id, $0) })
+        var bestScore = -1
+        var bestBearing: Double? = nil
+        var bestDirection: String
+        var bestReason: String
+        switch lang {
+        case .en:
+            bestDirection = "Northwest (Qian - Open Gate)"; bestReason = "Auspicious Open Gate with Chief Deity"
+        case .zhHant:
+            bestDirection = "西北方 (乾宮開門)"; bestReason = "開門乘吉神值符，天地德合"
+        case .ja:
+            bestDirection = "北西方 (乾宮 開門)"; bestReason = "開門に直符神が臨み、万事亨通"
+        case .ko:
+            bestDirection = "북서방 (건궁 개문)"; bestReason = "개문에 직부신이 임하여 천지덕합"
+        case .vi:
+            bestDirection = "Tây Bắc (Càn Cung Khai Môn)"; bestReason = "Khai Môn thừa cát thần Trực Phù, thiên địa đức hợp"
+        case .th:
+            bestDirection = "ทิศตะวันตกเฉียงเหนือ (เฉียน - ประตูเปิด)"; bestReason = "ประตูเปิดสถิตร่วมเทพจื่อฝู ราบรื่นมงคลยิ่ง"
+        case .id:
+            bestDirection = "Barat Laut (Qian - Gerbang Pembuka)"; bestReason = "Gerbang Pembuka dinaungi Panglima Agung"
+        case .auto, .zhHans:
+            bestDirection = "西北方 (乾宫开门)"; bestReason = "开门乘吉神值符，天地德合"
+        }
+        var tabooDirs: [String] = []
+        for p in 1...9 where p != 5 {
+            guard let data = byPalace[p], let def = defById[p] else { continue }
+            let door = QimenDoor(name: data.door, palace: p, isAuspicious: data.ausp, luckType: data.luck, lore: "")
+            let dName = door.localizedName
+            let sName = QimenPalaceCell(palaceId: p, palaceName: "\(def.name) \(def.trigram)", trigram: def.trigram,
+                                        doorName: data.door, doorLuck: data.luck, starName: data.star, godName: data.god,
+                                        tianStem: data.tian, diStem: data.di, isTaiJiCenter: false, isDoorAuspicious: data.ausp).localizedStarName
+            let gName = QimenPalaceCell(palaceId: p, palaceName: "\(def.name) \(def.trigram)", trigram: def.trigram,
+                                        doorName: data.door, doorLuck: data.luck, starName: data.star, godName: data.god,
+                                        tianStem: data.tian, diStem: data.di, isTaiJiCenter: false, isDoorAuspicious: data.ausp).localizedGodName
+            let lore = door.localizedLore
+            if data.door == "生门" || data.door == "开门" {
+                let candidateScore = data.door == "开门" ? 4 : 3
+                if candidateScore > bestScore {
+                    switch lang {
+                    case .en:
+                        bestDirection = "\(def.name) \(def.trigram) · \(dName)"
+                        bestReason = "Protected by \(sName) & \(gName), \(lore)"
+                    case .zhHant:
+                        bestDirection = "\(def.name)\(def.trigram) (\(dName))"
+                        bestReason = "臨\(sName)星與\(gName)神，\(lore)"
+                    case .ja:
+                        bestDirection = "\(def.name)\(def.trigram) (\(dName))"
+                        bestReason = "\(sName)星と\(gName)神が臨み、\(lore)"
+                    case .ko:
+                        bestDirection = "\(def.name) \(def.trigram) (\(dName))"
+                        bestReason = "\(sName)성과 \(gName)신이 임하여, \(lore)"
+                    case .vi:
+                        bestDirection = "\(def.name) \(def.trigram) (\(dName))"
+                        bestReason = "Lâm \(sName) tinh cùng \(gName) thần, \(lore)"
+                    case .th:
+                        bestDirection = "\(def.name) \(def.trigram) (\(dName))"
+                        bestReason = "สถิตดาว \(sName) และเทพ \(gName), \(lore)"
+                    case .id:
+                        bestDirection = "\(def.name) \(def.trigram) (\(dName))"
+                        bestReason = "Dinaungi bintang \(sName) & dewa \(gName), \(lore)"
+                    case .auto, .zhHans:
+                        bestDirection = "\(def.name)方 (\(def.trigram)宫\(data.door))"
+                        bestReason = "临\(data.star)星与\(data.god)神，\(lore)"
+                    }
+                    bestBearing = Self.bearing(for: def.name)
+                    bestScore = candidateScore
+                }
+            }
+            if data.door == "死门" || data.door == "惊门" {
+                switch lang {
+                case .en: tabooDirs.append("\(def.name) \(def.trigram) · \(dName)")
+                case .zhHant: tabooDirs.append("\(def.name)\(def.trigram)\(dName)")
+                case .ja: tabooDirs.append("\(def.name) \(def.trigram) \(dName)")
+                case .ko: tabooDirs.append("\(def.name) \(def.trigram) \(dName)")
+                case .vi: tabooDirs.append("\(def.name) \(def.trigram) (\(dName))")
+                case .th: tabooDirs.append("\(def.name) \(def.trigram) (\(dName))")
+                case .id: tabooDirs.append("\(def.name) \(def.trigram) (\(dName))")
+                case .auto, .zhHans: tabooDirs.append("\(def.name)\(data.door)")
+                }
+            }
+        }
+
+        // 11. 生成展示顺序的 cells。
+        var cells: [QimenPalaceCell] = []
+        for p in displayPalaceDefs {
+            guard let data = byPalace[p.id] else { continue }
+            cells.append(QimenPalaceCell(
+                palaceId: p.id,
+                palaceName: "\(p.name) \(p.trigram)",
+                trigram: p.trigram,
+                doorName: data.door,
+                doorLuck: data.luck,
+                starName: data.star,
+                godName: data.god,
+                tianStem: data.tian,
+                diStem: data.di,
+                isTaiJiCenter: p.id == 5,
+                isDoorAuspicious: data.ausp
+            ))
+        }
+
+        // 12. 在绝对最优方位后附加转向提示。
+        if let targetBearing = bestBearing, heading.isFinite {
             let turn = Self.shortestTurn(from: heading, to: targetBearing)
             if abs(turn) >= 1.0 {
                 let degrees = Int(round(abs(turn)))
                 switch lang {
-                case .en:
-                    bestDirection += turn > 0 ? " · turn right \(degrees)°" : " · turn left \(degrees)°"
-                case .zhHant:
-                    bestDirection += turn > 0 ? " · 右轉約\(degrees)°" : " · 左轉約\(degrees)°"
-                case .ja:
-                    bestDirection += turn > 0 ? " · 右へ約\(degrees)°" : " · 左へ約\(degrees)°"
-                case .ko:
-                    bestDirection += turn > 0 ? " · 오른쪽으로 약 \(degrees)°" : " · 왼쪽으로 약 \(degrees)°"
-                case .vi:
-                    bestDirection += turn > 0 ? " · rẽ phải khoảng \(degrees)°" : " · rẽ trái khoảng \(degrees)°"
-                case .th:
-                    bestDirection += turn > 0 ? " · เลี้ยวขวาประมาณ \(degrees)°" : " · เลี้ยวซ้ายประมาณ \(degrees)°"
-                case .id:
-                    bestDirection += turn > 0 ? " · belok kanan sekitar \(degrees)°" : " · belok kiri sekitar \(degrees)°"
-                case .auto, .zhHans:
-                    bestDirection += turn > 0 ? " · 右转约\(degrees)°" : " · 左转约\(degrees)°"
+                case .en: bestDirection += turn > 0 ? " · turn right \(degrees)°" : " · turn left \(degrees)°"
+                case .zhHant: bestDirection += turn > 0 ? " · 右轉約\(degrees)°" : " · 左轉約\(degrees)°"
+                case .ja: bestDirection += turn > 0 ? " · 右へ約\(degrees)°" : " · 左へ約\(degrees)°"
+                case .ko: bestDirection += turn > 0 ? " · 오른쪽으로 약 \(degrees)°" : " · 왼쪽으로 약 \(degrees)°"
+                case .vi: bestDirection += turn > 0 ? " · rẽ phải khoảng \(degrees)°" : " · rẽ trái khoảng \(degrees)°"
+                case .th: bestDirection += turn > 0 ? " · เลี้ยวขวาประมาณ \(degrees)°" : " · เลี้ยวซ้ายประมาณ \(degrees)°"
+                case .id: bestDirection += turn > 0 ? " · belok kanan sekitar \(degrees)°" : " · belok kiri sekitar \(degrees)°"
+                case .auto, .zhHans: bestDirection += turn > 0 ? " · 右转约\(degrees)°" : " · 左转约\(degrees)°"
                 }
             }
         }
-        
+
         return QimenChart(
             dunType: dunType,
             juNumber: juNumber,

@@ -16,35 +16,33 @@ public struct KongWangDetailSheet: View {
         let m = Mountain24Data.shared.mountain(for: currentHeading)
         let rawDelta = abs(currentHeading - m.centerAngle)
         let delta = min(rawDelta, 360.0 - rawDelta)
-        let isLargeKW = delta >= 6.8 && [1, 3, 5, 7].contains(m.subIndex)
-        let isSmallKW = delta >= 6.5 && !isLargeKW
-        let isJianXiang = delta >= 1.5 && delta < 6.5
-        let isZhengZhen = delta < 1.5
+        let kwLevel = motion.headingState.kongWangLevel
         let kwStatusText: String
         let kwGradeText: String
         let kwColor: Color
         let kwDesc: String
         let kwRemedyText: String
         
-        if isLargeKW {
+        switch kwLevel {
+        case .largeVoid:
             kwStatusText = lang.t("kw_large_title")
             kwGradeText = lang.t("kw_large_grade")
             kwColor = .red
             kwDesc = lang.t("kw_large_desc")
             kwRemedyText = lang.t("kw_large_remedy")
-        } else if isSmallKW {
+        case .smallVoid:
             kwStatusText = lang.t("kw_small_title")
             kwGradeText = lang.t("kw_small_grade")
             kwColor = .orange
             kwDesc = lang.t("kw_small_desc")
             kwRemedyText = lang.t("kw_small_remedy")
-        } else if isJianXiang {
+        case .jianXiang:
             kwStatusText = lang.t("kw_sub_title")
             kwGradeText = lang.t("kw_sub_grade")
             kwColor = .yellow
             kwDesc = lang.t("kw_sub_desc")
             kwRemedyText = lang.t("kw_sub_remedy")
-        } else {
+        case .pure:
             kwStatusText = lang.t("kw_pure_title")
             kwGradeText = lang.t("kw_pure_grade")
             kwColor = .green

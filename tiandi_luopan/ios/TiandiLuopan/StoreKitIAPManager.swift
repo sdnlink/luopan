@@ -605,6 +605,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     public func refreshEntitlements() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
+            self.reconcileEntitlementsWithReceipt(self.verifyReceipt())
             self.isVIPUser = self.isVIP()
             self.isLifetimeUser = self.isLifetime()
             self.floorplanCreditsCount = self.floorplanCredits()
@@ -1328,15 +1329,23 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         let defaults = UserDefaults.standard
         var didChange = false
         
-        if receipt.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue) {
+        // 1. 终身买断版对齐：收据存在有效终身商品且未退款则点亮；若收据可信但不含终身商品（已退款/未购），则立即收回
+        let hasLifetimeInReceipt = receipt.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue)
+        if hasLifetimeInReceipt {
             if !defaults.bool(forKey: kIsLifetime) || !defaults.bool(forKey: kIsVIP) {
                 defaults.set(true, forKey: kIsLifetime)
                 defaults.set(true, forKey: kIsVIP)
                 didChange = true
             }
+        } else if defaults.bool(forKey: kIsLifetime) {
+            // 收据经过密码学校验完全可信，但有效商品中不含终身版（说明被退款/撤销，或未购买）
+            defaults.set(false, forKey: kIsLifetime)
+            didChange = true
         }
         
-        if receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue) {
+        // 2. 年度订阅会员对齐：收据存在有效年度交易且未退款，比对并延展到期日；若已退款且无终身版，则立即收回 VIP
+        let hasYearlyInReceipt = receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
+        if hasYearlyInReceipt {
             let currentExpiry = defaults.double(forKey: kVIPExpireDate)
             if let receiptExpiry = receipt.latestExpirationDate?.timeIntervalSince1970, receiptExpiry > currentExpiry {
                 defaults.set(receiptExpiry, forKey: kVIPExpireDate)
@@ -1344,6 +1353,14 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
                 didChange = true
             } else if currentExpiry > Date().timeIntervalSince1970 && !defaults.bool(forKey: kIsVIP) {
                 defaults.set(true, forKey: kIsVIP)
+                didChange = true
+            }
+        } else if !hasLifetimeInReceipt {
+            // 收据中既无终身版，也无有效年度订阅（已被苹果退款/撤回）：立即收回 VIP
+            let currentExpiry = defaults.double(forKey: kVIPExpireDate)
+            if defaults.bool(forKey: kIsVIP) || currentExpiry > 0 {
+                defaults.set(false, forKey: kIsVIP)
+                defaults.set(0.0, forKey: kVIPExpireDate)
                 didChange = true
             }
         }
@@ -1464,10 +1481,24 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             return allowLifetime || allowYearly || !processedIDs.isEmpty
         } else if !processedIDs.isEmpty, receipt.isTrusted {
             // 兼容已有合法 StoreKit 交易 ID 记录的版本升级或签名格式演进：
-            // 必须同时满足本地收据通过 Apple 签名验证（isTrusted 含证书链+数字签名），
-            // 仅凭 UserDefaults 中的任意字符串数组不再能绕过防篡改校验。
+            // 必须同时满足本地收据通过 Apple 签名验证（isTrusted 含证书链+数字签名）。
+            // 若全部非消耗型/订阅商品均已被 Apple 退款撤回（purchasedProductIDs 为空），
+            // 则严禁保留终身版与 VIP 权益，必须清除已退款的伪造/陈旧 VIP 状态。
+            var didClear = false
+            if defaults.bool(forKey: kIsLifetime) {
+                defaults.set(false, forKey: kIsLifetime)
+                didClear = true
+            }
+            if defaults.bool(forKey: kIsVIP) {
+                defaults.set(false, forKey: kIsVIP)
+                defaults.set(0.0, forKey: kVIPExpireDate)
+                didClear = true
+            }
+            if didClear {
+                defaults.synchronize()
+            }
             updateEntitlementSealLocked()
-            return true
+            return !processedIDs.isEmpty
         }
         
         // 判定为无收据、无合法交易签名的 UserDefaults 本地篡改：立即清除伪造权益

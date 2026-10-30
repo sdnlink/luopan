@@ -11,8 +11,12 @@ public final class CameraPreviewController: ObservableObject {
     
     public init() {}
     
-    public func stopSession() {
-        activeView?.stopSession()
+    public func stopSession(completion: (() -> Void)? = nil) {
+        if let view = activeView {
+            view.stopSession(completion: completion)
+        } else {
+            completion?()
+        }
     }
     
     public func pauseSessionForBackground() {
@@ -85,13 +89,15 @@ public struct CameraPreviewView: UIViewRepresentable {
             // can leave its loading state instead of waiting forever.
             cancelPendingCapture()
             
-            if let session = captureSession {
-                sessionQueue.sync {
-                    if session.isRunning { session.stopRunning() }
-                }
+            if let sessionToStop = captureSession {
                 captureSession = nil
                 previewLayer?.removeFromSuperlayer()
                 previewLayer = nil
+                sessionQueue.async {
+                    if sessionToStop.isRunning { sessionToStop.stopRunning() }
+                    for input in sessionToStop.inputs { sessionToStop.removeInput(input) }
+                    for output in sessionToStop.outputs { sessionToStop.removeOutput(output) }
+                }
             }
             photoCaptureOutput = nil
             photoCompletion = nil
@@ -288,17 +294,20 @@ public struct CameraPreviewView: UIViewRepresentable {
             setupSession(position: position)
         }
         
-        public func stopSession() {
+        public func stopSession(completion: (() -> Void)? = nil) {
             wantsRunning = false
             cancelPendingCapture()
             sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
             sessionObservers.removeAll()
-            guard let sessionToStop = captureSession else { return }
+            guard let sessionToStop = captureSession else {
+                completion?()
+                return
+            }
             captureSession = nil
             previewLayer?.removeFromSuperlayer()
             previewLayer = nil
             photoCaptureOutput = nil
-            sessionQueue.sync {
+            sessionQueue.async {
                 if sessionToStop.isRunning {
                     sessionToStop.stopRunning()
                 }
@@ -307,6 +316,11 @@ public struct CameraPreviewView: UIViewRepresentable {
                 }
                 for output in sessionToStop.outputs {
                     sessionToStop.removeOutput(output)
+                }
+                if let completion = completion {
+                    DispatchQueue.main.async {
+                        completion()
+                    }
                 }
             }
         }
@@ -419,6 +433,7 @@ public struct ARVisionView: View {
     @State private var hasCameraPermission: Bool = false
     @State private var showSnapshotToast: Bool = false
     @State private var cameraPosition: AVCaptureDevice.Position = .back
+    @State private var isSwitchingCamera: Bool = false
     @State private var captureTrigger: Int = 0
     @State private var isAIScanning: Bool = false
     @State private var pendingCapturePurpose: CapturePurpose?
@@ -673,6 +688,7 @@ public struct ARVisionView: View {
             targetOffset = .zero
             manualTargetNormalizedOffset = 0.0
             targetDragStart = nil
+            isSwitchingCamera = false
         }
     }
 
@@ -941,17 +957,33 @@ public struct ARVisionView: View {
                 Spacer()
                 // 翻转镜头按钮
                 Button(action: {
+                    guard !isSwitchingCamera else { return }
                     let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
                     guard AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: nextPosition) != nil else {
                         aiError = lang.t("ar_ai_camera_required")
                         return
                     }
-                    if cameraPosition == .front {
-                        cameraModel.stopSession()
-                    } else {
+                    let isCurrentAR = (cameraPosition == .back && ARWorldTrackingConfiguration.isSupported)
+                    if isCurrentAR {
                         fusionModel.pause()
+                        cameraPosition = nextPosition
+                    } else {
+                        isSwitchingCamera = true
+                        var hasSwitched = false
+                        let performSwitch = {
+                            guard !hasSwitched else { return }
+                            hasSwitched = true
+                            cameraPosition = nextPosition
+                            isSwitchingCamera = false
+                        }
+                        // Safety timeout: Ensure UI never stays locked if camera hardware takes long
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            performSwitch()
+                        }
+                        cameraModel.stopSession {
+                            performSwitch()
+                        }
                     }
-                    cameraPosition = nextPosition
                 }) {
                     Image(systemName: "camera.rotate.fill")
                         .font(.system(size: 13))
@@ -960,7 +992,7 @@ public struct ARVisionView: View {
                         .foregroundColor(.white)
                         .clipShape(Circle())
                 }
-                .disabled(isAIScanning || pendingCapturePurpose != nil)
+                .disabled(isAIScanning || pendingCapturePurpose != nil || isSwitchingCamera)
             }
 
             // 第二行：功能按钮组（小屏横向滚动兜底，避免挤压标题换行竖排）

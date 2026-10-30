@@ -145,6 +145,11 @@ public class TianJiShuEngine {
             let mSitting = Mountain24Data.shared.mountain(for: sitAngle)
             let fenjin = Fenjin120Data.shared.resolveFenjin(for: heading)
             let hex = Hexagram64Data.shared.hexagram(for: heading)
+            // 与玄空盘页一致的兼向替卦判定：向首山偏差 > 3° 即按替卦排盘
+            // （Mountain24Data.resolveHeadingState 的 isJianXiang 同口径）。
+            let facingDelta = ((heading - mFacing.centerAngle).truncatingRemainder(dividingBy: 360.0) + 540.0)
+                .truncatingRemainder(dividingBy: 360.0) - 180.0
+            let useTiGua = abs(facingDelta) > 3.0
             
             let p1Text: String
             switch renderLanguage {
@@ -228,7 +233,7 @@ public class TianJiShuEngine {
             curY += 250
             
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
-            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, date: reportDate)
+            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, useTiGua: useTiGua, date: reportDate)
             let meta = xkChart.periodMeta
             
             let sec2Title = tr8(
@@ -325,7 +330,7 @@ public class TianJiShuEngine {
             
             let hq = SanHeWaterEngine.shared.resolveHuangQuanWater(facing: mFacing)
             let basha = SanHeWaterEngine.shared.resolveBaSha(sitting: mSitting)
-            let sanHeItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: mSitting)
+            let sanHeItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: mSitting, facing: mFacing)
             let lang = LocalizationManager.shared
             let hqLabel = tr8("向首八路黄泉判据", "向首八路黃泉判據", "Eight-Road Huangquan test", "向首八路黄泉判定", "향수 팔로황천 판별", "Phán định Bát Lộ Hoàng Tuyền", "เกณฑ์น้ำฮวงเฉวียนแปดทิศ", "Uji Huangquan Delapan Arah")
             let bashaLabel = tr8("坐山八煞曜位辨识", "坐山八煞曜位辨識", "Sitting-mountain Sha position", "坐山八煞曜位識別", "좌산 팔살요위 식별", "Nhận định Bát Sát Diệu vị", "ตำแหน่งดาวพิฆาตแปดทิศ", "Posisi Sha Delapan Arah")

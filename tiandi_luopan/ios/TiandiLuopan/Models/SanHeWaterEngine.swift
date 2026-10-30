@@ -735,7 +735,10 @@ public final class SanHeWaterEngine {
     }
     
     // 3. 四大局长生对照与十二长生水法
-    public func resolveWaterMethod(sitting: Mountain24Item) -> [SanHeWaterItem] {
+    //    十二长生局以坐山定（坐山起长生，体系自洽）；其中黄泉煞标记统一为
+    //    八路黄泉口诀的向首口径（与 resolveHuangQuanWater(facing:) 一致），
+    //    避免同屏出现"坐庚向甲"等盘两套黄泉结论。
+    public func resolveWaterMethod(sitting: Mountain24Item, facing: Mountain24Item) -> [SanHeWaterItem] {
         let phases = ChangShengPhase.allCases
         var list: [SanHeWaterItem] = []
 
@@ -780,10 +783,10 @@ public final class SanHeWaterEngine {
             let targetBranch = branchIndexForMountain(m)
             let phaseOffset = (targetBranch - bureauStart + 12) % 12
             let p = phases[phaseOffset]
-            let isHQ = (sitting.name == "庚" && m.name == "坤") || (sitting.name == "丁" && m.name == "坤") ||
-                       (sitting.name == "乙" && m.name == "巽") || (sitting.name == "丙" && m.name == "巽") ||
-                       (sitting.name == "甲" && m.name == "艮") || (sitting.name == "癸" && m.name == "艮") ||
-                       (sitting.name == "辛" && m.name == "乾") || (sitting.name == "壬" && m.name == "乾")
+            let isHQ = (facing.name == "庚" && m.name == "坤") || (facing.name == "丁" && m.name == "坤") ||
+                       (facing.name == "乙" && m.name == "巽") || (facing.name == "丙" && m.name == "巽") ||
+                       (facing.name == "甲" && m.name == "艮") || (facing.name == "癸" && m.name == "艮") ||
+                       (facing.name == "辛" && m.name == "乾") || (facing.name == "壬" && m.name == "乾")
             list.append(SanHeWaterItem(id: idx, mountainName: m.name, phase: p, isHuangQuanSha: isHQ))
         }
         return list

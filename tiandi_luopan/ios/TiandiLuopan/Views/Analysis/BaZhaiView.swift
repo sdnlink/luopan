@@ -75,7 +75,7 @@ public struct BaZhaiView: View {
             sittingPalace: state.sittingMountain.palace,
             facingPalace: state.facingMountain.palace
         )
-        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain, facing: state.facingMountain)
         let zeri = cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
 
         let content = VStack(spacing: 16) {
@@ -110,7 +110,7 @@ public struct BaZhaiView: View {
             sittingPalace: state.sittingMountain.palace,
             facingPalace: state.facingMountain.palace
         )
-        cachedWaterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain)
+        cachedWaterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain, facing: state.facingMountain)
         cachedZeRi = ZeRiEngine.shared.analyze(sitting: state.sittingMountain)
     }
     

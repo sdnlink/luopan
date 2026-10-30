@@ -206,6 +206,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var distanceSamples: [Float] = []
     private var rendersSpatialMesh = true
     private var lastCapturedTimestamp: TimeInterval = 0
+    private var retryCount: Int = 0
     private var lubanNodeA: SCNNode?
     private var lubanNodeB: SCNNode?
     private var lubanLineNode: SCNNode?
@@ -314,6 +315,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         savedAnchorCount = 0
         clearLubanPoints()
         clearGroundBaguaOverlay()
+        sceneView.session.pause()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
         refreshSavedWorldMapState()
@@ -1142,6 +1144,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             guard let self = self,
                   let sceneView = currentSceneView,
                   self.sceneView === sceneView else { return }
+            self.retryCount = 0
             self.trackingState = state
             self.updateMeasurements(frame: frame, sceneView: sceneView)
         }
@@ -1170,21 +1173,27 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     public func session(_ session: ARSession, didFailWithError error: Error) {
         DispatchQueue.main.async { [weak self] in
             self?.trackingState = .unavailable
-            self?.retryStartOnce(failedSession: session)
+            self?.retryStart(failedSession: session)
         }
     }
 
-    /// Recovers the AR session once after a start failure (e.g. the camera was
+    /// Recovers the AR session after a start failure (e.g. the camera was
     /// briefly held by the plain camera session during a fast lens flip), so
-    /// the live preview does not stay black forever.  A second failure is left
-    /// for the user's next action to rebuild the session.
-    private func retryStartOnce(failedSession: ARSession) {
+    /// the live preview does not stay black forever.
+    private func retryStart(failedSession: ARSession) {
         guard let sceneView = sceneView, sceneView.session === failedSession,
               let configuration = activeConfiguration else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+        guard retryCount < 3 else {
+            retryCount = 0
+            return
+        }
+        retryCount += 1
+        let delay = Double(retryCount) * 0.4
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self, let current = self.sceneView,
                   current.session === failedSession else { return }
             self.trackingState = .initializing
+            current.session.pause()
             current.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         }
     }

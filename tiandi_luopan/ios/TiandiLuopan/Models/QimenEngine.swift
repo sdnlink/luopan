@@ -110,7 +110,12 @@ public struct QimenDoor {
                 "惊门": "Waspadai perselisihan; cocok untuk menangkap pencuri", "开门": "Sangat baik untuk pembukaan bisnis, relokasi & sukses lancar"
             ][name] ?? lore
         case .auto, .zhHans:
-            return lore
+            return [
+                "休门": "求名休闲大吉，水清木秀", "生门": "求财置业大吉，土旺金生",
+                "伤门": "讨债索敌宜，出行防伤灾", "杜门": "潜伏隐匿避灾，闭藏门户",
+                "景门": "文书考试宴请吉，火炎防急", "死门": "吊丧刑戮宜，出行造葬大凶",
+                "惊门": "官非惊恐口舌，捕盗宜", "开门": "经商开业动身，百事通亨"
+            ][name] ?? lore
         }
     }
 }
@@ -409,9 +414,15 @@ public class QimenEngine {
         let shichenGz = ((effDayGz * 12 + hourBranch) % 60 + 60) % 60
         let xun = shichenGz / 10
 
-        // 4. 地盘（固定）：坎戊、坤己、震庚、巽辛、中壬(天禽寄)、乾癸、兑丁、艮丙、离乙。
-        let diPanStem: [Int: String] = [1: "戊", 2: "己", 3: "庚", 4: "辛", 5: "壬", 6: "癸", 7: "丁", 8: "丙", 9: "乙"]
-        let stemToPalace: [String: Int] = ["戊": 1, "己": 2, "庚": 3, "辛": 4, "壬": 5, "癸": 6, "丁": 7, "丙": 8, "乙": 9]
+        // 4. 地盘（动态）：按局数起戊，阳遁顺飞/阴遁逆飞洛书九宫布三奇六仪。
+        //    布干序固定为 戊己庚辛壬癸丁丙乙；阳遁一局即 戊坎、己坤、庚震、辛巽、
+        //    壬中(天禽寄)、癸乾、丁兑、丙艮、离乙，其余局数平移起点并翻转飞向。
+        var diPanStem: [Int: String] = [:]
+        let diPlacement = flightFull(from: juNumber, forward: forward)
+        for (i, palace) in diPlacement.enumerated() {
+            diPanStem[palace] = sixYiStems[i]
+        }
+        let stemToPalace = Dictionary(uniqueKeysWithValues: diPanStem.map { ($1, $0) })
         let xunToSixYi = ["戊", "己", "庚", "辛", "壬", "癸"]
         let xunHeadSixYi = xunToSixYi[xun]
         let zhiFuPalace = stemToPalace[xunHeadSixYi]! // 值符/值使本宫（旬首六仪所在）
@@ -434,7 +445,7 @@ public class QimenEngine {
         for k in 0..<9 {
             let dest = starDest[k], origin = starOrigin[k]
             tianStar[dest] = nineStars[origin - 1]
-            tianStem[dest] = sixYiStems[origin - 1]
+            tianStem[dest] = diPanStem[origin] ?? "戊"
         }
 
         // 7. 天盘八门（不入中宫）。

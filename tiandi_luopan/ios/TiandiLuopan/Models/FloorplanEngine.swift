@@ -336,7 +336,8 @@ public class FloorplanEngine {
             FloorplanRoom(
                 name: balconyName,
                 type: .balcony,
-                rect: CGRect(x: 0.32, y: 0.88, width: 0.38, height: 0.10)
+                // 右下角阳台：与左下大门 (0.40-0.60)×(0.82-0.94) 保持 x 向不重叠
+                rect: CGRect(x: 0.62, y: 0.88, width: 0.30, height: 0.10)
             )
         ]
     }

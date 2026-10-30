@@ -681,14 +681,16 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     /// a one-shot request fails and the delegate cannot receive the error.
     public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         let clError = error as? CLError
-        // kCLErrorLocationUnknown is transient; Core Location keeps trying.
-        if clError?.code == .locationUnknown { return }
+        // kCLErrorLocationUnknown 是瞬态错误（Core Location 会继续尝试），
+        // kCLErrorHeadingFailure 是罗盘/航向问题而非 GPS 定位失败——两者都
+        // 保留当前坐标，避免把正常的定位状态误标为失效。
+        if clError?.code == .locationUnknown || clError?.code == .headingFailure { return }
         DispatchQueue.main.async {
             let status = manager.authorizationStatus
             self.locationAuthorizationStatus = status
-            if status == .denied || status == .restricted {
-                self.hasLocationFix = false
-            }
+            // 拒绝/受限/定位服务不可用/网络等任何非瞬态失败都视为失去定位，
+            // 避免陈旧经纬度、磁偏角与太阳时继续参与术数计算。
+            self.hasLocationFix = false
         }
     }
 

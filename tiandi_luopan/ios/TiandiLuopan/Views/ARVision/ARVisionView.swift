@@ -452,7 +452,7 @@ public struct ARVisionView: View {
     private var targetSanHeWater: SanHeWaterItem? {
         let sitting = motion.headingState.sittingMountain
         let mTarget = targetMountain
-        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting)
+        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting, facing: mTarget)
         return waterItems.first(where: { $0.mountainName == mTarget.name })
     }
 
@@ -1041,7 +1041,7 @@ public struct ARVisionView: View {
     private func horizonCompassRibbon() -> some View {
         let baseHeading = motion.headingState.facingAngle
         let sitting = motion.headingState.sittingMountain
-        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting)
+        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting, facing: motion.headingState.facingMountain)
         let baShaZhi = SanHeWaterEngine.shared.resolveBaSha(sitting: sitting).shaZhi
         let offsets: [Double] = [-30.0, -15.0, 0.0, 15.0, 30.0]
 

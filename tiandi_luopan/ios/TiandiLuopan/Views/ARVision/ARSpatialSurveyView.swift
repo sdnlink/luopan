@@ -319,6 +319,20 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         refreshSavedWorldMapState()
     }
 
+    /// Delayed AR start on a specific view.  The camera hardware is exclusive:
+    /// when the user flips back from the plain camera (AVCaptureSession) to AR,
+    /// the old session's stop is asynchronous, and running the AR session
+    /// immediately would fail with a busy camera and leave a black frame.
+    /// Deferring the start gives the previous session time to release the
+    /// camera; if the view was already replaced (another flip) meanwhile, the
+    /// deferred start is abandoned.
+    public func startOn(_ view: ARSCNView, afterDelay delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak view] in
+            guard let self = self, let view = view, self.sceneView === view else { return }
+            self.start()
+        }
+    }
+
     public func clearGroundBaguaOverlay() {
         groundBaguaProjected = false
         currentStandingPalace = nil
@@ -1156,6 +1170,22 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     public func session(_ session: ARSession, didFailWithError error: Error) {
         DispatchQueue.main.async { [weak self] in
             self?.trackingState = .unavailable
+            self?.retryStartOnce(failedSession: session)
+        }
+    }
+
+    /// Recovers the AR session once after a start failure (e.g. the camera was
+    /// briefly held by the plain camera session during a fast lens flip), so
+    /// the live preview does not stay black forever.  A second failure is left
+    /// for the user's next action to rebuild the session.
+    private func retryStartOnce(failedSession: ARSession) {
+        guard let sceneView = sceneView, sceneView.session === failedSession,
+              let configuration = activeConfiguration else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self = self, let current = self.sceneView,
+                  current.session === failedSession else { return }
+            self.trackingState = .initializing
+            current.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         }
     }
 
@@ -1654,7 +1684,12 @@ public struct ARFusionCaptureView: UIViewRepresentable {
         // drawing the full classified mesh here; the dedicated spatial survey
         // screen remains responsible for that heavier visualization.
         model.attach(to: view, renderMesh: false)
-        if isActive { model.start() }
+        if isActive {
+            // Camera hardware is exclusive: the plain camera session released
+            // on a lens flip stops asynchronously, so starting AR immediately
+            // would fail and leave a black frame. Defer to let it release.
+            model.startOn(view, afterDelay: 0.25)
+        }
         return view
     }
 

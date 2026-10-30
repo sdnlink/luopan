@@ -139,6 +139,10 @@ public struct FloorplanView: View {
             .padding(.top, 8)
         }
         }
+        // The page re-renders at sensor rate. System alerts attached to inner
+        // controls were repeatedly torn down (buttons unresponsive), so the
+        // confirmations are rendered as a stable root-level overlay instead.
+        .overlay(floorplanConfirmationOverlay)
         .sheet(item: $selectedRoom) { room in
             RoomAuditDetailSheet(
                 room: room,
@@ -519,16 +523,6 @@ public struct FloorplanView: View {
                     .foregroundColor(.white)
                     .cornerRadius(6)
             }
-            .alert(isPresented: $showResetConfirmation) {
-                Alert(
-                    title: Text(lang.t("reset_sample")),
-                    message: Text(lang.t("floorplan_reset_confirm")),
-                    primaryButton: .destructive(Text(lang.t("reset_sample"))) {
-                        resetToSampleLayout()
-                    },
-                    secondaryButton: .cancel()
-                )
-            }
             
             // 罗盘联动 / 手动微调
             Button(action: {
@@ -715,16 +709,6 @@ public struct FloorplanView: View {
         .background(Color.black.opacity(0.35))
         .cornerRadius(8)
         .padding(.horizontal, 16)
-        .alert(isPresented: $showEditingRoomDeleteConfirmation) {
-            Alert(
-                title: Text(lang.t("floorplan_delete_room")),
-                message: Text(lang.t("floorplan_delete_confirm")),
-                primaryButton: .destructive(Text(lang.t("floorplan_delete_room"))) {
-                    deleteSelectedEditingRoom()
-                },
-                secondaryButton: .cancel()
-            )
-        }
     }
 
     private func resizeButton(symbol: String, label: String, action: @escaping () -> Void) -> some View {
@@ -782,6 +766,35 @@ public struct FloorplanView: View {
         }
         persistLayout()
         refreshAudit(force: true)
+    }
+
+    @ViewBuilder
+    private var floorplanConfirmationOverlay: some View {
+        if showResetConfirmation {
+            FloorplanConfirmDialog(
+                title: lang.t("reset_sample"),
+                message: lang.t("floorplan_reset_confirm"),
+                confirmTitle: lang.t("reset_sample"),
+                cancelTitle: lang.t("cancel"),
+                onConfirm: {
+                    showResetConfirmation = false
+                    resetToSampleLayout()
+                },
+                onCancel: { showResetConfirmation = false }
+            )
+        } else if showEditingRoomDeleteConfirmation {
+            FloorplanConfirmDialog(
+                title: lang.t("floorplan_delete_room"),
+                message: lang.t("floorplan_delete_confirm"),
+                confirmTitle: lang.t("floorplan_delete_room"),
+                cancelTitle: lang.t("cancel"),
+                onConfirm: {
+                    showEditingRoomDeleteConfirmation = false
+                    deleteSelectedEditingRoom()
+                },
+                onCancel: { showEditingRoomDeleteConfirmation = false }
+            )
+        }
     }
 
     private func deleteSelectedEditingRoom() {
@@ -1769,23 +1782,88 @@ private struct FloorplanRoomTypeEditor: View {
                                 .foregroundColor(.red)
                         }
                     }
-                    .alert(isPresented: $showDeleteConfirmation) {
-                        Alert(
-                            title: Text(LocalizationManager.shared.t("floorplan_delete_room")),
-                            message: Text(LocalizationManager.shared.t("floorplan_delete_confirm")),
-                            primaryButton: .destructive(Text(LocalizationManager.shared.t("floorplan_delete_room"))) {
-                                onDelete()
-                                presentationMode.wrappedValue.dismiss()
-                            },
-                            secondaryButton: .cancel()
-                        )
-                    }
                 }
             }
             .navigationBarTitle(LocalizationManager.shared.t(titleKey), displayMode: .inline)
             .navigationBarItems(trailing: Button(LocalizationManager.shared.t("done")) {
                 presentationMode.wrappedValue.dismiss()
             })
+        }
+        .overlay(
+            Group {
+                if showDeleteConfirmation, let onDelete = onDelete {
+                    FloorplanConfirmDialog(
+                        title: LocalizationManager.shared.t("floorplan_delete_room"),
+                        message: LocalizationManager.shared.t("floorplan_delete_confirm"),
+                        confirmTitle: LocalizationManager.shared.t("floorplan_delete_room"),
+                        cancelTitle: LocalizationManager.shared.t("cancel"),
+                        onConfirm: {
+                            showDeleteConfirmation = false
+                            onDelete()
+                            presentationMode.wrappedValue.dismiss()
+                        },
+                        onCancel: { showDeleteConfirmation = false }
+                    )
+                }
+            }
+        )
+    }
+}
+
+/// Self-contained confirmation dialog. It does not depend on UIKit alert
+/// presentation, so it keeps working while the host view is re-rendered by
+/// high-frequency sensor updates.
+private struct FloorplanConfirmDialog: View {
+    let title: String
+    let message: String
+    let confirmTitle: String
+    let cancelTitle: String
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.55)
+                .ignoresSafeArea()
+                .onTapGesture { onCancel() }
+            VStack(spacing: 14) {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                Text(message)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 10) {
+                    Button(action: onCancel) {
+                        Text(cancelTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.12))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    Button(action: onConfirm) {
+                        Text(confirmTitle)
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.red.opacity(0.85))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(18)
+            .frame(maxWidth: 300)
+            .background(Color(red: 0.14, green: 0.14, blue: 0.18))
+            .cornerRadius(14)
         }
     }
 }
@@ -1877,17 +1955,6 @@ public struct RoomAuditDetailSheet: View {
                             .padding(12)
                             .background(Color.red.opacity(0.10))
                             .cornerRadius(10)
-                            .alert(isPresented: $showDeleteConfirmation) {
-                                Alert(
-                                    title: Text(lang.t("floorplan_delete_room")),
-                                    message: Text(lang.t("floorplan_delete_confirm")),
-                                    primaryButton: .destructive(Text(lang.t("floorplan_delete_room"))) {
-                                        onDelete()
-                                        presentationMode.wrappedValue.dismiss()
-                                    },
-                                    secondaryButton: .cancel()
-                                )
-                            }
                         }
                         
                         // 2. 气场格局诊断
@@ -1964,6 +2031,24 @@ public struct RoomAuditDetailSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .overlay(
+            Group {
+                if showDeleteConfirmation, let onDelete = onDelete {
+                    FloorplanConfirmDialog(
+                        title: lang.t("floorplan_delete_room"),
+                        message: lang.t("floorplan_delete_confirm"),
+                        confirmTitle: lang.t("floorplan_delete_room"),
+                        cancelTitle: lang.t("cancel"),
+                        onConfirm: {
+                            showDeleteConfirmation = false
+                            onDelete()
+                            presentationMode.wrappedValue.dismiss()
+                        },
+                        onCancel: { showDeleteConfirmation = false }
+                    )
+                }
+            }
+        )
     }
     
     private var badgeColor: Color {

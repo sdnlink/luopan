@@ -379,14 +379,30 @@ public enum KongWangLevel {
 
 public extension CompassHeadingState {
     /// 空亡等级。判级口径与 KongWangDetailSheet 保持一致：
-    /// 大空亡 = 偏差 ≥ 6.8° 且落在子午卯酉两宫交界缝 (subIndex 1/3/5/7)；
-    /// 小空亡 = 偏差 ≥ 6.5°；兼向 = 1.5°~6.5°；其余为正向纯清。
+    /// 大空亡(出卦) = 落在八卦交界缝（每卦 45° 扇区边界，即 22.5° + 45°·k），
+    ///              且距该缝 ≤ 0.7°（≈ 距最近山中心 ≥ 6.8°）；
+    /// 小空亡(差错) = 距任一山边界 ≤ 1.0°（距最近山中心 ≥ 6.5°）；
+    /// 兼向 = 距山中心 1.5°~6.5°；其余为正向纯清。
     public var kongWangLevel: KongWangLevel {
-        let rawDelta = abs(facingAngle - facingMountain.centerAngle)
-        let delta = min(rawDelta, 360.0 - rawDelta)
-        if delta >= 6.8 && [1, 3, 5, 7].contains(facingMountain.subIndex) {
-            return .largeVoid
-        } else if delta >= 6.5 {
+        let a = (facingAngle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        let center = (facingMountain.centerAngle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        var rawDelta = abs(a - center)
+        if rawDelta > 180 { rawDelta = 360 - rawDelta }
+        let delta = rawDelta // 距最近山中心的角度 (0 ~ 7.5)
+
+        if delta >= 6.5 {
+            // 已贴近某山边界（山边界位于 center ± 7.5°）。
+            // 进一步判断是否落在八卦交界（出卦）线上：共 8 条，位于 22.5° + 45°·k。
+            var minGapToChuGua = 180.0
+            for k in 0..<8 {
+                let line = 22.5 + 45.0 * Double(k)
+                var d = abs(a - line)
+                if d > 180 { d = 360 - d }
+                minGapToChuGua = min(minGapToChuGua, d)
+            }
+            if minGapToChuGua <= 0.7 {
+                return .largeVoid
+            }
             return .smallVoid
         } else if delta >= 1.5 {
             return .jianXiang

@@ -94,11 +94,17 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     @Published public private(set) var lastCompletedProductID: String?
     
     public var hasUnlockedVIP: Bool {
-        // Read the persisted expiry on every entitlement check. The app can
-        // remain in the foreground past an annual expiry, so relying only on
-        // the last published Boolean would keep premium screens unlocked
-        // until the next scene activation.
-        return isLifetimeUser || isVIP()
+        // 轻量校验：仅读取本地持久化权益并比对到期时间，避免 SwiftUI 每次重绘
+        // 都重新解析+验签 App Store 收据（主线程重活，会造成明显卡顿）。
+        // 针对篡改/到期的完整校验（本地收据签名 + 防篡改 HMAC 封印）在
+        // init、购买完成、恢复购买、回到前台(refreshEntitlements) 时执行，
+        // 这些路径会调用 isVIP()/isLifetime()，进而触发真正的收据验证。
+        if UserDefaults.standard.bool(forKey: kIsLifetime) { return true }
+        if UserDefaults.standard.bool(forKey: kIsVIP) {
+            let expire = UserDefaults.standard.double(forKey: kVIPExpireDate)
+            if expire == 0 || Date().timeIntervalSince1970 < expire { return true }
+        }
+        return false
     }
     
     public var canUseFloorplan: Bool {
@@ -139,6 +145,10 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     private let kTianjiCredits = "yx_iap_tianji_credits"
     private var receiptRefreshRequest: SKReceiptRefreshRequest?
     private var receiptRefreshCompletion: ((Bool) -> Void)?
+    // 收据校验结果缓存：以收据文件修改时间为 key，文件不变则直接复用，
+    // 避免 isVIP()/floorplanCredits() 等查询在每次调用时重复解析 ASN.1 + 验签（主线程重活）。
+    private var cachedReceiptResult: ReceiptValidationResult?
+    private var cachedReceiptModDate: Date?
     private let kProcessedTransactionIDs = "yx_iap_processed_transaction_ids"
     private let kEntitlementSeal = "yx_iap_entitlement_hmac_seal"
     private let kKeychainSealAccount = "com.yanxiang.compass.iap.seal.key"
@@ -266,6 +276,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         }
         if let activeRefresh = receiptRefreshRequest, request === activeRefresh {
             receiptRefreshRequest = nil
+            invalidateReceiptCache() // 刷新后收据已更新，强制重读
             let result = verifyReceipt()
             reconcileEntitlementsWithReceipt(result)
             let completion = receiptRefreshCompletion
@@ -326,6 +337,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
         lastStatusMessage = nil
         guard !isProcessingPurchase else { return }
         isProcessingPurchase = true
+        invalidateReceiptCache()
         let localReceipt = verifyReceipt()
         if localReceipt.isTrusted {
             reconcileEntitlementsWithReceipt(localReceipt)
@@ -382,6 +394,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     }
     
     private func handlePurchased(_ transaction: SKPaymentTransaction) {
+        invalidateReceiptCache() // 交易完成后本地收据可能更新，下次校验强制重读
         let pid = transaction.payment.productIdentifier
         let txId = transaction.transactionIdentifier ?? "\(pid)-\(transaction.transactionDate?.timeIntervalSince1970 ?? 0)"
         if !claimTransaction(txId) {
@@ -401,6 +414,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     }
     
     private func handleRestored(_ transaction: SKPaymentTransaction) {
+        invalidateReceiptCache() // 恢复购买后本地收据可能更新，下次校验强制重读
         let pid = transaction.payment.productIdentifier
         let txId = transaction.transactionIdentifier ?? "\(pid)-restored"
         // A restore callback replays an existing transaction. Non-consumable
@@ -724,7 +738,39 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
     // MARK: - 本地收据校验 (appStoreReceiptURL / ASN.1 PKCS#7) 与 Keychain HMAC 防篡改保护
     
     /// 读取并校验 Bundle.main.appStoreReceiptURL 本地收据容器、BundleID 与内购商品载荷（基于 ASN.1 DER TLV 结构化解析）
+    /// 该入口带缓存：收据文件未变化时直接返回上次结果，避免每次权益查询都重新解析 ASN.1 + CMS 验签（主线程重活）。
     public func verifyReceipt() -> ReceiptValidationResult {
+        if let url = Bundle.main.appStoreReceiptURL, FileManager.default.fileExists(atPath: url.path) {
+            let mod = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+            if let cached = cachedReceiptResult, let cachedMod = cachedReceiptModDate, cachedMod == mod {
+                return cached
+            }
+            let result = computeReceiptValidation()
+            cachedReceiptResult = result
+            cachedReceiptModDate = mod
+            return result
+        }
+        cachedReceiptResult = nil
+        cachedReceiptModDate = nil
+        return ReceiptValidationResult(
+            isValidContainer: false,
+            bundleIDMatched: false,
+            purchasedProductIDs: [],
+            latestExpirationDate: nil,
+            receiptSHA256: "",
+            certificateChainValid: false,
+            signatureValid: false
+        )
+    }
+
+    /// 使收据校验缓存失效（购买/恢复/刷新收据后调用，确保下次读取最新收据）。
+    private func invalidateReceiptCache() {
+        cachedReceiptResult = nil
+        cachedReceiptModDate = nil
+    }
+
+    /// 真正执行 App Store 本地收据的 ASN.1 解析与密码学验签。
+    private func computeReceiptValidation() -> ReceiptValidationResult {
         guard let receiptURL = Bundle.main.appStoreReceiptURL,
               FileManager.default.fileExists(atPath: receiptURL.path),
               let receiptData = try? Data(contentsOf: receiptURL),

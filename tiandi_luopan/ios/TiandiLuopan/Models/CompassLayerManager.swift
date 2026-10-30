@@ -53,15 +53,8 @@ public class CompassLayerManager: ObservableObject {
     @Published public var showLevelBubble: Bool = CompassLayerManager.storedBool("compass_layer_level_bubble", default: true) {
         didSet { Self.defaults.set(showLevelBubble, forKey: "compass_layer_level_bubble") }
     }
-    @Published public var currentPreset: CompassPreset = {
-        guard let raw = CompassLayerManager.defaults.string(forKey: "compass_layer_preset"),
-              let preset = CompassPreset(rawValue: raw) else { return .comprehensive }
-        return preset
-    }()
-
-    /// Manual switches can make the saved preset name stale. Resolve the
-    /// visible selection from the actual flags so the sheet never claims a
-    /// preset is active after the user customized one or more layers.
+    /// 当前实际生效的预设：依据各图层开关实时推导（手动切换单层后也能正确反映），
+    /// 而非持久化一个易过时的“上次应用预设”。视图层统一使用此计算属性。
     public var activePreset: CompassPreset? {
         CompassPreset.allCases.first { preset in
             switch preset {
@@ -80,7 +73,6 @@ public class CompassLayerManager: ObservableObject {
     private init() {}
     
     public func applyPreset(_ preset: CompassPreset) {
-        currentPreset = preset
         Self.defaults.set(preset.rawValue, forKey: "compass_layer_preset")
         switch preset {
         case .comprehensive:

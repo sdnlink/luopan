@@ -164,7 +164,10 @@ public final class OnDeviceShaAnalyzer {
         request.maximumObservations = 24
         request.minimumConfidence = minimumConfidence
         request.minimumAspectRatio = 0.04
-        request.maximumAspectRatio = 1.0
+        // 放宽宽高比上限：原 1.0 仅允许竖/正方形，会把道路/走廊等横向（宽>高）
+        // 的包围盒整体排除，导致路冲、穿心煞的矩形判定几乎无法触发。放宽到 4.0
+        // 后，横向道路特征也能被检出，具体的“高瘦/横向”形状判定仍由 classify 完成。
+        request.maximumAspectRatio = 4.0
         request.quadratureTolerance = quadratureTolerance
         let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
         try handler.perform([request])

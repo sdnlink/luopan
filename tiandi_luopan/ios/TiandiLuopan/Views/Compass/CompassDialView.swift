@@ -326,7 +326,7 @@ public struct CompassDialView: View {
         .frame(width: radius * 2, height: radius * 2)
     }
     
-    // MARK: - 先天八卦环
+    // MARK: - 后天八卦环 (坎北/离南/震东/兑西，洛书后天方位)
     private struct GuaItem: Identifiable {
         let id: String
         let key: String

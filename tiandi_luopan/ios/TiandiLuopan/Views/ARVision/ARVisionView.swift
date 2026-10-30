@@ -966,7 +966,15 @@ public struct ARVisionView: View {
                     let isCurrentAR = (cameraPosition == .back && ARWorldTrackingConfiguration.isSupported)
                     if isCurrentAR {
                         fusionModel.pause()
-                        cameraPosition = nextPosition
+                        // ARSession 释放相机是异步的：立即切到普通相机时，前置
+                        // startRunning 会撞上相机独占而启动失败（黑屏）。与反向
+                        // 路径（stopSession 完成后才切换）对称，延迟让 AR 让出
+                        // 相机后再切换，期间按钮防抖禁用。
+                        isSwitchingCamera = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [nextPosition] in
+                            cameraPosition = nextPosition
+                            isSwitchingCamera = false
+                        }
                     } else {
                         isSwitchingCamera = true
                         var hasSwitched = false

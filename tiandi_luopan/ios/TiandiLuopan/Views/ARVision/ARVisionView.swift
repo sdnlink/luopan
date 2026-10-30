@@ -965,11 +965,11 @@ public struct ARVisionView: View {
                     }
                     let isCurrentAR = (cameraPosition == .back && ARWorldTrackingConfiguration.isSupported)
                     if isCurrentAR {
-                        fusionModel.pause()
-                        // ARSession 释放相机是异步的：立即切到普通相机时，前置
-                        // startRunning 会撞上相机独占而启动失败（黑屏）。与反向
-                        // 路径（stopSession 完成后才切换）对称，延迟让 AR 让出
-                        // 相机后再切换，期间按钮防抖禁用。
+                        // 完全释放 AR 会话（pause 只挂起，ARSession/ARSCNView 在
+                        // 视图移除时仍可能同步等待底层会话，主线程被卡死）。
+                        // stop() 摘除 delegate、清空 sceneView 与配置，视图移除
+                        // 时无活跃 AR 资源，再延迟切换让相机硬件完全释放。
+                        fusionModel.stop()
                         isSwitchingCamera = true
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [nextPosition] in
                             cameraPosition = nextPosition

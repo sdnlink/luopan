@@ -23,6 +23,10 @@ public struct QimenDunjiaView: View {
         on: .main,
         in: .common
     ).autoconnect()
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
     
     public init(isActive: Bool = true) {
         self.isActive = isActive

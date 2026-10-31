@@ -33,10 +33,10 @@ public struct ReceiptValidationResult {
 // MARK: - IAP 商品与权益定义
 
 public enum IAPProductID: String, CaseIterable {
-    case vipYearly = "com.yanxiang.luopan.vip.yearly"           // 演象·年度堪舆会员 198元/年
-    case proLifetime = "com.yanxiang.luopan.pro.lifetime"       // 演象·大师终身版 298元 一次性买断
-    case floorplanSingle = "com.yanxiang.luopan.floorplan.single" // 户型空间立极·单套全案 19.9元
-    case tianjiSingle = "com.yanxiang.luopan.tianji.single"       // 福宅天机宣纸长卷·单次高清导出 9.9元
+    case vipYearly = "com.yanxiang.compass.vip.yearly"           // 演象·年度堪舆会员 198元/年
+    case proLifetime = "com.yanxiang.compass.pro.lifetime"       // 演象·大师终身版 298元 一次性买断
+    case floorplanSingle = "com.yanxiang.compass.floorplan.case"   // 户型空间立极·单套全案 19.9元
+    case tianjiSingle = "com.yanxiang.compass.tianji.single"       // 福宅天机宣纸长卷·单次高清导出 9.9元
     
     var title: String {
         switch self {
@@ -551,7 +551,7 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             } else {
                 defaults.set(oldExpiry > Date().timeIntervalSince1970, forKey: kIsVIP)
             }
-        } else if pid == IAPProductID.floorplanSingle.rawValue {
+        } else if pid == IAPProductID.floorplanSingle.rawValue || pid == "com.yanxiang.compass.floorplan.single" || pid == "com.yanxiang.luopan.floorplan.single" {
             let current = defaults.integer(forKey: kFloorplanCredits)
             defaults.set(current + 1, forKey: kFloorplanCredits)
         } else if pid == IAPProductID.tianjiSingle.rawValue {
@@ -1471,7 +1471,10 @@ public class StoreKitIAPManager: NSObject, ObservableObject, SKProductsRequestDe
             let allowYearly = receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
             defaults.set(allowLifetime, forKey: kIsLifetime)
             defaults.set(allowLifetime || allowYearly, forKey: kIsVIP)
-            if !receipt.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue) && processedIDs.isEmpty {
+            let hasFloorplanInReceipt = receipt.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue)
+                || receipt.purchasedProductIDs.contains("com.yanxiang.compass.floorplan.single")
+                || receipt.purchasedProductIDs.contains("com.yanxiang.luopan.floorplan.single")
+            if !hasFloorplanInReceipt && processedIDs.isEmpty {
                 defaults.set(0, forKey: kFloorplanCredits)
             }
             if !receipt.purchasedProductIDs.contains(IAPProductID.tianjiSingle.rawValue) && processedIDs.isEmpty {

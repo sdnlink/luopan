@@ -1,15 +1,19 @@
-name: Build iOS IPA
+name: iOS Build & Sign (Device Test & TestFlight)
 
 on:
+  workflow_dispatch:
+    inputs:
+      upload_to_testflight:
+        description: 'Upload to TestFlight (requires App Store Connect API Key)'
+        required: false
+        default: 'false'
+        type: boolean
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
 
 jobs:
-  build-macos:
-    name: Build via Xcode (macOS)
+  build-and-sign:
+    name: Build Signed IPA (macOS)
     runs-on: macos-14
     defaults:
       run:
@@ -18,13 +22,77 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode
+      - name: Select Xcode Version
         run: sudo xcode-select -switch /Applications/Xcode_15.4.app || true
 
-      - name: Show Xcode Version
-        run: xcodebuild -version
+      - name: Show Build Environment
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install Apple Certificate and Provisioning Profile
+        id: setup_signing
+        env:
+          P12_BASE64: ${{ secrets.BUILD_CERTIFICATE_P12 || secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          PROV_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE || secrets.BUILD_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'actions_temp_keychain_123' }}
+        run: |
+          if [ -z "$P12_BASE64" ] || [ -z "$PROV_BASE64" ]; then
+            echo "::error::Missing signing secrets! Please configure BUILD_CERTIFICATE_P12 and BUILD_PROVISION_PROFILE in GitHub Secrets."
+            exit 1
+          fi
+
+          # 1. 临时文件路径
+          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
+          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          # 2. 解密证书与描述文件
+          echo "$P12_BASE64" | base64 --decode > "$CERT_PATH"
+          echo "$PROV_BASE64" | base64 --decode > "$PP_PATH"
+
+          # 3. 创建并配置临时钥匙串
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # 4. 导入证书
+          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+
+          # 5. 读取证书常用名 (Identity)
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -1 | grep -o '".*"' | sed 's/"//g')
+          echo "Discovered Signing Identity: $SIGNING_IDENTITY"
+          echo "signing_identity=$SIGNING_IDENTITY" >> "$GITHUB_OUTPUT"
+
+          # 6. 安装 Provisioning Profile
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(security cms -D -i "$PP_PATH" 2>/dev/null | grep -A1 '<key>UUID</key>' | grep string | sed 's/.*>\(.*\)<.*/\1/' | head -1)
+          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "Installed Profile UUID: $UUID"
+          echo "profile_uuid=$UUID" >> "$GITHUB_OUTPUT"
+
+          # 7. 检测 Profile 导出方式 (development, ad-hoc, 或 app-store)
+          PROV_XML=$(security cms -D -i "$PP_PATH" 2>/dev/null)
+          if echo "$PROV_XML" | grep -q '<key>ProvisionedDevices</key>'; then
+            if echo "$PROV_XML" | grep -q '<key>get-task-allow</key>[[:space:]]*<true/>'; then
+              METHOD="development"
+            else
+              METHOD="ad-hoc"
+            fi
+          else
+            METHOD="app-store"
+          fi
+          echo "Detected Export Method: $METHOD"
+          echo "export_method=$METHOD" >> "$GITHUB_OUTPUT"
 
       - name: Build Archive
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SIGNING_IDENTITY: ${{ steps.setup_signing.outputs.signing_identity }}
+          PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
         run: |
           set -o pipefail
           xcodebuild archive \
@@ -33,53 +101,71 @@ jobs:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath build/TiandiLuopan.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild.log || {
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" 2>&1 | tee xcodebuild.log || {
               echo "::error::Xcodebuild Archive Failed. Printing Error Details:"
               grep -E "error:|fatal error:" xcodebuild.log || tail -n 120 xcodebuild.log
               exit 1
             }
 
-      - name: Package Unsigned IPA
+      - name: Export IPA
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
+          METHOD: ${{ steps.setup_signing.outputs.export_method }}
         run: |
-          mkdir -p build/Payload
-          cp -r build/TiandiLuopan.xcarchive/Products/Applications/TiandiLuopan.app build/Payload/
-          cd build
-          zip -r YanXiangCompass-v1.3.0.ipa Payload
-          cd ..
-          mkdir -p dist-ios
-          cp build/YanXiangCompass-v1.3.0.ipa dist-ios/
+          mkdir -p build
+          cat <<EOF > build/ExportOptions.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>$METHOD</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>teamID</key>
+              <string>$TEAM_ID</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>com.yanxiang.compass</key>
+                  <string>$PROFILE_UUID</string>
+              </dict>
+              <key>compileBitcode</key>
+              <false/>
+              <key>stripSwiftSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
 
-      - name: Upload Xcode IPA Artifact
+          xcodebuild -exportArchive \
+            -archivePath build/TiandiLuopan.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath dist-ios
+
+      - name: Upload Signed IPA to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: YanXiangCompass-Xcode-IPA
-          path: tiandi_luopan/dist-ios/YanXiangCompass-v1.3.0.ipa
+          name: YanXiangCompass-Signed-IPA
+          path: tiandi_luopan/dist-ios/*.ipa
           retention-days: 14
 
-  build-universal:
-    name: Build Universal IPA (Ubuntu Fast Runner)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tiandi_luopan
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Package Universal IPA
+      - name: Upload to TestFlight (Optional)
+        if: ${{ github.event.inputs.upload_to_testflight == 'true' && secrets.APPSTORE_API_KEY_ID != '' }}
+        env:
+          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          API_KEY_BASE64: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
         run: |
-          python tools/package_ipa.py
-
-      - name: Upload Universal IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: YanXiangCompass-Universal-IPA
-          path: tiandi_luopan/dist-ios/YanXiangCompass-v1.3.0.ipa
-          retention-days: 14
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+          IPA_FILE=$(ls dist-ios/*.ipa | head -1)
+          echo "Uploading $IPA_FILE to TestFlight..."
+          xcrun altool --upload-app \
+            -f "$IPA_FILE" \
+            -t ios \
+            --apiKey "$API_KEY_ID" \
+            --apiIssuer "$ISSUER_ID"

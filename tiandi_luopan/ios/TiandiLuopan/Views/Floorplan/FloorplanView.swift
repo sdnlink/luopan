@@ -114,40 +114,53 @@ public struct FloorplanView: View {
             Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea()
             
             if isActive {
-                VStack(spacing: 8) {
-                // 1. 顶部控制栏
-                topControlBar()
+                GeometryReader { geo in
+                    let screenW = geo.size.width
+                    let screenH = geo.size.height
+                    let canvasSide = isPad ? min(screenW - 48, screenH * 0.46) : min(screenW - 32, 340)
 
-                headingQualityNotice()
+                    VStack(spacing: 8) {
+                        // 1. 顶部控制栏
+                        topControlBar()
+                            .frame(maxWidth: isPad ? 720 : .infinity)
 
-                if userFloorplanImage != nil {
-                    roomDetectionBar()
-                }
+                        headingQualityNotice()
+                            .frame(maxWidth: isPad ? 720 : .infinity)
 
-                if isEditingRooms {
-                    roomLayoutTools()
-                    if let editingRoom = editingRoom {
-                        roomResizeTools(room: editingRoom)
+                        if userFloorplanImage != nil {
+                            roomDetectionBar()
+                                .frame(maxWidth: isPad ? 720 : .infinity)
+                        }
+
+                        if isEditingRooms {
+                            roomLayoutTools()
+                                .frame(maxWidth: isPad ? 720 : .infinity)
+                            if let editingRoom = editingRoom {
+                                roomResizeTools(room: editingRoom)
+                                    .frame(maxWidth: isPad ? 720 : .infinity)
+                            }
+                        }
+                        
+                        // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
+                        floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
+                            .frame(width: isPad ? canvasSide : nil, height: canvasSide)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, isPad ? 0 : 16)
+
+                        if !isSyncWithCompass {
+                            manualHeadingControl()
+                                .frame(maxWidth: isPad ? 720 : .infinity)
+                                .padding(.horizontal, 16)
+                        }
+                        
+                        // 3. 底部体检报告与房间列表
+                        auditListSection(report: auditResult.report)
+                            .frame(maxWidth: isPad ? 720 : .infinity)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
                 }
-                
-                // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
-                floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
-                    .frame(height: canvasHeight)
-                    .padding(.horizontal, 16)
-
-                if !isSyncWithCompass {
-                    manualHeadingControl()
-                        .padding(.horizontal, 16)
-                }
-                
-                // 3. 底部体检报告与房间列表
-                auditListSection(report: auditResult.report)
             }
-            .frame(maxWidth: isPad ? 800 : .infinity)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 8)
-        }
         }
         // The page re-renders at sensor rate. System alerts attached to inner
         // controls were repeatedly torn down (buttons unresponsive), so the
@@ -1214,7 +1227,13 @@ public struct FloorplanView: View {
               image.size.height > 0,
               canvasSize.width > 0,
               canvasSize.height > 0 else {
-            return CGRect(origin: .zero, size: canvasSize)
+            let side = min(canvasSize.width, canvasSize.height)
+            return CGRect(
+                x: (canvasSize.width - side) / 2,
+                y: (canvasSize.height - side) / 2,
+                width: side,
+                height: side
+            )
         }
         let imageAspect = image.size.width / image.size.height
         let canvasAspect = canvasSize.width / canvasSize.height
@@ -1288,16 +1307,16 @@ public struct FloorplanView: View {
                 
                 VStack(spacing: 2) {
                     Image(systemName: room.type.iconName)
-                        .font(.system(size: 11))
+                        .font(.system(size: isPad ? 15 : 11))
                         .foregroundColor(strokeColor)
                     Text(room.name)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: isPad ? 13 : 10, weight: .bold))
                         .foregroundColor(.white)
                     Text(room.palaceName)
-                        .font(.system(size: 8))
+                        .font(.system(size: isPad ? 11 : 8))
                         .foregroundColor(.white.opacity(0.65))
                 }
-                .padding(2)
+                .padding(isPad ? 4 : 2)
             }
         }
         .frame(width: rw, height: rh)
@@ -1561,20 +1580,20 @@ public struct FloorplanView: View {
     }
     
     private func auditItemRow(item: FloorplanAuditItem) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+        HStack(alignment: .top, spacing: isPad ? 10 : 8) {
             Circle()
                 .fill(item.isSevere ? Color.red : (item.isGood ? Color.green : Color.orange))
-                .frame(width: 8, height: 8)
+                .frame(width: isPad ? 10 : 8, height: isPad ? 10 : 8)
                 .padding(.top, 4)
             
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: isPad ? 4 : 3) {
                 HStack {
                     Text(item.title)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: isPad ? 14 : 12, weight: .bold))
                         .foregroundColor(.white)
                     Spacer()
                     Text(item.isSevere ? lang.t("floorplan_severe_sha") : (item.isGood ? lang.t("grade_auspicious") : lang.t("floorplan_warn_sha")))
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: isPad ? 11 : 10, weight: .bold))
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(item.isSevere ? Color.red.opacity(0.2) : (item.isGood ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))

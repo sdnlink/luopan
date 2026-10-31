@@ -16,6 +16,10 @@ public struct PurpleWhiteView: View {
     @State private var selectedPalaceId: Int? = nil
     @State private var lastFacingSector: Int?
     @State private var lastCalendarDayKey: Int?
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -114,7 +118,8 @@ public struct PurpleWhiteView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .frame(maxWidth: isPad ? 580 : .infinity)
+                .padding(.horizontal, isPad ? 0 : 16)
                 
                 if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
                     palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
@@ -211,49 +216,52 @@ public struct PurpleWhiteView: View {
         let strokeColor = isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : (isFacing ? Color.yanCyan : (isDanger ? Color.red : (isJi ? Color.green.opacity(0.5) : Color.white.opacity(0.12))))
         let bgColor = isDanger ? Color.red.opacity(0.12) : (isJi ? Color.green.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         
-        return VStack(spacing: 2) {
+        return VStack {
             // 顶行: 宫位名 + 冲犯标签
             HStack {
                 Text(item.direction)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: isPad ? 12 : 10, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
                 if item.isTaiSui {
                     Text(lang.t("tag_taisui"))
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
                         .foregroundColor(.red)
                 } else if item.isSanSha {
                     Text(lang.t("tag_sansha"))
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
                         .foregroundColor(.purple)
                 }
                 if isFacing {
                     Image(systemName: "location.north.fill")
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
                         .foregroundColor(.yanCyan)
                 }
             }
             
+            Spacer(minLength: 2)
+            
             // 中行: 年飞星数字 (大字显影)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("\(item.yearGuestStar)")
-                    .font(.system(size: 20, weight: .bold, design: .serif))
+                    .font(.system(size: isPad ? 28 : 20, weight: .bold, design: .serif))
                     .foregroundColor(isDanger ? Color.red : (isJi ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.7)))
                 
                 Text("\(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
-                    .font(.system(size: 9))
+                    .font(.system(size: isPad ? 12 : 9))
                     .foregroundColor(.white.opacity(0.5))
             }
-            .padding(.vertical, 1)
+            
+            Spacer(minLength: 2)
             
             // 底行: 星名与化解提示
             Text(item.starName)
-                .font(.system(size: 8))
+                .font(.system(size: isPad ? 11 : 8))
                 .foregroundColor(isDanger ? Color.red : Color.white.opacity(0.65))
                 .lineLimit(1)
         }
-        .padding(6)
-        .frame(minHeight: 68)
+        .padding(isPad ? 10 : 6)
+        .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)
         .overlay(

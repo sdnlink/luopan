@@ -79,7 +79,8 @@ public struct QimenDunjiaView: View {
                             }
                     }
                 }
-                .padding(.horizontal, 16)
+                .frame(maxWidth: isPad ? 580 : .infinity)
+                .padding(.horizontal, isPad ? 0 : 16)
                 
                 if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
@@ -194,37 +195,40 @@ public struct QimenDunjiaView: View {
         let borderColor = isSelected ? Color.yanCyan : (isJi ? Color.green.opacity(0.5) : (isXiong ? Color.red.opacity(0.4) : Color.white.opacity(0.12)))
         let bgColor = isJi ? Color.green.opacity(0.08) : (isXiong ? Color.red.opacity(0.06) : Color(red: 0.12, green: 0.13, blue: 0.18))
         
-        return VStack(spacing: 3) {
+        return VStack {
             // 顶行: 八神 / 九星
             HStack {
                 Text(cell.localizedGodName)
-                    .font(.system(size: 9, weight: .bold))
+                    .font(.system(size: isPad ? 12 : 9, weight: .bold))
                     .foregroundColor(Color.yellow)
                 Spacer()
                 Text(cell.localizedStarName)
-                    .font(.system(size: 9))
+                    .font(.system(size: isPad ? 12 : 9))
                     .foregroundColor(Color.yanCyan)
             }
             
+            Spacer(minLength: 2)
+            
             // 中行: 八门 (大字显影)
             Text(cell.localizedDoorName)
-                .font(.system(size: 15, weight: .bold, design: .serif))
+                .font(.system(size: isPad ? 22 : 15, weight: .bold, design: .serif))
                 .foregroundColor(isJi ? Color.green : (isXiong ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45)))
-                .padding(.vertical, 2)
+            
+            Spacer(minLength: 2)
             
             // 底行: 宫名 / 天地三奇六仪
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.system(size: 8))
+                    .font(.system(size: isPad ? 11 : 8))
                     .foregroundColor(.white.opacity(0.6))
                 Spacer()
                 Text("\(cell.tianStem)/\(cell.diStem)")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(size: isPad ? 12 : 9, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
         }
-        .padding(6)
-        .frame(minHeight: 72)
+        .padding(isPad ? 10 : 6)
+        .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)
         .overlay(

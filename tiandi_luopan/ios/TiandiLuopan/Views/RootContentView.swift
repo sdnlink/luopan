@@ -13,8 +13,12 @@ extension Font {
     /// 在 iPhone 上保持设计原始字号，在 iPad Pro / iPad Air / iPad mini 大屏上自动按 1.35x 比例智能放大，
     /// 确保罗盘刻度、度数、八方吉凶、户型体检、九宫飞星、系统设置等所有界面的文本层次均清晰可辨。
     public static func adaptive(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let scale: CGFloat = isPad ? 1.35 : 1.0
+        // 按“可用空间”而非设备 idiom 决定字体放大：水平尺寸类为 regular 时使用大屏
+        // 比例（iPad 全形态、iPhone Duo 展开态内屏），紧凑宽度（常规 iPhone 与
+        // iPhone Duo 外屏）保持原字号。苹果 iPhone Duo 适配要求禁用
+        // userInterfaceIdiom 做布局决策，应改用 size class / 可用空间。
+        let isLargeLayout = UITraitCollection.current.horizontalSizeClass == .regular
+        let scale: CGFloat = isLargeLayout ? 1.35 : 1.0
         let scaledSize = (size * scale).rounded()
         return Font.system(size: scaledSize, weight: weight, design: design)
     }
@@ -47,8 +51,11 @@ public struct RootContentView: View {
         appearance.backgroundColor = UIColor(red: 14/255.0, green: 14/255.0, blue: 17/255.0, alpha: 1.0)
         
         let itemAppearance = UITabBarItemAppearance()
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let tabFontSize: CGFloat = isPad ? 13 : 10
+        // 按启动时的水平尺寸类决定 Tab 字号（regular：iPad 与 iPhone Duo 展开态内屏）。
+        // TabBar appearance 为全局一次性设置，折叠/展开中途切换形态不会自动刷新，
+        // 但字号差异很小，不影响可用性。
+        let isLargeLayout = UITraitCollection.current.horizontalSizeClass == .regular
+        let tabFontSize: CGFloat = isLargeLayout ? 13 : 10
         let tabFont = UIFont.systemFont(ofSize: tabFontSize, weight: .medium)
         itemAppearance.normal.iconColor = UIColor.systemGray2
         itemAppearance.normal.titleTextAttributes = [

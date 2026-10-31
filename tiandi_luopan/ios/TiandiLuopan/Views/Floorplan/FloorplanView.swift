@@ -91,12 +91,17 @@ public struct FloorplanView: View {
         )
     }
 
-    private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+    // 布局按“可用空间”而非设备 idiom 决策：horizontalSizeClass == .regular
+    // （iPad 全形态、iPhone Duo 展开态内屏）启用大屏布局；紧凑宽度（常规
+    // iPhone、iPhone Duo 外屏）保持手机布局。苹果 iPhone Duo 适配要求禁用
+    // userInterfaceIdiom，改用 size class / 可用空间。
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isLargeLayout: Bool {
+        horizontalSizeClass == .regular
     }
 
     private var canvasHeight: CGFloat {
-        isPad ? 560 : 340
+        isLargeLayout ? 560 : 340
     }
     
     public var body: some View {
@@ -117,47 +122,47 @@ public struct FloorplanView: View {
                 GeometryReader { geo in
                     let screenW: CGFloat = geo.size.width
                     let screenH: CGFloat = geo.size.height
-                    let canvasSide: CGFloat = isPad
+                    let canvasSide: CGFloat = isLargeLayout
                         ? min(screenW - 48, screenH * 0.46)
                         : min(screenW - 32, screenH < 700 ? 250.0 : (screenH > 900 ? 380.0 : min(340.0, screenH * 0.40)))
 
                     VStack(spacing: 8) {
                         // 1. 顶部控制栏
                         topControlBar()
-                            .frame(maxWidth: isPad ? 720 : .infinity)
+                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
 
                         headingQualityNotice()
-                            .frame(maxWidth: isPad ? 720 : .infinity)
+                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
 
                         if userFloorplanImage != nil {
                             roomDetectionBar()
-                                .frame(maxWidth: isPad ? 720 : .infinity)
+                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                         }
 
                         if isEditingRooms {
                             roomLayoutTools()
-                                .frame(maxWidth: isPad ? 720 : .infinity)
+                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                             if let editingRoom = editingRoom {
                                 roomResizeTools(room: editingRoom)
-                                    .frame(maxWidth: isPad ? 720 : .infinity)
+                                    .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                             }
                         }
                         
                         // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
                         floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
-                            .frame(width: isPad ? canvasSide : nil, height: canvasSide)
+                            .frame(width: isLargeLayout ? canvasSide : nil, height: canvasSide)
                             .frame(maxWidth: .infinity)
-                            .padding(.horizontal, isPad ? 0 : 16)
+                            .padding(.horizontal, isLargeLayout ? 0 : 16)
 
                         if !isSyncWithCompass {
                             manualHeadingControl()
-                                .frame(maxWidth: isPad ? 720 : .infinity)
+                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                                 .padding(.horizontal, 16)
                         }
                         
                         // 3. 底部体检报告与房间列表
                         auditListSection(report: auditResult.report)
-                            .frame(maxWidth: isPad ? 720 : .infinity)
+                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
@@ -1322,7 +1327,7 @@ public struct FloorplanView: View {
                         .font(.adaptive(size: 8))
                         .foregroundColor(.white.opacity(0.65))
                 }
-                .padding(isPad ? 4 : 2)
+                .padding(isLargeLayout ? 4 : 2)
             }
         }
         .frame(width: rw, height: rh)
@@ -1586,13 +1591,13 @@ public struct FloorplanView: View {
     }
     
     private func auditItemRow(item: FloorplanAuditItem) -> some View {
-        HStack(alignment: .top, spacing: isPad ? 10 : 8) {
+        HStack(alignment: .top, spacing: isLargeLayout ? 10 : 8) {
             Circle()
                 .fill(item.isSevere ? Color.red : (item.isGood ? Color.green : Color.orange))
-                .frame(width: isPad ? 10 : 8, height: isPad ? 10 : 8)
+                .frame(width: isLargeLayout ? 10 : 8, height: isLargeLayout ? 10 : 8)
                 .padding(.top, 4)
             
-            VStack(alignment: .leading, spacing: isPad ? 4 : 3) {
+            VStack(alignment: .leading, spacing: isLargeLayout ? 4 : 3) {
                 HStack {
                     Text(item.title)
                         .font(.adaptive(size: 12, weight: .bold))

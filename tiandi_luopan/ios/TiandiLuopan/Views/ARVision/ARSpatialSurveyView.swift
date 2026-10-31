@@ -215,6 +215,20 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var groundBaguaSpan: Float = 2.4
     private var groundBaguaNorthYawRadians: Float = 0.0
 
+    /// AR 命中检测使用的屏幕中心点。优先取 AR 视图自身 bounds —— 该值随
+    /// iPhone Duo 折叠/展开实时变化，与窗口尺寸保持一致；仅当视图尚未完成
+    /// 首次布局时回退到所属 window 的 bounds。不使用 UIScreen.main：在折叠
+    /// 屏上应用尺寸随窗口变化，主屏尺寸会失真（苹果 iPhone Duo 适配要求）。
+    private func projectionCenter(of view: ARSCNView) -> CGPoint {
+        if view.bounds.width > 0, view.bounds.height > 0 {
+            return CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        }
+        if let window = view.window {
+            return CGPoint(x: window.bounds.midX, y: window.bounds.midY)
+        }
+        return .zero
+    }
+
     /// World maps can be large and are user-created survey data. Store them
     /// in a durable app support directory so a background/suspension cycle or
     /// a later share action does not lose a file written to the temporary
@@ -355,10 +369,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         guard let sceneView = sceneView,
               let frame = sceneView.session.currentFrame else { return false }
 
-        let center = CGPoint(
-            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
-            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
-        )
+        let center = projectionCenter(of: sceneView)
 
         var floorPos: SIMD3<Float>?
         var resolvedSpan: Float = 2.4
@@ -787,10 +798,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     public func placeLubanPoint() -> Bool {
         guard let sceneView = sceneView,
               let frame = sceneView.session.currentFrame else { return false }
-        let center = CGPoint(
-            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
-            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
-        )
+        let center = projectionCenter(of: sceneView)
 
         var resolvedWorldPos: SIMD3<Float>?
         let target: ARRaycastQuery.Target = lidarAvailable ? .existingPlaneGeometry : .estimatedPlane
@@ -1242,10 +1250,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             largestPlaneDepth = nil
         }
 
-        let center = CGPoint(
-            x: sceneView.bounds.width > 0 ? sceneView.bounds.midX : UIScreen.main.bounds.midX,
-            y: sceneView.bounds.height > 0 ? sceneView.bounds.midY : UIScreen.main.bounds.midY
-        )
+        let center = projectionCenter(of: sceneView)
 
         var measuredDistance: Float? = nil
 

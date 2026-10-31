@@ -27,8 +27,11 @@ public struct XuanKongGridView: View {
     // 九宫格九个方位的标准九宫排布对应 (从左到右，从上到下：东南4、正南9、西南2；正东3、中宫5、正西7；东北8、正北1、西北6)
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
 
-    private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
+    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用大屏布局。
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isLargeLayout: Bool {
+        horizontalSizeClass == .regular
     }
     
     public init(isActive: Bool = true) {
@@ -72,7 +75,7 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
-            .frame(maxWidth: isPad ? 720 : .infinity)
+            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
             .frame(maxWidth: .infinity)
             .padding(.top, 10)
             .padding(.bottom, 24)
@@ -154,8 +157,8 @@ public struct XuanKongGridView: View {
         }
         .background(Color.white.opacity(0.08))
         .cornerRadius(8)
-        .frame(maxWidth: isPad ? 680 : .infinity)
-        .padding(.horizontal, isPad ? 0 : 16)
+        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
+        .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
     private func tabButton(title: String, index: Int) -> some View {
@@ -167,7 +170,7 @@ public struct XuanKongGridView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, isPad ? 10 : 8)
+                .padding(.vertical, isLargeLayout ? 10 : 8)
                 .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
                 .foregroundColor(selectedSubTab == index ? .black : .white.opacity(0.75))
         }
@@ -218,8 +221,8 @@ public struct XuanKongGridView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
                 )
         )
-        .frame(maxWidth: isPad ? 680 : .infinity)
-        .padding(.horizontal, isPad ? 0 : 16)
+        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
+        .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
     // MARK: - 玄空九星排盘内容
@@ -229,8 +232,8 @@ public struct XuanKongGridView: View {
             patternBadgeView(chart: chart)
             ninePalacesGrid(chart: chart)
             analysisCard(chart: chart)
-                .frame(maxWidth: isPad ? 680 : .infinity)
-                .padding(.horizontal, isPad ? 0 : 16)
+                .frame(maxWidth: isLargeLayout ? 680 : .infinity)
+                .padding(.horizontal, isLargeLayout ? 0 : 16)
         }
     }
     
@@ -265,7 +268,7 @@ public struct XuanKongGridView: View {
                                 }
                             }
                             .font(.adaptive(size: 13, weight: isSelected ? .bold : .medium))
-                            .frame(width: isLocked ? (isPad ? 62 : 52) : (isPad ? 52 : 44), height: isPad ? 36 : 32)
+                            .frame(width: isLocked ? (isLargeLayout ? 62 : 52) : (isLargeLayout ? 52 : 44), height: isLargeLayout ? 36 : 32)
                             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .black : .white)
                             .cornerRadius(8)
@@ -339,7 +342,7 @@ public struct XuanKongGridView: View {
                 }
             }
         }
-        .frame(maxWidth: isPad ? 680 : .infinity)
+        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
     }
     
     // MARK: - 3x3 九宫飞星网格
@@ -359,8 +362,8 @@ public struct XuanKongGridView: View {
                     }
             }
         }
-        .frame(maxWidth: isPad ? 580 : .infinity)
-        .padding(.horizontal, isPad ? 0 : 16)
+        .frame(maxWidth: isLargeLayout ? 580 : .infinity)
+        .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
     private func palaceCellView(cell: XuanKongPalace) -> some View {
@@ -399,7 +402,7 @@ public struct XuanKongGridView: View {
                     .foregroundColor(.white.opacity(0.5))
             }
         }
-        .padding(isPad ? 12 : 8)
+        .padding(isLargeLayout ? 12 : 8)
         .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)

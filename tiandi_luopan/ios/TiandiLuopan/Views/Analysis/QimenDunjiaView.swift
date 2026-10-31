@@ -24,8 +24,11 @@ public struct QimenDunjiaView: View {
         in: .common
     ).autoconnect()
 
-    private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
+    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
+    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用大屏布局。
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isLargeLayout: Bool {
+        horizontalSizeClass == .regular
     }
     
     public init(isActive: Bool = true) {
@@ -83,8 +86,8 @@ public struct QimenDunjiaView: View {
                             }
                     }
                 }
-                .frame(maxWidth: isPad ? 580 : .infinity)
-                .padding(.horizontal, isPad ? 0 : 16)
+                .frame(maxWidth: isLargeLayout ? 580 : .infinity)
+                .padding(.horizontal, isLargeLayout ? 0 : 16)
                 
                 if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
@@ -231,7 +234,7 @@ public struct QimenDunjiaView: View {
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
         }
-        .padding(isPad ? 10 : 6)
+        .padding(isLargeLayout ? 10 : 6)
         .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)

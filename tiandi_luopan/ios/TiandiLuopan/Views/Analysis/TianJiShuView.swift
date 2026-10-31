@@ -38,7 +38,7 @@ public struct TianJiShuView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.95, green: 0.85, blue: 0.45)))
                                 .scaleEffect(1.5)
                             Text(lang.t("tianji_rendering"))
-                                .font(.system(size: 14))
+                                .font(.adaptive(size: 14))
                                 .foregroundColor(.white.opacity(0.8))
                         }
                         Spacer()
@@ -56,7 +56,7 @@ public struct TianJiShuView: View {
                                     VStack(spacing: 60) {
                                         ForEach(0..<8, id: \.self) { _ in
                                             Text(lang.t("tianji_vip_preview_watermark"))
-                                                .font(.system(size: 22, weight: .bold, design: .serif))
+                                                .font(.adaptive(size: 22, weight: .bold, design: .serif))
                                                 .foregroundColor(Color.red.opacity(0.2))
                                                 .rotationEffect(.degrees(-25))
                                                 .frame(maxWidth: .infinity)
@@ -113,7 +113,7 @@ public struct TianJiShuView: View {
                                         }
                                         Text(isExporting ? lang.t("exporting") : lang.t("save_to_photos"))
                                     }
-                                    .font(.system(size: 13, weight: .bold))
+                                    .font(.adaptive(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
                                     .background(
@@ -141,7 +141,7 @@ public struct TianJiShuView: View {
                                         Image(systemName: "square.and.arrow.up.fill")
                                         Text(lang.t("share_and_print"))
                                     }
-                                    .font(.system(size: 13, weight: .bold))
+                                    .font(.adaptive(size: 13, weight: .bold))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
                                     .background(Color.white.opacity(0.12))
@@ -161,7 +161,7 @@ public struct TianJiShuView: View {
                             Image(systemName: "checkmark.seal.fill")
                                 .foregroundColor(.green)
                             Text(lang.t("save_success"))
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.adaptive(size: 12, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         .padding(.horizontal, 16)

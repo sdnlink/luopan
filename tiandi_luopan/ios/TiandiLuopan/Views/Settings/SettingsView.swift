@@ -63,11 +63,11 @@ public struct SettingsView: View {
                             Image(systemName: "crown.fill")
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Text(lang.t("vip_member_center"))
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.adaptive(size: 16, weight: .bold))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Spacer()
                             Text(isProUnlocked ? lang.t("vip_user") : lang.t("standard_user"))
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.adaptive(size: 11, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(isProUnlocked ? Color.green.opacity(0.3) : Color.yellow.opacity(0.3))
@@ -89,13 +89,13 @@ public struct SettingsView: View {
                            !iap.hasProduct(for: selectedProduct) {
                             HStack(spacing: 8) {
                                 Text(lang.t("price_unavailable"))
-                                    .font(.system(size: 10))
+                                    .font(.adaptive(size: 10))
                                     .foregroundColor(.orange.opacity(0.9))
                                 Spacer()
                                 Button(lang.t("reload_prices")) {
                                     iap.refreshProductsIfNeeded(force: true)
                                 }
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.adaptive(size: 11, weight: .semibold))
                                 .foregroundColor(.yanCyan)
                             }
                         }
@@ -111,7 +111,7 @@ public struct SettingsView: View {
                                     Text(lang.t("pay_securely"))
                                     Spacer()
                                 }
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .padding(.vertical, 10)
                                 .background(
                                     LinearGradient(
@@ -132,7 +132,7 @@ public struct SettingsView: View {
                             HStack {
                                 Spacer()
                                 Text(lang.t("restore_purchases"))
-                                    .font(.system(size: 11))
+                                    .font(.adaptive(size: 11))
                                     .foregroundColor(Color.yanCyan)
                                 Spacer()
                             }
@@ -173,7 +173,7 @@ public struct SettingsView: View {
                             Spacer()
                             Text(motion.coordsDesc)
                                 .foregroundColor(.secondary)
-                                .font(.system(size: 11))
+                                .font(.adaptive(size: 11))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
@@ -181,13 +181,13 @@ public struct SettingsView: View {
                             Button(lang.t("open_system_settings")) {
                                 motion.openLocationSettings()
                             }
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.adaptive(size: 11, weight: .semibold))
                             .foregroundColor(Color.yanCyan)
                         } else if motion.locationAuthorizationStatus == .notDetermined {
                             Button(lang.t("request_location_permission")) {
                                 motion.requestLocationPermission()
                             }
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.adaptive(size: 11, weight: .semibold))
                             .foregroundColor(Color.yanCyan)
                         }
                     }
@@ -197,7 +197,7 @@ public struct SettingsView: View {
                         Spacer()
                         Text(motion.solarTimeDesc)
                             .foregroundColor(.secondary)
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -210,7 +210,7 @@ public struct SettingsView: View {
                         Spacer()
                         Text(motion.isDistorted ? lang.t("settings_mag_field_warning") : lang.t("settings_mag_field_normal"))
                             .foregroundColor(motion.isDistorted ? .red : .green)
-                            .font(.system(size: 13))
+                            .font(.adaptive(size: 13))
                     }
                     
                     HStack {
@@ -218,7 +218,7 @@ public struct SettingsView: View {
                         Spacer()
                         Text(String(format: "%.1f μT", motion.magneticStrengthUT))
                             .foregroundColor(.secondary)
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(.adaptive(size: 13, design: .monospaced))
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                             .fixedSize(horizontal: true, vertical: false)
@@ -231,10 +231,10 @@ public struct SettingsView: View {
                             Text(lang.t("compass_calib"))
                             Spacer()
                             Text(motion.isDistorted ? lang.t("settings_calib_status_need") : lang.t("settings_calib_status_high"))
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.adaptive(size: 12, weight: .bold))
                                 .foregroundColor(motion.isDistorted ? .orange : .green)
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
+                                .font(.adaptive(size: 12))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -247,21 +247,21 @@ public struct SettingsView: View {
                         Spacer()
                         Text(lang.t("settings_version_value"))
                             .foregroundColor(.secondary)
-                            .font(.system(size: 13))
+                            .font(.adaptive(size: 13))
                     }
                     HStack {
                         Text(lang.t("settings_theory_base"))
                         Spacer()
                         Text(lang.t("settings_theory_desc"))
                             .foregroundColor(.secondary)
-                            .font(.system(size: 12))
+                            .font(.adaptive(size: 12))
                     }
                     VStack(alignment: .leading, spacing: 6) {
                         Label(lang.t("settings_safety_title"), systemImage: "exclamationmark.shield.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.adaptive(size: 13, weight: .semibold))
                             .foregroundColor(.orange)
                         Text(lang.t("settings_safety_disclaimer"))
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(.secondary)
                             .lineSpacing(3)
                     }
@@ -269,13 +269,13 @@ public struct SettingsView: View {
                         Button(lang.t("legal_terms_button")) {
                             legalDocument = .terms
                         }
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                         Spacer()
                         Button(lang.t("legal_privacy_button")) {
                             legalDocument = .privacy
                         }
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                     }
                     Button {
@@ -286,10 +286,10 @@ public struct SettingsView: View {
                             Text(lang.t("legal_compliance_button"))
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
+                                .font(.adaptive(size: 10, weight: .semibold))
                         }
                     }
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.adaptive(size: 12, weight: .semibold))
                     .foregroundColor(.orange)
                 }
             }
@@ -367,12 +367,12 @@ public struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(id.title)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                         Text(tag)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.adaptive(size: 9, weight: .bold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1.5)
                             .background(Color.yellow.opacity(0.25))
@@ -382,13 +382,13 @@ public struct SettingsView: View {
                             .minimumScaleFactor(0.7)
                     }
                     Text(id.desc)
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(2)
                 }
                 Spacer(minLength: 8)
                 Text(iap.localizedPrice(for: id))
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .font(.adaptive(size: 15, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -413,15 +413,15 @@ public struct SettingsView: View {
     private func privilegeRow(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13))
+                .font(.adaptive(size: 13))
                 .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 .frame(width: 20)
             Text(title)
-                .font(.system(size: 12))
+                .font(.adaptive(size: 12))
                 .foregroundColor(.white.opacity(0.85))
             Spacer()
             Text(lang.t("vip_short"))
-                .font(.system(size: 9, weight: .bold))
+                .font(.adaptive(size: 9, weight: .bold))
                 .foregroundColor(.yellow)
         }
     }
@@ -442,7 +442,7 @@ public struct LegalDocumentSheet: View {
         NavigationView {
             ScrollView {
                 Text(bodyText)
-                    .font(.system(size: 13))
+                    .font(.adaptive(size: 13))
                     .foregroundColor(.primary)
                     .lineSpacing(5)
                     .frame(maxWidth: .infinity, alignment: .leading)

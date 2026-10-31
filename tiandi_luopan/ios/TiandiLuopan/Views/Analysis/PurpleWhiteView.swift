@@ -68,7 +68,7 @@ public struct PurpleWhiteView: View {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("purplewhite_header_title"))
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.adaptive(size: 14, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
@@ -77,7 +77,7 @@ public struct PurpleWhiteView: View {
                     ? "\(chart.year) / \(chart.month)"
                     : "\(chart.year)\(lang.t("year_suffix")) · \(chart.month)\(lang.t("month_suffix"))"
                 Text(dateLabel)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.adaptive(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -160,14 +160,14 @@ public struct PurpleWhiteView: View {
     private func tagPill(title: String, value: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(.system(size: 10, weight: .bold))
+                .font(.adaptive(size: 10, weight: .bold))
                 .foregroundColor(.black)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .background(color)
                 .cornerRadius(4)
             Text(value)
-                .font(.system(size: 10, weight: .medium))
+                .font(.adaptive(size: 10, weight: .medium))
                 .foregroundColor(.white)
         }
         .padding(.horizontal, 6)
@@ -183,18 +183,18 @@ public struct PurpleWhiteView: View {
                 Image(systemName: isDanger ? "exclamationmark.triangle.fill" : "sparkles")
                     .foregroundColor(isDanger ? .red : Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text(item.palaceName)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.adaptive(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 Text("· \(item.starName)")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.adaptive(size: 12, weight: .semibold))
                     .foregroundColor(isDanger ? .red : Color.yanCyan)
                 Spacer()
                 Text("\(item.yearGuestStar) / \(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
             Text(item.advice)
-                .font(.system(size: 12))
+                .font(.adaptive(size: 12))
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(3)
         }
@@ -220,21 +220,21 @@ public struct PurpleWhiteView: View {
             // 顶行: 宫位名 + 冲犯标签
             HStack {
                 Text(item.direction)
-                    .font(.system(size: isPad ? 12 : 10, weight: .bold))
+                    .font(.adaptive(size: 10, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
                 if item.isTaiSui {
                     Text(lang.t("tag_taisui"))
-                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
+                        .font(.adaptive(size: 8, weight: .bold))
                         .foregroundColor(.red)
                 } else if item.isSanSha {
                     Text(lang.t("tag_sansha"))
-                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
+                        .font(.adaptive(size: 8, weight: .bold))
                         .foregroundColor(.purple)
                 }
                 if isFacing {
                     Image(systemName: "location.north.fill")
-                        .font(.system(size: isPad ? 10 : 8, weight: .bold))
+                        .font(.adaptive(size: 8, weight: .bold))
                         .foregroundColor(.yanCyan)
                 }
             }
@@ -244,11 +244,11 @@ public struct PurpleWhiteView: View {
             // 中行: 年飞星数字 (大字显影)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("\(item.yearGuestStar)")
-                    .font(.system(size: isPad ? 28 : 20, weight: .bold, design: .serif))
+                    .font(.adaptive(size: 20, weight: .bold, design: .serif))
                     .foregroundColor(isDanger ? Color.red : (isJi ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.7)))
                 
                 Text("\(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
-                    .font(.system(size: isPad ? 12 : 9))
+                    .font(.adaptive(size: 9))
                     .foregroundColor(.white.opacity(0.5))
             }
             
@@ -256,7 +256,7 @@ public struct PurpleWhiteView: View {
             
             // 底行: 星名与化解提示
             Text(item.starName)
-                .font(.system(size: isPad ? 11 : 8))
+                .font(.adaptive(size: 8))
                 .foregroundColor(isDanger ? Color.red : Color.white.opacity(0.65))
                 .lineLimit(1)
         }

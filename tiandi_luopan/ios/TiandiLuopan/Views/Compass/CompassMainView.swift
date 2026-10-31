@@ -38,14 +38,14 @@ public struct CompassMainView: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(Color.orange)
                             Text("\(lang.t("mag_warning_tap")) (\(String(format: "%.0f", motion.magneticStrengthUT)) μT) · \(lang.t("tap_to_calib"))")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.adaptive(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.65)
                                 .layoutPriority(1)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 10))
+                                .font(.adaptive(size: 10))
                                 .foregroundColor(.white.opacity(0.7))
                         }
                         .padding(.horizontal, 10)
@@ -116,7 +116,7 @@ public struct CompassMainView: View {
                     Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
                     Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
                 }
-                .font(.system(size: 11, weight: .bold))
+                .font(.adaptive(size: 11, weight: .bold))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(motion.isLocked ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
@@ -132,7 +132,7 @@ public struct CompassMainView: View {
                     Circle().fill(kwColor).frame(width: 5, height: 5)
                     Text(kwStatus)
                 }
-                .font(.system(size: 11, weight: .bold))
+                .font(.adaptive(size: 11, weight: .bold))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(kwColor.opacity(0.15))
@@ -150,7 +150,7 @@ public struct CompassMainView: View {
                     Image(systemName: "safari.fill")
                     Text(lang.t("btn_calib"))
                 }
-                .font(.system(size: 11, weight: .medium))
+                .font(.adaptive(size: 11, weight: .medium))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.08))
@@ -166,7 +166,7 @@ public struct CompassMainView: View {
                     Image(systemName: "square.3.layers.3d")
                     Text(lang.t("btn_layers"))
                 }
-                .font(.system(size: 11, weight: .medium))
+                .font(.adaptive(size: 11, weight: .medium))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.08))
@@ -182,7 +182,7 @@ public struct CompassMainView: View {
                     Image(systemName: "square.grid.2x2")
                     Text(lang.t("btn_palace_all"))
                 }
-                .font(.system(size: 11, weight: .medium))
+                .font(.adaptive(size: 11, weight: .medium))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.08))
@@ -204,17 +204,17 @@ public struct CompassMainView: View {
                 HStack {
                     HStack(spacing: 6) {
                         Text(hex.localizedName)
-                            .font(.system(size: 15, weight: .bold, design: .serif))
+                            .font(.adaptive(size: 15, weight: .bold, design: .serif))
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text(fenjin.jiaziName)
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.adaptive(size: 11, weight: .bold))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
                             .foregroundColor(fenjin.isAuspicious ? Color.green : Color.red)
                             .cornerRadius(4)
                         Text(fenjin.localizedGrade)
-                            .font(.system(size: 10))
+                            .font(.adaptive(size: 10))
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
@@ -222,17 +222,17 @@ public struct CompassMainView: View {
                     
                     HStack(spacing: 2) {
                         Text(lang.t("btn_fenjin_detail"))
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(Color.yanCyan)
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 9))
+                            .font(.adaptive(size: 9))
                             .foregroundColor(Color.yanCyan)
                     }
                 }
                 
                 HStack {
                     Text(fenjin.localizedLore)
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
                     Spacer()

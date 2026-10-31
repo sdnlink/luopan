@@ -31,10 +31,10 @@ public struct FengshuiPalaceDetailSheet: View {
                             HStack {
                                 HStack(spacing: 6) {
                                     Text("【\(p.gua)\(lang.t("gua_suffix")) · \(p.dir)】")
-                                        .font(.system(size: 16, weight: .bold, design: .serif))
+                                        .font(.adaptive(size: 16, weight: .bold, design: .serif))
                                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                     Text(p.elem)
-                                        .font(.system(size: 10, weight: .bold))
+                                        .font(.adaptive(size: 10, weight: .bold))
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(Color.white.opacity(0.12))
@@ -43,31 +43,31 @@ public struct FengshuiPalaceDetailSheet: View {
                                 }
                                 Spacer()
                                 Text("\(lang.t("family_member_corresp"))\(p.member)")
-                                    .font(.system(size: 11))
+                                    .font(.adaptive(size: 11))
                                     .foregroundColor(.white.opacity(0.8))
                             }
                             
                             Text(p.desc)
-                                .font(.system(size: 12))
+                                .font(.adaptive(size: 12))
                                 .foregroundColor(.white.opacity(0.85))
                                 .lineSpacing(3)
                             
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(lang.t("suitable_spaces"))
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.adaptive(size: 11, weight: .bold))
                                         .foregroundColor(.green)
                                     Text(p.bestRoom)
-                                        .font(.system(size: 11))
+                                        .font(.adaptive(size: 11))
                                         .foregroundColor(.white.opacity(0.8))
                                 }
                                 Spacer()
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(lang.t("forbidden_layouts"))
-                                        .font(.system(size: 11, weight: .bold))
+                                        .font(.adaptive(size: 11, weight: .bold))
                                         .foregroundColor(.red)
                                     Text(p.taboo)
-                                        .font(.system(size: 11))
+                                        .font(.adaptive(size: 11))
                                         .foregroundColor(.white.opacity(0.8))
                                 }
                             }

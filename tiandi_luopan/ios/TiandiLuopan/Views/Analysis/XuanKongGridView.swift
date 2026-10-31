@@ -163,7 +163,7 @@ public struct XuanKongGridView: View {
             selectedSubTab = index
         }) {
             Text(title)
-                .font(.system(size: isPad ? 14 : 12, weight: selectedSubTab == index ? .bold : .medium))
+                .font(.adaptive(size: 12, weight: selectedSubTab == index ? .bold : .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, isPad ? 10 : 8)
                 .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
@@ -179,11 +179,11 @@ public struct XuanKongGridView: View {
                     Image(systemName: "scroll.fill")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("tianji_scroll"))
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.adaptive(size: 13, weight: .bold))
                         .foregroundColor(.white)
                 }
                 Text(lang.t("xuankong_integrated_title"))
-                    .font(.system(size: 10))
+                    .font(.adaptive(size: 10))
                     .foregroundColor(.white.opacity(0.65))
             }
             
@@ -193,7 +193,7 @@ public struct XuanKongGridView: View {
                 showTianJiShuSheet = true
             }) {
                 Text(lang.t("one_click_export"))
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.adaptive(size: 11, weight: .bold))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
@@ -238,7 +238,7 @@ public struct XuanKongGridView: View {
         
         return VStack(spacing: 6) {
             Text(chart.periodMeta.label)
-                .font(.system(size: 12, weight: .bold))
+                .font(.adaptive(size: 12, weight: .bold))
                 .foregroundColor(chart.periodMeta.isCurrent ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.75))
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -259,10 +259,10 @@ public struct XuanKongGridView: View {
                                 Text("\(p)\(lang.t("xuankong_period_unit"))")
                                 if isLocked {
                                     Image(systemName: "lock.fill")
-                                        .font(.system(size: 8))
+                                        .font(.adaptive(size: 8))
                                 }
                             }
-                            .font(.system(size: isPad ? 15 : 13, weight: isSelected ? .bold : .medium))
+                            .font(.adaptive(size: 13, weight: isSelected ? .bold : .medium))
                             .frame(width: isLocked ? (isPad ? 62 : 52) : (isPad ? 52 : 44), height: isPad ? 36 : 32)
                             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .black : .white)
@@ -280,13 +280,13 @@ public struct XuanKongGridView: View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
                 Text("\(chart.sittingMountain)\(lang.t("mountain_suffix"))\(chart.facingMountain)\(lang.t("facing_suffix"))")
-                    .font(.system(size: 18, weight: .bold, design: .serif))
+                    .font(.adaptive(size: 18, weight: .bold, design: .serif))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 
                 Text(chart.patternType)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.adaptive(size: 12, weight: .bold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Color.orange.opacity(0.2))
@@ -303,9 +303,9 @@ public struct XuanKongGridView: View {
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.adaptive(size: 9, weight: .bold))
                         Text(chart.chartModeTitle)
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.adaptive(size: 11, weight: .semibold))
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -318,7 +318,7 @@ public struct XuanKongGridView: View {
                 HStack(spacing: 6) {
                     if chart.isSanBanGua {
                         Text(sanBanGuaBadgeText())
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.adaptive(size: 10, weight: .bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(Color.green.opacity(0.2))
@@ -327,7 +327,7 @@ public struct XuanKongGridView: View {
                     }
                     if chart.isQiXingDaJie {
                         Text(qiXingDaJieBadgeText())
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.adaptive(size: 10, weight: .bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.22))
@@ -371,29 +371,29 @@ public struct XuanKongGridView: View {
         return VStack {
             HStack {
                 Text("\(cell.sittingStar)")
-                    .font(.system(size: isPad ? 18 : 13, weight: .bold))
+                    .font(.adaptive(size: 13, weight: .bold))
                     .foregroundColor(Color.yanCyan)
                 Spacer()
                 Text("\(cell.facingStar)")
-                    .font(.system(size: isPad ? 18 : 13, weight: .bold))
+                    .font(.adaptive(size: 13, weight: .bold))
                     .foregroundColor(Color.orange)
             }
             
             Spacer(minLength: 2)
             
             Text("\(cell.periodStar)")
-                .font(.system(size: isPad ? 36 : 22, weight: .bold, design: .serif))
+                .font(.adaptive(size: 22, weight: .bold, design: .serif))
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
             Spacer(minLength: 2)
             
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.system(size: isPad ? 12 : 9))
+                    .font(.adaptive(size: 9))
                     .foregroundColor(.white.opacity(0.5))
                 Spacer()
                 Text(cell.localizedElement)
-                    .font(.system(size: isPad ? 12 : 9))
+                    .font(.adaptive(size: 9))
                     .foregroundColor(.white.opacity(0.5))
             }
         }
@@ -411,11 +411,11 @@ public struct XuanKongGridView: View {
     private func analysisCard(chart: XuanKongChart) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(lang.t("xuankong_deep_analysis"))
-                .font(.system(size: 14, weight: .bold))
+                .font(.adaptive(size: 14, weight: .bold))
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
             Text(chart.patternDesc)
-                .font(.system(size: 13))
+                .font(.adaptive(size: 13))
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(4)
             
@@ -425,14 +425,14 @@ public struct XuanKongGridView: View {
                 let sel = chart.palaces[selectedPalaceIdx]
                 HStack(spacing: 6) {
                     Text("【\(sel.localizedPalaceName)】")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.adaptive(size: 12, weight: .bold))
                         .foregroundColor(Color.yanCyan)
                     Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(.adaptive(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
                     Text(sel.localizedEvaluation)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.adaptive(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -448,7 +448,7 @@ public struct XuanKongGridView: View {
                 Text(chart.healthAdvice)
                 Text(chart.remedyAdvice)
             }
-            .font(.system(size: 11))
+            .font(.adaptive(size: 11))
             .foregroundColor(.white.opacity(0.7))
         }
         .padding(14)

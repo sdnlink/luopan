@@ -154,7 +154,8 @@ public struct XuanKongGridView: View {
         }
         .background(Color.white.opacity(0.08))
         .cornerRadius(8)
-        .padding(.horizontal, 16)
+        .frame(maxWidth: isPad ? 680 : .infinity)
+        .padding(.horizontal, isPad ? 0 : 16)
     }
     
     private func tabButton(title: String, index: Int) -> some View {
@@ -215,6 +216,8 @@ public struct XuanKongGridView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
                 )
         )
+        .frame(maxWidth: isPad ? 680 : .infinity)
+        .padding(.horizontal, isPad ? 0 : 16)
     }
     
     // MARK: - 玄空九星排盘内容
@@ -223,9 +226,9 @@ public struct XuanKongGridView: View {
             periodPickerBar(chart: chart)
             patternBadgeView(chart: chart)
             ninePalacesGrid(chart: chart)
-                .padding(.horizontal, 16)
             analysisCard(chart: chart)
-                .padding(.horizontal, 16)
+                .frame(maxWidth: isPad ? 680 : .infinity)
+                .padding(.horizontal, isPad ? 0 : 16)
         }
     }
     
@@ -334,6 +337,7 @@ public struct XuanKongGridView: View {
                 }
             }
         }
+        .frame(maxWidth: isPad ? 680 : .infinity)
     }
     
     // MARK: - 3x3 九宫飞星网格
@@ -353,6 +357,8 @@ public struct XuanKongGridView: View {
                     }
             }
         }
+        .frame(maxWidth: isPad ? 580 : .infinity)
+        .padding(.horizontal, isPad ? 0 : 16)
     }
     
     private func palaceCellView(cell: XuanKongPalace) -> some View {
@@ -362,34 +368,37 @@ public struct XuanKongGridView: View {
         let borderColor = isSelected ? Color.yanCyan : (isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12)))
         let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
         
-        return VStack(spacing: isPad ? 6 : 4) {
+        return VStack {
             HStack {
                 Text("\(cell.sittingStar)")
-                    .font(.system(size: isPad ? 16 : 13, weight: .bold))
+                    .font(.system(size: isPad ? 18 : 13, weight: .bold))
                     .foregroundColor(Color.yanCyan)
                 Spacer()
                 Text("\(cell.facingStar)")
-                    .font(.system(size: isPad ? 16 : 13, weight: .bold))
+                    .font(.system(size: isPad ? 18 : 13, weight: .bold))
                     .foregroundColor(Color.orange)
             }
             
+            Spacer(minLength: 2)
+            
             Text("\(cell.periodStar)")
-                .font(.system(size: isPad ? 28 : 22, weight: .bold, design: .serif))
+                .font(.system(size: isPad ? 36 : 22, weight: .bold, design: .serif))
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                .padding(.vertical, isPad ? 6 : 2)
+            
+            Spacer(minLength: 2)
             
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.system(size: isPad ? 11 : 9))
+                    .font(.system(size: isPad ? 12 : 9))
                     .foregroundColor(.white.opacity(0.5))
                 Spacer()
                 Text(cell.localizedElement)
-                    .font(.system(size: isPad ? 11 : 9))
+                    .font(.system(size: isPad ? 12 : 9))
                     .foregroundColor(.white.opacity(0.5))
             }
         }
         .padding(isPad ? 12 : 8)
-        .frame(minHeight: isPad ? 108 : 74)
+        .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)
         .overlay(

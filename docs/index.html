@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天机演象 · 官方技术支持 | YanXiang Compass Official Support</title>
+    <style>
+        :root {
+            --gold-primary: #d4af37;
+            --gold-light: #f3e5ab;
+            --bg-dark: #121216;
+            --card-bg: #1c1d24;
+            --border-color: #2e303d;
+            --text-main: #f0f0f5;
+            --text-muted: #9aa0a6;
+            --accent-green: #2ecc71;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            padding-bottom: 60px;
+        }
+
+        /* 顶部导航 */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(18, 18, 22, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 100%;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 9px;
+            background: linear-gradient(135deg, #d4af37, #8c6d1f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.25);
+        }
+
+        .brand-title {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--gold-light);
+        }
+
+        .lang-picker select {
+            background: #252733;
+            color: var(--gold-light);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .lang-picker select:hover, .lang-picker select:focus {
+            border-color: var(--gold-primary);
+        }
+
+        /* 容器 */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* 英雄横幅 */
+        .hero {
+            padding: 50px 0 35px;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--gold-light);
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .hero p {
+            font-size: 16px;
+            color: var(--text-muted);
+            max-width: 680px;
+            margin: 0 auto 24px;
+        }
+
+        .hero-badges {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            background: rgba(212, 175, 55, 0.1);
+            color: var(--gold-primary);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+        }
+
+        /* 卡片通用 */
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--gold-light);
+            margin: 40px 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 22px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(212, 175, 55, 0.4);
+        }
+
+        .card-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+
+        .card h3 {
+            font-size: 17px;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* FAQ 手风琴 */
+        .faq-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .faq-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+
+        .faq-item:hover {
+            border-color: rgba(212, 175, 55, 0.35);
+        }
+
+        .faq-question {
+            padding: 16px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .faq-question::after {
+            content: "+";
+            font-size: 20px;
+            color: var(--gold-primary);
+            transition: transform 0.2s;
+        }
+
+        .faq-item.active .faq-question::after {
+            content: "−";
+        }
+
+        .faq-answer {
+            display: none;
+            padding: 0 20px 18px;
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 12px;
+        }
+
+        .faq-item.active .faq-answer {
+            display: block;
+        }
+
+        /* 联系方式区域 */
+        .contact-box {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.08), rgba(28, 29, 36, 0.95));
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .contact-box h2 {
+            font-size: 22px;
+            color: var(--gold-light);
+            margin-bottom: 10px;
+        }
+
+        .contact-box p {
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .contact-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #d4af37, #aa820a);
+            color: #121216;
+            text-decoration: none;
+            font-weight: 700;
+            padding: 12px 28px;
+            border-radius: 30px;
+            box-shadow: 0 4px 16px rgba(212, 175, 55, 0.3);
+            transition: all 0.2s;
+            font-size: 15px;
+        }
+
+        .contact-btn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 6px 20px rgba(212, 175, 55, 0.45);
+        }
+
+        footer {
+            margin-top: 60px;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 24px; }
+            .hero p { font-size: 14px; }
+            .contact-box { padding: 22px 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-icon">🧭</div>
+            <div class="brand-title" id="txt-app-title">天机演象</div>
+        </div>
+        <div class="lang-picker">
+            <select id="lang-select" onchange="switchLanguage(this.value)">
+                <option value="zh-Hans">简体中文 (Simplified Chinese)</option>
+                <option value="zh-Hant">繁體中文 (Traditional Chinese)</option>
+                <option value="en">English (US)</option>
+                <option value="ja">日本語 (Japanese)</option>
+                <option value="ko">한국어 (Korean)</option>
+                <option value="vi">Tiếng Việt (Vietnamese)</option>
+                <option value="th">ไทย (Thai)</option>
+                <option value="id">Bahasa Indonesia</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 英雄横幅 -->
+        <section class="hero">
+            <h1 id="txt-hero-title">官方技术支持与客户服务中心</h1>
+            <p id="txt-hero-desc">我们随时为您解答关于天机演象（YanXiang Compass）在传感器校准、AR实景透视、户型立极计算以及 Apple 内购订阅等方面的任何问题。</p>
+            <div class="hero-badges">
+                <span class="badge">🔒 <span id="txt-badge-privacy">本地计算 · 零隐私上传</span></span>
+                <span class="badge">⚡ <span id="txt-badge-response">人工技术支持 · 24小时内响应</span></span>
+                <span class="badge">🍎 <span id="txt-badge-apple">原生 Apple StoreKit 认证支持</span></span>
+            </div>
+        </section>
+
+        <!-- 核心功能与使用引导 -->
+        <h2 class="section-title">💡 <span id="txt-features-title">功能指南与使用建议</span></h2>
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-icon">🧭</div>
+                <h3 id="txt-card1-title">高精度双轴罗盘与水准仪</h3>
+                <p id="txt-card1-desc">利用 iPhone 内置陀螺仪与磁力计实时运算 360° 方位角与 120 分金吉凶，双轴太极水准球助您精准掌控平水校准。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">📷</div>
+                <h3 id="txt-card2-title">AR 实景天心透视与形煞立向</h3>
+                <p id="txt-card2-desc">基于 AVFoundation 与真实相机视角，实地对准门向、天心线与周围环境形煞，支持带方位度数水印的高清存证快照。</p>
+            </div>
+            <div class="card">
+                <div class="card-icon">🏡</div>
+                <h3 id="txt-card3-title">户型空间立极与九宫体检</h3>
+                <p id="txt-card3-desc">导入房型蓝图，自动或手动定位中宫几何重心，半透明层叠透视大门、灶位、卫生间及财位文昌吉凶布局。</p>
+            </div>
+        </div>
+
+        <!-- 常见问题 FAQ -->
+        <h2 class="section-title">❓ <span id="txt-faq-title">常见问题解答 (FAQ)</span></h2>
+        <div class="faq-list">
+            <div class="faq-item">
+                <div class="faq-question" id="txt-q1">1. 罗盘指针晃动或指向有偏差，如何校准？</div>
+                <div class="faq-answer" id="txt-a1">
+                    由于手机内置磁力计易受周围钢筋水泥、强磁场（如磁吸手机壳、电磁炉或扬声器）干扰。校准方法：
+                    <br>1) 握持手机在空中画“8”字形晃动 3~5 次即可重新校准地磁传感器；
+                    <br>2) 尽量远离大块金属物体或摘下含强磁铁的手机壳后测量；
+                    <br>3) 开启系统定位权限，App 将自动借助国际地磁模型（WMM）为您进行精确的“真北与磁北”磁偏角校正。
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" id="txt-q2">2. 进入 AR 实景模式时画面黑屏或提示无权限？</div>
+                <div class="faq-answer" id="txt-a2">
+                    AR 实景透视需要使用系统相机权限。请前往 iPhone 的【设置】->【隐私与安全性】->【相机】，找到【天机演象】并开启相机访问权限，随后重新进入 App 即可恢复正常预览。
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" id="txt-q3">3. 更换手机或重新安装后，如何找回已购买的会员？</div>
+                <div class="faq-answer" id="txt-a3">
+                    本应用的所有订阅及大师终身版均由 Apple ID 官方托管：
+                    <br>1) 确保新设备上登录的是购买该产品的同一个 Apple ID；
+                    <br>2) 打开本应用，进入【设置】-> 点击【恢复已购项目 (Restore Purchases)】按钮；
+                    <br>3) 系统将自动向 Apple App Store 服务器验证收据并立即恢复您的所有 VIP/终身权益，绝不会产生二次扣费。
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" id="txt-q4">4. 导出的“天机宣纸长卷”或户型快照保存在哪里？</div>
+                <div class="faq-answer" id="txt-a4">
+                    导出的高清无水印宣纸长卷及测算存证快照会直接写入您 iPhone 的系统相册。请确保在系统弹窗提示时允许本应用写入相册权限。若未找到，可在【照片】App 的“最近项目”或相册列表内查看。
+                </div>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question" id="txt-q5">5. 为什么应用不需要注册账号？数据会泄露吗？</div>
+                <div class="faq-answer" id="txt-a5">
+                    我们坚持极简与本地隐私至上的理念。本应用完全运行在手机本地，不设外部中央数据库，不搜集您的手机号、身份信息或照片。所有测量数据只存在于您的设备本地沙盒中，安全纯净。
+                </div>
+            </div>
+        </div>
+
+        <!-- 联系支持 -->
+        <div class="contact-box">
+            <h2 id="txt-contact-title">仍需进一步协助？联系技术支持团队</h2>
+            <p id="txt-contact-desc">如果您在使用过程中遇到任何 Bug、支付异常或有宝贵的功能建议，欢迎随时与我们的工程师团队直接取得联系。</p>
+            <a class="contact-btn" href="mailto:support@sdnlink.cn?subject=天机演象iOS技术支持反馈">
+                ✉️ <span id="txt-contact-btn">发送支持邮件 (support@sdnlink.cn)</span>
+            </a>
+            <div style="margin-top: 14px; font-size: 12px; color: #777;" id="txt-contact-hours">服务时间：周一至周日 09:00 - 21:00 (GMT+8) · 承诺 24 小时内跟进处理</div>
+        </div>
+
+        <!-- 页脚 -->
+        <footer>
+            <p>© 2026 天机演象 (YanXiang Compass) · 保留所有权利 (All Rights Reserved)</p>
+            <p style="margin-top: 6px;"><a href="privacy.html" style="color: var(--gold-primary); text-decoration: none;" id="txt-footer-privacy">隐私政策 (Privacy Policy)</a></p>
+        </footer>
+    </div>
+
+    <!-- 8 语言字典与切换脚本 -->
+    <script>
+        const i18nData = {
+            "zh-Hans": {
+                appTitle: "天机演象",
+                heroTitle: "官方技术支持与客户服务中心",
+                heroDesc: "我们随时为您解答关于天机演象（YanXiang Compass）在传感器校准、AR实景透视、户型立极计算以及 Apple 内购订阅等方面的任何问题。",
+                badgePrivacy: "本地计算 · 零隐私上传",
+                badgeResponse: "人工技术支持 · 24小时内响应",
+                badgeApple: "原生 Apple StoreKit 认证支持",
+                featuresTitle: "功能指南与使用建议",
+                card1Title: "高精度双轴罗盘与水准仪",
+                card1Desc: "利用 iPhone 内置陀螺仪与磁力计实时运算 360° 方位角与 120 分金吉凶，双轴太极水准球助您精准掌控平水校准。",
+                card2Title: "AR 实景天心透视与形煞立向",
+                card2Desc: "基于 AVFoundation 与真实相机视角，实地对准门向、天心线与周围环境形煞，支持带方位度数水印的高清存证快照。",
+                card3Title: "户型空间立极与九宫体检",
+                card3Desc: "导入房型蓝图，自动或手动定位中宫几何重心，半透明层叠透视大门、灶位、卫生间及财位文昌吉凶布局。",
+                faqTitle: "常见问题解答 (FAQ)",
+                q1: "1. 罗盘指针晃动或指向有偏差，如何校准？",
+                a1: "由于手机内置磁力计易受周围钢筋水泥、强磁场（如磁吸手机壳、电磁炉或扬声器）干扰。校准方法：<br>1) 握持手机在空中画“8”字形晃动 3~5 次即可重新校准地磁传感器；<br>2) 尽量远离大块金属物体或摘下含强磁铁的手机壳后测量；<br>3) 开启系统定位权限，App 将自动借助国际地磁模型（WMM）为您进行精确的“真北与磁北”磁偏角校正。",
+                q2: "2. 进入 AR 实景模式时画面黑屏或提示无权限？",
+                a2: "AR 实景透视需要使用系统相机权限。请前往 iPhone 的【设置】->【隐私与安全性】->【相机】，找到【天机演象】并开启相机访问权限，随后重新进入 App 即可恢复正常预览。",
+                q3: "3. 更换手机或重新安装后，如何找回已购买的会员？",
+                a3: "本应用的所有订阅及大师终身版均由 Apple ID 官方托管：<br>1) 确保新设备上登录的是购买该产品的同一个 Apple ID；<br>2) 打开本应用，进入【设置】-> 点击【恢复已购项目 (Restore Purchases)】按钮；<br>3) 系统将自动向 Apple App Store 服务器验证收据并立即恢复您的所有 VIP/终身权益，绝不会产生二次扣费。",
+                q4: "4. 导出的“天机宣纸长卷”或户型快照保存在哪里？",
+                a4: "导出的高清无水印宣纸长卷及测算存证快照会直接写入您 iPhone 的系统相册。请确保在系统弹窗提示时允许本应用写入相册权限。若未找到，可在【照片】App 的“最近项目”或相册列表内查看。",
+                q5: "5. 为什么应用不需要注册账号？数据会泄露吗？",
+                a5: "我们坚持极简与本地隐私至上的理念。本应用完全运行在手机本地，不设外部中央数据库，不搜集您的手机号、身份信息或照片。所有测量数据只存在于您的设备本地沙盒中，安全纯净。",
+                contactTitle: "仍需进一步协助？联系技术支持团队",
+                contactDesc: "如果您在使用过程中遇到任何 Bug、支付异常或有宝贵的功能建议，欢迎随时与我们的工程师团队直接取得联系。",
+                contactBtn: "发送支持邮件 (support@sdnlink.cn)",
+                contactHours: "服务时间：周一至周日 09:00 - 21:00 (GMT+8) · 承诺 24 小时内跟进处理",
+                footerPrivacy: "隐私政策 (Privacy Policy)"
+            },
+            "zh-Hant": {
+                appTitle: "天機演象",
+                heroTitle: "官方技術支援與客戶服務中心",
+                heroDesc: "我們隨時為您解答關於天機演象（YanXiang Compass）在感測器校準、AR實景透視、戶型立極計算以及 Apple 內購訂閱等方面的任何問題。",
+                badgePrivacy: "本地運算 · 零隱私上傳",
+                badgeResponse: "人工技術支援 · 24小時內回覆",
+                badgeApple: "原生 Apple StoreKit 認證支援",
+                featuresTitle: "功能指南與使用建議",
+                card1Title: "高精度雙軸羅盤與水準儀",
+                card1Desc: "利用 iPhone 內建陀螺儀與磁力儀即時運算 360° 方位角與 120 分金吉凶，雙軸太極水準球助您精準掌控平水校準。",
+                card2Title: "AR 實景天心透視與形煞立向",
+                card2Desc: "基於 AVFoundation 與真實相機視角，實地對準門向、天心線與周圍環境形煞，支援帶方位度數水印的高清存證快照。",
+                card3Title: "戶型空間立極與九宮體檢",
+                card3Desc: "匯入房型藍圖，自動或手動定位中宮幾何重心，半透明層疊透視大門、灶位、洗手間及財位文昌吉凶佈局。",
+                faqTitle: "常見問題解答 (FAQ)",
+                q1: "1. 羅盤指針晃動或指向有偏差，如何校準？",
+                a1: "由於手機內建磁力儀易受周圍鋼筋水泥、強磁場干擾。校準方法：<br>1) 手持手機在空中畫“8”字形晃動 3~5 次即可重新校準；<br>2) 遠離大型金屬物體或卸下含強磁鐵的手機殼；<br>3) 開啟定位權限，App 將依據國際地磁模型（WMM）自動進行磁偏角真北校正。",
+                q2: "2. 進入 AR 實景模式時畫面黑屏或提示無權限？",
+                a2: "請前往 iPhone 的【設定】->【隱私權與安全性】->【相機】，找到【天機演象】並開啟相機權限，隨後重新打開 App 即可恢復。",
+                q3: "3. 更換手機後，如何找回已購買的會員權益？",
+                a3: "所有訂閱及終身買斷均由 Apple ID 託管：<br>1) 確保新手機登入同一個 Apple ID；<br>2) 進入 App【設定】點擊【恢復購買 (Restore Purchases)】；<br>3) 系統將自動向 Apple 驗證收據並恢復權益，絕無二次收費。",
+                q4: "4. 導出的宣紙長卷或戶型快照儲存在哪裡？",
+                a4: "導出圖片將直接寫入您 iPhone 的內建相簿。請確保允許本應用寫入相簿權限，可在【照片】App 中查看。",
+                q5: "5. 為什麼不需要註冊帳號？數據會外洩嗎？",
+                a5: "本應用全面離線運行，無任何外部中央伺服器，不蒐集您的私人資訊，數據僅存於設備沙盒中，絕對安全。",
+                contactTitle: "仍需進一步協助？聯絡技術支援團隊",
+                contactDesc: "如果您在體驗中遇到任何疑問或功能建議，歡迎直接發送郵件與我們聯繫。",
+                contactBtn: "發送支援郵件 (support@sdnlink.cn)",
+                contactHours: "服務時間：週一至週日 09:00 - 21:00 (GMT+8) · 24 小時內處理",
+                footerPrivacy: "隱私政策 (Privacy Policy)"
+            },
+            "en": {
+                appTitle: "YanXiang Compass",
+                heroTitle: "Official Technical Support & Help Center",
+                heroDesc: "We are here to assist you with any questions regarding YanXiang Compass: sensor calibration, AR survey, floorplan analysis, and Apple In-App Purchases.",
+                badgePrivacy: "Local-First · Zero Cloud Tracking",
+                badgeResponse: "Direct Support · Response within 24h",
+                badgeApple: "Official Apple StoreKit Integration",
+                featuresTitle: "Features & User Guide",
+                card1Title: "High-Precision Dual-Axis Compass & Level",
+                card1Desc: "Leverages iPhone's gyroscope and magnetometer for real-time 360° heading and 120-Fenjin calculations with an integrated spirit bubble.",
+                card2Title: "AR Real-World Sightline & Spatial Survey",
+                card2Desc: "Uses AVFoundation camera streaming to align architectural facing and environmental features with watermarked precision snapshots.",
+                card3Title: "Floorplan Centroid & Palace Audit",
+                card3Desc: "Imports blueprints to locate geometric centroids and overlay Nine-Palace Feng Shui diagnostics for doors, kitchens, and study areas.",
+                faqTitle: "Frequently Asked Questions (FAQ)",
+                q1: "1. The compass dial seems jittery or inaccurate. How do I calibrate?",
+                a1: "Smartphones can be influenced by nearby ferromagnetic materials or magnetic cases. To calibrate:<br>1) Wave your iPhone in a figure-8 motion 3-5 times in the air;<br>2) Move away from large metal objects or magnetic phone accessories;<br>3) Allow location access so the App can correct for True North using the World Magnetic Model (WMM).",
+                q2: "2. The AR camera screen is black or permission was denied?",
+                a2: "AR survey requires camera access. Please open iOS <b>Settings -> Privacy & Security -> Camera</b>, locate <b>YanXiang Compass</b> and enable Camera permission, then relaunch the app.",
+                q3: "3. How do I restore my purchases after changing or restoring devices?",
+                a3: "All subscriptions and lifetime purchases are secured by your Apple ID:<br>1) Ensure you are logged into the same Apple ID on the new device;<br>2) Open the App, go to <b>Settings</b> and tap <b>Restore Purchases</b>;<br>3) Apple StoreKit will re-validate your receipt and restore your entitlements instantly without extra charges.",
+                q4: "4. Where are exported high-resolution scrolls and snapshots saved?",
+                a4: "Exported charts and reports are saved directly to your iPhone's <b>Photos</b> library. Please ensure photo write permissions are granted when prompted.",
+                q5: "5. Why is no account login required? Is my data safe?",
+                a5: "We believe in privacy by design. The app executes all computations on-device with zero external servers. Your architectural floorplans and compass readings remain private to your phone.",
+                contactTitle: "Need Further Assistance? Contact Us",
+                contactDesc: "If you encounter any bugs, payment issues, or have feature requests, our engineering team is here to help.",
+                contactBtn: "Send Support Email (support@sdnlink.cn)",
+                contactHours: "Hours: Monday - Sunday 09:00 - 21:00 (GMT+8) · 24-hour turnaround",
+                footerPrivacy: "Privacy Policy"
+            },
+            "ja": {
+                appTitle: "天機演象",
+                heroTitle: "公式テクニカルサポート＆ヘルプセンター",
+                heroDesc: "天機演象（YanXiang Compass）のセンサー校正、AR実景透視、間取り図重心測定、Appleアプリ内課金に関するお問い合わせに対応いたします。",
+                badgePrivacy: "完全ローカル処理 · プライバシー保護",
+                badgeResponse: "専任サポート · 24時間以内回答",
+                badgeApple: "Apple StoreKit 公式連携",
+                featuresTitle: "機能ガイドと使い方のヒント",
+                card1Title: "高精度2軸電子羅盤と水準器",
+                card1Desc: "iPhoneのジャイロと磁気センサーを活用し、360度の方位角と120分金をリアルタイム表示。水準器球で正確な水平測定をサポートします。",
+                card2Title: "AR空間透視と現地方位測定",
+                card2Desc: "カメラ実景と天心十道グリッドを重ね合わせ、玄関や周辺建物の吉凶方位を正確に視認。方位印字付き高解像度スナップショットに対応。",
+                card3Title: "間取り図の幾何重心と九宮風水診断",
+                card3Desc: "図面画像を読み込み、幾何学的重心を自動／手動で立極。九宮八宅の配置（財位、玄関、キッチンなど）を直感的に透視診断します。",
+                faqTitle: "よくあるご質問 (FAQ)",
+                q1: "1. コンパスの針がブレたり精度が落ちた場合の校正方法は？",
+                a1: "周囲の鉄骨や磁気ケースの影響を受けることがあります。<br>1) 端末を空中でゆっくり「8」の字を描くように数回振ってください。<br>2) 磁石付きスマホカバーを外して測定してください。<br>3) 位置情報権限を許可すると、世界磁気モデル（WMM）に基づき真北の自動補正が行われます。",
+                q2: "2. ARモード起動時に画面が真っ暗になる場合の対処法は？",
+                a2: "カメラ権限が必要です。iPhoneの【設定】->【プライバシーとセキュリティ】->【カメラ】から【天機演象】をオンに設定してください。",
+                q3: "3. 機種変更後、購入済みの会員プランを復元するには？",
+                a3: "購入履歴はApple IDに紐づいています。<br>1) 購入時と同じApple IDでサインインしていることを確認します。<br>2) アプリ内の【設定】から【購入を復元 (Restore Purchases)】をタップしてください。<br>3) 追加料金なしで即座にVIP・永久版が再適用されます。",
+                q4: "4. 保存した天機宣紙長巻やレポートはどこに保存されますか？",
+                a4: "iPhone標準の「写真」アプリに直接保存されます。初回保存時に写真アクセス権限を許可してください。",
+                q5: "5. アカウント登録が不要な理由とデータの安全性は？",
+                a5: "プライバシー重視のため、本アプリは外部サーバーを持たず完全オフラインで動作します。お客様のデータが外部へ送信されることは一切ありません。",
+                contactTitle: "解決しない場合のお問い合わせ",
+                contactDesc: "不具合のご報告、課金トラブル、機能のご要望などがございましたら、お気軽に開発チームまでご連絡ください。",
+                contactBtn: "サポートメールを送信 (support@sdnlink.cn)",
+                contactHours: "対応時間：月〜日 09:00 - 21:00 (GMT+8) · 24時間以内にご返答",
+                footerPrivacy: "プライバシーポリシー (Privacy Policy)"
+            },
+            "ko": {
+                appTitle: "천기연상",
+                heroTitle: "공식 기술 지원 및 고객 서비스 센터",
+                heroDesc: "천기연상(YanXiang Compass)의 센서 보정, AR 증강현실 측정, 평면도 중심 분석 및 Apple 인앱 결제에 관한 모든 문의를 신속하게 지원합니다.",
+                badgePrivacy: "로컬 오프라인 연산 · 개인정보 수집 없음",
+                badgeResponse: "전문 지원팀 · 24시간 이내 응답",
+                badgeApple: "공식 Apple StoreKit 연동 지원",
+                featuresTitle: "주요 기능 및 사용 가이드",
+                card1Title: "고정밀 2축 나침반 및 수평계",
+                card1Desc: "iPhone의 자이로스코프와 지자기 센서를 활용하여 360° 방위각과 120분금을 실시간 연산하며 정확한 수평을 지원합니다.",
+                card2Title: "AR 실경 천심선 및 현장 방위 측정",
+                card2Desc: "카메라 화면 위에 나침반 십자선을 증강현실로 투영하여 건물 좌향과 주변 환경을 정밀하게 측정하고 워터마크 스냅샷을 저장합니다.",
+                card3Title: "도면 중심점 계산 및 구궁 풍수 진단",
+                card3Desc: "평면도를 불러와 기하학적 중심점을 자동으로 설정하고 현관, 주방, 재물운 및 문창 방위를 반투명 오버레이로 진단합니다.",
+                faqTitle: "자주 묻는 질문 (FAQ)",
+                q1: "1. 나침반 바늘이 흔들리거나 방향이 맞지 않을 때 해결법은?",
+                a1: "주변의 금속이나 자석 케이스의 간섭을 받을 수 있습니다.<br>1) 기기를 공중에서 '8'자 모양으로 3~5회 흔들어 지자기 센서를 보정하세요.<br>2) 자석이 내장된 케이스를 분리한 후 측정하세요.<br>3) 위치 권한을 허용하면 국제지자기모델(WMM)을 기반으로 진북 편각이 자동 보정됩니다.",
+                q2: "2. AR 모드 진입 시 카메라 화면이 검게 나오는 경우?",
+                a2: "iPhone의 [설정] -> [개인정보 보호 및 보안] -> [카메라]에서 [천기연상] 앱의 접근 권한을 켠 후 앱을 다시 실행해 주세요.",
+                q3: "3. 기기 변경 후 기존에 구매한 멤버십을 복원하려면?",
+                a3: "모든 구매 내역은 사용자의 Apple ID로 관리됩니다.<br>1) 동일한 Apple ID로 로그인되어 있는지 확인합니다.<br>2) 앱 내 [설정] 메뉴에서 [구매 복원 (Restore Purchases)] 버튼을 누릅니다.<br>3) 추가 결제 없이 기존 VIP 및 평생 소장 권한이 즉시 복원됩니다.",
+                q4: "4. 내보낸 한지 족자 보고서와 사진은 어디에 저장되나요?",
+                a4: "iPhone의 기본 [사진] 앱에 자동으로 저장됩니다. 사진 저장 권한 팝업 시 허용을 선택해 주세요.",
+                q5: "5. 회원가입이 필요 없는 이유와 보안은 안전한가요?",
+                a5: "개인정보 보호를 위해 앱은 외부 서버 없이 기기 내부에서만 작동합니다. 측정 데이터와 사진은 절대 외부로 전송되지 않습니다.",
+                contactTitle: "도움이 더 필요하신가요? 엔지니어 지원팀 문의",
+                contactDesc: "결제 오류, 버그 제보 또는 기능 제안이 있으시면 언제든지 지원팀으로 이메일을 보내주세요.",
+                contactBtn: "지원 이메일 보내기 (support@sdnlink.cn)",
+                contactHours: "운영 시간: 월~일 09:00 - 21:00 (GMT+8) · 24시간 이내 답변",
+                footerPrivacy: "개인정보 처리방침 (Privacy Policy)"
+            },
+            "vi": {
+                appTitle: "YanXiang Compass",
+                heroTitle: "Trung Tâm Hỗ Trợ Kỹ Thuật Chính Thức",
+                heroDesc: "Chúng tôi luôn sẵn sàng giải đáp mọi thắc mắc về La Bàn Thiên Cơ Diễn Tượng (YanXiang Compass): hiệu chuẩn cảm biến, camera AR, phong thủy mặt bằng và thanh toán Apple StoreKit.",
+                badgePrivacy: "Xử lý cục bộ · Bảo mật tuyệt đối",
+                badgeResponse: "Hỗ trợ kỹ thuật · Phản hồi trong 24h",
+                badgeApple: "Tích hợp chuẩn Apple StoreKit",
+                featuresTitle: "Hướng Dẫn Tính Năng & Sử Dụng",
+                card1Title: "La Bàn Kép & Thước Thủy Chuẩn Xác",
+                card1Desc: "Sử dụng con quay hồi chuyển và cảm biến từ tính của iPhone để tính toán góc phương vị 360° cùng bọt thủy cân bằng theo thời gian thực.",
+                card2Title: "Khảo Sát Thực Tế AR & Xác Định Hướng",
+                card2Desc: "Chiếu hệ thống chữ thập và độ số la bàn trực tiếp lên cảnh quan thực tế qua camera, hỗ trợ chụp ảnh bằng chứng có dấu nước tọa độ.",
+                card3Title: "Lập Cực Mặt Bằng & Chẩn Đoán Bát Trạch",
+                card3Desc: "Nhập sơ đồ nhà, tự động xác định tâm điểm hình học và xếp chồng Cửu Cung để đánh giá vị trí cửa chính, bếp và tài vị.",
+                faqTitle: "Câu Hỏi Thường Gặp (FAQ)",
+                q1: "1. Kim la bàn bị rung lắc hoặc sai lệch, cách hiệu chuẩn ra sao?",
+                a1: "Do cảm biến bị ảnh hưởng bởi kim loại hoặc ốp lưng từ tính.<br>1) Cầm điện thoại vẽ hình số '8' trong không khí 3-5 lần;<br>2) Tháo ốp lưng có nam châm khi đo đạc;<br>3) Bật quyền vị trí để ứng dụng tự động bù trừ độ lệch từ Bắc thực (WMM).",
+                q2: "2. Màn hình AR bị đen hoặc báo lỗi quyền truy cập?",
+                a2: "Vui lòng vào <b>Cài đặt iOS -> Quyền riêng tư & Bảo mật -> Camera</b>, tìm <b>YanXiang Compass</b> và bật quyền cho phép.",
+                q3: "3. Làm sao để khôi phục gói VIP sau khi đổi điện thoại mới?",
+                a3: "Tất cả gói đăng ký được liên kết với Apple ID của bạn:<br>1) Đăng nhập cùng một Apple ID trên máy mới;<br>2) Vào mục <b>Cài đặt</b> trong app và chọn <b>Khôi phục giao dịch mua (Restore Purchases)</b>;<br>3) Quyền lợi của bạn sẽ được kích hoạt lại ngay lập tức mà không phát sinh phí.",
+                q4: "4. Bản đồ phong thủy giấy xuyến xuất ra được lưu ở đâu?",
+                a4: "Ảnh xuất ra với độ nét cao được lưu trực tiếp vào ứng dụng <b>Ảnh (Photos)</b> trên iPhone của bạn.",
+                q5: "5. Vì sao không cần đăng ký tài khoản? Dữ liệu có an toàn không?",
+                a5: "Ứng dụng hoạt động hoàn toàn offline trên máy, không có máy chủ trung gian và không thu thập bất kỳ dữ liệu cá nhân nào.",
+                contactTitle: "Bạn Vẫn Cần Hỗ Trợ? Liên Hệ Đội Ngũ Kỹ Thuật",
+                contactDesc: "Nếu gặp bất kỳ sự cố nào hoặc có đề xuất cải tiến, hãy gửi thư trực tiếp cho các kỹ sư của chúng tôi.",
+                contactBtn: "Gửi Email Hỗ Trợ (support@sdnlink.cn)",
+                contactHours: "Thời gian: Thứ 2 - Chủ Nhật 09:00 - 21:00 (GMT+8) · Phản hồi trong 24 giờ",
+                footerPrivacy: "Chính Sách Quyền Riêng Tư (Privacy Policy)"
+            },
+            "th": {
+                appTitle: "YanXiang Compass",
+                heroTitle: "ศูนย์สนับสนุนด้านเทคนิคและบริการลูกค้า",
+                heroDesc: "เราพร้อมตอบทุกคำถามเกี่ยวกับการใช้งาน YanXiang Compass: การปรับเทียบเซ็นเซอร์, โหมดความจริงเสริม AR, การวิเคราะห์แปลนบ้าน และการสมัครสมาชิก Apple IAP",
+                badgePrivacy: "ประมวลผลบนเครื่อง · ไร้การอัปโหลดข้อมูล",
+                badgeResponse: "ทีมงานช่วยเหลือ · ตอบกลับภายใน 24 ชม.",
+                badgeApple: "รองรับระบบทางการของ Apple StoreKit",
+                featuresTitle: "คำแนะนำฟังก์ชันและการใช้งาน",
+                card1Title: "เข็มทิศความแม่นยำสูงและระดับน้ำ",
+                card1Desc: "ใช้เซ็นเซอร์วัดการหมุนและสนามแม่เหล็กของ iPhone เพื่อคำนวณทิศทาง 360° แบบเรียลไทม์ พร้อมลูกปะดับน้ำวัดความเอียง",
+                card2Title: "ระบบ AR จำลองมุมมองและทิศทางจริง",
+                card2Desc: "ฉายแกนเข็มทิศทับซ้อนกับภาพจริงจากกล้องเพื่อเล็งทิศทางอาคารและสภาพแวดล้อม พร้อมบันทึกภาพถ่ายที่มีลายน้ำพิกัด",
+                card3Title: "การหาจุดศูนย์ถ่วงแปลนบ้านและผังเก้าช่อง",
+                card3Desc: "นำเข้าภาพแปลนห้องเพื่อหาจุดศูนย์กลางทางเรขาคณิต พร้อมวิเคราะห์ตำแหน่งประตู ห้องครัว และตำแหน่งมงคล",
+                faqTitle: "คำถามที่พบบ่อย (FAQ)",
+                q1: "1. เข็มทิศหมุนแกว่งหรือไม่ตรง มีวิธีปรับเทียบอย่างไร?",
+                a1: "อาจเกิดจากการรบกวนของแม่เหล็กหรือเคสโทรศัพท์:<br>1) ถือโทรศัพท์แล้วแกว่งเป็นรูปเลข '8' ในอากาศ 3-5 ครั้ง;<br>2) ถอดเคสที่มีแถบแม่เหล็กออกก่อนทำการวัด;<br>3) เปิดการเข้าถึงตำแหน่งเพื่อคำนวณมุมเบี่ยงเบนแม่เหล็กโลก (WMM) ไปยังทิศเหนือจริงโดยอัตโนมัติ",
+                q2: "2. เมื่อเปิดโหมด AR แล้วหน้าจอดำหรือแจ้งว่าไม่มีสิทธิ์?",
+                a2: "โปรดไปที่ <b>การตั้งค่า iOS -> ความเป็นส่วนตัวและความปลอดภัย -> กล้อง</b> ค้นหา <b>YanXiang Compass</b> และเปิดใช้งานสิทธิ์กล้อง",
+                q3: "3. เมื่อเปลี่ยนเครื่องใหม่ จะกู้คืนสถานะสมาชิกที่เคยซื้อได้อย่างไร?",
+                a3: "การซื้อทั้งหมดจะผูกกับ Apple ID ของคุณ:<br>1) เข้าสู่ระบบด้วย Apple ID เดียวกันบนอุปกรณ์ใหม่;<br>2) เปิดแอป ไปที่เมนู <b>การตั้งค่า</b> แล้วกด <b>กู้คืนรายการซื้อ (Restore Purchases)</b>;<br>3) สิทธิ์ VIP หรือตลอดชีพจะได้รับการเปิดใช้งานใหม่อีกครั้งทันทีโดยไม่มีค่าใช้จ่าย",
+                q4: "4. ภาพบันทึกรายงานม้วนกระดาษโบราณถูกบันทึกไว้ที่ใด?",
+                a4: "ไฟล์รูปภาพความละเอียดสูงจะถูกบันทึกลงในแอป <b>รูปภาพ (Photos)</b> ของ iPhone โดยตรง",
+                q5: "5. ทำไมถึงไม่ต้องลงทะเบียนบัญชี? ข้อมูลปลอดภัยหรือไม่?",
+                a5: "แอปทำงานแบบออฟไลน์ทั้งหมดบนตัวเครื่อง โดยไม่มีเซิร์ฟเวอร์ภายนอกและไม่เก็บข้อมูลส่วนบุคคลของคุณ",
+                contactTitle: "ต้องการความช่วยเหลือเพิ่มเติม? ติดต่อทีมเทคนิค",
+                contactDesc: "หากคุณพบปัญหาในการใช้งาน ปัญหาการชำระเงิน หรือมีข้อเสนอแนะ โปรดติดต่อทีมวิศวกรของเราได้ตลอดเวลา",
+                contactBtn: "ส่งอีเมลสนับสนุน (support@sdnlink.cn)",
+                contactHours: "เวลาทำการ: จันทร์ - อาทิตย์ 09:00 - 21:00 (GMT+8) · ตอบกลับภายใน 24 ชม.",
+                footerPrivacy: "นโยบายความเป็นส่วนตัว (Privacy Policy)"
+            },
+            "id": {
+                appTitle: "YanXiang Compass",
+                heroTitle: "Pusat Bantuan & Dukungan Teknis Resmi",
+                heroDesc: "Kami siap membantu Anda terkait penggunaan YanXiang Compass: kalibrasi sensor, survei AR real-time, analisis denah feng shui, dan langganan Apple In-App Purchase.",
+                badgePrivacy: "Pemrosesan Lokal · Nol Pengunggahan Data",
+                badgeResponse: "Dukungan Langsung · Tanggapan dalam 24 Jam",
+                badgeApple: "Integrasi Resmi Apple StoreKit",
+                featuresTitle: "Panduan Fitur & Penggunaan",
+                card1Title: "Kompas Sumbu Ganda Presisi Tinggi & Waterpass",
+                card1Desc: "Memanfaatkan giroskop dan magnetometer iPhone untuk menghitung azimut 360° secara real-time dengan gelembung perata air.",
+                card2Title: "Survei Spasial AR & Penyelarasan Arah Nyata",
+                card2Desc: "Menggunakan kamera untuk memproyeksikan retikel kompas ke lingkungan nyata, mendukung tangkapan layar beresolusi tinggi dengan tanda koordinat.",
+                card3Title: "Penentuan Titik Pusat Denah & Audit Sembilan Istana",
+                card3Desc: "Impor gambar denah untuk menemukan titik berat geometris dan mendiagnosis tata letak pintu masuk, dapur, dan sudut keberuntungan.",
+                faqTitle: "Pertanyaan yang Sering Diajukan (FAQ)",
+                q1: "1. Jarum kompas bergetar atau tidak akurat, bagaimana cara mengkalibrasinya?",
+                a1: "Sensor dapat terpengaruh oleh medan magnet atau casing magnetik:<br>1) Gerakkan iPhone di udara membentuk angka '8' sebanyak 3-5 kali;<br>2) Lepaskan casing yang mengandung magnet kuat saat mengukur;<br>3) Aktifkan izin lokasi agar aplikasi dapat mengoreksi deklinasi magnetik menuju Kutub Utara Sejati (WMM).",
+                q2: "2. Layar AR hitam atau akses kamera ditolak?",
+                a2: "Buka <b>Pengaturan iOS -> Privasi & Keamanan -> Kamera</b>, temukan <b>YanXiang Compass</b> dan aktifkan izin akses kamera.",
+                q3: "3. Bagaimana cara memulihkan langganan setelah berganti perangkat?",
+                a3: "Semua pembelian dikelola oleh Apple ID Anda:<br>1) Pastikan Anda masuk ke Apple ID yang sama di perangkat baru;<br>2) Buka aplikasi, masuk ke <b>Pengaturan</b> dan pilih <b>Pulihkan Pembelian (Restore Purchases)</b>;<br>3) Hak akses VIP atau seumur hidup Anda akan langsung aktif kembali tanpa biaya tambahan.",
+                q4: "4. Di mana laporan gulungan kertas dan foto survei disimpan?",
+                a4: "Laporan beresolusi tinggi disimpan langsung ke dalam aplikasi <b>Foto (Photos)</b> di iPhone Anda.",
+                q5: "5. Mengapa tidak memerlukan akun? Apakah data saya aman?",
+                a5: "Aplikasi kami mengutamakan privasi. Semua komputasi berjalan secara offline di perangkat Anda tanpa server eksternal, sehingga data Anda sepenuhnya aman.",
+                contactTitle: "Butuh Bantuan Lebih Lanjut? Hubungi Tim Dukungan",
+                contactDesc: "Jika Anda menemukan kendala teknis, gangguan pembayaran, atau memiliki saran fitur, silakan hubungi tim pengembang kami.",
+                contactBtn: "Kirim Email Dukungan (support@sdnlink.cn)",
+                contactHours: "Jam Layanan: Senin - Minggu 09:00 - 21:00 (GMT+8) · Tanggapan dalam 24 jam",
+                footerPrivacy: "Kebijakan Privasi (Privacy Policy)"
+            }
+        };
+
+        function switchLanguage(lang) {
+            const data = i18nData[lang] || i18nData["zh-Hans"];
+            document.documentElement.lang = lang;
+
+            document.getElementById("txt-app-title").innerText = data.appTitle;
+            document.getElementById("txt-hero-title").innerText = data.heroTitle;
+            document.getElementById("txt-hero-desc").innerText = data.heroDesc;
+            document.getElementById("txt-badge-privacy").innerText = data.badgePrivacy;
+            document.getElementById("txt-badge-response").innerText = data.badgeResponse;
+            document.getElementById("txt-badge-apple").innerText = data.badgeApple;
+
+            document.getElementById("txt-features-title").innerText = data.featuresTitle;
+            document.getElementById("txt-card1-title").innerText = data.card1Title;
+            document.getElementById("txt-card1-desc").innerText = data.card1Desc;
+            document.getElementById("txt-card2-title").innerText = data.card2Title;
+            document.getElementById("txt-card2-desc").innerText = data.card2Desc;
+            document.getElementById("txt-card3-title").innerText = data.card3Title;
+            document.getElementById("txt-card3-desc").innerText = data.card3Desc;
+
+            document.getElementById("txt-faq-title").innerText = data.faqTitle;
+            document.getElementById("txt-q1").innerText = data.q1;
+            document.getElementById("txt-a1").innerHTML = data.a1;
+            document.getElementById("txt-q2").innerText = data.q2;
+            document.getElementById("txt-a2").innerHTML = data.a2;
+            document.getElementById("txt-q3").innerText = data.q3;
+            document.getElementById("txt-a3").innerHTML = data.a3;
+            document.getElementById("txt-q4").innerText = data.q4;
+            document.getElementById("txt-a4").innerHTML = data.a4;
+            document.getElementById("txt-q5").innerText = data.q5;
+            document.getElementById("txt-a5").innerHTML = data.a5;
+
+            document.getElementById("txt-contact-title").innerText = data.contactTitle;
+            document.getElementById("txt-contact-desc").innerText = data.contactDesc;
+            document.getElementById("txt-contact-btn").innerText = data.contactBtn;
+            document.getElementById("txt-contact-hours").innerText = data.contactHours;
+            document.getElementById("txt-footer-privacy").innerText = data.footerPrivacy;
+
+            try {
+                localStorage.setItem("support_lang_pref", lang);
+            } catch(e) {}
+        }
+
+        // FAQ 手风琴交互
+        document.querySelectorAll(".faq-question").forEach(q => {
+            q.addEventListener("click", () => {
+                const parent = q.parentElement;
+                parent.classList.toggle("active");
+            });
+        });
+
+        // 页面初始化时自动检测用户语言
+        window.addEventListener("DOMContentLoaded", () => {
+            let userLang = "zh-Hans";
+            try {
+                const saved = localStorage.getItem("support_lang_pref");
+                if (saved && i18nData[saved]) {
+                    userLang = saved;
+                } else {
+                    const navLang = (navigator.language || navigator.userLanguage || "zh-CN").toLowerCase();
+                    if (navLang.startsWith("zh-hk") || navLang.startsWith("zh-tw") || navLang.startsWith("zh-hant")) {
+                        userLang = "zh-Hant";
+                    } else if (navLang.startsWith("zh")) {
+                        userLang = "zh-Hans";
+                    } else if (navLang.startsWith("ja")) {
+                        userLang = "ja";
+                    } else if (navLang.startsWith("ko")) {
+                        userLang = "ko";
+                    } else if (navLang.startsWith("vi")) {
+                        userLang = "vi";
+                    } else if (navLang.startsWith("th")) {
+                        userLang = "th";
+                    } else if (navLang.startsWith("id")) {
+                        userLang = "id";
+                    } else if (navLang.startsWith("en")) {
+                        userLang = "en";
+                    }
+                }
+            } catch(e) {}
+
+            const select = document.getElementById("lang-select");
+            if (select) select.value = userLang;
+            switchLanguage(userLang);
+        });
+    </script>
+</body>
+</html>

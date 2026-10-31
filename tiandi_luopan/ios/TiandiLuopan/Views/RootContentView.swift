@@ -12,11 +12,15 @@ extension Font {
     /// 全景自适应计算最优字体字号：
     /// 在 iPhone 上保持设计原始字号，在 iPad Pro / iPad Air / iPad mini 大屏上自动按 1.35x 比例智能放大，
     /// 确保罗盘刻度、度数、八方吉凶、户型体检、九宫飞星、系统设置等所有界面的文本层次均清晰可辨。
-    public static func adaptive(size: CGFloat, weight: Weight = .regular, design: Design = .default) -> Font {
+    public static func adaptive(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let scale: CGFloat = isPad ? 1.35 : 1.0
         let scaledSize = (size * scale).rounded()
         return Font.system(size: scaledSize, weight: weight, design: design)
+    }
+
+    public static func adaptive(size: CGFloat, design: Font.Design) -> Font {
+        adaptive(size: size, weight: .regular, design: design)
     }
 }
 

@@ -396,30 +396,52 @@ jobs:
       # 10. 上传至苹果商店 App Store Connect / TestFlight (仅 app-store 模式生效)
       # --------------------------------------------------
       - name: Upload to App Store Connect (TestFlight)
-        if: ${{ (github.event.inputs.build_target == 'app-store') && (github.event.inputs.upload_to_appstore != 'false') }}
+        if: ${{ env.BUILD_TARGET == 'app-store' && (github.event.inputs.upload_to_appstore == true || github.event.inputs.upload_to_appstore == 'true' || github.event_name == 'push') }}
         env:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          API_KEY_BASE64: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          API_KEY_RAW: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
         run: |
           set -euo pipefail
 
-          if [ -z "$API_KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$API_KEY_BASE64" ]; then
-            echo "::error::Missing APPSTORE_API_KEY_ID, APPSTORE_ISSUER_ID, or APPSTORE_API_PRIVATE_KEY in GitHub Secrets."
+          echo "===== Checking App Store Connect Upload Credentials ====="
+          if [ -z "$API_KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$API_KEY_RAW" ]; then
+            echo "::error::Missing one of the required secrets: APPSTORE_API_KEY_ID, APPSTORE_ISSUER_ID, or APPSTORE_API_PRIVATE_KEY."
+            echo "Please configure these in GitHub Settings -> Secrets and variables -> Actions."
             exit 1
           fi
 
-          mkdir -p ~/.appstoreconnect/private_keys
-          printf '%s' "$API_KEY_BASE64" | base64 -D > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
+          # 确保私钥目录存在
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_FILE="$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
 
-          echo "Uploading $IPA_FILE to App Store Connect..."
+          # 智能兼容：无论用户 Secret 存的是 PEM 原文还是 Base64，均能正确处理
+          if echo "$API_KEY_RAW" | grep -q "BEGIN PRIVATE KEY"; then
+            echo "$API_KEY_RAW" > "$KEY_FILE"
+          else
+            printf '%s' "$API_KEY_RAW" | base64 -D > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+
+          # 重新确认 IPA 文件路径
+          UPLOAD_IPA="$(find dist-ios -maxdepth 1 -name '*.ipa' -print -quit)"
+          if [ -z "$UPLOAD_IPA" ] || [ ! -f "$UPLOAD_IPA" ]; then
+            echo "::error::Cannot find exported .ipa file in dist-ios/ directory!"
+            exit 1
+          fi
+
+          echo "Target IPA for upload: $UPLOAD_IPA"
+          echo "Uploading to App Store Connect using API Key: $API_KEY_ID..."
+
           xcrun altool --upload-app \
-            -f "$IPA_FILE" \
+            -f "$UPLOAD_IPA" \
             -t ios \
             --apiKey "$API_KEY_ID" \
-            --apiIssuer "$ISSUER_ID"
+            --apiIssuer "$ISSUER_ID" \
+            --verbose
 
-          echo "🎉 Successfully uploaded to App Store Connect! TestFlight build will be available shortly."
+          echo "🎉 Successfully uploaded to App Store Connect! TestFlight build will appear in 5-15 minutes."
 
       # --------------------------------------------------
       # 11. 上传 IPA 构建产物至 GitHub Artifacts (两种模式均可下载)

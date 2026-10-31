@@ -1,183 +1,483 @@
-name: iOS Build & Sign (Device Test & TestFlight)
+name: iOS Development Build
 
 on:
   workflow_dispatch:
-    inputs:
-      upload_to_testflight:
-        description: 'Upload to TestFlight (requires App Store Connect API Key)'
-        required: false
-        default: 'false'
-        type: boolean
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
 
 jobs:
   build-and-sign:
-    name: Build Signed IPA (macOS)
-    runs-on: macos-14
+    name: Build and Sign Development IPA
+    runs-on: macos-15
+
     defaults:
       run:
         working-directory: tiandi_luopan
+        shell: bash
+
+    env:
+      APP_BUNDLE_ID: com.yanxiang.compass
+      PROJECT_PATH: ios/TiandiLuopan.xcodeproj
+      SCHEME_NAME: TiandiLuopan
+      CONFIGURATION: Release
+
     steps:
-      - name: Checkout repository
+      # --------------------------------------------------
+      # 1. 获取源代码
+      # --------------------------------------------------
+      - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
-        run: sudo xcode-select -switch /Applications/Xcode_15.4.app || true
-
+      # --------------------------------------------------
+      # 2. 检查构建环境
+      # --------------------------------------------------
       - name: Show Build Environment
         run: |
-          xcodebuild -version
-          swift --version
+          set -euo pipefail
 
-      - name: Install Apple Certificate and Provisioning Profile
+          echo "===== macOS ====="
+          sw_vers
+
+          echo "===== Xcode ====="
+          xcode-select -p
+          xcodebuild -version
+          xcodebuild -showsdks
+
+          echo "===== Project ====="
+          test -d "$PROJECT_PATH"
+          xcodebuild -list -project "$PROJECT_PATH"
+
+      # --------------------------------------------------
+      # 3. 导入 Apple Development 证书和描述文件
+      # --------------------------------------------------
+      - name: Install Apple Development Certificate
         id: setup_signing
         env:
-          P12_BASE64: ${{ secrets.BUILD_CERTIFICATE_P12 || secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_BASE64: ${{ secrets.BUILD_CERTIFICATE_P12 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          PROV_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE || secrets.BUILD_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'actions_temp_keychain_123' }}
+          PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -z "$P12_BASE64" ] || [ -z "$PROV_BASE64" ]; then
-            echo "::error::Missing signing secrets! Please configure BUILD_CERTIFICATE_P12 and BUILD_PROVISION_PROFILE in GitHub Secrets."
+          set -euo pipefail
+
+          # 检查 Secrets
+          test -n "$P12_BASE64" || {
+            echo "Missing BUILD_CERTIFICATE_P12"
+            exit 1
+          }
+
+          test -n "$P12_PASSWORD" || {
+            echo "Missing P12_PASSWORD"
+            exit 1
+          }
+
+          test -n "$PROFILE_BASE64" || {
+            echo "Missing BUILD_PROVISION_PROFILE"
+            exit 1
+          }
+
+          test -n "$TEAM_ID" || {
+            echo "Missing APPLE_TEAM_ID"
+            exit 1
+          }
+
+          # 创建临时目录
+          mkdir -p "$RUNNER_TEMP/signing"
+
+          P12_PATH="$RUNNER_TEMP/signing/certificate.p12"
+          PP_PATH="$RUNNER_TEMP/signing/profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/signing/profile.plist"
+
+          # 解码 Base64 文件
+          printf '%s' "$P12_BASE64" | base64 -D > "$P12_PATH"
+          printf '%s' "$PROFILE_BASE64" | base64 -D > "$PP_PATH"
+
+          test -s "$P12_PATH"
+          test -s "$PP_PATH"
+
+          # 创建临时 Keychain
+          KEYCHAIN_PATH="$RUNNER_TEMP/build-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+
+          security create-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security set-keychain-settings \
+            -lut 21600 \
+            "$KEYCHAIN_PATH"
+
+          security unlock-keychain \
+            -p "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          # 导入 P12 证书和私钥
+          security import "$P12_PATH" \
+            -P "$P12_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          # 设置代码签名权限
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          # 将临时 Keychain 加入搜索列表
+          security list-keychain -d user -s \
+            "$KEYCHAIN_PATH" \
+            "$HOME/Library/Keychains/login.keychain-db"
+
+          # 查找有效的 Apple Development 身份
+          IDENTITIES="$(security find-identity \
+            -v \
+            -p codesigning \
+            "$KEYCHAIN_PATH")"
+
+          echo "$IDENTITIES"
+
+          SIGNING_IDENTITY="$(
+            printf '%s\n' "$IDENTITIES" |
+            awk -F '"' '/"Apple Development:/ {
+              print $2
+              exit
+            }'
+          )"
+
+          if [ -z "$SIGNING_IDENTITY" ]; then
+            echo "ERROR: Apple Development certificate not found."
             exit 1
           fi
 
-          # 1. 临时文件路径
-          CERT_PATH="$RUNNER_TEMP/build_certificate.p12"
-          PP_PATH="$RUNNER_TEMP/profile.mobileprovision"
-          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
-
-          # 2. 解密证书与描述文件
-          echo "$P12_BASE64" | base64 --decode > "$CERT_PATH"
-          echo "$PROV_BASE64" | base64 --decode > "$PP_PATH"
-
-          # 3. 创建并配置临时钥匙串
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # 4. 导入证书
-          security import "$CERT_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
-
-          # 5. 读取证书常用名 (Identity)
-          SIGNING_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -1 | grep -o '".*"' | sed 's/"//g')
-          echo "Discovered Signing Identity: $SIGNING_IDENTITY"
-          echo "signing_identity=$SIGNING_IDENTITY" >> "$GITHUB_OUTPUT"
-
-          # 6. 安装 Provisioning Profile
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          UUID=$(security cms -D -i "$PP_PATH" 2>/dev/null | grep -A1 '<key>UUID</key>' | grep string | sed 's/.*>\(.*\)<.*/\1/' | head -1)
-          cp "$PP_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
-          echo "Installed Profile UUID: $UUID"
-          echo "profile_uuid=$UUID" >> "$GITHUB_OUTPUT"
-
-          # 7. 检测 Profile 导出方式 (development, ad-hoc, 或 app-store)
-          security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/profile.plist" 2>/dev/null
-          GET_TASK_ALLOW=$(/usr/libexec/PlistBuddy -c "Print Entitlements:get-task-allow" "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "false")
-          HAS_DEVICES=$(/usr/libexec/PlistBuddy -c "Print ProvisionedDevices" "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "")
-
-          if [ "$GET_TASK_ALLOW" = "true" ]; then
-            METHOD="development"
-            SIGNING_CERT="development"
-          elif [ -n "$HAS_DEVICES" ]; then
-            METHOD="ad-hoc"
-            SIGNING_CERT="distribution"
-          else
-            METHOD="app-store"
-            SIGNING_CERT="distribution"
+          # 检查证书 Team ID
+          if [[ "$SIGNING_IDENTITY" != *"($TEAM_ID)"* ]]; then
+            echo "ERROR: Certificate Team ID does not match."
+            echo "$SIGNING_IDENTITY"
+            exit 1
           fi
-          echo "Detected Export Method: $METHOD (signingCertificate: $SIGNING_CERT)"
-          echo "export_method=$METHOD" >> "$GITHUB_OUTPUT"
-          echo "signing_cert=$SIGNING_CERT" >> "$GITHUB_OUTPUT"
 
+          echo "Signing identity: $SIGNING_IDENTITY"
+
+          # 解码 Provisioning Profile
+          security cms -D \
+            -i "$PP_PATH" \
+            > "$PROFILE_PLIST"
+
+          # 提取 Profile 信息
+          PROFILE_NAME=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Name" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_UUID=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :UUID" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_TEAM=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :TeamIdentifier:0" \
+              "$PROFILE_PLIST"
+          )
+
+          PROFILE_APP_ID=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Entitlements:application-identifier" \
+              "$PROFILE_PLIST"
+          )
+
+          GET_TASK_ALLOW=$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Entitlements:get-task-allow" \
+              "$PROFILE_PLIST"
+          )
+
+          echo "===== Provisioning Profile ====="
+          echo "Name: $PROFILE_NAME"
+          echo "UUID: $PROFILE_UUID"
+          echo "Team: $PROFILE_TEAM"
+          echo "Application ID: $PROFILE_APP_ID"
+          echo "get-task-allow: $GET_TASK_ALLOW"
+
+          # 检查 Profile 类型
+          if [ "$GET_TASK_ALLOW" != "true" ]; then
+            echo "ERROR: This is not an iOS Development profile."
+            exit 1
+          fi
+
+          # 检查 Team ID
+          if [ "$PROFILE_TEAM" != "$TEAM_ID" ]; then
+            echo "ERROR: Profile Team ID mismatch."
+            exit 1
+          fi
+
+          # 检查 Bundle ID
+          case "$PROFILE_APP_ID" in
+            *."$APP_BUNDLE_ID")
+              ;;
+            *)
+              echo "ERROR: Bundle ID mismatch."
+              echo "Expected: $APP_BUNDLE_ID"
+              echo "Actual: $PROFILE_APP_ID"
+              exit 1
+              ;;
+          esac
+
+          # 检查 Profile 是否包含设备 UDID
+          if ! /usr/libexec/PlistBuddy \
+            -c "Print :ProvisionedDevices" \
+            "$PROFILE_PLIST" \
+            >/dev/null 2>&1; then
+            echo "ERROR: Profile does not contain registered devices."
+            exit 1
+          fi
+
+          # 安装 Provisioning Profile
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          mkdir -p "$PROFILE_DIR"
+
+          cp "$PP_PATH" \
+            "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          # 输出给后续步骤使用
+          {
+            echo "signing_identity=$SIGNING_IDENTITY"
+            echo "profile_uuid=$PROFILE_UUID"
+            echo "profile_name=$PROFILE_NAME"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Apple Development signing setup completed."
+
+      # --------------------------------------------------
+      # 4. 检查 Xcode 项目
+      # --------------------------------------------------
+      - name: Check Signing Configuration
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
+        run: |
+          set -euo pipefail
+
+          echo "===== Build Settings ====="
+
+          xcodebuild \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME_NAME" \
+            -configuration "$CONFIGURATION" \
+            -showBuildSettings \
+            | grep -E \
+              'PRODUCT_BUNDLE_IDENTIFIER|IPHONEOS_DEPLOYMENT_TARGET|TARGETED_DEVICE_FAMILY|CODE_SIGN_STYLE' \
+            || true
+
+          echo "===== Signing Configuration ====="
+          echo "Bundle ID: $APP_BUNDLE_ID"
+          echo "Team ID: $TEAM_ID"
+          echo "Profile UUID: $PROFILE_UUID"
+
+      # --------------------------------------------------
+      # 5. 创建 XCArchive
+      # --------------------------------------------------
       - name: Build Archive
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SIGNING_IDENTITY: ${{ steps.setup_signing.outputs.signing_identity }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
         run: |
-          set -o pipefail
+          set -euo pipefail
+
+          mkdir -p build
+
           xcodebuild archive \
-            -project ios/TiandiLuopan.xcodeproj \
-            -scheme TiandiLuopan \
-            -configuration Release \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME_NAME" \
+            -configuration "$CONFIGURATION" \
             -destination "generic/platform=iOS" \
             -archivePath build/TiandiLuopan.xcarchive \
             CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" 2>&1 | tee xcodebuild.log || {
-              echo "::error::Xcodebuild Archive Failed. Printing Error Details:"
-              grep -E "error:|fatal error:" xcodebuild.log || tail -n 120 xcodebuild.log
-              exit 1
-            }
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            2>&1 | tee build/xcodebuild-archive.log
 
-      - name: Export IPA
+          test -d build/TiandiLuopan.xcarchive
+
+      # --------------------------------------------------
+      # 6. 配置 Development 导出参数
+      # --------------------------------------------------
+      - name: Create ExportOptions
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
-          METHOD: ${{ steps.setup_signing.outputs.export_method }}
-          SIGNING_CERT: ${{ steps.setup_signing.outputs.signing_cert }}
         run: |
-          mkdir -p build
-          cat <<EOF > build/ExportOptions.plist
+          set -euo pipefail
+
+          mkdir -p dist-ios
+
+          cat > ExportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>$METHOD</string>
+              <string>development</string>
+
+              <key>teamID</key>
+              <string>${TEAM_ID}</string>
+
               <key>signingStyle</key>
               <string>manual</string>
-              <key>signingCertificate</key>
-              <string>$SIGNING_CERT</string>
-              <key>teamID</key>
-              <string>$TEAM_ID</string>
+
               <key>provisioningProfiles</key>
               <dict>
-                  <key>com.yanxiang.compass</key>
-                  <string>$PROFILE_UUID</string>
+                  <key>${APP_BUNDLE_ID}</key>
+                  <string>${PROFILE_UUID}</string>
               </dict>
-              <key>compileBitcode</key>
-              <false/>
+
+              <key>destination</key>
+              <string>export</string>
+
               <key>stripSwiftSymbols</key>
               <true/>
           </dict>
           </plist>
           EOF
 
+          plutil -lint ExportOptions.plist
+
+      # --------------------------------------------------
+      # 7. 导出 IPA
+      # --------------------------------------------------
+      - name: Export Development IPA
+        run: |
+          set -euo pipefail
+
           xcodebuild -exportArchive \
             -archivePath build/TiandiLuopan.xcarchive \
-            -exportOptionsPlist build/ExportOptions.plist \
-            -exportPath dist-ios
+            -exportPath dist-ios \
+            -exportOptionsPlist ExportOptions.plist \
+            2>&1 | tee build/xcodebuild-export.log
 
-      - name: Upload Signed IPA to Artifacts
+          echo "===== Exported Files ====="
+          ls -lah dist-ios
+
+          IPA_FILE="$(find dist-ios -maxdepth 1 -name '*.ipa' -print -quit)"
+
+          if [ -z "$IPA_FILE" ]; then
+            echo "ERROR: IPA file was not generated."
+            exit 1
+          fi
+
+          echo "IPA_FILE=$IPA_FILE" >> "$GITHUB_ENV"
+
+      # --------------------------------------------------
+      # 8. 验证 IPA 签名
+      # --------------------------------------------------
+      - name: Verify IPA Signature
+        run: |
+          set -euo pipefail
+
+          IPA_FILE="$IPA_FILE"
+
+          VERIFY_DIR="$RUNNER_TEMP/ipa-verify"
+
+          mkdir -p "$VERIFY_DIR"
+
+          unzip -q "$IPA_FILE" -d "$VERIFY_DIR"
+
+          APP_PATH="$(find "$VERIFY_DIR/Payload" \
+            -maxdepth 1 \
+            -name '*.app' \
+            -print -quit)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Application bundle not found."
+            exit 1
+          fi
+
+          echo "===== Verify Code Signature ====="
+
+          codesign --verify \
+            --deep \
+            --strict \
+            --verbose=2 \
+            "$APP_PATH"
+
+          codesign -dv \
+            --verbose=4 \
+            "$APP_PATH" \
+            2>&1 | tee build/codesign-info.log
+
+          echo "===== Verify Embedded Profile ====="
+
+          EMBEDDED_PROFILE="$APP_PATH/embedded.mobileprovision"
+
+          test -s "$EMBEDDED_PROFILE"
+
+          security cms -D \
+            -i "$EMBEDDED_PROFILE" \
+            > "$VERIFY_DIR/embedded-profile.plist"
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :Name" \
+            "$VERIFY_DIR/embedded-profile.plist"
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :Entitlements:get-task-allow" \
+            "$VERIFY_DIR/embedded-profile.plist"
+
+          echo "===== Verify Bundle ID ====="
+
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleIdentifier" \
+            "$APP_PATH/Info.plist"
+
+          echo "IPA signature verification completed."
+
+      # --------------------------------------------------
+      # 9. 生成 SHA256
+      # --------------------------------------------------
+      - name: Generate SHA256
+        run: |
+          set -euo pipefail
+
+          cd dist-ios
+
+          shasum -a 256 *.ipa > SHA256SUMS.txt
+
+          cat SHA256SUMS.txt
+
+      # --------------------------------------------------
+      # 10. 上传 IPA 构建产物
+      # --------------------------------------------------
+      - name: Upload Development IPA
         uses: actions/upload-artifact@v4
         with:
-          name: YanXiangCompass-Signed-IPA
-          path: tiandi_luopan/dist-ios/*.ipa
+          name: TiandiLuopan-Development-IPA
+          path: tiandi_luopan/dist-ios/
+          if-no-files-found: error
           retention-days: 14
 
-      - name: Upload to TestFlight (Optional)
-        if: ${{ github.event.inputs.upload_to_testflight == 'true' }}
-        env:
-          API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          API_KEY_BASE64: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-        run: |
-          if [ -z "$API_KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$API_KEY_BASE64" ]; then
-            echo "::warning::Skipping TestFlight upload: APPSTORE_API_KEY_ID / ISSUER_ID / APPSTORE_API_PRIVATE_KEY secret is not set."
-            exit 0
-          fi
-          mkdir -p ~/.appstoreconnect/private_keys
-          echo "$API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
-          IPA_FILE=$(ls dist-ios/*.ipa | head -1)
-          echo "Uploading $IPA_FILE to TestFlight..."
-          xcrun altool --upload-app \
-            -f "$IPA_FILE" \
-            -t ios \
-            --apiKey "$API_KEY_ID" \
-            --apiIssuer "$ISSUER_ID"
+      # --------------------------------------------------
+      # 11. 上传构建日志
+      # --------------------------------------------------
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TiandiLuopan-Build-Logs
+          path: |
+            tiandi_luopan/build/*.log
+            tiandi_luopan/ExportOptions.plist
+          if-no-files-found: ignore
+          retention-days: 7

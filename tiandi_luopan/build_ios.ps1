@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) { throw "IPA 打包失败" }
 
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "  ✅ iOS 资源生成与打包流程完成！" -ForegroundColor Green
-Write-Host "  产物目录: dist-ios/YanXiangCompass-v1.3.0.ipa" -ForegroundColor Green
+Write-Host "  产物目录: dist-ios/YanXiangCompass-v1.3.1.ipa" -ForegroundColor Green
 Write-Host "  Xcode 工程: ios/TiandiLuopan.xcodeproj" -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 

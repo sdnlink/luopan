@@ -310,7 +310,7 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 本仓库现已全面提供适用于 **iPhone (iOS 14.0+)** 的移植版本与标准安装包：
 
 ### 5.1 产物与工程路径
-* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.0.ipa`
+* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.1.ipa`
 * **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj`（Swift 5.x + **纯 SwiftUI** + CoreLocation + CoreMotion + ARKit + StoreKit）
 * **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（可选。原生 App 本身是纯 SwiftUI 壳，**不通过 WKWebView 渲染该目录**；`www` 仅由 `tools/serve_ios_web.py` 在局域网内作为免签 PWA 提供服务，详见 5.3 方式 4）
 
@@ -320,7 +320,7 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 1. 提取并生成全套高清 iOS AppIcon / PWA 图标资源；
 2. 重新生成 Web 适配核心（`prepare_ios_web.py`）；
-3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.0.ipa`。
+3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.1.ipa`。
 
 > **⚠️ 关于“在 Windows 上打包 IPA”的说明**
 > 一个可被设备安装的、**经过 Apple 签名**的 IPA 必须依赖 macOS + Xcode（`xcodebuild` / `codesign`）或 Apple 的云构建链编译出真实的 Mach-O 可执行文件。**Windows 环境无法完成这一步。**
@@ -336,7 +336,7 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 #### 方式 1：通过签名工具直接安装 IPA（无需 Mac）
 * 使用 **爱思助手 (3uTools)**、**Sideloadly** 或 **AltStore**：
   1. 将 iPhone 通过数据线连接电脑；
-  2. 打开 Sideloadly / 爱思助手，将 `dist-ios/YanXiangCompass-v1.3.0.ipa` 拖入；
+  2. 打开 Sideloadly / 爱思助手，将 `dist-ios/YanXiangCompass-v1.3.1.ipa` 拖入；
   3. 输入您的免费 Apple ID 进行一键签名安装；
   4. 首次打开在 iPhone「设置 -> 通用 -> VPN与设备管理」信任开发者证书即可。
 * 若设备已越狱或拥有 **TrollStore**，可直接将 IPA 发送至手机无视证书永久安装。

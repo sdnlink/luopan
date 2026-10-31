@@ -128,10 +128,14 @@ jobs:
           fi
           echo "App process is alive: $BUNDLE_ID"
           mkdir -p duo-screenshots
-          xcrun simctl io "$DUO_UDID" screenshot duo-screenshots/duo-tab-0-main.png
+          # iPhone Duo 模拟器同时暴露两个显示器（LCD 外屏 / LCD-1 内屏），
+          # simctl io screenshot 必须显式指定 --display：
+          #   --display=1  LCD (primary)      1398x2034  外屏
+          #   --display=3  LCD-1 (primary-1)  2007x2853  内屏
+          xcrun simctl io "$DUO_UDID" screenshot --display=1 duo-screenshots/duo-tab-0-main.png
 
       # --------------------------------------------------
-      # 7. 逐个 Tab 截图（外屏，模拟器默认折叠状态）
+      # 7. 逐个 Tab 截图（外屏 + 内屏双显示器）
       # --------------------------------------------------
       - name: Capture Screenshots for All Tabs
         run: |
@@ -141,8 +145,19 @@ jobs:
             xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
             xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" -selectedTab "$i"
             sleep 8
-            xcrun simctl io "$DUO_UDID" screenshot "duo-screenshots/duo-tab-$i.png"
+            # 外屏（LCD）截图：必需，失败即中断
+            xcrun simctl io "$DUO_UDID" screenshot --display=1 "duo-screenshots/duo-tab-$i.png"
+            # 内屏（LCD-1）截图：尽力而为。模拟器默认处于折叠状态，
+            # 内屏可能未渲染 App；展开后重跑即可捕获大屏布局。
+            xcrun simctl io "$DUO_UDID" screenshot --display=3 "duo-screenshots/duo-inner-tab-$i.png" \
+              || echo "::warning::Inner display (LCD-1) screenshot failed for tab $i (simulator likely folded)"
           done
+          # 主 Tab 内屏截图
+          xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
+          xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" -selectedTab 0
+          sleep 8
+          xcrun simctl io "$DUO_UDID" screenshot --display=3 "duo-screenshots/duo-inner-tab-0.png" \
+            || echo "::warning::Inner display (LCD-1) screenshot failed for tab 0 (simulator likely folded)"
           echo "===== Captured Screenshots ====="
           ls -la duo-screenshots
 
@@ -174,11 +189,13 @@ jobs:
         run: |
           echo "=========================================================================="
           echo "🧪 iPhone Duo 模拟器冒烟测试完成"
-          echo " - 覆盖：iOS 27 runtime 构建、安装、权限、启动、进程存活、外屏五 Tab 截图"
+          echo " - 覆盖：iOS 27 runtime 构建、安装、权限、启动、进程存活、五 Tab 截图"
+          echo " - 截图：外屏 LCD (--display=1, 1398x2034) 与内屏 LCD-1 (--display=3, 2007x2853) 双显示器"
           echo ""
           echo "⚠️ 已知限制（Apple 官方论坛确认）："
           echo "   1. 命令行（simctl / XCUITest）暂无法控制 iPhone Duo 的折叠姿态，"
-          echo "      模拟器默认处于折叠（外屏）状态。"
+          echo "      模拟器默认处于折叠（外屏）状态，内屏截图可能为未渲染画面。"
           echo "   2. 内屏展开态（7.6 英寸双维 regular）布局、折叠线区域表现，"
-          echo "      需在 Xcode 27.1 的 Device Hub 中手动开合验证，或真机验证。"
+          echo "      需在 Xcode 27.1 的 Device Hub 中手动开合后重跑本工作流，"
+          echo "      或在真机上验证。"
           echo "=========================================================================="

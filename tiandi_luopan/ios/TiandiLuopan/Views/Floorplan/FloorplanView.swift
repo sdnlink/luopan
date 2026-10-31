@@ -117,7 +117,7 @@ public struct FloorplanView: View {
                 GeometryReader { geo in
                     let screenW = geo.size.width
                     let screenH = geo.size.height
-                    let canvasSide = isPad ? min(screenW - 48, screenH * 0.46) : min(screenW - 32, 340)
+                    let canvasSide = isPad ? min(screenW - 48, screenH * 0.46) : min(screenW - 32, screenH < 700 ? 260 : 340)
 
                     VStack(spacing: 8) {
                         // 1. 顶部控制栏
@@ -499,8 +499,10 @@ public struct FloorplanView: View {
                     .layoutPriority(1)
             }
             
-            Spacer()
+            Spacer(minLength: 6)
 
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
             // AR 空间测绘 / RoomPlan 扫描快速入口
             Button(action: {
                 showARSpatialSurvey = true
@@ -604,6 +606,8 @@ public struct FloorplanView: View {
                     .background(Color.white.opacity(0.12))
                     .foregroundColor(.white)
                     .clipShape(Circle())
+            }
+                }
             }
         }
         .padding(.horizontal, 16)

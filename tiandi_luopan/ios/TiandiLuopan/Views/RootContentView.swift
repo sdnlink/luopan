@@ -11,9 +11,17 @@ extension Color {
 public struct RootContentView: View {
     private let motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
-    @State private var selectedTab: Int = 0
+    @State private var selectedTab: Int
     
     public init() {
+        var initialTab = 0
+        if let tabArgIndex = CommandLine.arguments.firstIndex(of: "-selectedTab"),
+           tabArgIndex + 1 < CommandLine.arguments.count,
+           let tabValue = Int(CommandLine.arguments[tabArgIndex + 1]) {
+            initialTab = tabValue
+        }
+        _selectedTab = State(initialValue: initialTab)
+        
         // 自定义原生 TabBar 深色黑金质感外观
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()

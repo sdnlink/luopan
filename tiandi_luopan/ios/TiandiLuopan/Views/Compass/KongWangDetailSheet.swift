@@ -57,17 +57,17 @@ public struct KongWangDetailSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(kwStatusText)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.adaptive(size: 20, weight: .bold))
                                 .foregroundColor(kwColor)
                             Text("\(lang.t("kw_heading_prefix")): \(String(format: "%.1f", currentHeading))° · \(m.localizedName) (\(lang.t("kw_center_prefix")) \(String(format: "%.1f", m.centerAngle))° \(lang.t("kw_deviation_prefix")) \(String(format: "%.1f", delta))°)")
-                                .font(.system(size: 13))
+                                .font(.adaptive(size: 13))
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.75)
                         }
                         Spacer()
                         Text(kwGradeText)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(kwColor.opacity(0.2))
@@ -80,9 +80,9 @@ public struct KongWangDetailSheet: View {
                     // 诊断解析
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("kw_principle_section"))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.adaptive(size: 15, weight: .bold))
                         Text(kwDesc)
-                            .font(.system(size: 13))
+                            .font(.adaptive(size: 13))
                             .lineSpacing(4)
                             .foregroundColor(.primary)
                     }
@@ -90,9 +90,9 @@ public struct KongWangDetailSheet: View {
                     // 地师调理
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("kw_master_remedy_section"))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.adaptive(size: 15, weight: .bold))
                         Text(kwRemedyText)
-                            .font(.system(size: 13))
+                            .font(.adaptive(size: 13))
                             .lineSpacing(3)
                             .padding(12)
                             .background(Color.yellow.opacity(0.08))

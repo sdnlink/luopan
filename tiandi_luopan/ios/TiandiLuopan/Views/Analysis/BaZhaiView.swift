@@ -120,7 +120,7 @@ public struct BaZhaiView: View {
         return HStack(spacing: 0) {
             Button(action: { selectedSubTab = 0 }) {
                 Text(lang.t("bazhai_tab_title"))
-                    .font(.system(size: 13, weight: selectedSubTab == 0 ? .bold : .medium))
+                    .font(.adaptive(size: 13, weight: selectedSubTab == 0 ? .bold : .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .background(selectedSubTab == 0 ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
@@ -129,7 +129,7 @@ public struct BaZhaiView: View {
             
             Button(action: { selectedSubTab = 1 }) {
                 Text(lang.t("sanhe_tab_title"))
-                    .font(.system(size: 13, weight: selectedSubTab == 1 ? .bold : .medium))
+                    .font(.adaptive(size: 13, weight: selectedSubTab == 1 ? .bold : .medium))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .background(selectedSubTab == 1 ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
@@ -149,10 +149,10 @@ public struct BaZhaiView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(bz.localizedHouseGua)
-                            .font(.system(size: 20, weight: .bold, design: .serif))
+                            .font(.adaptive(size: 20, weight: .bold, design: .serif))
                             .foregroundColor(.white)
                         Text(bz.localizedHouseType)
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.adaptive(size: 12, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.2))
@@ -160,7 +160,7 @@ public struct BaZhaiView: View {
                             .cornerRadius(4)
                     }
                     Text("\(lang.t("gate_facing_prefix"))：\(bz.localizedGateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.localizedName)】")
-                        .font(.system(size: 13))
+                        .font(.adaptive(size: 13))
                         .foregroundColor(bz.gateStar.isAuspicious ? Color.green : Color.red)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -178,16 +178,16 @@ public struct BaZhaiView: View {
                     HStack(alignment: .top, spacing: 10) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.localizedDirection)
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.adaptive(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                             Text(item.star.localizedName)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.adaptive(size: 12, weight: .semibold))
                                 .foregroundColor(item.star.isAuspicious ? Color(red: 0.4, green: 0.85, blue: 0.4) : Color(red: 0.95, green: 0.4, blue: 0.4))
                         }
                         .frame(width: 120, alignment: .leading)
                         
                         Text(item.star.localizedSuggestion)
-                            .font(.system(size: 12))
+                            .font(.adaptive(size: 12))
                             .foregroundColor(.white.opacity(0.85))
                             .lineSpacing(2)
                         
@@ -207,12 +207,12 @@ public struct BaZhaiView: View {
                         Image(systemName: "calendar.badge.clock")
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text(lang.t("zeri_title"))
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.adaptive(size: 14, weight: .bold))
                             .foregroundColor(.white)
                     }
                     Spacer()
                     Text(zeri.overallStatus)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.adaptive(size: 11, weight: .bold))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(zeri.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
@@ -221,25 +221,25 @@ public struct BaZhaiView: View {
                 }
                 
                 Text("\(lang.t("current_four_pillars"))：\(zeri.fourPillarsText)")
-                    .font(.system(size: 12, weight: .semibold, design: .serif))
+                    .font(.adaptive(size: 12, weight: .semibold, design: .serif))
                     .foregroundColor(Color.yanCyan)
                 
                 Text(zeri.detailsText)
-                    .font(.system(size: 12))
+                    .font(.adaptive(size: 12))
                     .foregroundColor(.white.opacity(0.85))
                     .lineSpacing(2)
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
                         Text(lang.t("auspicious_fit"))
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.adaptive(size: 10, weight: .bold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(Color.green.opacity(0.2))
                             .foregroundColor(.green)
                             .cornerRadius(3)
                         Text(zeri.yiActivities.joined(separator: " · "))
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(.white.opacity(0.8))
                     }
                     Spacer()
@@ -248,14 +248,14 @@ public struct BaZhaiView: View {
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
                         Text(lang.t("inauspicious_avoid"))
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.adaptive(size: 10, weight: .bold))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(Color.red.opacity(0.2))
                             .foregroundColor(.red)
                             .cornerRadius(3)
                         Text(zeri.jiActivities.joined(separator: " · "))
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(.white.opacity(0.8))
                     }
                     Spacer()
@@ -291,12 +291,12 @@ public struct BaZhaiView: View {
                             Image(systemName: "drop.triangle.fill")
                                 .foregroundColor(Color.yanCyan)
                             Text(lang.t("yang_gong_water_title"))
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.adaptive(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         Spacer()
                         Text(hq.badgeText)
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.adaptive(size: 11, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(hq.isJiuPin ? Color.green.opacity(0.2) : (hq.isDanger ? Color.red.opacity(0.2) : Color.blue.opacity(0.2)))
@@ -305,12 +305,12 @@ public struct BaZhaiView: View {
                     }
                     
                     Text(hq.waterDesc)
-                        .font(.system(size: 12))
+                        .font(.adaptive(size: 12))
                         .foregroundColor(.white.opacity(0.9))
                         .lineSpacing(3)
                     
                     Text("\(lang.t("song_quote"))：“\(hq.localizedQuote)”")
-                        .font(.system(size: 10, design: .serif))
+                        .font(.adaptive(size: 10, design: .serif))
                         .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 }
                 .padding(12)
@@ -325,12 +325,12 @@ public struct BaZhaiView: View {
                             Image(systemName: "triangle.fill")
                                 .foregroundColor(Color.orange)
                             Text(lang.t("sitting_mountain_clash"))
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.adaptive(size: 14, weight: .bold))
                                 .foregroundColor(.white)
                         }
                         Spacer()
                         Text("\(lang.t("clash_at"))【\(basha.localizedShaDir)】")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.adaptive(size: 11, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.orange.opacity(0.2))
@@ -339,17 +339,17 @@ public struct BaZhaiView: View {
                     }
                     
                     Text(basha.lore)
-                        .font(.system(size: 12))
+                        .font(.adaptive(size: 12))
                         .foregroundColor(.white.opacity(0.85))
                         .lineSpacing(2)
                     
                     Text(basha.remedy)
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                         .foregroundColor(Color.yellow.opacity(0.9))
                         .lineSpacing(2)
                     
                     Text("\(lang.t("song_quote"))：“\(basha.localizedSong)”\n\(basha.localizedXiaoShaRule)")
-                        .font(.system(size: 10, design: .serif))
+                        .font(.adaptive(size: 10, design: .serif))
                         .foregroundColor(.white.opacity(0.6))
                         .lineSpacing(2)
                 }
@@ -362,10 +362,10 @@ public struct BaZhaiView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(lang.t("water_rule_12")): \(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.adaptive(size: 14, weight: .bold))
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text(lang.t("water_rule_desc"))
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(.white.opacity(0.7))
                     }
                     Spacer()
@@ -380,24 +380,24 @@ public struct BaZhaiView: View {
                     ForEach(Array(shItems.prefix(12))) { item in
                         HStack {
                             Text(item.localizedMountainName + lang.t("mountain_suffix"))
-                                .font(.system(size: 15, weight: .bold, design: .serif))
+                                .font(.adaptive(size: 15, weight: .bold, design: .serif))
                                 .foregroundColor(.white)
                                 .frame(width: 60, alignment: .leading)
                             
                             Text("【\(item.phase.localizedName)】")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(item.phase == .changSheng || item.phase == .diWang ? Color.green : (item.phase == .mu || item.phase == .jue ? Color.orange : Color.white.opacity(0.8)))
                                 .frame(width: 80, alignment: .leading)
                             
                             Text(item.phase.localizedWaterRule)
-                                .font(.system(size: 12))
+                                .font(.adaptive(size: 12))
                                 .foregroundColor(.white.opacity(0.8))
                             
                             Spacer()
                             
                             if item.isHuangQuanSha {
                                 Text(lang.t("huangquan_sha"))
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(.adaptive(size: 9, weight: .bold))
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 2)
                                     .background(Color.red.opacity(0.3))

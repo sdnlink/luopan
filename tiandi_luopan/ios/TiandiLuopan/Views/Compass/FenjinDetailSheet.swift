@@ -19,17 +19,17 @@ public struct FenjinDetailSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("【\(currentFenjin.jiaziName)】\(lang.t("fenjin_title_suffix"))")
-                                .font(.system(size: 26, weight: .bold, design: .serif))
+                                .font(.adaptive(size: 26, weight: .bold, design: .serif))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Text("\(lang.t("fenjin_mountain_belong"))：\(currentFenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(currentFenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", currentFenjin.centerAngle))°)")
-                                .font(.system(size: 13))
+                                .font(.adaptive(size: 13))
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.75)
                         }
                         Spacer()
                         Text(currentFenjin.localizedGrade)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(currentFenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
@@ -42,9 +42,9 @@ public struct FenjinDetailSheet: View {
                     // 度数跨度
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_range_section"))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.adaptive(size: 15, weight: .bold))
                         Text("\(String(format: "%.1f", currentFenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", currentFenjin.endAngle))° (\(lang.t("fenjin_span")) 3.0°)")
-                            .font(.system(size: 13, design: .monospaced))
+                            .font(.adaptive(size: 13, design: .monospaced))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -53,9 +53,9 @@ public struct FenjinDetailSheet: View {
                     // 孤虚旺相秘传断语
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_lore_section"))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.adaptive(size: 15, weight: .bold))
                         Text(currentFenjin.localizedLore)
-                            .font(.system(size: 14))
+                            .font(.adaptive(size: 14))
                             .lineSpacing(4)
                             .padding(12)
                             .background(Color.yellow.opacity(0.08))
@@ -65,11 +65,11 @@ public struct FenjinDetailSheet: View {
                     // 立向指引
                     VStack(alignment: .leading, spacing: 6) {
                         Text(lang.t("fenjin_guidance_section"))
-                            .font(.system(size: 15, weight: .bold))
+                            .font(.adaptive(size: 15, weight: .bold))
                         Text(currentFenjin.isAuspicious ?
                              lang.t("fenjin_auspicious_advice") :
                              lang.t("fenjin_inauspicious_advice"))
-                            .font(.system(size: 13))
+                            .font(.adaptive(size: 13))
                             .foregroundColor(.secondary)
                             .lineSpacing(3)
                     }

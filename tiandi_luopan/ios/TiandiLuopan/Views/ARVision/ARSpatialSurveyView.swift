@@ -1866,16 +1866,16 @@ public struct ARSpatialSurveyView: View {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(lang.t("ar_spatial_survey"))
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.adaptive(size: 16, weight: .bold))
                         .foregroundColor(.white)
                     Text(model.lidarAvailable ? lang.t("ar_spatial_lidar_available") : lang.t("ar_spatial_lidar_unavailable"))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.adaptive(size: 10, weight: .medium))
                         .foregroundColor(model.lidarAvailable ? .green : .orange)
                 }
                 Spacer()
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.adaptive(size: 13, weight: .bold))
                         .foregroundColor(.white)
                         .padding(9)
                         .background(Color.black.opacity(0.55))
@@ -1895,7 +1895,7 @@ public struct ARSpatialSurveyView: View {
                             showRoomPlan = true
                         }) {
                             Image(systemName: "house.fill")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(9)
                                 .background(Color.blue.opacity(0.8))
@@ -1908,7 +1908,7 @@ public struct ARSpatialSurveyView: View {
                         _ = model.toggleGroundBaguaOverlay()
                     }) {
                         Image(systemName: "square.grid.3x3.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(model.groundBaguaProjected ? .black : .white)
                             .padding(9)
                             .background(model.groundBaguaProjected ? Color(red: 0.95, green: 0.80, blue: 0.25) : Color.black.opacity(0.55))
@@ -1919,7 +1919,7 @@ public struct ARSpatialSurveyView: View {
                         _ = model.placeLubanPoint()
                     }) {
                         Image(systemName: "ruler.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(model.lubanPointA != nil ? .black : .white)
                             .padding(9)
                             .background(model.lubanPointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
@@ -1930,7 +1930,7 @@ public struct ARSpatialSurveyView: View {
                         model.toggleMeshVisibility()
                     }) {
                         Image(systemName: model.meshVisible ? "eye.fill" : "eye.slash.fill")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(model.meshVisible ? .yanCyan : .white.opacity(0.75))
                             .padding(9)
                             .background(Color.black.opacity(0.55))
@@ -1942,7 +1942,7 @@ public struct ARSpatialSurveyView: View {
                         model.resetSurvey()
                     }) {
                         Image(systemName: "arrow.counterclockwise")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(.white)
                             .padding(9)
                             .background(Color.black.opacity(0.55))
@@ -1952,7 +1952,7 @@ public struct ARSpatialSurveyView: View {
                     if model.hasSavedWorldMap {
                         Button(action: restoreLatestMap) {
                             Image(systemName: "arrow.down.doc.fill")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.yanCyan)
                                 .padding(9)
                                 .background(Color.black.opacity(0.55))
@@ -1967,7 +1967,7 @@ public struct ARSpatialSurveyView: View {
                         }
                     }) {
                         Image(systemName: "camera.viewfinder")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(.green)
                             .padding(9)
                             .background(Color.black.opacity(0.55))
@@ -1976,7 +1976,7 @@ public struct ARSpatialSurveyView: View {
                     .accessibilityLabel(lang.t("capture_proof"))
                     Button(action: saveMap) {
                         Image(systemName: isSavingMap ? "hourglass" : "square.and.arrow.up")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(isSavingMap ? .orange : .white)
                             .padding(9)
                             .background(Color.black.opacity(0.55))
@@ -2005,11 +2005,11 @@ public struct ARSpatialSurveyView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label(trackingText, systemImage: trackingIcon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.adaptive(size: 11, weight: .semibold))
                     .foregroundColor(trackingColor)
                 Spacer()
                 Text("\(lang.t("ar_spatial_planes")): \(model.planeCount)")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.adaptive(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.85))
             }
 
@@ -2018,7 +2018,7 @@ public struct ARSpatialSurveyView: View {
                 if false, let h = model.estimatedRoomHeightMeters {
                 let beamWarning = model.hasLowBeamWarning
                 Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(beamWarning ? .orange : .green)
             }
             if model.lidarAvailable {
@@ -2029,7 +2029,7 @@ public struct ARSpatialSurveyView: View {
                         .foregroundColor(.yanCyan)
                 }
             }
-            .font(.system(size: 10, weight: .medium))
+            .font(.adaptive(size: 10, weight: .medium))
             .foregroundColor(.white.opacity(0.75))
 
             HStack {
@@ -2047,7 +2047,7 @@ public struct ARSpatialSurveyView: View {
                 Spacer()
                 Button(action: { _ = model.placeLubanPoint() }) {
                     Text(lubanActionTitle)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.adaptive(size: 10, weight: .bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.yanCyan.opacity(0.85))
@@ -2055,16 +2055,16 @@ public struct ARSpatialSurveyView: View {
                         .cornerRadius(8)
                 }
             }
-            .font(.system(size: 13, weight: .bold, design: .monospaced))
+            .font(.adaptive(size: 13, weight: .bold, design: .monospaced))
             .foregroundColor(.white)
 
             if let standing = model.currentStandingPalace {
                 HStack(spacing: 6) {
                     Image(systemName: "safari.fill")
                         .foregroundColor(Color(red: 0.95, green: 0.80, blue: 0.25))
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                     Text(standing)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.adaptive(size: 10, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -2080,16 +2080,16 @@ public struct ARSpatialSurveyView: View {
                 HStack(spacing: 6) {
                     Image(systemName: eval.yangIsAuspicious ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                         .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                     Text(eval.localizedSummary(for: lang.effectiveLanguage))
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
                         .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                     Spacer()
                     Button(action: { model.clearLubanPoints() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
+                            .font(.adaptive(size: 12))
                             .foregroundColor(.white.opacity(0.7))
                     }
                 }
@@ -2099,14 +2099,14 @@ public struct ARSpatialSurveyView: View {
                 .cornerRadius(8)
             } else if model.lubanPointA != nil {
                 Text(lubanPendingHint)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.adaptive(size: 10, weight: .medium))
                     .foregroundColor(.yanCyan)
             }
 
             if let width = model.largestPlaneWidth, let depth = model.largestPlaneDepth {
                 HStack {
                     Text("\(lang.t("ar_spatial_largest_plane")): \(String(format: "%.2f × %.2f m", width, depth))")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(.adaptive(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.white.opacity(0.75))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -2117,7 +2117,7 @@ public struct ARSpatialSurveyView: View {
                         }
                     }) {
                         Label(lang.t("tab_floorplan"), systemImage: "scope")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.adaptive(size: 10, weight: .bold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.9))
@@ -2130,12 +2130,12 @@ public struct ARSpatialSurveyView: View {
             if let h = model.estimatedRoomHeightMeters {
                 let beamWarning = model.hasLowBeamWarning
                 Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(beamWarning ? .orange : .green)
             }
             if model.lidarAvailable {
                 Text(lang.t("ar_spatial_semantic_candidate"))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.adaptive(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.65))
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 5) {
                     ForEach(Array(Self.semanticTypes.enumerated()), id: \.offset) { entry in
@@ -2143,7 +2143,7 @@ public struct ARSpatialSurveyView: View {
                         let count = model.semanticCounts[item.0.rawValue, default: 0]
                         if count > 0 {
                             Label("\(lang.t(item.1)) \(count)", systemImage: item.2)
-                                .font(.system(size: 10, weight: .medium))
+                                .font(.adaptive(size: 10, weight: .medium))
                                 .foregroundColor(.white.opacity(0.9))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -2152,12 +2152,12 @@ public struct ARSpatialSurveyView: View {
                 }
             } else {
                 Text(lang.t("ar_spatial_no_depth"))
-                    .font(.system(size: 10))
+                    .font(.adaptive(size: 10))
                     .foregroundColor(.orange.opacity(0.9))
             }
             if let saveMessage = saveMessage {
                 Text(saveMessage)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.adaptive(size: 10, weight: .semibold))
                     .foregroundColor(.yanCyan)
             }
         }
@@ -2263,14 +2263,14 @@ public struct ARSpatialSurveyView: View {
     private var unsupportedOverlay: some View {
         VStack(spacing: 10) {
             Image(systemName: "arkit")
-                .font(.system(size: 42))
+                .font(.adaptive(size: 42))
                 .foregroundColor(.yanCyan)
             Text(lang.t("ar_spatial_no_ar"))
-                .font(.system(size: 14, weight: .bold))
+                .font(.adaptive(size: 14, weight: .bold))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
             Text(lang.t("ar_spatial_camera_fallback"))
-                .font(.system(size: 11))
+                .font(.adaptive(size: 11))
                 .foregroundColor(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
         }

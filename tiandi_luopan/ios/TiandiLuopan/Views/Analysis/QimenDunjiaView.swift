@@ -44,12 +44,12 @@ public struct QimenDunjiaView: View {
                     Image(systemName: "sparkles")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("qimen_header_title"))
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.adaptive(size: 14, weight: .bold))
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
                 Text(chart.title)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.adaptive(size: 11, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -86,14 +86,14 @@ public struct QimenDunjiaView: View {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
                     HStack(spacing: 8) {
                         Text("【\(activeCell.localizedPalaceName)】")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.adaptive(size: 11, weight: .bold))
                             .foregroundColor(Color.yanCyan)
                         Text("\(activeCell.localizedDoorName) [\(doorObj.localizedLuckType)] · \(activeCell.localizedGodName) · \(activeCell.localizedStarName)")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.adaptive(size: 11, weight: .semibold))
                             .foregroundColor(activeCell.isDoorAuspicious ? .green : (activeCell.isDoorInauspicious ? .red : Color(red: 0.95, green: 0.85, blue: 0.45)))
                         Spacer()
                         Text(doorObj.localizedLore)
-                            .font(.system(size: 10))
+                            .font(.adaptive(size: 10))
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -111,22 +111,22 @@ public struct QimenDunjiaView: View {
                         Image(systemName: "location.north.circle.fill")
                             .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                         Text(lang.t("qimen_travel_best"))
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.adaptive(size: 12, weight: .bold))
                             .foregroundColor(.white)
                         Spacer()
                         Text(lang.t("qimen_pattern_best"))
-                            .font(.system(size: 10))
+                            .font(.adaptive(size: 10))
                             .foregroundColor(.green)
                     }
                     
                     Text("\(lang.t("qimen_best_nav"))【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
-                        .font(.system(size: 11))
+                        .font(.adaptive(size: 11))
                         .foregroundColor(Color.green)
                         .lineLimit(2)
                     
                     if !chart.tabooDirections.isEmpty {
                         Text("\(lang.t("qimen_taboo_nav"))【\(chart.tabooDirections)】\(lang.t("qimen_taboo_suffix"))")
-                            .font(.system(size: 11))
+                            .font(.adaptive(size: 11))
                             .foregroundColor(Color.orange)
                             .lineLimit(2)
                     }
@@ -199,11 +199,11 @@ public struct QimenDunjiaView: View {
             // 顶行: 八神 / 九星
             HStack {
                 Text(cell.localizedGodName)
-                    .font(.system(size: isPad ? 12 : 9, weight: .bold))
+                    .font(.adaptive(size: 9, weight: .bold))
                     .foregroundColor(Color.yellow)
                 Spacer()
                 Text(cell.localizedStarName)
-                    .font(.system(size: isPad ? 12 : 9))
+                    .font(.adaptive(size: 9))
                     .foregroundColor(Color.yanCyan)
             }
             
@@ -211,7 +211,7 @@ public struct QimenDunjiaView: View {
             
             // 中行: 八门 (大字显影)
             Text(cell.localizedDoorName)
-                .font(.system(size: isPad ? 22 : 15, weight: .bold, design: .serif))
+                .font(.adaptive(size: 15, weight: .bold, design: .serif))
                 .foregroundColor(isJi ? Color.green : (isXiong ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45)))
             
             Spacer(minLength: 2)
@@ -219,11 +219,11 @@ public struct QimenDunjiaView: View {
             // 底行: 宫名 / 天地三奇六仪
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.system(size: isPad ? 11 : 8))
+                    .font(.adaptive(size: 8))
                     .foregroundColor(.white.opacity(0.6))
                 Spacer()
                 Text("\(cell.tianStem)/\(cell.diStem)")
-                    .font(.system(size: isPad ? 12 : 9, weight: .bold, design: .monospaced))
+                    .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
         }

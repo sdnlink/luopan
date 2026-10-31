@@ -781,17 +781,17 @@ public struct ARRoomPlanSurveyView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(lang.t("ar_roomplan_title"))
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.adaptive(size: 16, weight: .bold))
                             .foregroundColor(.white)
                         Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : "\(lang.t("ar_roomplan_finished")) (\(max(1, model.scannedRoomCount)) 室)")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.adaptive(size: 10, weight: .medium))
                             .foregroundColor(model.isCapturing ? .green : .orange)
                     }
                     Spacer()
                     if model.isCapturing {
                         Button(action: { model.finishCurrentRoomSegment() }) {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.black)
                                 .padding(9)
                                 .background(Color.green)
@@ -801,7 +801,7 @@ public struct ARRoomPlanSurveyView: View {
                     } else if model.didFinish {
                         Button(action: { model.startNextRoomSegment() }) {
                             Image(systemName: "plus.square.on.square")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.black)
                                 .padding(9)
                                 .background(Color.green.opacity(0.9))
@@ -810,7 +810,7 @@ public struct ARRoomPlanSurveyView: View {
                         .accessibilityLabel("继续加扫下一间")
                         Button(action: syncToFloorplan) {
                             Image(systemName: "scope")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.black)
                                 .padding(9)
                                 .background(Color.yanCyan)
@@ -819,7 +819,7 @@ public struct ARRoomPlanSurveyView: View {
                         .accessibilityLabel(lang.t("tab_floorplan"))
                         Button(action: shareReport) {
                             Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.adaptive(size: 13, weight: .bold))
                                 .foregroundColor(.white)
                                 .padding(9)
                                 .background(Color.blue.opacity(0.8))
@@ -832,7 +832,7 @@ public struct ARRoomPlanSurveyView: View {
                         presentationMode.wrappedValue.dismiss()
                     }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.adaptive(size: 13, weight: .bold))
                             .foregroundColor(.white)
                             .padding(9)
                             .background(Color.black.opacity(0.6))
@@ -850,7 +850,7 @@ public struct ARRoomPlanSurveyView: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     Text(lang.t("ar_roomplan_semantic_note"))
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.adaptive(size: 10, weight: .medium))
                         .foregroundColor(.white.opacity(0.72))
                     if model.estimatedAreaSqMeters > 0 {
                         Text(String(
@@ -859,7 +859,7 @@ public struct ARRoomPlanSurveyView: View {
                             model.estimatedDepthMeters,
                             model.estimatedAreaSqMeters
                         ))
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
                         .foregroundColor(.yanCyan)
                     }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
@@ -873,7 +873,7 @@ public struct ARRoomPlanSurveyView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             ForEach(model.spatialFindings, id: \.self) { finding in
                                 Text(finding)
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.adaptive(size: 10, weight: .bold))
                                     .foregroundColor(finding.contains("⚠️") ? .orange : .green)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
@@ -887,12 +887,12 @@ public struct ARRoomPlanSurveyView: View {
                     }
                     if let error = model.errorMessage {
                         Text("\(lang.t("ar_roomplan_failed")): \(error)")
-                            .font(.system(size: 10))
+                            .font(.adaptive(size: 10))
                             .foregroundColor(.orange)
                     }
                     if let reportMessage = reportMessage {
                         Text(reportMessage)
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.adaptive(size: 10, weight: .semibold))
                             .foregroundColor(.yanCyan)
                     }
                 }
@@ -930,7 +930,7 @@ public struct ARRoomPlanSurveyView: View {
 
     private func semanticCount(_ key: String, value: Int, icon: String) -> some View {
         Label("\(lang.t(key)): \(value)", systemImage: icon)
-            .font(.system(size: 11, weight: .medium))
+            .font(.adaptive(size: 11, weight: .medium))
             .foregroundColor(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

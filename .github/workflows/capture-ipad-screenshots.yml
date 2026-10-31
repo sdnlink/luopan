@@ -43,7 +43,7 @@ jobs:
       - name: Set up Python & Dependencies
         run: |
           python3 --version
-          python3 -m pip install --upgrade pip Pillow
+          python3 -m pip install --break-system-packages Pillow || python3 -m pip install Pillow
 
       - name: Build App for iOS Simulator (Debug)
         run: |

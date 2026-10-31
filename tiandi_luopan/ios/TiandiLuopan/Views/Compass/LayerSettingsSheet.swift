@@ -56,5 +56,6 @@ public struct LayerSettingsSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

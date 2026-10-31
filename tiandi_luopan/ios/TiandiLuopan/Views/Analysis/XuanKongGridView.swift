@@ -26,6 +26,10 @@ public struct XuanKongGridView: View {
     
     // 九宫格九个方位的标准九宫排布对应 (从左到右，从上到下：东南4、正南9、西南2；正东3、中宫5、正西7；东北8、正北1、西北6)
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -68,8 +72,10 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
-                .padding(.top, 10)
-                .padding(.bottom, 24)
+            .frame(maxWidth: isPad ? 720 : .infinity)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 10)
+            .padding(.bottom, 24)
             }
         }
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
@@ -156,9 +162,9 @@ public struct XuanKongGridView: View {
             selectedSubTab = index
         }) {
             Text(title)
-                .font(.system(size: 12, weight: selectedSubTab == index ? .bold : .medium))
+                .font(.system(size: isPad ? 14 : 12, weight: selectedSubTab == index ? .bold : .medium))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, isPad ? 10 : 8)
                 .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
                 .foregroundColor(selectedSubTab == index ? .black : .white.opacity(0.75))
         }
@@ -253,8 +259,8 @@ public struct XuanKongGridView: View {
                                         .font(.system(size: 8))
                                 }
                             }
-                            .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                            .frame(width: isLocked ? 52 : 44, height: 32)
+                            .font(.system(size: isPad ? 15 : 13, weight: isSelected ? .bold : .medium))
+                            .frame(width: isLocked ? (isPad ? 62 : 52) : (isPad ? 52 : 44), height: isPad ? 36 : 32)
                             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .black : .white)
                             .cornerRadius(8)
@@ -356,34 +362,34 @@ public struct XuanKongGridView: View {
         let borderColor = isSelected ? Color.yanCyan : (isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12)))
         let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
         
-        return VStack(spacing: 4) {
+        return VStack(spacing: isPad ? 6 : 4) {
             HStack {
                 Text("\(cell.sittingStar)")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: isPad ? 16 : 13, weight: .bold))
                     .foregroundColor(Color.yanCyan)
                 Spacer()
                 Text("\(cell.facingStar)")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: isPad ? 16 : 13, weight: .bold))
                     .foregroundColor(Color.orange)
             }
             
             Text("\(cell.periodStar)")
-                .font(.system(size: 22, weight: .bold, design: .serif))
+                .font(.system(size: isPad ? 28 : 22, weight: .bold, design: .serif))
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                .padding(.vertical, 2)
+                .padding(.vertical, isPad ? 6 : 2)
             
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.system(size: 9))
+                    .font(.system(size: isPad ? 11 : 9))
                     .foregroundColor(.white.opacity(0.5))
                 Spacer()
                 Text(cell.localizedElement)
-                    .font(.system(size: 9))
+                    .font(.system(size: isPad ? 11 : 9))
                     .foregroundColor(.white.opacity(0.5))
             }
         }
-        .padding(8)
-        .frame(minHeight: 74)
+        .padding(isPad ? 12 : 8)
+        .frame(minHeight: isPad ? 108 : 74)
         .background(bgColor)
         .cornerRadius(8)
         .overlay(

@@ -218,6 +218,7 @@ public struct TianJiShuView: View {
                 VIPPaywallSheet(defaultProductId: .tianjiSingle)
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         // Stable overlay instead of a system alert: this page observes the
         // high-frequency compass stream, which tore down the alert.
         .overlay(

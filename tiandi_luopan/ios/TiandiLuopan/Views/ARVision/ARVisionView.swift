@@ -1768,6 +1768,7 @@ public struct ShaRemedyDetailSheet: View {
                 VIPPaywallSheet(defaultProductId: .vipYearly)
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     // MARK: - 1. 八大形煞快速切换栏

@@ -331,6 +331,7 @@ public struct SettingsView: View {
         }
         }
 
+                .navigationViewStyle(StackNavigationViewStyle())
                 .preferredColorScheme(.dark)
             } else {
                 Color.clear.ignoresSafeArea()
@@ -452,6 +453,7 @@ public struct LegalDocumentSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 

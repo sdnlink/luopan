@@ -1,0 +1,95 @@
+name: Capture iPad 12.9" Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_language:
+        description: '截屏语言选择 (all 代表全语种 8 种语言 40 张图)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - zh-Hans
+          - zh-Hant
+          - en
+          - ja
+          - ko
+          - th
+          - vi
+          - id
+
+jobs:
+  capture-ipad-screenshots:
+    name: Auto Capture iPad 12.9" Screenshots
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Select Highest Available Xcode
+        run: |
+          echo "=== Detecting Xcode Versions on Runner ==="
+          find /Applications -maxdepth 1 -name "Xcode*.app" -print
+          HIGHEST_XCODE="$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)"
+          if [ -n "$HIGHEST_XCODE" ]; then
+            echo "Selecting Xcode at: $HIGHEST_XCODE"
+            sudo xcode-select -s "$HIGHEST_XCODE/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      - name: Set up Python & Dependencies
+        run: |
+          python3 --version
+          python3 -m pip install --upgrade pip Pillow
+
+      - name: Build App for iOS Simulator (Debug)
+        run: |
+          echo "=== Building TiandiLuopan for iOS Simulator ==="
+          xcodebuild build \
+            -project tiandi_luopan/ios/TiandiLuopan.xcodeproj \
+            -scheme TiandiLuopan \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug \
+            -derivedDataPath tiandi_luopan/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+          echo "Verifying built app bundle..."
+          APP_PATH="tiandi_luopan/build/Build/Products/Debug-iphonesimulator/TiandiLuopan.app"
+          if [ -d "$APP_PATH" ]; then
+            echo "App successfully built at: $APP_PATH"
+          else
+            echo "::error::Built app not found at $APP_PATH"
+            exit 1
+          fi
+
+      - name: Run Automated iPad 12.9" Screenshot Capture
+        run: |
+          python3 .github/scripts/capture_ipad_screenshots.py \
+            --app-path "tiandi_luopan/build/Build/Products/Debug-iphonesimulator/TiandiLuopan.app" \
+            --lang "${{ inputs.target_language }}" \
+            --output-dir "dist-screenshots"
+
+      - name: Upload Screenshots as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPad-12.9-Screenshots
+          path: dist-screenshots/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Log Download Path Instructions
+        run: |
+          echo "=========================================================================="
+          echo "🎉 iPad 12.9\" 截图捕获完成并已成功上传为 Artifact！"
+          echo "📥 下载路径："
+          echo "1. 打开本 Actions 工作流运行详情页面："
+          echo "   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "2. 滑动到页面底部的 'Artifacts' (工件) 区域"
+          echo "3. 点击下载 'iPad-12.9-Screenshots' 压缩包"
+          echo "=========================================================================="
+

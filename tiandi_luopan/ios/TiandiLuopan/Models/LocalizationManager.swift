@@ -82,7 +82,10 @@ public class LocalizationManager: ObservableObject {
     private let kAppLanguageKey = "app_language"
     
     private init() {
-        let saved = UserDefaults.standard.string(forKey: kAppLanguageKey) ?? "auto"
+        var saved = UserDefaults.standard.string(forKey: kAppLanguageKey) ?? "auto"
+        if let idx = CommandLine.arguments.firstIndex(of: "-appLanguage"), idx + 1 < CommandLine.arguments.count {
+            saved = CommandLine.arguments[idx + 1]
+        }
         let setting = AppLanguage(rawValue: saved) ?? .auto
         self.currentSetting = setting
         self.effectiveLanguage = LocalizationManager.resolveLanguage(for: setting)

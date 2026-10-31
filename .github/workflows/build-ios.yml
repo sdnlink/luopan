@@ -75,18 +75,23 @@ jobs:
           echo "profile_uuid=$UUID" >> "$GITHUB_OUTPUT"
 
           # 7. 检测 Profile 导出方式 (development, ad-hoc, 或 app-store)
-          PROV_XML=$(security cms -D -i "$PP_PATH" 2>/dev/null)
-          if echo "$PROV_XML" | grep -q '<key>ProvisionedDevices</key>'; then
-            if echo "$PROV_XML" | grep -q '<key>get-task-allow</key>[[:space:]]*<true/>'; then
-              METHOD="development"
-            else
-              METHOD="ad-hoc"
-            fi
+          security cms -D -i "$PP_PATH" > "$RUNNER_TEMP/profile.plist" 2>/dev/null
+          GET_TASK_ALLOW=$(/usr/libexec/PlistBuddy -c "Print Entitlements:get-task-allow" "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "false")
+          HAS_DEVICES=$(/usr/libexec/PlistBuddy -c "Print ProvisionedDevices" "$RUNNER_TEMP/profile.plist" 2>/dev/null || echo "")
+
+          if [ "$GET_TASK_ALLOW" = "true" ]; then
+            METHOD="development"
+            SIGNING_CERT="development"
+          elif [ -n "$HAS_DEVICES" ]; then
+            METHOD="ad-hoc"
+            SIGNING_CERT="distribution"
           else
             METHOD="app-store"
+            SIGNING_CERT="distribution"
           fi
-          echo "Detected Export Method: $METHOD"
+          echo "Detected Export Method: $METHOD (signingCertificate: $SIGNING_CERT)"
           echo "export_method=$METHOD" >> "$GITHUB_OUTPUT"
+          echo "signing_cert=$SIGNING_CERT" >> "$GITHUB_OUTPUT"
 
       - name: Build Archive
         env:
@@ -115,6 +120,7 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
           METHOD: ${{ steps.setup_signing.outputs.export_method }}
+          SIGNING_CERT: ${{ steps.setup_signing.outputs.signing_cert }}
         run: |
           mkdir -p build
           cat <<EOF > build/ExportOptions.plist
@@ -126,6 +132,8 @@ jobs:
               <string>$METHOD</string>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>$SIGNING_CERT</string>
               <key>teamID</key>
               <string>$TEAM_ID</string>
               <key>provisioningProfiles</key>

@@ -83,5 +83,6 @@ public struct FenjinDetailSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

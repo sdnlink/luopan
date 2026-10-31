@@ -90,6 +90,14 @@ public struct FloorplanView: View {
             roll: motion.roll
         )
     }
+
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    private var canvasHeight: CGFloat {
+        isPad ? 560 : 340
+    }
     
     public var body: some View {
         // CompassMotionManager publishes tilt and magnetic-field samples more
@@ -125,7 +133,7 @@ public struct FloorplanView: View {
                 
                 // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
                 floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
-                    .frame(height: 340)
+                    .frame(height: canvasHeight)
                     .padding(.horizontal, 16)
 
                 if !isSyncWithCompass {
@@ -136,6 +144,8 @@ public struct FloorplanView: View {
                 // 3. 底部体检报告与房间列表
                 auditListSection(report: auditResult.report)
             }
+            .frame(maxWidth: isPad ? 800 : .infinity)
+            .frame(maxWidth: .infinity)
             .padding(.top, 8)
         }
         }
@@ -1789,6 +1799,7 @@ private struct FloorplanRoomTypeEditor: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .overlay(
             Group {
                 if showDeleteConfirmation, let onDelete = onDelete {
@@ -2034,6 +2045,7 @@ public struct RoomAuditDetailSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .overlay(
             Group {
                 if showDeleteConfirmation, let onDelete = onDelete {

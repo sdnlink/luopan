@@ -254,6 +254,8 @@ public struct VIPPaywallSheet: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
                     }
+                    .frame(maxWidth: 640)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationBarTitle(LocalizationManager.shared.t("vip_member_center"), displayMode: .inline)
@@ -261,6 +263,7 @@ public struct VIPPaywallSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
         .onAppear {
             iap.clearTransientMessages()
             iap.refreshProductsIfNeeded()

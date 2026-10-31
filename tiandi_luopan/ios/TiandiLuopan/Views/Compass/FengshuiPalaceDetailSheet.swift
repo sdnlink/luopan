@@ -92,5 +92,6 @@ public struct FengshuiPalaceDetailSheet: View {
                 presentationMode.wrappedValue.dismiss()
             })
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

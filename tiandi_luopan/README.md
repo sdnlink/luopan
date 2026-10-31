@@ -365,10 +365,10 @@ iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMess
 * **商品配置清单 (Apple App Store Connect)**：
   | 商品 ID (Product Identifier) | 类型 | 官方参考定价 | 权益说明 |
   | :--- | :--- | :--- | :--- |
-  | `com.yanxiang.luopan.vip.yearly` | 自动续期订阅 (Auto-Renewable) | ¥198/年 | 演象·年度堪舆会员（解锁全场景全息交互、奇门全息排盘、紫白客星布防、宣纸长图无限导出） |
-  | `com.yanxiang.luopan.pro.lifetime` | 非消耗品 (Non-Consumable) | ¥298 | 演象·大师终身专业版（一次付费，终身永久享受所有专业特权与未来算法升级） |
-  | `com.yanxiang.luopan.floorplan.single` | 消耗品 (Consumable) | ¥19.9/套 | 户型空间立极·单套房型全案体检（几何重心立极、全屋动线与明财文昌位吉凶诊断） |
-  | `com.yanxiang.luopan.tianji.single` | 消耗品 (Consumable) | ¥9.9/次 | 福宅天机堪舆全案宣纸长卷·单次无水印高清长图导出 |
+  | `com.yanxiang.compass.vip.yearly` | 自动续期订阅 (Auto-Renewable) | ¥198/年 | 演象·年度堪舆会员（解锁全场景全息交互、奇门全息排盘、紫白客星布防、宣纸长图无限导出） |
+  | `com.yanxiang.compass.pro.lifetime` | 非消耗品 (Non-Consumable) | ¥298 | 演象·大师终身专业版（一次付费，终身永久享受所有专业特权与未来算法升级） |
+  | `com.yanxiang.compass.floorplan.case` | 消耗品 (Consumable) | ¥19.9/套 | 户型空间立极·单套房型全案体检（几何重心立极、全屋动线与明财文昌位吉凶诊断） |
+  | `com.yanxiang.compass.tianji.single` | 消耗品 (Consumable) | ¥9.9/次 | 福宅天机堪舆全案宣纸长卷·单次无水印高清长图导出 |
 
 * **审核合规保障**：
   - 支持 **恢复已购项目 (Restore Purchases)**，一键找回已购权益；

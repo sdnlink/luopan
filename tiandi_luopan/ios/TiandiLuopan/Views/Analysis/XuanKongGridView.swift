@@ -164,6 +164,8 @@ public struct XuanKongGridView: View {
         }) {
             Text(title)
                 .font(.adaptive(size: 12, weight: selectedSubTab == index ? .bold : .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, isPad ? 10 : 8)
                 .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)

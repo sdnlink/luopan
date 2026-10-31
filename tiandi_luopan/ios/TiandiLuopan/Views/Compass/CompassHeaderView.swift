@@ -91,6 +91,8 @@ public struct CompassHeaderView: View {
                     Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
                         .font(.adaptive(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 
                 Spacer()

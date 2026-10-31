@@ -132,6 +132,8 @@ public struct BaZhaiView: View {
             Button(action: { selectedSubTab = 1 }) {
                 Text(lang.t("sanhe_tab_title"))
                     .font(.adaptive(size: 13, weight: selectedSubTab == 1 ? .bold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                     .background(selectedSubTab == 1 ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)

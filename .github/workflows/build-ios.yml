@@ -154,12 +154,16 @@ jobs:
           retention-days: 14
 
       - name: Upload to TestFlight (Optional)
-        if: ${{ github.event.inputs.upload_to_testflight == 'true' && secrets.APPSTORE_API_KEY_ID != '' }}
+        if: ${{ github.event.inputs.upload_to_testflight == 'true' }}
         env:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           API_KEY_BASE64: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
         run: |
+          if [ -z "$API_KEY_ID" ] || [ -z "$ISSUER_ID" ] || [ -z "$API_KEY_BASE64" ]; then
+            echo "::warning::Skipping TestFlight upload: APPSTORE_API_KEY_ID / ISSUER_ID / APPSTORE_API_PRIVATE_KEY secret is not set."
+            exit 0
+          fi
           mkdir -p ~/.appstoreconnect/private_keys
           echo "$API_KEY_BASE64" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${API_KEY_ID}.p8
           IPA_FILE=$(ls dist-ios/*.ipa | head -1)

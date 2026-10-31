@@ -58,7 +58,6 @@ public struct CompassMainView: View {
                 
                 // 2. 罗盘快捷辅助工具条 (锁定朝向 / 分金详勘 / 空亡诊断 / 八方全鉴)
                 compassToolBar()
-                    .padding(.horizontal, 16)
                     .padding(.top, 2)
                 
                 Spacer(minLength: 4)
@@ -107,7 +106,8 @@ public struct CompassMainView: View {
         case .largeVoid: kwColor = Color.red
         }
         
-        return HStack(spacing: 8) {
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
             // 锁定朝向按钮
             Button(action: {
                 motion.toggleLock()
@@ -189,6 +189,8 @@ public struct CompassMainView: View {
                 .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 .cornerRadius(6)
             }
+            }
+            .padding(.horizontal, 16)
         }
     }
     

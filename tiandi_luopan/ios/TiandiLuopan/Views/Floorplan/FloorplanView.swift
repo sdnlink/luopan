@@ -117,7 +117,9 @@ public struct FloorplanView: View {
                 GeometryReader { geo in
                     let screenW: CGFloat = geo.size.width
                     let screenH: CGFloat = geo.size.height
-                    let canvasSide: CGFloat = isPad ? min(screenW - 48, screenH * 0.46) : min(screenW - 32, screenH < 700 ? 260.0 : 340.0)
+                    let canvasSide: CGFloat = isPad
+                        ? min(screenW - 48, screenH * 0.46)
+                        : min(screenW - 32, screenH < 700 ? 250.0 : (screenH > 900 ? 380.0 : min(340.0, screenH * 0.40)))
 
                     VStack(spacing: 8) {
                         // 1. 顶部控制栏

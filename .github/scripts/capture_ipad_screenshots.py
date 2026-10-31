@@ -168,9 +168,39 @@ def main():
     print(f"Installing {app_path} onto simulator...")
     run_cmd(["xcrun", "simctl", "install", udid, app_path])
 
+    # 3. Pre-grant all system privacy permissions (Location, Camera, Photos, Motion, etc.)
+    # This prevents any permission authorization alert dialogs from appearing during capture.
+    print(f"Pre-granting all privacy permissions for {BUNDLE_ID}...")
+    services = [
+        "all",
+        "location",
+        "location-always",
+        "camera",
+        "photos",
+        "photos-add",
+        "motion",
+        "microphone",
+        "user-tracking"
+    ]
+    for s in services:
+        run_cmd(["xcrun", "simctl", "privacy", udid, "grant", s, BUNDLE_ID], check=False)
+
+    # 4. Set fixed GPS coordinates (Beijing) so compass/solar terms compute immediately
+    run_cmd(["xcrun", "simctl", "location", udid, "set", "39.9042,116.4074"], check=False)
+
+    # 5. Clean status bar (9:41 AM, 100% battery, full signal) for professional App Store screenshots
+    run_cmd([
+        "xcrun", "simctl", "status_bar", udid, "override",
+        "--time", "9:41",
+        "--batteryState", "charged",
+        "--batteryLevel", "100",
+        "--cellularBars", "4",
+        "--wifiBars", "3"
+    ], check=False)
+
     captured_records = []
 
-    # 3. Iterate Languages & Screens
+    # 6. Iterate Languages & Screens
     try:
         for lang_info in selected_langs:
             code = lang_info["code"]

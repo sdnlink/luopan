@@ -1,6 +1,7 @@
 import SwiftUI
 import SceneKit
 import simd
+import UIKit
 
 // MARK: - 全屋 3D 空间测绘立体布局与形煞全息查看器
 
@@ -12,8 +13,10 @@ public struct House3DSpaceViewer: View {
     @State private var viewMode: ViewAngleMode = .perspective
     @State private var showDimensions: Bool = true
     @State private var showShaAlerts: Bool = true
+    @State private var showBaguaGrid: Bool = true
     @State private var selectedShaItem: HouseSpatialShaItem? = nil
     @State private var sceneCoordinator: HouseSceneCoordinator? = nil
+    @State private var shareSheetItem: SurveyShareReportItem? = nil
 
     public enum ViewAngleMode: String, CaseIterable {
         case perspective = "3D透视"
@@ -35,6 +38,7 @@ public struct House3DSpaceViewer: View {
                 viewMode: viewMode,
                 showDimensions: showDimensions,
                 showShaAlerts: showShaAlerts,
+                showBaguaGrid: showBaguaGrid,
                 selectedShaItem: selectedShaItem,
                 coordinatorRef: { coord in
                     self.sceneCoordinator = coord
@@ -52,6 +56,9 @@ public struct House3DSpaceViewer: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 20)
+        }
+        .sheet(item: $shareSheetItem) { report in
+            SurveyShareActivityView(image: report.image)
         }
     }
 
@@ -82,6 +89,17 @@ public struct House3DSpaceViewer: View {
                 .background(Color.white.opacity(0.12))
                 .cornerRadius(12)
 
+                // 导出与分享长图存证
+                Button(action: exportAndShareReport) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.adaptive(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.blue.opacity(0.75))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("导出全屋测绘与形煞报告")
+
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark")
                         .font(.adaptive(size: 12, weight: .bold))
@@ -110,8 +128,8 @@ public struct House3DSpaceViewer: View {
                 )
                 Divider().frame(height: 18).background(Color.white.opacity(0.2))
                 metricCell(
-                    title: "房间数",
-                    value: "\(max(1, survey.rooms.count)) 室"
+                    title: "结构开孔",
+                    value: "\(survey.openings.count) 处"
                 )
             }
             .padding(.vertical, 6)
@@ -241,15 +259,27 @@ public struct House3DSpaceViewer: View {
 
                 Spacer()
 
-                // 尺寸标注开关
-                Button(action: { showDimensions.toggle() }) {
-                    Image(systemName: showDimensions ? "ruler.fill" : "ruler")
+                // 八宅九宫地面投影开关
+                Button(action: { showBaguaGrid.toggle() }) {
+                    Image(systemName: showBaguaGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
                         .font(.adaptive(size: 12, weight: .bold))
-                        .foregroundColor(showDimensions ? .yanGold : .white.opacity(0.6))
+                        .foregroundColor(showBaguaGrid ? .yanGold : .white.opacity(0.6))
                         .padding(7)
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("切换八宅九宫地面阵")
+
+                // 尺寸标注开关
+                Button(action: { showDimensions.toggle() }) {
+                    Image(systemName: showDimensions ? "ruler.fill" : "ruler")
+                        .font(.adaptive(size: 12, weight: .bold))
+                        .foregroundColor(showDimensions ? .yanCyan : .white.opacity(0.6))
+                        .padding(7)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("切换尺寸标尺")
 
                 // 形煞警示标注开关
                 Button(action: { showShaAlerts.toggle() }) {
@@ -260,6 +290,7 @@ public struct House3DSpaceViewer: View {
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("切换形煞警示")
 
                 // 重置视角
                 Button(action: {
@@ -272,6 +303,7 @@ public struct House3DSpaceViewer: View {
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("重置视角")
             }
             .padding(8)
             .background(Color.black.opacity(0.85))
@@ -286,6 +318,12 @@ public struct House3DSpaceViewer: View {
         case .critical: return .red
         }
     }
+
+    private func exportAndShareReport() {
+        guard let coord = sceneCoordinator, let snapshot = coord.captureSnapshot() else { return }
+        let reportImage = SurveyReportRenderer.renderReportImage(survey: survey, snapshot: snapshot)
+        self.shareSheetItem = SurveyShareReportItem(image: reportImage)
+    }
 }
 
 // MARK: - SceneKit 3D 场景封装与渲染器
@@ -295,6 +333,7 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
     public let viewMode: House3DSpaceViewer.ViewAngleMode
     public let showDimensions: Bool
     public let showShaAlerts: Bool
+    public let showBaguaGrid: Bool
     public let selectedShaItem: HouseSpatialShaItem?
     public let coordinatorRef: (HouseSceneCoordinator) -> Void
 
@@ -306,7 +345,7 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
         let scnView = SCNView(frame: .zero)
         scnView.backgroundColor = UIColor(red: 0.04, green: 0.05, blue: 0.08, alpha: 1.0)
         scnView.autoenablesDefaultLighting = false
-        scnView.allowsCameraControl = true // 支持单指旋转、双指缩放
+        scnView.allowsCameraControl = true
 
         let scene = SCNScene()
         scnView.scene = scene
@@ -317,7 +356,8 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
             survey: survey,
             viewMode: viewMode,
             showDimensions: showDimensions,
-            showShaAlerts: showShaAlerts
+            showShaAlerts: showShaAlerts,
+            showBaguaGrid: showBaguaGrid
         )
 
         coordinatorRef(context.coordinator)
@@ -330,6 +370,7 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
             viewMode: viewMode,
             showDimensions: showDimensions,
             showShaAlerts: showShaAlerts,
+            showBaguaGrid: showBaguaGrid,
             selectedShaItem: selectedShaItem
         )
     }
@@ -344,7 +385,12 @@ public final class HouseSceneCoordinator: NSObject {
     private var rootHouseNode = SCNNode()
     private var shaAlertsNode = SCNNode()
     private var dimensionsNode = SCNNode()
+    private var baguaGridNode = SCNNode()
     private var currentSurvey: HouseSpatialSurvey?
+
+    public func captureSnapshot() -> UIImage? {
+        return scnView?.snapshot()
+    }
 
     public func setupScene(
         scene: SCNScene,
@@ -352,13 +398,13 @@ public final class HouseSceneCoordinator: NSObject {
         survey: HouseSpatialSurvey,
         viewMode: House3DSpaceViewer.ViewAngleMode,
         showDimensions: Bool,
-        showShaAlerts: Bool
+        showShaAlerts: Bool,
+        showBaguaGrid: Bool
     ) {
         self.scene = scene
         self.scnView = view
         self.currentSurvey = survey
 
-        // 1. 设置光照系统 (环境光 + 主金色辅光 + 侧顶光)
         let ambientLight = SCNLight()
         ambientLight.type = .ambient
         ambientLight.color = UIColor(white: 0.45, alpha: 1.0)
@@ -376,19 +422,20 @@ public final class HouseSceneCoordinator: NSObject {
         lightNode.look(at: SCNVector3(0, 0, 0))
         scene.rootNode.addChildNode(lightNode)
 
-        // 2. 摄像机设置
         let camera = SCNCamera()
         camera.zNear = 0.1
         camera.zFar = 150.0
         cameraNode.camera = camera
         scene.rootNode.addChildNode(cameraNode)
 
-        // 3. 构建全屋模型节点
         scene.rootNode.addChildNode(rootHouseNode)
+        scene.rootNode.addChildNode(baguaGridNode)
         scene.rootNode.addChildNode(shaAlertsNode)
         scene.rootNode.addChildNode(dimensionsNode)
 
         buildHouseGeometry(survey: survey)
+        buildDimensionsLines(survey: survey)
+        buildBaguaGridOverlay(survey: survey)
         resetCamera(mode: viewMode)
     }
 
@@ -397,13 +444,14 @@ public final class HouseSceneCoordinator: NSObject {
         viewMode: House3DSpaceViewer.ViewAngleMode,
         showDimensions: Bool,
         showShaAlerts: Bool,
+        showBaguaGrid: Bool,
         selectedShaItem: HouseSpatialShaItem?
     ) {
         dimensionsNode.isHidden = !showDimensions
         shaAlertsNode.isHidden = !showShaAlerts
+        baguaGridNode.isHidden = !showBaguaGrid
 
         if let item = selectedShaItem, let coord = item.coordinate {
-            // 摄像机微移平滑聚焦在形煞位置
             SCNTransaction.begin()
             SCNTransaction.animationDuration = 0.6
             cameraNode.look(at: SCNVector3(coord.x, coord.y + 0.5, coord.z))
@@ -443,14 +491,12 @@ public final class HouseSceneCoordinator: NSObject {
     private func buildHouseGeometry(survey: HouseSpatialSurvey) {
         rootHouseNode.childNodes.forEach { $0.removeFromParentNode() }
         shaAlertsNode.childNodes.forEach { $0.removeFromParentNode() }
-        dimensionsNode.childNodes.forEach { $0.removeFromParentNode() }
 
         let cx = survey.centroidX
         let cz = survey.centroidZ
         let w = survey.dimensions.totalWidth
         let d = survey.dimensions.totalDepth
 
-        // 1. 地面基盘与八卦罗盘网格
         let floorGeo = SCNPlane(width: CGFloat(w * 1.35), height: CGFloat(d * 1.35))
         let floorMat = SCNMaterial()
         floorMat.diffuse.contents = UIColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 0.95)
@@ -460,10 +506,9 @@ public final class HouseSceneCoordinator: NSObject {
         floorNode.position = SCNVector3(cx, 0, cz)
         rootHouseNode.addChildNode(floorNode)
 
-        // 地面网格线
         addGridLines(centerX: cx, centerZ: cz, width: w * 1.3, depth: d * 1.3)
 
-        // 2. 3D 立极中宫点 (金色贯通天地的太极光柱)
+        // 金色贯通天地的立极中宫光柱
         let pillarGeo = SCNCylinder(radius: 0.18, height: CGFloat(survey.dimensions.ceilingHeight * 1.5))
         let pillarMat = SCNMaterial()
         pillarMat.diffuse.contents = UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 0.75)
@@ -473,7 +518,6 @@ public final class HouseSceneCoordinator: NSObject {
         pillarNode.position = SCNVector3(cx, survey.dimensions.ceilingHeight * 0.75, cz)
         rootHouseNode.addChildNode(pillarNode)
 
-        // 立极中宫地面太极圆盘
         let centerRingGeo = SCNTorus(ringRadius: 0.6, pipeRadius: 0.04)
         let ringMat = SCNMaterial()
         ringMat.diffuse.contents = UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 0.9)
@@ -482,7 +526,7 @@ public final class HouseSceneCoordinator: NSObject {
         ringNode.position = SCNVector3(cx, 0.02, cz)
         rootHouseNode.addChildNode(ringNode)
 
-        // 3. 墙体几何生成 (半透明建筑玻璃体科技质感)
+        // 墙体
         for wall in survey.walls {
             let start = wall.start
             let end = wall.end
@@ -509,7 +553,7 @@ public final class HouseSceneCoordinator: NSObject {
             rootHouseNode.addChildNode(wallNode)
         }
 
-        // 4. 门窗开孔三维立体显影
+        // 门窗
         for op in survey.openings {
             let opH = CGFloat(op.height)
             let opW = CGFloat(op.width)
@@ -517,14 +561,14 @@ public final class HouseSceneCoordinator: NSObject {
             let mat = SCNMaterial()
             switch op.type {
             case .entranceDoor:
-                mat.diffuse.contents = UIColor(red: 0.95, green: 0.80, blue: 0.20, alpha: 0.90) // 金黄大门
+                mat.diffuse.contents = UIColor(red: 0.95, green: 0.80, blue: 0.20, alpha: 0.90)
                 mat.emission.contents = UIColor(red: 0.5, green: 0.4, blue: 0.1, alpha: 0.4)
             case .interiorDoor:
-                mat.diffuse.contents = UIColor(red: 0.85, green: 0.65, blue: 0.45, alpha: 0.80) // 木色房门
+                mat.diffuse.contents = UIColor(red: 0.85, green: 0.65, blue: 0.45, alpha: 0.80)
             case .window, .balconyDoor:
-                mat.diffuse.contents = UIColor(red: 0.10, green: 0.85, blue: 0.95, alpha: 0.60) // 亮青色玻璃窗
+                mat.diffuse.contents = UIColor(red: 0.10, green: 0.85, blue: 0.95, alpha: 0.60)
             case .opening:
-                mat.diffuse.contents = UIColor(red: 0.30, green: 0.90, blue: 0.50, alpha: 0.50) // 绿色通透开口
+                mat.diffuse.contents = UIColor(red: 0.30, green: 0.90, blue: 0.50, alpha: 0.50)
             }
             box.materials = [mat]
 
@@ -535,7 +579,7 @@ public final class HouseSceneCoordinator: NSObject {
             rootHouseNode.addChildNode(opNode)
         }
 
-        // 5. 结构横梁展示 (悬空红棕色/沉降压顶)
+        // 横梁
         for beam in survey.beams {
             let len = simd_distance(SIMD2<Float>(beam.startX, beam.startZ), SIMD2<Float>(beam.endX, beam.endZ))
             guard len > 0.1 else { continue }
@@ -554,7 +598,7 @@ public final class HouseSceneCoordinator: NSObject {
             rootHouseNode.addChildNode(bNode)
         }
 
-        // 6. 房间功能分区地坪高亮与标签
+        // 房间地坪高亮
         for room in survey.rooms {
             let rW = CGFloat(room.sizeX * 0.90)
             let rD = CGFloat(room.sizeZ * 0.90)
@@ -579,15 +623,100 @@ public final class HouseSceneCoordinator: NSObject {
             rootHouseNode.addChildNode(rNode)
         }
 
-        // 7. 形煞警示标注与流线
         buildShaAlertVisuals(survey: survey)
+    }
+
+    // MARK: - 3D 尺寸标尺立体线条
+    private func buildDimensionsLines(survey: HouseSpatialSurvey) {
+        dimensionsNode.childNodes.forEach { $0.removeFromParentNode() }
+        let cx = survey.centroidX
+        let cz = survey.centroidZ
+        let w = survey.dimensions.totalWidth
+        let d = survey.dimensions.totalDepth
+        let h = survey.dimensions.ceilingHeight
+
+        let lineMat = SCNMaterial()
+        lineMat.diffuse.contents = UIColor(red: 0.0, green: 0.85, blue: 0.95, alpha: 0.85)
+
+        // 开间宽度标尺 (沿 X 轴外移)
+        let widthLineGeo = SCNBox(width: CGFloat(w), height: 0.015, length: 0.015, chamferRadius: 0)
+        widthLineGeo.materials = [lineMat]
+        let widthLineNode = SCNNode(geometry: widthLineGeo)
+        widthLineNode.position = SCNVector3(cx, 0.05, cz + d * 0.5 + 0.45)
+        dimensionsNode.addChildNode(widthLineNode)
+
+        // 进深长度标尺 (沿 Z 轴外移)
+        let depthLineGeo = SCNBox(width: 0.015, height: 0.015, length: CGFloat(d), chamferRadius: 0)
+        depthLineGeo.materials = [lineMat]
+        let depthLineNode = SCNNode(geometry: depthLineGeo)
+        depthLineNode.position = SCNVector3(cx + w * 0.5 + 0.45, 0.05, cz)
+        dimensionsNode.addChildNode(depthLineNode)
+
+        // 室内净高立柱标尺 (沿 Y 轴立起)
+        let heightLineGeo = SCNBox(width: 0.015, height: CGFloat(h), length: 0.015, chamferRadius: 0)
+        heightLineGeo.materials = [lineMat]
+        let heightLineNode = SCNNode(geometry: heightLineGeo)
+        heightLineNode.position = SCNVector3(cx - w * 0.5 - 0.45, h * 0.5, cz - d * 0.5 - 0.45)
+        dimensionsNode.addChildNode(heightLineNode)
+    }
+
+    // MARK: - 八宅九宫阵地面贴地投影
+    private func buildBaguaGridOverlay(survey: HouseSpatialSurvey) {
+        baguaGridNode.childNodes.forEach { $0.removeFromParentNode() }
+        let cx = survey.centroidX
+        let cz = survey.centroidZ
+        let w = survey.dimensions.totalWidth
+        let d = survey.dimensions.totalDepth
+        let cellW = CGFloat(w / 3.0)
+        let cellD = CGFloat(d / 3.0)
+
+        let facingGua = HouseSpatialSurveyEngine.guaForAngle(survey.compassHeading)
+        let sittingAngle = (survey.compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
+        let sittingGua = HouseSpatialSurveyEngine.guaForAngle(sittingAngle)
+        let bazhai = BaZhaiEngine.shared.analyze(sittingPalace: sittingGua, facingPalace: facingGua)
+
+        for row in -1...1 {
+            for col in -1...1 {
+                let cellX = cx + Float(col) * Float(cellW)
+                let cellZ = cz + Float(row) * Float(cellD)
+
+                let plane = SCNPlane(width: cellW * 0.95, height: cellD * 0.95)
+                let mat = SCNMaterial()
+
+                if row == 0 && col == 0 {
+                    mat.diffuse.contents = UIColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 0.18)
+                } else {
+                    let relX = Double(col)
+                    let relZ = Double(row)
+                    let angleRad = atan2(relX, -relZ)
+                    let angleDeg = (angleRad * 180.0 / Double.pi + 360.0).truncatingRemainder(dividingBy: 360.0)
+                    let geoAngle = (angleDeg + survey.compassHeading).truncatingRemainder(dividingBy: 360.0)
+                    let cellGua = HouseSpatialSurveyEngine.guaForAngle(geoAngle)
+
+                    if let item = bazhai.items.first(where: { $0.guaName == cellGua }) {
+                        if item.star.isAuspicious {
+                            mat.diffuse.contents = UIColor(red: 0.20, green: 0.85, blue: 0.45, alpha: 0.15)
+                        } else {
+                            mat.diffuse.contents = UIColor(red: 0.85, green: 0.30, blue: 0.25, alpha: 0.14)
+                        }
+                    } else {
+                        mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
+                    }
+                }
+
+                plane.materials = [mat]
+                let node = SCNNode(geometry: plane)
+                node.eulerAngles.x = -Float.pi / 2
+                node.position = SCNVector3(cellX, 0.012, cellZ)
+                baguaGridNode.addChildNode(node)
+            }
+        }
     }
 
     private func buildShaAlertVisuals(survey: HouseSpatialSurvey) {
         for sha in survey.shaItems {
             guard let pos = sha.coordinate else { continue }
 
-            // 警示浮球
             let sphereGeo = SCNSphere(radius: 0.22)
             let sphereMat = SCNMaterial()
             let alertColor = sha.severity == .critical ? UIColor.systemRed : (sha.severity == .warning ? UIColor.systemOrange : UIColor.systemGreen)
@@ -598,7 +727,6 @@ public final class HouseSceneCoordinator: NSObject {
             sNode.position = SCNVector3(pos.x, max(0.5, pos.y), pos.z)
             shaAlertsNode.addChildNode(sNode)
 
-            // 穿堂煞对冲光线 (从大门直通主窗/阳台)
             if let targetPos = sha.vectorEnd {
                 let dist = simd_distance(pos, targetPos)
                 if dist > 0.5 {
@@ -615,7 +743,7 @@ public final class HouseSceneCoordinator: NSObject {
                     let dir = simd_normalize(targetPos - pos)
                     let pitch = asin(-dir.y)
                     let yaw = atan2(dir.x, dir.z)
-                    beamNode.eulerAngles = SCNVector3(pitch + Float.pi / 2, yaw, 0)
+                    beamNode.eulerAngles = SCNVector3(pitch + Float.pi / 2, yaw, Float(0))
                     shaAlertsNode.addChildNode(beamNode)
                 }
             }
@@ -623,7 +751,7 @@ public final class HouseSceneCoordinator: NSObject {
     }
 
     private func addGridLines(centerX: Float, centerZ: Float, width: Float, depth: Float) {
-        let step: Float = 1.0 // 1米格网
+        let step: Float = 1.0
         let halfW = width * 0.5
         let halfD = depth * 0.5
 
@@ -631,7 +759,6 @@ public final class HouseSceneCoordinator: NSObject {
         let lineMat = SCNMaterial()
         lineMat.diffuse.contents = UIColor(white: 0.35, alpha: 0.3)
 
-        // X 方向网格线
         var z = -halfD
         while z <= halfD {
             let line = SCNBox(width: CGFloat(width), height: 0.005, length: 0.02, chamferRadius: 0)
@@ -642,7 +769,6 @@ public final class HouseSceneCoordinator: NSObject {
             z += step
         }
 
-        // Z 方向网格线
         var x = -halfW
         while x <= halfW {
             let line = SCNBox(width: 0.02, height: 0.005, length: CGFloat(depth), chamferRadius: 0)
@@ -655,4 +781,156 @@ public final class HouseSceneCoordinator: NSObject {
 
         rootHouseNode.addChildNode(gridNode)
     }
+}
+
+// MARK: - 全息长图测绘报告渲染器
+
+public enum SurveyReportRenderer {
+    public static func renderReportImage(survey: HouseSpatialSurvey, snapshot: UIImage) -> UIImage {
+        let size = CGSize(width: 1080, height: 1920)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            UIColor(red: 0.04, green: 0.05, blue: 0.08, alpha: 1.0).setFill()
+            cg.fill(CGRect(origin: .zero, size: size))
+
+            // 1. 顶部标题与金线
+            "天机演象 · 全屋 3D 空间测绘与形煞全息存证".draw(
+                at: CGPoint(x: 50, y: 60),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 34),
+                    .foregroundColor: UIColor(red: 0.96, green: 0.85, blue: 0.40, alpha: 1.0)
+                ]
+            )
+
+            let subtitle = String(
+                format: "测绘基准朝向: %.1f° · 空间得分: %d分 · 测绘时间: %@",
+                survey.compassHeading,
+                survey.fengshuiScore,
+                DateFormatter.localizedString(from: survey.timestamp, dateStyle: .medium, timeStyle: .short)
+            )
+            subtitle.draw(
+                at: CGPoint(x: 50, y: 110),
+                withAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: 20, weight: .medium),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.7)
+                ]
+            )
+
+            // 2. 绘制 3D 模型透视渲染图
+            let snapRect = CGRect(x: 50, y: 160, width: size.width - 100, height: 860)
+            snapshot.draw(in: snapRect)
+            let borderPath = UIBezierPath(roundedRect: snapRect, cornerRadius: 16)
+            UIColor(red: 0.96, green: 0.85, blue: 0.40, alpha: 0.6).setStroke()
+            borderPath.lineWidth = 2
+            borderPath.stroke()
+
+            // 3. 物理测绘核心数据面板
+            let panelRect = CGRect(x: 50, y: 1050, width: size.width - 100, height: 260)
+            UIColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 0.90).setFill()
+            UIBezierPath(roundedRect: panelRect, cornerRadius: 14).fill()
+
+            "【房屋全维物理测绘参数】".draw(
+                at: CGPoint(x: 75, y: 1070),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 24),
+                    .foregroundColor: UIColor(red: 0.0, green: 0.85, blue: 0.95, alpha: 1.0)
+                ]
+            )
+
+            let dimsText = String(
+                format: "• 开间面宽: %.2f m     • 进深长度: %.2f m\n• 室内净层高: %.2f m    • 进深面宽比: %.2f\n• 套内净面积: %.1f ㎡   • 建筑估算面积: %.1f ㎡\n• 墙体总段数: %d 段     • 门窗开孔总数: %d 处",
+                survey.dimensions.totalWidth,
+                survey.dimensions.totalDepth,
+                survey.dimensions.ceilingHeight,
+                survey.dimensions.aspectRatio,
+                survey.dimensions.usableFloorArea,
+                survey.dimensions.grossFloorArea,
+                survey.walls.count,
+                survey.openings.count
+            )
+            let pStyle = NSMutableParagraphStyle()
+            pStyle.lineSpacing = 8
+            dimsText.draw(
+                in: CGRect(x: 75, y: 1115, width: panelRect.width - 50, height: 180),
+                withAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: 20, weight: .regular),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.92),
+                    .paragraphStyle: pStyle
+                ]
+            )
+
+            // 4. 全屋形煞体检清单
+            let shaHeaderY: CGFloat = 1340
+            "【全屋形煞引擎体检结论与化解】".draw(
+                at: CGPoint(x: 50, y: shaHeaderY),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 26),
+                    .foregroundColor: UIColor(red: 0.96, green: 0.85, blue: 0.40, alpha: 1.0)
+                ]
+            )
+
+            var curY = shaHeaderY + 45
+            for sha in survey.shaItems.prefix(4) {
+                let badge = sha.severity == .critical ? "【严重】" : (sha.severity == .warning ? "【警示】" : "【纳吉】")
+                let lineTitle = "\(badge) \(sha.title) · \(sha.locationName)"
+                let titleColor = sha.severity == .critical ? UIColor.systemRed : (sha.severity == .warning ? UIColor.systemOrange : UIColor.systemGreen)
+
+                lineTitle.draw(
+                    at: CGPoint(x: 50, y: curY),
+                    withAttributes: [
+                        .font: UIFont.boldSystemFont(ofSize: 20),
+                        .foregroundColor: titleColor
+                    ]
+                )
+                curY += 28
+
+                let desc = "\(sha.detail)\n化解方案：\(sha.solution)"
+                let dStyle = NSMutableParagraphStyle()
+                dStyle.lineSpacing = 4
+                desc.draw(
+                    in: CGRect(x: 50, y: curY, width: size.width - 100, height: 75),
+                    withAttributes: [
+                        .font: UIFont.systemFont(ofSize: 17),
+                        .foregroundColor: UIColor.white.withAlphaComponent(0.85),
+                        .paragraphStyle: dStyle
+                    ]
+                )
+                curY += 80
+            }
+
+            // 5. 底部版权与防伪印记
+            "天机演象 AI 空间测绘引擎 · LiDAR 毫米级全息数字化建档".draw(
+                at: CGPoint(x: 50, y: size.height - 50),
+                withAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: 16, weight: .medium),
+                    .foregroundColor: UIColor.white.withAlphaComponent(0.4)
+                ]
+            )
+        }
+    }
+}
+
+public struct SurveyShareReportItem: Identifiable {
+    public let id = UUID()
+    public let image: UIImage
+}
+
+public struct SurveyShareActivityView: UIViewControllerRepresentable {
+    public let image: UIImage
+
+    public func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        return controller
+    }
+
+    public func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

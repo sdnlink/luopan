@@ -1,5 +1,16 @@
 # iOS 工程分析与实现说明
 
+## 源码基准与文档边界（2026-11-01）
+
+以下内容以 `ios/TiandiLuopan.xcodeproj`、`ios/TiandiLuopan/Info.plist` 和当前 Swift 源码为准：
+
+- 原生 App 是纯 SwiftUI 页面，由 UIKit 的 `UIHostingController` 承载；工程没有 `WKWebView` 或 `WKScriptMessageHandler` 调用。`ios/TiandiLuopan/www/` 是单独提供给 Safari/PWA 使用的 Web 资源，不是原生 App 的渲染入口。
+- 工程 `IPHONEOS_DEPLOYMENT_TARGET` 和 `MinimumOSVersion` 均为 **iOS 16.0**，README 中的“iOS 14+”属于旧说明。RoomPlan 仅在 iOS 16+ 且具备 LiDAR 的设备上启用，其他设备使用 ARKit 或虚拟测绘回退。
+- `StoreKitIAPManager.swift` 使用 **StoreKit 2** 的 `Product`、`Transaction.currentEntitlements`、`Transaction.updates` 和 `AppTransaction.refresh()`。本地 HMAC 镜像只缓存已验证权益；生产发布仍应以 App Store Connect 和服务端收据/交易校验为最终依据。
+- `WorldMagneticModel.swift` 使用 WMM 2025–2030 系数（epoch 2025.0）；README 和旧版修复记录中的 WMM 2020–2025 表述已过时。
+- Windows 侧 `package_ipa.py` 只能在没有 Xcode 编译产物时生成资源验证用的占位包，不能替代 macOS/Xcode 的签名导出。当前仓库未提交可安装的 `dist-ios` IPA。
+- PWA 资源仍保留 GPS 超时后写入北京坐标的演示兜底逻辑；这与原生 App 的“定位不可用”行为不同，使用 PWA 时不能把该坐标当作真实定位。
+
 ## 本轮修复（2026-10-28）
 
 - 修正 Xcode 工程的本地化区域清单，加入 `en`、`zh-Hans` 和 `zh-Hant`，并将开发区域统一为实际存在的 `zh-Hans.lproj`，确保三个 `.lproj` 资源在 Xcode 与归档产物中均被识别。
@@ -35,21 +46,21 @@
 ## 运行链路
 
 - `SceneDelegate` 创建 `ViewController`，`ViewController` 承载 `RootContentView`；根视图包含罗盘、AR、户型、玄空分析和设置五个 Tab。
-- `CompassMotionManager` 汇总 Core Location 航向/定位和 Core Motion 姿态/磁场数据，经过环形角度滤波后发布给 SwiftUI。罗盘盘面只旋转磁北盘，真北针单独叠加偏角。
-- 各分析引擎（奇门、飞星、八宅、三合、天机等）是本地 Swift 计算，AR 使用 `AVCaptureSession`，截图由 UIKit 绘制水印。
-- 会员流程由 `StoreKitIAPManager` 监听 StoreKit 1 交易队列，UI 通过 `VIPPaywallSheet` 和设置页购买/恢复权益。
+- `CompassMotionManager` 汇总 Core Location 航向/定位和 Core Motion 姿态/磁场数据，经过环形角度滤波后发布给 SwiftUI。罗盘盘面按设置中的真北/地磁北参考系旋转，磁针独立显示，真北针在可用时叠加偏角。
+- 各分析引擎（奇门、飞星、八宅、三合、天机等）是本地 Swift 计算；AR 主页面按镜头和设备能力使用 `AVCaptureSession` 或 ARKit，空间测绘使用 ARKit/RoomPlan，截图由 UIKit 绘制水印。
+- 会员流程由 `StoreKitIAPManager` 使用 StoreKit 2 的商品、当前权益和交易更新异步流进行购买、恢复与过期同步，UI 通过 `VIPPaywallSheet` 和设置页购买/恢复权益。
 
-## 已发现的主要问题
+## 历史问题与当前状态
 
-1. iOS 优先读取 `CLHeading.trueHeading`，定位暂不可用时使用 WMM 离线偏角作为后备，并在页面上区分真北与地磁北。
-2. AR 页面原先只有按方位映射形煞的规则，没有图像分析；“AI 扫描”在 Web 版本是固定延时和固定结果，不能作为真实识别。
-3. StoreKit 商品未返回时购买按钮没有稳定的失败状态；购买错误没有统一传给 SwiftUI，年度会员过期后仅在初始化时刷新；价格显示硬编码。
-4. Web 收银台在没有原生桥时会写入本地“购买成功”状态，存在伪造权益的风险；数字内容应该只走 App Store In-App Purchase，不能把 Apple Pay 当成替代渠道。
-5. AR 截图使用 `UIImageWriteToSavedPhotosAlbum`，不检查 Photos 权限和保存结果；相机会在页面生命周期切换时频繁重建，权限拒绝时只能显示仿真画板。
+1. 原生罗盘现在优先读取 `CLHeading.trueHeading`，定位不可用时才使用 WMM 离线偏角后备，并区分真北与地磁北。
+2. 原生 AR 页面已加入设备端 Vision 几何候选扫描；它仍不是训练好的建筑语义模型。Web/PWA 的扫描逻辑与原生实现独立，不能据此推断原生能力。
+3. 商品加载、购买错误、价格不可用、订阅过期和恢复流程已接入 StoreKit 2 状态；价格由 StoreKit 的 `priceLocale` 提供。
+4. Web 收银台不再在无原生环境时伪造购买成功；数字内容应通过原生 App StoreKit 内购完成。
+5. 原生 AR 存证现在使用 `PHPhotoLibrary` 授权并检查保存结果，相机会话在 Tab 切换、后台和系统中断时主动停止或恢复。
 
 ## 本次实现
 
-- 新增 `Models/WorldMagneticModel.swift`：移植 WMM 2020-2025 13 阶系数和椭球坐标、Schmidt 准正规化、时间漂移解算，输出北/东/下分量、偏角、倾角和总场强。定位回调现在用同一份 WMM 结果驱动真北针，并保留 Core Location 真北作为首次定位前的兜底。
+- 新增 `Models/WorldMagneticModel.swift`：移植 WMM 2025-2030 13 阶系数和椭球坐标、Schmidt 准正规化、时间漂移解算，输出北/东/下分量、偏角、倾角和总场强。定位回调在 Core Location 尚未提供有效真北时使用 WMM 后备。
 - 新增 `Models/OnDeviceShaAnalyzer.swift`：使用 Vision `VNDetectRectanglesRequest` 在设备端分析当前相机帧，按几何区域、长宽比和位置给出形煞候选、置信度和目标点；不上传图像、不需要网络或模型密钥。AR 页面新增扫描按钮并将结果映射到目标框。
 - StoreKit 管理器增加商品加载、购买中、错误、完成状态，年度权益按已有到期时间顺延，前后台切换时重新计算过期权益；会员页面显示 App Store 本地化价格并呈现失败提示。
 - Web 收银台移除无原生环境下的模拟购买成功逻辑，改为提示用户在原生 App 内通过 App Store 完成购买；页面文案统一为 StoreKit/App Store 内购。
@@ -158,7 +169,7 @@
 - AR 新增独立的三维空间测绘页面：使用 `ARWorldTrackingConfiguration` 检测水平/垂直平面，中心准星通过 ARKit raycast 实时测距，并显示追踪状态与已发现平面数量。支持 LiDAR 的设备启用 `sceneReconstruction = .meshWithClassification` 和 `sceneDepth`，对墙体、地面、天花板、门、窗、桌面和座椅进行网格语义候选统计；网格按 5Hz、最多 4000 个面采样，避免持续高耗电和发热。
 - ARKit 测绘与原 AVCapture 相机预览互斥，进入三维测绘时停止普通相机会话，退出后自动恢复；不支持 ARWorldTracking 的设备保留相机实景回退。语义结果明确标记为 LiDAR 网格候选，不等同于经过训练的建筑识别模型。
 - 三维测绘继续补充 LiDAR 网格线框和彩色语义图层、世界地图完成度、网格块数量和最大平面尺寸；支持重置扫描，并在 ARWorldMap 达到 mapped 状态后导出 `.arworldmap` 文件进行系统分享。导出前会检查建图完成度，避免分享不可恢复的半成品地图。
-- 增加 RoomPlan 条件能力：iOS 16+ 的 LiDAR 设备可从三维测绘页进入室内房间捕获，实时统计墙体、门、窗、开口和家具物体；RoomPlan 使用独立 AR 会话，结束或退出时主动停止，不与普通 AVCapture 或通用 ARKit 测绘同时占用相机。iOS 14/15 或不支持 RoomPlan 的设备继续使用 ARKit 网格回退。
+- 增加 RoomPlan 条件能力：iOS 16+ 的 LiDAR 设备可从三维测绘页进入室内房间捕获，实时统计墙体、门、窗、开口和家具物体；RoomPlan 使用独立 AR 会话，结束或退出时主动停止，不与普通 AVCapture 或通用 ARKit 测绘同时占用相机。不支持 RoomPlan 的设备继续使用 ARKit 网格或虚拟测绘回退。
 - 测距在 LiDAR 设备优先使用 existingPlaneGeometry 射线，普通设备回退到 estimatedPlane；中心距离采用最近五次测量的中值，降低单帧深度噪声和画面抖动。AR 会话中断结束时恢复原配置，不再强制重置已完成的空间地图。
 - RoomPlan 完成捕获后可生成并分享 JSON 语义报告，记录墙、门、窗、开口和家具物体数量；未完成捕获时禁止导出，避免把实时中间状态误当成最终结果。
 - 罗盘航向改为五点环形中值预滤波加自适应 EMA，Core Location 采样门限调整为 0.2°，并只读取前台活动窗口的界面方向；解析后的 `headingState.trueHeading` 与滤波后的主航向保持一致，降低静止抖动和页面间角度不一致。
@@ -167,11 +178,11 @@
 
 ## 发布前仍需完成
 
-- 在 App Store Connect 创建四个商品并确认 Bundle ID、价格、订阅组和审核元数据；StoreKit 1 的本地权益适合离线体验，生产环境仍应以 Apple receipt/StoreKit 2 服务端校验为最终权益来源。
+- 在 App Store Connect 创建四个商品并确认 Bundle ID、价格、订阅组和审核元数据；StoreKit 2 的系统签名验证用于客户端权益同步，生产环境仍应以服务端收据/交易校验为最终权益来源。
 - 用真机验证磁场干扰、定位拒绝、相机切换、Photos 拒绝、订阅续期/恢复和 StoreKit 沙盒交易；当前容器没有 Xcode/iOS SDK，无法在此处执行 `xcodebuild`。
 - Vision 当前是几何候选识别器，不等同于经过训练的建筑/道路分类模型；若需要生产级语义识别，应提供并审核一个 Core ML 模型，再替换分类层。
 - iOS 真机编译和 StoreKit 沙盒验证仍需在 macOS/Xcode 环境执行；本容器只能完成静态语法、兼容性、资源和工程配置检查。
-- RoomPlan 分支需要在 iOS 16+ LiDAR 真机验证房间捕获、门窗/开口语义统计、相机会话结束和低光场景；非 LiDAR 与 iOS 14/15 设备应验证 ARKit 回退路径。
+- RoomPlan 分支需要在 iOS 16+ LiDAR 真机验证房间捕获、门窗/开口语义统计、相机会话结束和低光场景；不支持 RoomPlan 的设备应验证 ARKit 或虚拟测绘回退路径。
 - 修复节气索引跨年边界：太阳黄经在 1 月可能仍处于冬至索引（23），真太阳时四柱原先只判断索引小于 2，会把立春前的 1 月误算为当年干支年。新增统一的立春前判断，真太阳时、择日、紫白、玄空元运和天机长卷岁次现在在 1 月均沿用上一干支年。
 - 修复罗盘与 iOS 系统指南针角度不一致：主盘和全部方位分析现在优先采用 Core Location 校准的真北 `trueHeading`，无有效真北时才回退到 WMM 地磁偏角；不再用 WMM 覆盖系统已校准偏角。磁针保留独立的连续地磁角度，真北针与盘面使用同一连续真北角度，避免偏角被重复叠加。
 - 提高 iPad 方向精度：Core Location 航向传感器现在读取当前界面方向并在航向回调中动态校正，支持倒置竖屏或横屏界面，避免固定 portrait 坐标造成 180° 或 90° 偏差。

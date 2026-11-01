@@ -5,7 +5,7 @@ import simd
 // MARK: - 3D 全屋测绘空间数据模型与全屋形煞引擎 (PRD 5.3 & 第7章)
 
 /// 形煞危害严重程度
-public enum ShaSeverity: String, Codable {
+public enum SpatialShaSeverity: String, Codable {
     case auspicious = "吉"
     case warning = "轻微"
     case critical = "严重"
@@ -247,7 +247,7 @@ public struct HouseDimensions: Codable {
 public struct HouseSpatialShaItem: Identifiable, Codable {
     public let id: UUID
     public let title: String
-    public let severity: ShaSeverity
+    public let severity: SpatialShaSeverity
     public let locationName: String
     public let detail: String
     public let fengshuiLore: String
@@ -272,7 +272,7 @@ public struct HouseSpatialShaItem: Identifiable, Codable {
     public init(
         id: UUID = UUID(),
         title: String,
-        severity: ShaSeverity,
+        severity: SpatialShaSeverity,
         locationName: String,
         detail: String,
         fengshuiLore: String,
@@ -991,5 +991,102 @@ public enum HouseSpatialSurveyEngine {
         let t = max(0.0, min(1.0, simd_dot(point - segA, seg) / l2))
         let projection = segA + t * seg
         return simd_distance(point, projection)
+    }
+}
+
+// MARK: - AutoCAD DXF 工程级矢量测绘图生成器 (PRD 专业测绘工具要求)
+
+extension HouseSpatialSurvey {
+    /// 生成符合工业标准的 AutoCAD ASCII DXF (Release 12/2000) 格式矢量图数据
+    public func generateCAD_DXF() -> String {
+        var s = ""
+        
+        // 1. DXF 头部
+        s += "0\nSECTION\n2\nHEADER\n"
+        s += "9\n$INSUNITS\n70\n6\n" // 米为单位 (Meters)
+        s += "9\n$ANGBASE\n50\n0.0\n"
+        s += "0\nENDSEC\n"
+        
+        // 2. TABLES 区域 (图层定义)
+        s += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n6\n"
+        
+        let layers: [(name: String, color: Int)] = [
+            ("WALLS_BEARING", 5),    // 蓝色
+            ("WALLS_PARTITION", 4),  // 青色
+            ("DOORS", 2),            // 黄色
+            ("WINDOWS", 3),          // 绿色
+            ("BEAMS", 1),            // 红色
+            ("ROOM_LABELS", 7),      // 白色
+            ("TAIJI_CENTER", 40)     // 金色
+        ]
+        
+        for lyr in layers {
+            s += "0\nLAYER\n2\n\(lyr.name)\n70\n0\n62\n\(lyr.color)\n6\nCONTINUOUS\n"
+        }
+        s += "0\nENDTAB\n0\nENDSEC\n"
+        
+        // 3. ENTITIES 区域 (绘图实体)
+        s += "0\nSECTION\n2\nENTITIES\n"
+        
+        // 绘制墙体线条 (LINE)
+        for wall in walls {
+            let layer = wall.isLoadBearing ? "WALLS_BEARING" : "WALLS_PARTITION"
+            s += "0\nLINE\n8\n\(layer)\n"
+            s += "10\n\(String(format: "%.3f", wall.startX))\n20\n\(String(format: "%.3f", -wall.startZ))\n30\n0.0\n"
+            s += "11\n\(String(format: "%.3f", wall.endX))\n21\n\(String(format: "%.3f", -wall.endZ))\n31\n0.0\n"
+        }
+        
+        // 绘制门与窗 (LINE)
+        for op in openings {
+            let layer = (op.type == .entranceDoor || op.type == .interiorDoor) ? "DOORS" : "WINDOWS"
+            let halfW = op.width * 0.5
+            // 沿门法线垂直方向画开孔线
+            let p1X = op.posX - op.normalZ * halfW
+            let p1Y = -(op.posZ + op.normalX * halfW)
+            let p2X = op.posX + op.normalZ * halfW
+            let p2Y = -(op.posZ - op.normalX * halfW)
+            
+            s += "0\nLINE\n8\n\(layer)\n"
+            s += "10\n\(String(format: "%.3f", p1X))\n20\n\(String(format: "%.3f", p1Y))\n30\n0.0\n"
+            s += "11\n\(String(format: "%.3f", p2X))\n21\n\(String(format: "%.3f", p2Y))\n31\n0.0\n"
+        }
+        
+        // 绘制结构横梁 (LINE)
+        for beam in beams {
+            s += "0\nLINE\n8\nBEAMS\n"
+            s += "10\n\(String(format: "%.3f", beam.startX))\n20\n\(String(format: "%.3f", -beam.startZ))\n30\n0.0\n"
+            s += "11\n\(String(format: "%.3f", beam.endX))\n21\n\(String(format: "%.3f", -beam.endZ))\n31\n0.0\n"
+        }
+        
+        // 绘制立极中宫点 (CIRCLE + 十字标)
+        s += "0\nCIRCLE\n8\nTAIJI_CENTER\n"
+        s += "10\n\(String(format: "%.3f", centroidX))\n20\n\(String(format: "%.3f", -centroidZ))\n30\n0.0\n40\n0.5\n"
+        s += "0\nTEXT\n8\nTAIJI_CENTER\n"
+        s += "10\n\(String(format: "%.3f", centroidX + 0.6))\n20\n\(String(format: "%.3f", -centroidZ))\n30\n0.0\n"
+        s += "40\n0.35\n1\nTaiJi Center (Centroid)\n"
+        
+        // 标注房间文字与面积 (TEXT)
+        for room in rooms {
+            s += "0\nTEXT\n8\nROOM_LABELS\n"
+            s += "10\n\(String(format: "%.3f", room.centerX - 0.4))\n20\n\(String(format: "%.3f", -room.centerZ))\n30\n0.0\n"
+            s += "40\n0.30\n1\n\(room.name) \(String(format: "%.1f", room.areaSqMeters))m2\n"
+        }
+        
+        // 4. 结尾
+        s += "0\nENDSEC\n0\nEOF\n"
+        return s
+    }
+
+    /// 导出为本地临时 DXF 文件以供 CAD 软件打开或分享
+    public func exportDXFFileURL() -> URL? {
+        let dxfString = generateCAD_DXF()
+        let fileName = "TianJi-HouseSurvey-\(id.uuidString.prefix(8)).dxf"
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try dxfString.write(to: tempURL, atomically: true, encoding: .ascii)
+            return tempURL
+        } catch {
+            return nil
+        }
     }
 }

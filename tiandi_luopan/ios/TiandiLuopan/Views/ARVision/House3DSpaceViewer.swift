@@ -76,7 +76,7 @@ public struct House3DSpaceViewer: View {
             .padding(.bottom, 20)
         }
         .sheet(item: $shareSheetItem) { report in
-            SurveyShareActivityView(image: report.image)
+            SurveyShareActivityView(activityItems: report.activityItems)
         }
     }
 
@@ -106,6 +106,22 @@ public struct House3DSpaceViewer: View {
                 .padding(.vertical, 4)
                 .background(Color.white.opacity(0.12))
                 .cornerRadius(12)
+
+                // 导出 CAD DXF 矢量图
+                Button(action: exportAndShareDXF) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "doc.badge.gearshape")
+                            .font(.adaptive(size: 11, weight: .bold))
+                        Text("CAD")
+                            .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(Color.yanCyan)
+                    .cornerRadius(12)
+                }
+                .accessibilityLabel("导出工业级 AutoCAD DXF 矢量测绘图")
 
                 // 导出与分享长图存证
                 Button(action: exportAndShareReport) {
@@ -365,7 +381,7 @@ public struct House3DSpaceViewer: View {
         }
     }
 
-    private func severityColor(_ severity: ShaSeverity) -> Color {
+    private func severityColor(_ severity: SpatialShaSeverity) -> Color {
         switch severity {
         case .auspicious: return .green
         case .warning: return .orange
@@ -376,7 +392,13 @@ public struct House3DSpaceViewer: View {
     private func exportAndShareReport() {
         guard let coord = sceneCoordinator, let snapshot = coord.captureSnapshot() else { return }
         let reportImage = SurveyReportRenderer.renderReportImage(survey: survey, snapshot: snapshot)
-        self.shareSheetItem = SurveyShareReportItem(image: reportImage)
+        self.shareSheetItem = SurveyShareReportItem(activityItems: [reportImage])
+    }
+
+    private func exportAndShareDXF() {
+        if let dxfURL = survey.exportDXFFileURL() {
+            self.shareSheetItem = SurveyShareReportItem(activityItems: [dxfURL])
+        }
     }
 }
 
@@ -1029,14 +1051,14 @@ public enum SurveyReportRenderer {
 
 public struct SurveyShareReportItem: Identifiable {
     public let id = UUID()
-    public let image: UIImage
+    public let activityItems: [Any]
 }
 
 public struct SurveyShareActivityView: UIViewControllerRepresentable {
-    public let image: UIImage
+    public let activityItems: [Any]
 
     public func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
         if let popover = controller.popoverPresentationController {
             popover.sourceView = controller.view
             popover.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)

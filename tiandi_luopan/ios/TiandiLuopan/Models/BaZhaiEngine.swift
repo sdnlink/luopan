@@ -119,7 +119,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "Stability, peace, and academic excellence; ideal for study, meditation, and children's room."
             case .jueMing: return "Indicates exhaustion and health decline; strictly avoid for bedrooms/entrance; suitable for bathroom or storage."
             case .wuGui:   return "Prone to quarrels, conflicts, and theft; counteract with heavy furnishings or peaceful water cures."
-            case .liuSha:  return "Disturbed peace and emotional turbulence; suitable for storage rooms or remedies."
+            case .liuSha:  return "Emotional turbulence and romance trouble. What to do: Place storage cabinets/shelves here, keep it tidy and rarely occupied; avoid using it as the main bedroom or study. → Effect: Manages disputes and romance-related trouble; covers this direction."
             case .huoHai:  return "Obstacles and petty disputes; requires stillness rather than dynamic movement."
             }
         case .zhHant:
@@ -130,7 +130,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "安穩守成、文昌得利，宜作書房、冥想及兒童房"
             case .jueMing: return "主病痛耗散，嚴禁作臥房大門，宜作衛生間或儲物室"
             case .wuGui:   return "易惹口舌是非、盜賊火災，宜壓以重物或化水局"
-            case .liuSha:  return "酒色桃花、心緒不寧，宜化解或設雜物間"
+            case .liuSha:  return "酒色桃花、心緒不寧。做法：此方位設雜物櫃/儲物架，保持整潔少坐人；不宜作主臥或書房。→ 影響：管是非口舌與桃花糾紛，覆蓋該方位。"
             case .huoHai:  return "官非小人、財帛破耗，宜靜不宜動"
             }
         case .ja:
@@ -141,7 +141,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "安定安寧、学業成就、書斎、瞑想室、子供部屋に適しています"
             case .jueMing: return "病気や気力減退を招き、寝室や玄関には厳禁。浴室や倉庫に適します"
             case .wuGui:   return "口論や盗難トラブルを招きやすく、重厚な家具や水による鎮静が有効です"
-            case .liuSha:  return "精神の乱れや感情トラブルを招きやすく、浄化や物置に適します"
+            case .liuSha:  return "感情トラブルや精神の乱れを招きやすい方位です。やり方：収納棚や物置を置き、整理整頓し人があまり居ない場所にします。主寝室や書斎にはしない。→ 効果：トラブルや恋愛問題を緩和し、この方位に作用します。"
             case .huoHai:  return "訴訟や小人の邪魔、財の散財を招くため、静寂を保つのが好ましいです"
             }
         case .ko:
@@ -152,7 +152,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "안정과 수성, 학업 문창에 유익하며 서재나 명상방, 아이방에 좋습니다"
             case .jueMing: return "건강 쇠퇴와 손실을 초래하므로 안방/대문은 피하고 화장실이나 창고에 적합합니다"
             case .wuGui:   return "시비 구설과 화재 도난 위험이 있어 무거운 가구로 누르거나 물로 화해해야 합니다"
-            case .liuSha:  return "정신 불안과 감정 혼란을 일으키므로 정화하거나 수납공간으로 씁니다"
+            case .liuSha:  return "감정 혼란과 이성 문제를 부르는 방위입니다. 방법: 수납장이나 창고로 쓰고 정리 정돈하며 사람이 오래 머물지 않게 합니다. 안방이나 서재로는 쓰지 마세요. → 효과: 구설과 이성 문제를 완화하며 이 방위에 작용합니다."
             case .huoHai:  return "구설 시비와 재물 손실을 부르므로 동하기보다 정적인 상태를 유지해야 합니다"
             }
         case .vi:
@@ -163,7 +163,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "Bình an ổn định, vượng văn xương học vấn, hợp phòng đọc sách, thiền định, trẻ em."
             case .jueMing: return "Chủ bệnh tật hao tài, cấm kỵ làm cửa chính hay phòng ngủ, hợp làm nhà kho vệ sinh."
             case .wuGui:   return "Dễ vướng khẩu thiệt thị phi, hỏa hoạn đạo tặc, nên dùng vật nặng trấn áp hoặc thủy giải."
-            case .liuSha:  return "Bất an tâm thần, đào hoa xấu phiền não, nên hóa giải hoặc bố trí nhà kho."
+            case .liuSha:  return "Đào hoa xấu, tâm thần bất an. Cách làm: Dùng nơi này làm tủ chứa đồ/kho, giữ gọn gàng, ít người lui tới; không làm phòng ngủ chính hay phòng sách. → Ảnh hưởng: Giảm thị phi và rắc rối tình cảm; phủ hướng này."
             case .huoHai:  return "Thị phi tiểu nhân, hao tài tốn của, nên giữ tĩnh tránh động."
             }
         case .th:
@@ -174,7 +174,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "ความมั่นคงราบรื่น สติปัญญาและการเรียนรู้ เหมาะกับห้องหนังสือ ห้องสมาธิ ห้องเด็ก"
             case .jueMing: return "เหน็ดเหนื่อยเจ็บป่วย ห้ามใช้ทำประตูหรือห้องนอน เหมาะกับห้องน้ำหรือห้องเก็บของ"
             case .wuGui:   return "อาจเกิดข้อพิพาท ทะเลาะเบาะแว้ง ควรแก้ไขด้วยของหนักทับหรือใช้น้ำปรับพลัง"
-            case .liuSha:  return "อารมณ์แปรปรวน ไม่สงบ ควรปรับแก้หรือใช้เป็นห้องเก็บของเบ็ดเตล็ด"
+            case .liuSha:  return "อารมณ์แปรปรวน เรื่องชายหญิงไม่สงบ วิธีทำ: ใช้เป็นตู้เก็บของ/ห้องเก็บของ เก็บให้เป็นระเบียบ ไม่ควรใช้เป็นห้องนอนใหญ่หรือห้องหนังสือ → ผล: ลดปากเสียงและเรื่องชู้สาว ครอบคลุมทิศนี้"
             case .huoHai:  return "อุปสรรคข้อขัดแย้ง การเงินรั่วไหล ควรปล่อยให้สงบนิ่งไม่ควรเคลื่อนไหว"
             }
         case .id:
@@ -185,7 +185,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "Kedamaian dan prestasi akademis; cocok untuk ruang kerja, meditasi, dan kamar anak."
             case .jueMing: return "Penyebab kelelahan dan penyakit; hindari untuk kamar tidur/pintu; cocok untuk toilet/gudang."
             case .wuGui:   return "Memicu perselisihan dan kerugian; netralkan dengan perabot berat atau elemen air tenang."
-            case .liuSha:  return "Kekacauan emosi dan ketidakharmonisan; cocok untuk gudang atau dinetralkan."
+            case .liuSha:  return "Kekacauan emosi dan masalah percintaan. Cara: Gunakan area ini untuk lemari penyimpanan/gudang, jaga rapi dan jarang dihuni; jangan jadikan kamar tidur utama atau ruang kerja. → Efek: Mengurangi pertikaian dan masalah asmara; mencakup arah ini."
             case .huoHai:  return "Rintangan dan pertengkaran kecil; lebih baik dijaga tetap tenang tanpa aktivitas dinamis."
             }
         case .auto, .zhHans:
@@ -196,7 +196,7 @@ public enum StarLuckType: String, Codable {
             case .fuWei:   return "安稳守成、文昌得利，宜作书房、冥想及儿童房"
             case .jueMing: return "主病痛耗散，严禁作卧房大门，宜作卫生间或储物室"
             case .wuGui:   return "易惹口舌是非、盗贼火灾，宜压以重物或化水局"
-            case .liuSha:  return "酒色桃花、心绪不宁，宜化解或设杂物间"
+            case .liuSha:  return "酒色桃花、心绪不宁。做法：此方位设杂物柜/储物架，保持整洁少坐人；不宜作主卧或书房。→ 影响：管是非口舌与桃花纠纷，覆盖该方位。"
             case .huoHai:  return "官非小人、财帛破耗，宜静不宜动"
             }
         }

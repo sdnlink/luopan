@@ -1744,17 +1744,14 @@ public struct ShaRemedyDetailSheet: View {
                     // 2. 煞气核心诊断与古典赋文卡片
                     shaDiagnosisCard
                     
-                    // 3. 锦囊第一策：生态屏障与玄关动线调和（免费开放 · 立即见效）
-                    ecoBarrierRemedyCard
+                    // 3. 化解三步走（免费核心：方法 + 影响范围）
+                    remedyStepsCard
                     
-                    // 4. 锦囊第二策：镇宅开光法物秘宝与方位要领（VIP专属 / 核心真传）
-                    talismanRemedyCard
+                    // 4. 进阶调理参考（免费：玄空避忌 + 择日安放）
+                    advancedTipsCard
                     
-                    // 5. 锦囊第三策：玄空理气与五行生克调化（形理兼治）
-                    xuanKongElementsRemedyCard
-                    
-                    // 6. 锦囊第四策：杨公择日安放良辰秘法（全套安放仪轨）
-                    auspiciousTimingRemedyCard
+                    // 5. 进阶法物参考（VIP 可选）
+                    vipRemedyCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
@@ -1886,15 +1883,15 @@ public struct ShaRemedyDetailSheet: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
     
-    // MARK: - 3. 锦囊第一策：生态屏障与玄关动线调和（免费开放）
-    private var ecoBarrierRemedyCard: some View {
+    // MARK: - 3. 化解三步走（免费核心卡：直接可做的方法 + 影响范围）
+    private var remedyStepsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("🌿 第一策 · 绿色生态与玄关屏风法", systemImage: "leaf.fill")
+                Label("🛠 化解三步走 · 直接可做", systemImage: "checkmark.circle.fill")
                     .font(.adaptive(size: 14, weight: .bold))
                     .foregroundColor(.green)
                 Spacer()
-                Text("即刻落地 · 全员免费")
+                Text("先做① → 再②③")
                     .font(.adaptive(size: 10, weight: .medium))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -1903,45 +1900,73 @@ public struct ShaRemedyDetailSheet: View {
                     .cornerRadius(6)
             }
             
-            Text("无需动土破土，通过环境植被与室内动线重塑，以柔克刚化解外部冲击气场：")
+            Text("① 立即可做（免费）→ ② 低成本改造 → ③ 可选强化。每一步都标明影响范围，按需执行即可。")
                 .font(.adaptive(size: 11))
                 .foregroundColor(.white.opacity(0.7))
             
+            Text(currentSha.localizedRemedySolution)
+                .font(.adaptive(size: 12))
+                .foregroundColor(.white.opacity(0.95))
+                .lineSpacing(3)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(red: 0.12, green: 0.15, blue: 0.13))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.green.opacity(0.3), lineWidth: 1))
+        }
+        .padding(14)
+        .background(Color(red: 0.10, green: 0.13, blue: 0.12))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.25), lineWidth: 1))
+    }
+    
+    // MARK: - 4. 进阶调理参考（免费：玄空避忌 + 择日安放）
+    private var advancedTipsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("📋 进阶调理参考", systemImage: "text.book.closed.fill")
+                    .font(.adaptive(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
+                Spacer()
+                Text("免费")
+                    .font(.adaptive(size: 10, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.18))
+                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
+                    .cornerRadius(6)
+            }
+            
             VStack(alignment: .leading, spacing: 8) {
-                ecoDetailRow(
-                    icon: "tree.fill",
-                    title: "阳台与窗前植被防护林",
-                    desc: ecoPlantDesc(for: currentSha.id)
+                timingPointRow(
+                    tag: "玄空避忌",
+                    content: "冲煞方若逢二黑病符或五黄廉贞位，忌动土、忌红色暖光；可挂铜葫芦或六帝钱泄土气。"
                 )
-                
-                ecoDetailRow(
-                    icon: "rectangle.split.2x1.fill",
-                    title: "室内玄关九曲回流格局",
-                    desc: "正对冲煞方向设立双面透光山水屏风或半高玄关隔断柜，将直冲强气转化为'曲折有情'之徐缓生气，藏风聚气而不阻滞光线。"
+                timingPointRow(
+                    tag: "择日建议",
+                    content: "安放法物选天德、月德、天赦吉日，避开岁破、月破日；上午7-13点（辰巳午时）为佳。"
                 )
-                
-                ecoDetailRow(
-                    icon: "curtains.closed",
-                    title: "双层Low-E隔音透光布艺",
-                    desc: "窗边配置双层厚质隔音透光窗帘或百叶帘，物理阻绝外部视线与急煞风刃直透宅心，保全家中私密安稳气场。"
+                timingPointRow(
+                    tag: "安放要点",
+                    content: "净手后安置于指定方位；镜面朝外、微下倾3-5度，勿照邻家门窗。"
                 )
             }
         }
         .padding(14)
-        .background(Color(red: 0.12, green: 0.15, blue: 0.13))
+        .background(Color(red: 0.10, green: 0.13, blue: 0.16))
         .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.green.opacity(0.3), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.3), lineWidth: 1))
     }
     
-    // MARK: - 4. 锦囊第二策：镇宅开光法物秘宝（VIP专属/核心真传）
-    private var talismanRemedyCard: some View {
+    // MARK: - 5. 进阶法物参考（VIP 可选：材质规格与挂法）
+    private var vipRemedyCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("🛡️ 第二策 · 镇宅开光法物秘宝", systemImage: "shield.checkered")
+                Label("🛡 进阶法物参考", systemImage: "shield.checkered")
                     .font(.adaptive(size: 14, weight: .bold))
                     .foregroundColor(Color(red: 0.95, green: 0.8, blue: 0.3))
                 Spacer()
-                Text("开光真品 · 形煞克星")
+                Text("VIP 可选")
                     .font(.adaptive(size: 10, weight: .medium))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -1953,7 +1978,7 @@ public struct ShaRemedyDetailSheet: View {
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
                     title: lang.t("ar_vip_remedy_title"),
-                    featureDesc: "形煞本物克制真传、特选纯铜开光重器规制、悬挂倾角严训与邻里相合禁忌，解锁 VIP 尊享完整全案。",
+                    featureDesc: "常用化煞法物的材质、规格与悬挂要领，配合方位实操细节，解锁 VIP 查看完整参考。",
                     badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
                     onUnlockTap: { showPaywall = true }
@@ -1961,18 +1986,18 @@ public struct ShaRemedyDetailSheet: View {
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     talismanItemRow(
-                        title: "核心克制法物推荐",
+                        title: "常用法物与挂法",
                         content: currentSha.localizedRemedySolution
                     )
                     
                     talismanItemRow(
-                        title: "法器材质规制要求",
-                        content: "必须选用正品高密度压铸纯铜（镇金辟阴）、天然黑曜石（化煞纳水）或纯天然黄玉石（厚德载物）。严禁使用塑料电镀仿品，仿制品不仅无抗煞磁场，反招邪气反噬。"
+                        title: "材质参考",
+                        content: "优先选用纯铜、天然黑曜石、黄玉等天然材质器物；避免塑料电镀仿品。"
                     )
                     
                     talismanItemRow(
-                        title: "悬挂朝向与邻里和睦禁忌",
-                        content: "八卦镜或山海镇务必镜面朝外，向煞源微仰3至5度纳气消峰；严禁正对对面邻家门窗，遵循堪舆大师'化己之灾、莫害他人'的慈悲守和法则。"
+                        title: "悬挂要领",
+                        content: "镜面朝外、微下倾3-5度；八卦镜、山海镇等避免直照邻家门窗，保持邻里和睦。"
                     )
                 }
             }
@@ -1983,114 +2008,7 @@ public struct ShaRemedyDetailSheet: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.85, green: 0.7, blue: 0.25).opacity(0.35), lineWidth: 1))
     }
     
-    // MARK: - 5. 锦囊第三策：玄空理气与五行飞星调治
-    private var xuanKongElementsRemedyCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("🧭 第三策 · 玄空理气与五行飞星调化", systemImage: "safari.fill")
-                    .font(.adaptive(size: 14, weight: .bold))
-                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
-                Spacer()
-                Text("形理兼治")
-                    .font(.adaptive(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.18))
-                    .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
-                    .cornerRadius(6)
-            }
-            
-            VStack(alignment: .leading, spacing: 7) {
-                Text("“峦头无理气不灵，理气无峦头不验”。形峦凶煞若逢二黑病符星或五黄廉贞大煞飞临，凶应加倍：")
-                    .font(.adaptive(size: 11))
-                    .foregroundColor(.white.opacity(0.75))
-                    .lineSpacing(2)
-                
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .font(.adaptive(size: 11))
-                        .foregroundColor(.yellow)
-                    Text("【避煞要诀】冲煞方若为二黑巨门或五黄廉贞位，严禁动土穿凿与安放红色暖光灯，宜挂一具纯铜静安风铃或特制铜葫芦，以金泄土化解燥烈之气。")
-                        .font(.adaptive(size: 11))
-                        .foregroundColor(.white.opacity(0.9))
-                }
-                
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.adaptive(size: 11))
-                        .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
-                    Text("【借势生旺】配合罗盘实测向首，若当运一白贪狼水星或八白左辅、九紫右弼当令吉星飞临，可在此方布置水生植物或紫水晶洞，化煞气为权柄，转凶为大吉。")
-                        .font(.adaptive(size: 11))
-                        .foregroundColor(.white.opacity(0.9))
-                }
-            }
-        }
-        .padding(14)
-        .background(Color(red: 0.10, green: 0.13, blue: 0.16))
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.3), lineWidth: 1))
-    }
-    
-    // MARK: - 6. 锦囊第四策：杨公择日安放良辰秘法
-    private var auspiciousTimingRemedyCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("📅 第四策 · 杨公择日安放良辰秘法", systemImage: "calendar.badge.clock")
-                    .font(.adaptive(size: 14, weight: .bold))
-                    .foregroundColor(Color(red: 1.0, green: 0.6, blue: 0.3))
-                Spacer()
-                Text("天时吉课")
-                    .font(.adaptive(size: 10, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.18))
-                    .foregroundColor(.orange)
-                    .cornerRadius(6)
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                timingPointRow(
-                    tag: "择日避忌",
-                    content: "严禁岁破日、月破日、四废四绝日安放，且吉日地支不得与本宅坐向或户主本命生肖直冲（如子午相冲、丑未相冲）。"
-                )
-                
-                timingPointRow(
-                    tag: "推荐良辰",
-                    content: "首选【天德】、【月德】、【天赦】、【青龙】吉日。时辰宜选辰时（7:00-9:00 朝阳升腾）、巳时（9:00-11:00 阳火得令）或午时（11:00-13:00 至阳化阴）。"
-                )
-                
-                timingPointRow(
-                    tag: "安放净仪",
-                    content: "1. 净手焚一柱天然降真香或檀香熏沐法器；\n2. 法物原用红布严密封裹，至所选吉时良辰面向煞源启封揭彩；\n3. 端正放置于指定点位，心中默诵吉祥安康、家宅平顺之善念。"
-                )
-            }
-        }
-        .padding(14)
-        .background(Color(red: 0.16, green: 0.12, blue: 0.10))
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.35), lineWidth: 1))
-    }
-    
     // MARK: - 辅助子组件
-    private func ecoDetailRow(icon: String, title: String, desc: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .font(.adaptive(size: 13))
-                .foregroundColor(.green)
-                .frame(width: 18)
-                .padding(.top, 1)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.adaptive(size: 12, weight: .semibold))
-                    .foregroundColor(.white)
-                Text(desc)
-                    .font(.adaptive(size: 11))
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineSpacing(2)
-            }
-        }
-    }
-    
     private func talismanItemRow(title: String, content: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
@@ -2120,27 +2038,6 @@ public struct ShaRemedyDetailSheet: View {
                 .font(.adaptive(size: 11))
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(2)
-        }
-    }
-    
-    private func ecoPlantDesc(for id: String) -> String {
-        switch id {
-        case "tianzhan", "chuanxin":
-            return "在阳台或对冲窗台排布茂密的阔叶常绿植物（如大叶散尾葵、琴叶榕、龟背竹），枝叶彼此交叠形成天然生态气盾，软化高速风刃。"
-        case "luchong":
-            return "在门前或对正路冲的窗下放置圆叶富贵竹或发财树盆景，使外部车流直冲之气化作回环温润之风。"
-        case "fangong":
-            return "在窗台安置半圆型绿色植被弧阵，顺应离心力缓冲向外甩甩的煞气，守住财水不失。"
-        case "tantou":
-            return "在视线对冲窗口种植长春藤或常青绿植阻断窥视，辅以常闭微透光百叶帘化解阴邪暗窥。"
-        case "huoxing":
-            return "窗台摆设水培常春藤或小型水养植物，借水生木、木生火之循环，以水润燥调和火煞燥烈。"
-        case "baihu":
-            return "在住宅左侧青龙方多摆放茂盛高大植物（如富贵椰子、绿宝），以青翠生机助旺青龙，压制白虎张扬。"
-        case "gejiao":
-            return "在阳台下沿筑造厚重高盆花坛灌木，构筑人工厚实台座，阻绝急流与贴地快速车道下拔地气。"
-        default:
-            return "窗台排布阔叶常绿盆景，构建绿色生态缓冲屏障，调和外部急煞气流。"
         }
     }
 }

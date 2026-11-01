@@ -109,7 +109,10 @@ jobs:
           done
           xcrun simctl status_bar "$DUO_UDID" override \
             --time "9:41" --batteryState charged --batteryLevel 100 --wifiBars 3 2>/dev/null || true
-          xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID"
+          # 后台以 --console-pty 启动：App 崩溃时控制台会输出
+          # Swift fatal error / uncaught exception 等精确原因
+          (xcrun simctl launch --console-pty "$DUO_UDID" "$BUNDLE_ID" > app-console.log 2>&1 &)
+          echo "Launched with console capture (background)"
 
       # --------------------------------------------------
       # 6. 冒烟测试：进程存活 + 默认语言主截图
@@ -124,6 +127,19 @@ jobs:
           if ! xcrun simctl spawn "$DUO_UDID" launchctl list | grep -q "$BUNDLE_ID"; then
             echo "::error::App process is not alive on iPhone Duo simulator"
             xcrun simctl spawn "$DUO_UDID" launchctl list | tail -30 || true
+            echo "===== App console (crash reason) ====="
+            cat app-console.log 2>/dev/null | tail -100 || true
+            echo "===== Crash reports ====="
+            CRASH_FILE="$(ls -t "$HOME/Library/Logs/DiagnosticReports"/TiandiLuopan* 2>/dev/null | head -1 || true)"
+            if [ -n "$CRASH_FILE" ]; then
+              echo "Found: $CRASH_FILE"
+              grep -E "Exception Type|Termination Reason|Last Exception|abort|Fatal|SIG[A-Z]+|triggered" "$CRASH_FILE" | head -20 || true
+              cp "$CRASH_FILE" crash-report.ips 2>/dev/null || true
+            else
+              ls -t "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | head -10 || true
+            fi
+            echo "===== System log (last 2m, app) ====="
+            xcrun simctl spawn "$DUO_UDID" log show --last 2m --predicate 'process == "TiandiLuopan"' --style compact 2>/dev/null | tail -60 || true
             exit 1
           fi
           echo "App process is alive: $BUNDLE_ID"
@@ -238,6 +254,17 @@ jobs:
         with:
           name: iPhone-Duo-Build-Logs
           path: tiandi_luopan/build-duo-build.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload Crash Diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhone-Duo-Crash-Diagnostics
+          path: |
+            app-console.log
+            crash-report.ips
           retention-days: 7
           if-no-files-found: ignore
 

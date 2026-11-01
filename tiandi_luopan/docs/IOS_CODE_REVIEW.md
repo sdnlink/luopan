@@ -38,7 +38,7 @@
 | 紫白与择日 | `PurpleWhiteEngine.swift`、`ZeRiEngine.swift`、`PurpleWhiteView.swift` | 流年/流月客星、太岁/岁破/三煞方、四柱、冲克警告 | 紫白每宫 advice、择日宜忌和详情存在；坐山冲克单独标注 | 紫白建议主要按年星，月星参与有限；完整年/月/日神煞仍未实现 | 长卷全量写紫白九宫和择日警告/宜忌 |
 | 户型立极 | `FloorplanEngine.swift`、`FloorplanView.swift` | 图片/示例户型、房间编辑、面积质心、八宫分配、房间审计、缺角检查 | 房间与缺角有 lore/solution，正常房间也保留审计结果 | 缺角现查 3×3 外圈 8 区；审计主要使用矩形中心，真实多边形支持未贯穿 | 当前审计写入长卷；独立户型图按完整报告动态扩展 |
 | AR 形煞 | `ARVisionView.swift`、`OnDeviceShaAnalyzer.swift`、`ExteriorShaEngine.swift`、`ShaSurveyModels.swift` | Vision 矩形/轮廓几何候选、三帧共识、LiDAR 距离、手动/AI 标注、八宫聚合、化解页 | 八大静态形煞有通用 remedy；现场记录有距离/置信度/严重度并落盘 | 不是训练好的建筑语义模型；置信度是规则分数；八宫按报告基准朝向分组 | 当前现场记录进入长卷；无现场记录时才显示通用知识库 |
-| 空间测绘 | `ARSpatialSurveyView.swift`、`ARRoomPlanCaptureView.swift`、`HouseSpatialSurveyModel.swift`、`House3DSpaceViewer.swift`、`VRSpatialSurveyView.swift` | ARKit/LiDAR/RoomPlan/虚拟回退，墙门窗家具、测距、九宫、空间形煞、JSON/ARWorldMap/DXF/USdz | 每个 `shaItem` 有 detail/lore/solution，3D 查看器可看结果 | 规则和阈值是启发式；部分动态文案仍有中文硬编码 | 最近一次 `HouseSpatialSurvey` 的统计、评分和条目进入长卷 |
+| 空间测绘 | `ARSpatialSurveyView.swift`、`ARRoomPlanCaptureView.swift`、`HouseSpatialSurveyModel.swift`、`House3DSpaceViewer.swift`、`VRSpatialSurveyView.swift` | ARKit/LiDAR/RoomPlan/VR 仿真，墙门窗家具、测距、九宫、空间形煞、JSON/ARWorldMap/DXF/USDZ；户型页另有“当前户型3D”推演入口 | 每个 `shaItem` 有 detail/lore/solution，3D 查看器显示来源、实测构件和 VR 房间隔墙 | 规则和阈值是启发式；VR 依赖用户输入的比例尺寸，不能当现场实测；部分动态文案仍有中文硬编码 | 最近一次 `HouseSpatialSurvey`（AR/RoomPlan/VR，按 `scanMethod` 区分）的统计、评分和条目进入长卷 |
 | 长卷导出 | `TianJiShuEngine.swift`、`TianJiShuView.swift` | 宣纸长图、预览、相册保存、系统分享、成功后扣天机额度 | 当前接入模块输出完整数组并动态测量文本 | 仍为单张长图而非分页 PDF；`isPro` 参数保留兼容但由视图门控；真机内存/图像限制未实测 | 包含当前罗盘摘要、玄空/奇门/八宅/三合/紫白/择日、户型、AR 和室内测绘结果 |
 | 权益与本地化 | `StoreKitIAPManager.swift`、`VIPPaywallSheet.swift`、`LocalizationManager.swift` | StoreKit 2 交易/权益、会员和消耗额度、本地化字典 | 付费入口有门控；8 种语言字典无重复/缺失 | 消耗型余额仍只在本地记账，生产环境需服务端交易账本 | 不属于长卷内容，但决定导出是否可用 |
 
@@ -72,7 +72,7 @@
 当前页面模型和长卷都保留了各模块的完整锦囊数组；没有现场数据时，长卷会明确显示静态知识库的通用建议，避免把知识库冒充成现场检测结果。
 
 - 户型：房间审计和 3×3 外圈缺角均输出 lore/solution；独立户型图与长卷按完整条数扩展。
-- 空间测绘：最近一次 `HouseSpatialSurvey` 的房间、墙体、门窗、评分和 `shaItems` 摘要及 solution 进入长卷，原始 JSON/USDZ/ARWorldMap 仍单独导出。
+- 空间测绘：最近一次 `HouseSpatialSurvey` 的房间、墙体、门窗、评分和 `shaItems` 摘要及 solution 进入长卷，并保留 `scanMethod` 来源标记；户型图 3D 推演不会覆盖当前户型编辑状态，原始 JSON/USDZ/ARWorldMap 仍单独导出。
 - AR 外部形煞：保存采集朝向、距离、置信度、来源和备注；长卷按当前记录输出对应 remedy，无记录时才输出通用知识库。
 - 玄空：九宫逐宫评价、五黄/二黑提示及财富/健康/调理建议均输出。
 - 八宅：八宫 suggestion 全量输出；三合 24 山阶段和 lore 全量输出，但缺少现场水形证据。

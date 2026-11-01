@@ -1988,6 +1988,12 @@ public struct ARSpatialSurveyView: View {
     @State private var currentSurveyReport: HouseSpatialSurvey? = nil
     @State private var showVRSurvey = false
 
+    private var latestSurveyForVR: HouseSpatialSurvey? {
+        if let currentSurveyReport { return currentSurveyReport }
+        guard let data = UserDefaults.standard.data(forKey: "latest_house_spatial_survey") else { return nil }
+        return try? JSONDecoder().decode(HouseSpatialSurvey.self, from: data)
+    }
+
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [
         (.wall, "ar_spatial_wall", "rectangle.portrait"),
         (.floor, "ar_spatial_floor", "square"),
@@ -2120,7 +2126,7 @@ public struct ARSpatialSurveyView: View {
                         HStack(spacing: 3) {
                             Image(systemName: "cube.transparent")
                                 .font(.adaptive(size: 13, weight: .bold))
-                            Text("3D空间")
+                            Text("当前实测3D")
                                 .font(.adaptive(size: 10, weight: .bold))
                         }
                         .foregroundColor(.black)
@@ -2129,7 +2135,7 @@ public struct ARSpatialSurveyView: View {
                         .background(Color.yanGold)
                         .cornerRadius(14)
                     }
-                    .accessibilityLabel("查看全屋3D空间布局与形煞")
+                    .accessibilityLabel("查看当前实测全屋3D空间布局与形煞")
                     Button(action: { showVRSurvey = true }) {
                         HStack(spacing: 3) {
                             Image(systemName: "view.3d")
@@ -2473,7 +2479,10 @@ public struct ARSpatialSurveyView: View {
             }
         }
         .fullScreenCover(isPresented: $showVRSurvey) {
-            VRSpatialSurveyView()
+            // If a spatial scan already exists, let the VR editor start from
+            // that measured geometry so users can correct/complete it. An
+            // empty simulation is only used before the first scan.
+            VRSpatialSurveyView(initialSurvey: latestSurveyForVR)
         }
     }
 

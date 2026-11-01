@@ -66,7 +66,10 @@ public struct FloorplanView: View {
     @State private var didRestorePersistedLayout = false
     @State private var persistedSpatialSurvey: HouseSpatialSurvey? = nil
     @State private var show3DSpaceViewer: Bool = false
+    @State private var currentFloorplanSurvey: HouseSpatialSurvey? = nil
+    @State private var showCurrentFloorplan3D: Bool = false
     @State private var showARSpatialSurvey: Bool = false
+    @State private var showVRSpatialSurvey: Bool = false
     @State private var exportedReportImage: UIImage? = nil
     @State private var showReportShareSheet: Bool = false
     // Room/center edits call persistLayout frequently. Keep the image
@@ -249,6 +252,17 @@ public struct FloorplanView: View {
         .sheet(isPresented: $showARSpatialSurvey) {
             ARSpatialSurveyView()
         }
+        .fullScreenCover(isPresented: $showVRSpatialSurvey) {
+            // Start the simulation from the same room rectangles currently
+            // visible in 户型立极.  Previously the VR editor always opened an
+            // empty canvas, so its report could not represent the floorplan
+            // the user had just edited.
+            VRSpatialSurveyView(
+                initialFloorplanRooms: auditedRooms.isEmpty ? rooms : auditedRooms,
+                initialWidthMeters: calibratedWidthMeters,
+                initialDepthMeters: calibratedDepthMeters
+            )
+        }
         .sheet(isPresented: $showReportShareSheet) {
             if let reportImage = exportedReportImage {
                 FloorplanReportShareSheet(items: [reportImage])
@@ -256,6 +270,11 @@ public struct FloorplanView: View {
         }
         .sheet(isPresented: $show3DSpaceViewer) {
             if let s = persistedSpatialSurvey {
+                House3DSpaceViewer(survey: s)
+            }
+        }
+        .sheet(isPresented: $showCurrentFloorplan3D) {
+            if let s = currentFloorplanSurvey {
                 House3DSpaceViewer(survey: s)
             }
         }
@@ -314,6 +333,15 @@ public struct FloorplanView: View {
             persistedImageObjectID = nil
             restorePersistedLayoutIfNeeded()
             refreshAudit(force: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didUpdateHouseSpatialSurvey)) { _ in
+            // A VR correction updates the 3D archive but has no authority to
+            // replace the editable floorplan layout. Keep the current rooms
+            // and only refresh the “最近实测/VR 3D” snapshot button.
+            if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
+               let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
+                persistedSpatialSurvey = s
+            }
         }
     }
 
@@ -633,11 +661,34 @@ public struct FloorplanView: View {
                 .cornerRadius(6)
             }
             
+            // Always build this view from the rooms currently shown in 户型立极.
+            // The previous button opened the last persisted AR/VR snapshot,
+            // which could belong to a different floorplan.
+            Button(action: {
+                guard let survey = buildCurrentFloorplanSurvey() else { return }
+                currentFloorplanSurvey = survey
+                // Make the exact snapshot shown by this button available to
+                // 福宅天机长卷 and the AR archive while keeping its推演来源标记.
+                ShaSurveyStore.shared.updateInterior(survey)
+                showCurrentFloorplan3D = true
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "cube.transparent")
+                    Text("当前户型3D")
+                }
+                .font(.adaptive(size: 11, weight: .bold))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(Color.yanGold.opacity(0.85))
+                .foregroundColor(.black)
+                .cornerRadius(6)
+            }
+
             if let survey = persistedSpatialSurvey {
                 Button(action: { show3DSpaceViewer = true }) {
                     HStack(spacing: 3) {
                         Image(systemName: "cube.transparent")
-                        Text("3D空间")
+                        Text(survey.scanMethod.contains("VR") ? "最近VR仿真3D" : "最近实测3D")
                     }
                     .font(.adaptive(size: 11, weight: .bold))
                     .padding(.horizontal, 7)
@@ -647,6 +698,22 @@ public struct FloorplanView: View {
                     .cornerRadius(6)
                 }
             }
+
+            // 户型图/手工房间编辑没有 RoomPlan 档案时，也应有明确的
+            // 3D 入口。该入口是“按比例仿真”，不会冒充 LiDAR 实测结果。
+            Button(action: { showVRSpatialSurvey = true }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "view.3d")
+                    Text(lang.t("vr_survey_title"))
+                }
+                .font(.adaptive(size: 11, weight: .bold))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(Color.orange.opacity(0.78))
+                .foregroundColor(.black)
+                .cornerRadius(6)
+            }
+            .accessibilityLabel(lang.t("vr_survey_title"))
 
             // 重置立极点
             Button(action: {
@@ -710,6 +777,18 @@ public struct FloorplanView: View {
         let depth = Double(calibratedDepthText.replacingOccurrences(of: ",", with: "."))
         guard let width = width, let depth = depth, width > 0, depth > 0 else { return nil }
         return width * depth
+    }
+
+    private var calibratedWidthMeters: CGFloat? {
+        guard let value = Double(calibratedWidthText.replacingOccurrences(of: ",", with: ".")),
+              value.isFinite, value > 0 else { return nil }
+        return CGFloat(value)
+    }
+
+    private var calibratedDepthMeters: CGFloat? {
+        guard let value = Double(calibratedDepthText.replacingOccurrences(of: ",", with: ".")),
+              value.isFinite, value > 0 else { return nil }
+        return CGFloat(value)
     }
 
     private func roomCalibrationBar() -> some View {
@@ -950,6 +1029,94 @@ public struct FloorplanView: View {
         }
         UserDefaults.standard.removeObject(forKey: Self.savedLayoutKey)
         refreshAudit(force: true)
+    }
+
+    /// Builds a 3D projection from the rooms currently edited on this page.
+    /// The result is deliberately labelled as a floorplan projection because
+    /// its geometry comes from normalized room frames and optional user scale
+    /// calibration, not from LiDAR or RoomPlan observations.
+    private func buildCurrentFloorplanSurvey() -> HouseSpatialSurvey? {
+        let sourceRooms = (auditedRooms.isEmpty ? rooms : auditedRooms)
+            .filter { $0.type != .missingCorner }
+        guard !sourceRooms.isEmpty else { return nil }
+
+        func parsedMeters(_ text: String, fallback: Float) -> Float {
+            let value = Float(text.replacingOccurrences(of: ",", with: ".")) ?? fallback
+            return max(1.0, min(100.0, value.isFinite ? value : fallback))
+        }
+        let width = parsedMeters(calibratedWidthText, fallback: 12.0)
+        let depth = parsedMeters(calibratedDepthText, fallback: 10.0)
+        let roomHeight: Float = 2.8
+
+        let rooms3D = sourceRooms
+            .filter { $0.type != .door }
+            .map { room in
+                SpatialRoom3D(
+                    id: UUID(uuidString: room.id) ?? UUID(),
+                    name: room.name,
+                    type: room.type,
+                    center: SIMD3<Float>(Float(room.rect.midX) * width, roomHeight * 0.5, Float(room.rect.midY) * depth),
+                    size: SIMD3<Float>(max(0.5, Float(room.rect.width) * width), roomHeight, max(0.5, Float(room.rect.height) * depth))
+                )
+            }
+
+        var walls: [SpatialWall3D] = []
+        func addWall(_ start: SIMD3<Float>, _ end: SIMD3<Float>, thickness: Float = 0.12) {
+            walls.append(SpatialWall3D(start: start, end: end, height: roomHeight, thickness: thickness))
+        }
+        let outer = [
+            SIMD3<Float>(0, 0, 0), SIMD3<Float>(width, 0, 0),
+            SIMD3<Float>(width, 0, depth), SIMD3<Float>(0, 0, depth)
+        ]
+        for index in 0..<4 { addWall(outer[index], outer[(index + 1) % 4], thickness: 0.18) }
+        for room in sourceRooms where room.type != .door {
+            let x0 = Float(room.rect.minX) * width
+            let x1 = Float(room.rect.maxX) * width
+            let z0 = Float(room.rect.minY) * depth
+            let z1 = Float(room.rect.maxY) * depth
+            let corners = [SIMD3<Float>(x0, 0, z0), SIMD3<Float>(x1, 0, z0), SIMD3<Float>(x1, 0, z1), SIMD3<Float>(x0, 0, z1)]
+            for index in 0..<4 { addWall(corners[index], corners[(index + 1) % 4]) }
+        }
+
+        func makeOpening(for room: FloorplanRoom, type: SpatialOpeningType) -> SpatialOpening3D {
+            let distances: [(Int, CGFloat)] = [
+                (0, room.rect.minY), (1, 1 - room.rect.maxX),
+                (2, 1 - room.rect.maxY), (3, room.rect.minX)
+            ]
+            let edge = distances.min(by: { $0.1 < $1.1 })?.0 ?? 0
+            let alongDepth = edge == 1 || edge == 3
+            let span = max(0.5, Float((alongDepth ? room.rect.height * CGFloat(depth) : room.rect.width * CGFloat(width))))
+            let height: Float = type == .window || type == .balconyDoor ? 1.5 : 2.1
+            switch edge {
+            case 1:
+                return SpatialOpening3D(type: type, position: SIMD3<Float>(width, roomHeight * 0.5, Float(room.rect.midY) * depth), normal: SIMD3<Float>(1, 0, 0), width: span, height: height)
+            case 2:
+                return SpatialOpening3D(type: type, position: SIMD3<Float>(Float(room.rect.midX) * width, roomHeight * 0.5, depth), normal: SIMD3<Float>(0, 0, 1), width: span, height: height)
+            case 3:
+                return SpatialOpening3D(type: type, position: SIMD3<Float>(0, roomHeight * 0.5, Float(room.rect.midY) * depth), normal: SIMD3<Float>(-1, 0, 0), width: span, height: height)
+            default:
+                return SpatialOpening3D(type: type, position: SIMD3<Float>(Float(room.rect.midX) * width, roomHeight * 0.5, 0), normal: SIMD3<Float>(0, 0, -1), width: span, height: height)
+            }
+        }
+
+        var openings: [SpatialOpening3D] = []
+        if let door = sourceRooms.first(where: { $0.type == .door }) {
+            openings.append(makeOpening(for: door, type: .entranceDoor))
+        }
+        if let balcony = sourceRooms.first(where: { $0.type == .balcony }) {
+            openings.append(makeOpening(for: balcony, type: .balconyDoor))
+        }
+
+        return HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: "户型图 3D 推演（当前户型）",
+            walls: walls,
+            openings: openings,
+            beams: [],
+            rooms: rooms3D,
+            objects: [],
+            compassHeading: effectiveHeading,
+            centroidOverride: SIMD3<Float>(Float(centroid.x) * width, 0, Float(centroid.y) * depth)
+        )
     }
 
     private func headingQualityNotice() -> some View {

@@ -28,17 +28,52 @@ public struct VRSpatialSurveyView: View {
     @State private var selectedID: UUID?
     @State private var lastDrag: [UUID: CGSize] = [:]
     @State private var resultSurvey: HouseSpatialSurvey?
+    // VR is a scaled reconstruction path. Keep the scale explicit so a user
+    // can enter the measured envelope instead of treating the canvas as a
+    // physically accurate 12 × 10 metre scan.
+    @State private var widthMetersText: String = "12.0"
+    @State private var depthMetersText: String = "10.0"
+    @State private var ceilingMetersText: String = "2.8"
 
-    // 画布默认映射：12 米开间 × 10 米进深
-    private let metersW: CGFloat = 12.0
-    private let metersD: CGFloat = 10.0
+    private var metersW: CGFloat { boundedMeters(widthMetersText, fallback: 12.0) }
+    private var metersD: CGFloat { boundedMeters(depthMetersText, fallback: 10.0) }
+    private var ceilingHeight: Float { Float(boundedMeters(ceilingMetersText, fallback: 2.8)) }
 
     private let selectableTypes: [FloorplanRoomType] = [
         .livingRoom, .masterBedroom, .secondBedroom, .study,
         .kitchen, .bathroom, .balcony, .door,
     ]
 
-    public init() {}
+    public init(
+        initialFloorplanRooms: [FloorplanRoom] = [],
+        initialSurvey: HouseSpatialSurvey? = nil,
+        initialWidthMeters: CGFloat? = nil,
+        initialDepthMeters: CGFloat? = nil,
+        initialCeilingMeters: CGFloat? = nil
+    ) {
+        if let initialSurvey {
+            let seeded = Self.seededItems(from: initialSurvey)
+            self._rooms = State(initialValue: seeded.rooms)
+            self._openings = State(initialValue: seeded.openings)
+            self._widthMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.totalWidth))
+            self._depthMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.totalDepth))
+            self._ceilingMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.ceilingHeight))
+        } else {
+            let seededRooms = initialFloorplanRooms
+                .filter { $0.type != .missingCorner }
+                .map { VRRoomItem(type: $0.type, rect: Self.clampedRect($0.rect)) }
+            self._rooms = State(initialValue: seededRooms)
+            if let initialWidthMeters, initialWidthMeters.isFinite, initialWidthMeters > 0 {
+                self._widthMetersText = State(initialValue: String(format: "%.2f", initialWidthMeters))
+            }
+            if let initialDepthMeters, initialDepthMeters.isFinite, initialDepthMeters > 0 {
+                self._depthMetersText = State(initialValue: String(format: "%.2f", initialDepthMeters))
+            }
+            if let initialCeilingMeters, initialCeilingMeters.isFinite, initialCeilingMeters > 0 {
+                self._ceilingMetersText = State(initialValue: String(format: "%.2f", initialCeilingMeters))
+            }
+        }
+    }
 
     public var body: some View {
         VStack(spacing: 8) {
@@ -76,6 +111,9 @@ public struct VRSpatialSurveyView: View {
                 Text(lang.t("vr_survey_hint"))
                     .font(.adaptive(size: 10, weight: .medium))
                     .foregroundColor(.orange)
+                Text("仿真模型：请先填写实测开间、进深和层高；画布仅用于按比例重建")
+                    .font(.adaptive(size: 9))
+                    .foregroundColor(.white.opacity(0.6))
             }
             Spacer()
             Button(action: { presentationMode.wrappedValue.dismiss() }) {
@@ -104,9 +142,25 @@ public struct VRSpatialSurveyView: View {
                 }
             }
             .contentShape(Rectangle())
-            .onTapGesture { location in
-                addRoom(at: location, in: geo.size)
-            }
+            // `onTapGesture` with a CGPoint callback is an iOS 17 API, while
+            // this target still supports iOS 16. A zero-distance drag gives
+            // us the local tap location on every supported OS. The occupied
+            // check prevents a tap on an existing room/opening from creating
+            // a second room behind the selected item.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onEnded { value in
+                        // A parent simultaneous drag also receives room move
+                        // and resize gestures. Only a near-zero translation
+                        // is a canvas tap; otherwise a room drag could add a
+                        // duplicate room when its final point leaves the old
+                        // rectangle before the child state update lands.
+                        guard abs(value.translation.width) < 5,
+                              abs(value.translation.height) < 5 else { return }
+                        guard !isCanvasPointOccupied(value.location, in: geo.size) else { return }
+                        addRoom(at: value.location, in: geo.size)
+                    }
+            )
         }
         .aspectRatio(6.0 / 5.0, contentMode: .fit)
         .background(Color(red: 0.05, green: 0.07, blue: 0.10))
@@ -249,6 +303,14 @@ public struct VRSpatialSurveyView: View {
 
     private var toolbar: some View {
         VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Text("实测尺寸(m)")
+                    .font(.adaptive(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+                dimensionField(title: "开间", text: $widthMetersText)
+                dimensionField(title: "进深", text: $depthMetersText)
+                dimensionField(title: "层高", text: $ceilingMetersText)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(selectableTypes, id: \.self) { type in
@@ -340,6 +402,31 @@ public struct VRSpatialSurveyView: View {
         selectedID = item.id
     }
 
+    private func isCanvasPointOccupied(_ point: CGPoint, in size: CGSize) -> Bool {
+        guard size.width > 0, size.height > 0 else { return false }
+        let normalized = CGPoint(x: point.x / size.width, y: point.y / size.height)
+        return rooms.contains { $0.rect.contains(normalized) }
+            || openings.contains { $0.rect.contains(normalized) }
+    }
+
+    private func dimensionField(title: String, text: Binding<String>) -> some View {
+        HStack(spacing: 2) {
+            Text(title)
+                .font(.adaptive(size: 9))
+                .foregroundColor(.white.opacity(0.65))
+            TextField("", text: text)
+                .keyboardType(.decimalPad)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 42)
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.10))
+        .cornerRadius(5)
+    }
+
     private func clearAll() {
         rooms.removeAll()
         openings.removeAll()
@@ -352,52 +439,84 @@ public struct VRSpatialSurveyView: View {
 
     private func generateReport() {
         guard !rooms.isEmpty else { return }
-        let roomH: Float = 2.8
-
-        var minX = CGFloat.greatestFiniteMagnitude
-        var maxX = -CGFloat.greatestFiniteMagnitude
-        var minZ = CGFloat.greatestFiniteMagnitude
-        var maxZ = -CGFloat.greatestFiniteMagnitude
+        let width = metersW
+        let depth = metersD
+        let roomH = ceilingHeight
 
         var rooms3D: [SpatialRoom3D] = []
-        for room in rooms {
-            let x = CGFloat(room.rect.midX) * metersW
-            let z = CGFloat(room.rect.midY) * metersD
-            let w = max(CGFloat(0.5), CGFloat(room.rect.width) * metersW)
-            let d = max(CGFloat(0.5), CGFloat(room.rect.height) * metersD)
+        for room in rooms where room.type != .door {
+            let x = CGFloat(room.rect.midX) * width
+            let z = CGFloat(room.rect.midY) * depth
+            let w = max(CGFloat(0.5), CGFloat(room.rect.width) * width)
+            let d = max(CGFloat(0.5), CGFloat(room.rect.height) * depth)
             rooms3D.append(SpatialRoom3D(
                 name: room.type.localizedName,
                 type: room.type,
                 center: SIMD3<Float>(Float(x), roomH * 0.5, Float(z)),
                 size: SIMD3<Float>(Float(w), roomH, Float(d))
             ))
-            minX = min(minX, x - w * 0.5)
-            maxX = max(maxX, x + w * 0.5)
-            minZ = min(minZ, z - d * 0.5)
-            maxZ = max(maxZ, z + d * 0.5)
         }
 
-        // 全屋外框墙（VR 测绘不细分房间内隔墙，隔墙由房间矩形表达）
+        // The canvas is the measured envelope. Keeping the envelope fixed at
+        // the entered width/depth makes room coordinates and opening positions
+        // share one coordinate system; deriving the envelope from room boxes
+        // previously shifted doors and windows whenever a room was moved.
         var walls3D: [SpatialWall3D] = []
-        let fx0 = Float(minX)
-        let fx1 = Float(maxX)
-        let fz0 = Float(minZ)
-        let fz1 = Float(maxZ)
+        let fx0: Float = 0
+        let fx1 = Float(width)
+        let fz0: Float = 0
+        let fz1 = Float(depth)
         walls3D.append(SpatialWall3D(start: SIMD3<Float>(fx0, 0, fz0), end: SIMD3<Float>(fx1, 0, fz0), height: roomH, thickness: 0.18, isLoadBearing: false))
         walls3D.append(SpatialWall3D(start: SIMD3<Float>(fx1, 0, fz0), end: SIMD3<Float>(fx1, 0, fz1), height: roomH, thickness: 0.18, isLoadBearing: false))
         walls3D.append(SpatialWall3D(start: SIMD3<Float>(fx1, 0, fz1), end: SIMD3<Float>(fx0, 0, fz1), height: roomH, thickness: 0.18, isLoadBearing: false))
         walls3D.append(SpatialWall3D(start: SIMD3<Float>(fx0, 0, fz1), end: SIMD3<Float>(fx0, 0, fz0), height: roomH, thickness: 0.18, isLoadBearing: false))
 
+        // Rooms are drawn as floor regions in the viewer. Add their perimeter
+        // as light partition walls so the 3D result communicates the actual
+        // hand-drawn room separation instead of showing floating floor tiles.
+        for room in rooms where room.type != .door {
+            let x0 = Float(room.rect.minX * width)
+            let x1 = Float(room.rect.maxX * width)
+            let z0 = Float(room.rect.minY * depth)
+            let z1 = Float(room.rect.maxY * depth)
+            let corners = [
+                SIMD3<Float>(x0, 0, z0), SIMD3<Float>(x1, 0, z0),
+                SIMD3<Float>(x1, 0, z1), SIMD3<Float>(x0, 0, z1)
+            ]
+            for index in 0..<4 {
+                walls3D.append(SpatialWall3D(
+                    start: corners[index],
+                    end: corners[(index + 1) % 4],
+                    height: roomH,
+                    thickness: 0.10,
+                    isLoadBearing: false
+                ))
+            }
+        }
+
+        // A door room imported from 户型立极 represents the entrance even when
+        // the user has not placed a separate opening marker in this editor.
+        // Seed it at the nearest outer edge so the 3D model and the floorplan
+        // share the same entrance direction.
+        var openingItems = openings
+        if !openingItems.contains(where: { $0.isDoor }),
+           let doorRoom = rooms.first(where: { $0.type == .door }) {
+            openingItems.append(VROpeningItem(isDoor: true, rect: doorRoom.rect))
+        }
+        if !openingItems.contains(where: { !$0.isDoor }),
+           let balconyRoom = rooms.first(where: { $0.type == .balcony }) {
+            openingItems.append(VROpeningItem(isDoor: false, rect: balconyRoom.rect))
+        }
+
         var openings3D: [SpatialOpening3D] = []
-        for op in openings {
-            let w = max(CGFloat(0.5), CGFloat(op.rect.width) * metersW)
-            let h: Float = op.isDoor ? 2.1 : 1.5
-            // 开口朝外（简化：法线指向画布下方 = 北）
+        for op in openingItems {
+            let placement = openingPlacement(op, width: width, depth: depth)
+            let h = min(max(0.6, roomH - 0.1), op.isDoor ? 2.1 : 1.5)
             openings3D.append(SpatialOpening3D(
                 type: op.isDoor ? .entranceDoor : .window,
-                position: SIMD3<Float>(Float(op.rect.midX * metersW), h * 0.6, Float(op.rect.midY * metersD)),
-                normal: SIMD3<Float>(0, 0, 1),
-                width: Float(w),
+                position: SIMD3<Float>(placement.x, h * 0.5, placement.z),
+                normal: placement.normal,
+                width: Float(placement.span),
                 height: h
             ))
         }
@@ -413,7 +532,107 @@ public struct VRSpatialSurveyView: View {
             compassHeading: heading
         )
         ShaSurveyStore.shared.updateInterior(survey)
+        // Keep the generated snapshot in the same local archive consumed by
+        // 户型立极 and the report exporter.  Without this write, leaving the
+        // VR sheet discarded the model and the floorplan's 3D button kept
+        // showing an older RoomPlan result (or no result at all).
+        if let data = try? JSONEncoder().encode(survey) {
+            UserDefaults.standard.set(data, forKey: "latest_house_spatial_survey")
+            NotificationCenter.default.post(name: .didUpdateHouseSpatialSurvey, object: nil)
+        }
         resultSurvey = survey
+    }
+
+    private func openingPlacement(_ opening: VROpeningItem, width: CGFloat, depth: CGFloat) -> (x: Float, z: Float, normal: SIMD3<Float>, span: CGFloat) {
+        let distances: [(edge: Int, value: CGFloat)] = [
+            (0, opening.rect.minY),
+            (1, 1.0 - opening.rect.maxX),
+            (2, 1.0 - opening.rect.maxY),
+            (3, opening.rect.minX)
+        ]
+        let edge = distances.min(by: { $0.value < $1.value })?.edge ?? 0
+        switch edge {
+        case 1:
+            return (Float(width), Float(opening.rect.midY * depth), SIMD3<Float>(1, 0, 0), max(0.5, opening.rect.height * depth))
+        case 2:
+            return (Float(opening.rect.midX * width), Float(depth), SIMD3<Float>(0, 0, 1), max(0.5, opening.rect.width * width))
+        case 3:
+            return (0, Float(opening.rect.midY * depth), SIMD3<Float>(-1, 0, 0), max(0.5, opening.rect.height * depth))
+        default:
+            return (Float(opening.rect.midX * width), 0, SIMD3<Float>(0, 0, -1), max(0.5, opening.rect.width * width))
+        }
+    }
+
+    private func boundedMeters(_ text: String, fallback: CGFloat) -> CGFloat {
+        guard let value = Double(text), value.isFinite else { return fallback }
+        return CGFloat(max(1.0, min(100.0, value)))
+    }
+
+    private static func clampedRect(_ rect: CGRect) -> CGRect {
+        let width = min(max(rect.width, 0.04), 0.96)
+        let height = min(max(rect.height, 0.04), 0.96)
+        let x = min(max(rect.origin.x, 0), 1 - width)
+        let y = min(max(rect.origin.y, 0), 1 - height)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    /// Project a completed AR/RoomPlan survey into the editor's normalized
+    /// canvas. This keeps the VR path useful for correcting a scan instead of
+    /// silently replacing a real scan with an empty synthetic layout.
+    private static func seededItems(from survey: HouseSpatialSurvey) -> (rooms: [VRRoomItem], openings: [VROpeningItem]) {
+        var minX = Float.greatestFiniteMagnitude
+        var maxX = -Float.greatestFiniteMagnitude
+        var minZ = Float.greatestFiniteMagnitude
+        var maxZ = -Float.greatestFiniteMagnitude
+        for wall in survey.walls {
+            minX = min(minX, min(wall.startX, wall.endX))
+            maxX = max(maxX, max(wall.startX, wall.endX))
+            minZ = min(minZ, min(wall.startZ, wall.endZ))
+            maxZ = max(maxZ, max(wall.startZ, wall.endZ))
+        }
+        if !(minX < maxX && minZ < maxZ) {
+            minX = survey.centroidX - survey.dimensions.totalWidth * 0.5
+            maxX = survey.centroidX + survey.dimensions.totalWidth * 0.5
+            minZ = survey.centroidZ - survey.dimensions.totalDepth * 0.5
+            maxZ = survey.centroidZ + survey.dimensions.totalDepth * 0.5
+        }
+        let spanX = max(1.0, maxX - minX)
+        let spanZ = max(1.0, maxZ - minZ)
+        let roomItems = survey.rooms.map { room in
+            let rect = CGRect(
+                x: CGFloat((room.centerX - room.sizeX * 0.5 - minX) / spanX),
+                y: CGFloat((room.centerZ - room.sizeZ * 0.5 - minZ) / spanZ),
+                width: CGFloat(room.sizeX / spanX),
+                height: CGFloat(room.sizeZ / spanZ)
+            )
+            return VRRoomItem(type: room.type, rect: Self.clampedRect(rect))
+        }
+        // The VR editor has one explicit entrance type and one window type;
+        // interior doors are already represented by room partition walls and
+        // must not be reclassified as additional entrances.
+        let openingItems = survey.openings.compactMap { opening -> VROpeningItem? in
+            guard opening.type != .interiorDoor else { return nil }
+            let normal = SIMD2<Float>(opening.normalX, opening.normalZ)
+            let verticalEdge = abs(normal.x) > abs(normal.y)
+            let rect: CGRect
+            if verticalEdge {
+                rect = CGRect(
+                    x: CGFloat((opening.posX - minX) / spanX - 0.025),
+                    y: CGFloat((opening.posZ - opening.width * 0.5 - minZ) / spanZ),
+                    width: 0.05,
+                    height: CGFloat(opening.width / spanZ)
+                )
+            } else {
+                rect = CGRect(
+                    x: CGFloat((opening.posX - opening.width * 0.5 - minX) / spanX),
+                    y: CGFloat((opening.posZ - minZ) / spanZ - 0.025),
+                    width: CGFloat(opening.width / spanX),
+                    height: 0.05
+                )
+            }
+            return VROpeningItem(isDoor: opening.type == .entranceDoor || opening.type == .interiorDoor, rect: Self.clampedRect(rect))
+        }
+        return (roomItems, openingItems)
     }
 
     // MARK: - 视觉辅助

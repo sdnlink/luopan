@@ -2,6 +2,14 @@ import Foundation
 import CoreGraphics
 import simd
 
+extension Notification.Name {
+    /// Posted when a completed VR correction replaces the latest spatial
+    /// archive. This is intentionally separate from the floorplan
+    /// import notification: importing a floorplan also restores its room
+    /// layout, while editing a VR report must not overwrite that layout.
+    public static let didUpdateHouseSpatialSurvey = Notification.Name("com.yanxiang.compass.didUpdateHouseSpatialSurvey")
+}
+
 // MARK: - 3D 全屋测绘空间数据模型与全屋形煞引擎 (PRD 5.3 & 第7章)
 
 /// 形煞危害严重程度
@@ -197,6 +205,9 @@ public struct SpatialObject3D: Identifiable, Codable {
     public let sizeX: Float
     public let sizeY: Float
     public let sizeZ: Float
+    /// Y-axis rotation captured from RoomPlan. Optional keeps older survey
+    /// archives decodable and allows synthetic/VR objects without orientation.
+    public let rotationY: Float?
 
     public var position: SIMD3<Float> { SIMD3<Float>(posX, posY, posZ) }
     public var size: SIMD3<Float> { SIMD3<Float>(sizeX, sizeY, sizeZ) }
@@ -205,7 +216,8 @@ public struct SpatialObject3D: Identifiable, Codable {
         id: UUID = UUID(),
         category: String,
         position: SIMD3<Float>,
-        size: SIMD3<Float>
+        size: SIMD3<Float>,
+        rotationY: Float? = nil
     ) {
         self.id = id
         self.category = category
@@ -215,6 +227,7 @@ public struct SpatialObject3D: Identifiable, Codable {
         self.sizeX = size.x
         self.sizeY = size.y
         self.sizeZ = size.z
+        self.rotationY = rotationY
     }
 }
 
@@ -371,7 +384,8 @@ public enum HouseSpatialSurveyEngine {
         beams: [SpatialBeam3D],
         rooms: [SpatialRoom3D],
         objects: [SpatialObject3D],
-        compassHeading: Double
+        compassHeading: Double,
+        centroidOverride: SIMD3<Float>? = nil
     ) -> HouseSpatialSurvey {
         // 1. 计算全屋物理边界包围盒
         var minX: Float = .greatestFiniteMagnitude
@@ -388,10 +402,21 @@ public enum HouseSpatialSurveyEngine {
             maxH = max(maxH, w.height)
         }
         for o in openings {
-            minX = min(minX, o.posX - o.width * 0.5)
-            maxX = max(maxX, o.posX + o.width * 0.5)
-            minZ = min(minZ, o.posZ - o.width * 0.5)
-            maxZ = max(maxZ, o.posZ + o.width * 0.5)
+            // Opening width runs along the wall tangent, not along both
+            // world axes. Applying it to X and Z inflated the envelope for a
+            // side-wall window and shifted the fallback centre in wall-only
+            // or opening-only surveys.
+            let halfTangent = o.width * 0.5
+            let tangentX = -o.normalZ
+            let tangentZ = o.normalX
+            let tangentMinX = o.posX - tangentX * halfTangent
+            let tangentMaxX = o.posX + tangentX * halfTangent
+            let tangentMinZ = o.posZ - tangentZ * halfTangent
+            let tangentMaxZ = o.posZ + tangentZ * halfTangent
+            minX = min(minX, min(tangentMinX, tangentMaxX) - abs(o.normalX) * 0.05)
+            maxX = max(maxX, max(tangentMinX, tangentMaxX) + abs(o.normalX) * 0.05)
+            minZ = min(minZ, min(tangentMinZ, tangentMaxZ) - abs(o.normalZ) * 0.05)
+            maxZ = max(maxZ, max(tangentMinZ, tangentMaxZ) + abs(o.normalZ) * 0.05)
             maxH = max(maxH, o.posY + o.height * 0.5)
         }
         for r in rooms {
@@ -433,13 +458,19 @@ public enum HouseSpatialSurveyEngine {
             ]
         }
 
-        // 房间在房屋局部坐标系的 AABB → 全屋真实开间/进深（OBB 跨度）
+        // 先用墙体端点投影到局部坐标系。此前只要存在一个“房间推断框”
+        // 就完全忽略墙体，RoomPlan 的房间框会把整屋尺寸缩小或平移；而把
+        // 两类数据简单合并又会让家具推断框把实测墙体撑大。墙体是实测外壳
+        // 的优先证据，只有墙体不能形成二维边界时才使用房间框补全 VR/简化路径。
         var lMinX: Float = .greatestFiniteMagnitude
         var lMaxX: Float = -.greatestFiniteMagnitude
         var lMinZ: Float = .greatestFiniteMagnitude
         var lMaxZ: Float = -.greatestFiniteMagnitude
-        for room in rooms {
-            for corner in roomCorners(room) {
+        for wall in walls {
+            for corner in [
+                SIMD2<Float>(wall.startX, wall.startZ),
+                SIMD2<Float>(wall.endX, wall.endZ)
+            ] {
                 let lc = toLocal(corner)
                 lMinX = min(lMinX, lc.x); lMaxX = max(lMaxX, lc.x)
                 lMinZ = min(lMinZ, lc.y); lMaxZ = max(lMaxZ, lc.y)
@@ -447,15 +478,26 @@ public enum HouseSpatialSurveyEngine {
         }
         var obbUsable = lMinX < lMaxX && lMinZ < lMaxZ
         if !obbUsable {
-            // 无房间几何时退回墙端点局部包围盒
-            for w in walls {
-                for corner in [SIMD2<Float>(w.startX, w.startZ), SIMD2<Float>(w.endX, w.endZ)] {
+            // 墙体只有一条边或完全缺失时，才回退到房间框。
+            lMinX = .greatestFiniteMagnitude
+            lMaxX = -.greatestFiniteMagnitude
+            lMinZ = .greatestFiniteMagnitude
+            lMaxZ = -.greatestFiniteMagnitude
+            for room in rooms {
+                for corner in roomCorners(room) {
                     let lc = toLocal(corner)
                     lMinX = min(lMinX, lc.x); lMaxX = max(lMaxX, lc.x)
                     lMinZ = min(lMinZ, lc.y); lMaxZ = max(lMaxZ, lc.y)
                 }
             }
             obbUsable = lMinX < lMaxX && lMinZ < lMaxZ
+        }
+        if !obbUsable {
+            // 没有任何可用几何时才退回世界坐标 AABB。
+            lMinX = .greatestFiniteMagnitude
+            lMaxX = -.greatestFiniteMagnitude
+            lMinZ = .greatestFiniteMagnitude
+            lMaxZ = -.greatestFiniteMagnitude
         }
         let lSpanX = obbUsable ? max(1.5, lMaxX - lMinX) : spanX
         let lSpanZ = obbUsable ? max(1.5, lMaxZ - lMinZ) : spanZ
@@ -484,7 +526,14 @@ public enum HouseSpatialSurveyEngine {
         }
         let roomAreaRatio = usableArea / max(grossArea, 0.01)
         var isCentroidIndirect = false
-        if roomAreaRatio < 0.75, let largest = rooms.max(by: { $0.areaSqMeters < $1.areaSqMeters }) {
+        if let override = centroidOverride,
+           override.x.isFinite, override.z.isFinite {
+            // A floorplan editor may expose an explicit user-selected Tai Ji
+            // point. Use it for both the pillar and relative sha coordinates
+            // so the 3D result cannot drift back to the envelope midpoint.
+            cx = override.x
+            cz = override.z
+        } else if roomAreaRatio < 0.75, let largest = rooms.max(by: { $0.areaSqMeters < $1.areaSqMeters }) {
             cx = largest.centerX
             cz = largest.centerZ
             isCentroidIndirect = true
@@ -496,10 +545,15 @@ public enum HouseSpatialSurveyEngine {
         var score = 92
 
         // A. 中宫受污检测 —— 在房屋局部坐标系划分九宫中宫盒 (OBB 九宫)，避免斜房切片
-        let centerBoxMinX = lCx - lSpanX / 6.0
-        let centerBoxMaxX = lCx + lSpanX / 6.0
-        let centerBoxMinZ = lCz - lSpanZ / 6.0
-        let centerBoxMaxZ = lCz + lSpanZ / 6.0
+        // Use the resolved centroid (including a floorplan user's explicit
+        // override) for the central-palace box. Keeping lCx/lCz here made the
+        // 3D pillar move while the “中宫受污/火烧中宫” checks stayed at the
+        // old envelope centre.
+        let centerLocal = toLocal(SIMD2<Float>(cx, cz))
+        let centerBoxMinX = centerLocal.x - lSpanX / 6.0
+        let centerBoxMaxX = centerLocal.x + lSpanX / 6.0
+        let centerBoxMinZ = centerLocal.y - lSpanZ / 6.0
+        let centerBoxMaxZ = centerLocal.y + lSpanZ / 6.0
 
         for room in rooms {
             // 房间 4 角点旋转到局部坐标后取 AABB，与局部中宫盒求重叠

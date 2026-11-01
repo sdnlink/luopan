@@ -1040,6 +1040,10 @@ public struct ARVisionView: View {
                     .disabled(isAIScanning || pendingCapturePurpose != nil)
 
                     Button(action: {
+                        if !iap.hasUnlockedVIP {
+                            showPaywall = true
+                            return
+                        }
                         guard hasCameraPermission else {
                             aiError = lang.t("ar_ai_camera_required")
                             return
@@ -1047,8 +1051,17 @@ public struct ARVisionView: View {
                         showSpatialSurvey = true
                     }) {
                         HStack(spacing: 4) {
-                            Image(systemName: "arkit")
+                            Image(systemName: iap.hasUnlockedVIP ? "arkit" : "lock.fill")
                             Text(lang.t("ar_spatial_survey"))
+                            if !iap.hasUnlockedVIP {
+                                Text(lang.t("vip_badge_title"))
+                                    .font(.adaptive(size: 8, weight: .bold))
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(Color.yellow.opacity(0.3))
+                                    .foregroundColor(.yellow)
+                                    .cornerRadius(3)
+                            }
                         }
                         .font(.adaptive(size: 11, weight: .bold))
                         .padding(.horizontal, 9)

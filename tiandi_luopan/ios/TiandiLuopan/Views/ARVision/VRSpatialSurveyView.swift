@@ -22,6 +22,8 @@ public struct VRSpatialSurveyView: View {
         var rect: CGRect
     }
 
+    @ObservedObject private var iap = StoreKitIAPManager.shared
+    @State private var showPaywall = false
     @State private var rooms: [VRRoomItem] = []
     @State private var openings: [VROpeningItem] = []
     @State private var selectedType: FloorplanRoomType = .livingRoom
@@ -102,6 +104,9 @@ public struct VRSpatialSurveyView: View {
             if let survey = resultSurvey {
                 House3DSpaceViewer(survey: survey)
             }
+        }
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
         }
     }
 
@@ -460,6 +465,10 @@ public struct VRSpatialSurveyView: View {
     // MARK: - 生成测绘报告
 
     private func generateReport() {
+        if !iap.hasUnlockedVIP {
+            showPaywall = true
+            return
+        }
         validationMessage = nil
         guard !rooms.isEmpty else {
             validationMessage = "请至少添加一个房间后再生成测绘报告"

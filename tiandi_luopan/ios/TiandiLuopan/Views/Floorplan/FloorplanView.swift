@@ -38,6 +38,7 @@ public struct FloorplanView: View {
     @State private var userFloorplanImage: UIImage? = nil
     @State private var showImagePicker: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var paywallDefaultProduct: IAPProductID = .floorplanSingle
     @State private var showResetConfirmation: Bool = false
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
@@ -249,7 +250,7 @@ public struct FloorplanView: View {
             }
         }
         .sheet(isPresented: $showPaywall) {
-            VIPPaywallSheet(defaultProductId: .floorplanSingle)
+            VIPPaywallSheet(defaultProductId: paywallDefaultProduct)
         }
         .sheet(isPresented: $showARSpatialSurvey) {
             ARSpatialSurveyView()
@@ -575,6 +576,7 @@ public struct FloorplanView: View {
     private func acquireFloorplanAccess() -> Bool {
         if iap.hasUnlockedVIP || didConsumeFloorplanCredit { return true }
         guard iap.consumeFloorplanCredit() else {
+            paywallDefaultProduct = .floorplanSingle
             showPaywall = true
             return false
         }
@@ -604,14 +606,25 @@ public struct FloorplanView: View {
                 HStack(spacing: 6) {
             // AR 空间测绘 / RoomPlan 扫描快速入口
             Button(action: {
+                if !iap.hasUnlockedVIP {
+                    paywallDefaultProduct = .vipYearly
+                    showPaywall = true
+                    return
+                }
                 showARSpatialSurvey = true
             }) {
-                Image(systemName: "viewfinder")
-                    .font(.adaptive(size: 11, weight: .bold))
-                    .padding(6)
-                    .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    .cornerRadius(6)
+                HStack(spacing: 2) {
+                    Image(systemName: iap.hasUnlockedVIP ? "viewfinder" : "lock.fill")
+                    if !iap.hasUnlockedVIP {
+                        Text(lang.t("vip_badge_title"))
+                            .font(.adaptive(size: 8, weight: .bold))
+                    }
+                }
+                .font(.adaptive(size: 11, weight: .bold))
+                .padding(6)
+                .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .cornerRadius(6)
             }
             .accessibilityLabel(lang.t("ar_spatial_survey"))
             
@@ -621,6 +634,7 @@ public struct FloorplanView: View {
                     floorplanImageBeforePicker = userFloorplanImage
                     showImagePicker = true
                 } else {
+                    paywallDefaultProduct = .floorplanSingle
                     showPaywall = true
                 }
             }) {
@@ -699,6 +713,11 @@ public struct FloorplanView: View {
             // The previous button opened the last persisted AR/VR snapshot,
             // which could belong to a different floorplan.
             Button(action: {
+                if !iap.hasUnlockedVIP {
+                    paywallDefaultProduct = .vipYearly
+                    showPaywall = true
+                    return
+                }
                 guard let survey = buildCurrentFloorplanSurvey() else { return }
                 currentFloorplanSurvey = survey
                 // Make the exact snapshot shown by this button available to
@@ -707,8 +726,17 @@ public struct FloorplanView: View {
                 showCurrentFloorplan3D = true
             }) {
                 HStack(spacing: 3) {
-                    Image(systemName: "cube.transparent")
+                    Image(systemName: iap.hasUnlockedVIP ? "cube.transparent" : "lock.fill")
                     Text("当前户型3D")
+                    if !iap.hasUnlockedVIP {
+                        Text(lang.t("vip_badge_title"))
+                            .font(.adaptive(size: 8, weight: .bold))
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(Color.yellow.opacity(0.3))
+                            .foregroundColor(.yellow)
+                            .cornerRadius(3)
+                    }
                 }
                 .font(.adaptive(size: 11, weight: .bold))
                 .padding(.horizontal, 7)
@@ -719,10 +747,26 @@ public struct FloorplanView: View {
             }
 
             if let survey = persistedSpatialSurvey {
-                Button(action: { show3DSpaceViewer = true }) {
+                Button(action: {
+                    if !iap.hasUnlockedVIP {
+                        paywallDefaultProduct = .vipYearly
+                        showPaywall = true
+                        return
+                    }
+                    show3DSpaceViewer = true
+                }) {
                     HStack(spacing: 3) {
-                        Image(systemName: "cube.transparent")
+                        Image(systemName: iap.hasUnlockedVIP ? "cube.transparent" : "lock.fill")
                         Text(survey.scanMethod.contains("VR") ? "最近VR仿真3D" : "最近实测3D")
+                        if !iap.hasUnlockedVIP {
+                            Text(lang.t("vip_badge_title"))
+                                .font(.adaptive(size: 8, weight: .bold))
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color.yellow.opacity(0.3))
+                                .foregroundColor(.yellow)
+                                .cornerRadius(3)
+                        }
                     }
                     .font(.adaptive(size: 11, weight: .bold))
                     .padding(.horizontal, 7)
@@ -734,10 +778,26 @@ public struct FloorplanView: View {
             }
 
             if persistedVirtualSpatialSurvey != nil {
-                Button(action: { showVirtualSpaceViewer = true }) {
+                Button(action: {
+                    if !iap.hasUnlockedVIP {
+                        paywallDefaultProduct = .vipYearly
+                        showPaywall = true
+                        return
+                    }
+                    showVirtualSpaceViewer = true
+                }) {
                     HStack(spacing: 3) {
-                        Image(systemName: "view.3d")
+                        Image(systemName: iap.hasUnlockedVIP ? "view.3d" : "lock.fill")
                         Text("最近VR仿真3D")
+                        if !iap.hasUnlockedVIP {
+                            Text(lang.t("vip_badge_title"))
+                                .font(.adaptive(size: 8, weight: .bold))
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color.orange.opacity(0.3))
+                                .foregroundColor(.white)
+                                .cornerRadius(3)
+                        }
                     }
                     .font(.adaptive(size: 11, weight: .bold))
                     .padding(.horizontal, 7)
@@ -750,10 +810,26 @@ public struct FloorplanView: View {
 
             // 户型图/手工房间编辑没有 RoomPlan 档案时，也应有明确的
             // 3D 入口。该入口是“按比例仿真”，不会冒充 LiDAR 实测结果。
-            Button(action: { showVRSpatialSurvey = true }) {
+            Button(action: {
+                if !iap.hasUnlockedVIP {
+                    paywallDefaultProduct = .vipYearly
+                    showPaywall = true
+                    return
+                }
+                showVRSpatialSurvey = true
+            }) {
                 HStack(spacing: 3) {
-                    Image(systemName: "view.3d")
+                    Image(systemName: iap.hasUnlockedVIP ? "view.3d" : "lock.fill")
                     Text(lang.t("vr_survey_title"))
+                    if !iap.hasUnlockedVIP {
+                        Text(lang.t("vip_badge_title"))
+                            .font(.adaptive(size: 8, weight: .bold))
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(Color.orange.opacity(0.3))
+                            .foregroundColor(.white)
+                            .cornerRadius(3)
+                    }
                 }
                 .font(.adaptive(size: 11, weight: .bold))
                 .padding(.horizontal, 7)

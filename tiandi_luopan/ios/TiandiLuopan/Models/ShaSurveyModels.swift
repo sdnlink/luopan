@@ -176,3 +176,40 @@ public struct PanoramaFengShuiArchive: Identifiable, Codable {
     /// 形煞总条数（室内条目 + 外部标注）
     public var totalShaCount: Int { interiorShaCount + exteriorShaCount }
 }
+
+// MARK: - 全景形煞档案共享存储 (室内体检与外部标注的单一消费入口)
+// ARVisionView（外部标注）与 ARSpatialSurveyView / ARRoomPlanCaptureView
+// （室内体检）分别写入，报告页统一读取，打通"室内外两张皮"。
+
+public final class ShaSurveyStore: ObservableObject {
+    public static let shared = ShaSurveyStore()
+
+    /// 外部形煞标注（按采集顺序）
+    @Published public private(set) var records: [ExteriorShaRecord] = []
+    /// 最近一次室内体检（RoomPlan/LiDAR/户型图路径）
+    @Published public private(set) var latestInterior: HouseSpatialSurvey?
+
+    private init() {}
+
+    public func addRecord(_ record: ExteriorShaRecord) {
+        records.append(record)
+    }
+
+    public func updateInterior(_ survey: HouseSpatialSurvey?) {
+        latestInterior = survey
+    }
+
+    public func clearRecords() {
+        records.removeAll()
+    }
+
+    /// 室内外统一档案（任一侧有数据即非空）
+    public var archive: PanoramaFengShuiArchive? {
+        guard !records.isEmpty || latestInterior != nil else { return nil }
+        return PanoramaFengShuiArchive(
+            compassHeading: CompassMotionManager.shared.headingState.facingAngle,
+            interior: latestInterior,
+            exterior: records
+        )
+    }
+}

@@ -642,27 +642,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         if minZ >= maxZ { minZ = -3.0; maxZ = 3.0 }
 
         let heading = CompassMotionManager.shared.headingState.facingAngle
-        let entrancePos = SIMD3<Float>((minX + maxX) * 0.5, 1.0, minZ)
-        let entranceNorm = SIMD3<Float>(0, 0, 1)
-        openings3D.append(SpatialOpening3D(
-            type: .entranceDoor,
-            position: entrancePos,
-            normal: entranceNorm,
-            width: 0.95,
-            height: 2.1
-        ))
 
-        if maxZ - minZ > 2.5 {
-            let winPos = SIMD3<Float>((minX + maxX) * 0.5, 1.3, maxZ)
-            openings3D.append(SpatialOpening3D(
-                type: .window,
-                position: winPos,
-                normal: SIMD3<Float>(0, 0, -1),
-                width: 1.8,
-                height: 1.5
-            ))
-        }
-
+        // 不再硬编码门/窗占位：AR 平面测绘不提供真实门扇与窗洞，虚构会
+        // 误导鲁班门光/开门见灶/玄空旺星等下游检测。门/窗数据由
+        // RoomPlan 测绘或户型图识别路径提供，AR 平面路径如实降级。
         let roomH = estimatedRoomHeightMeters ?? 2.8
         if hasLowBeamWarning {
             beams3D.append(SpatialBeam3D(
@@ -679,15 +662,33 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let cx = (minX + maxX) * 0.5
         let cz = (minZ + maxZ) * 0.5
 
-        rooms3D.append(SpatialRoom3D(
-            name: FloorplanRoomType.livingRoom.localizedName,
-            type: .livingRoom,
-            center: SIMD3<Float>(cx, roomH * 0.5, cz),
-            size: SIMD3<Float>(spanX, roomH, spanZ)
-        ))
+        // 房间按水平平面（地板）推导：每个水平面 → 一个房间，类型按面积
+        // 顺序规则分配（与 syncPlanesToFloorplan 降级口径一致）。
+        let horizontalPlanes = planes
+            .filter { $0.alignment == .horizontal }
+            .sorted { ($0.extent.x * $0.extent.z) > ($1.extent.x * $1.extent.z) }
+        for (idx, plane) in horizontalPlanes.prefix(8).enumerated() {
+            let center = plane.transform * SIMD4<Float>(plane.center.x, plane.center.y, plane.center.z, 1.0)
+            let roomType: FloorplanRoomType = (idx == 0) ? .livingRoom : ((idx == 1) ? .masterBedroom : .study)
+            rooms3D.append(SpatialRoom3D(
+                name: roomType.localizedName,
+                type: roomType,
+                center: SIMD3<Float>(center.x, roomH * 0.5, center.z),
+                size: SIMD3<Float>(max(Float(1.5), plane.extent.x), roomH, max(Float(1.5), plane.extent.z))
+            ))
+        }
+        // 无水平平面（未扫描地板）时退化为单一客厅，并如实标注无房间分割
+        if rooms3D.isEmpty {
+            rooms3D.append(SpatialRoom3D(
+                name: FloorplanRoomType.livingRoom.localizedName,
+                type: .livingRoom,
+                center: SIMD3<Float>(cx, roomH * 0.5, cz),
+                size: SIMD3<Float>(spanX, roomH, spanZ)
+            ))
+        }
 
-        return HouseSpatialSurveyEngine.analyzeSpatialHouse(
-            scanMethod: "AR 空间点云与平面测绘",
+        let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: "AR 平面测绘（基础）",
             walls: walls3D,
             openings: openings3D,
             beams: beams3D,
@@ -695,6 +696,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             objects: objects3D,
             compassHeading: heading
         )
+        // 汇入全景形煞档案（与外部标注同源消费）
+        ShaSurveyStore.shared.updateInterior(survey)
+        return survey
     }
 
     public func syncPlanesToFloorplan() -> Bool {
@@ -2293,7 +2297,18 @@ public struct ARSpatialSurveyView: View {
         }
         .sheet(isPresented: $show3DSpaceViewer) {
             if let survey = currentSurveyReport {
-                House3DSpaceViewer(survey: survey)
+                VStack(spacing: 0) {
+                    if survey.scanMethod.contains("基础") {
+                        Text(lang.t("ar_spatial_basic_notice"))
+                            .font(.adaptive(size: 10, weight: .semibold))
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.orange.opacity(0.1))
+                    }
+                    House3DSpaceViewer(survey: survey)
+                }
             }
         }
     }

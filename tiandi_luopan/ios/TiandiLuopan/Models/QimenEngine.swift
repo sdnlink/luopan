@@ -285,9 +285,11 @@ public class QimenEngine {
     
     private init() {}
     
-    // 洛书飞布顺序（阳遁顺、阴遁逆）。包含中宫(5)用于九星，跳过中宫用于八门/八神。
-    private let luoOrderFull = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    private let luoOrderSkip = [1, 2, 3, 4, 6, 7, 8, 9]
+    // 洛书飞布顺序（阳遁顺、阴遁逆）。洛书外围九宫的环行路径为
+    // 1→8→3→4→9→2→7→6；九星/三奇六仪另将中宫 5 作为第九个位置，
+    // 八门/八神则跳过中宫。此前按数字升序飞布会把整盘落错宫位。
+    private let luoOrderFull = [1, 8, 3, 4, 9, 2, 7, 6, 5]
+    private let luoOrderSkip = [1, 8, 3, 4, 9, 2, 7, 6]
 
     private func stepFull(_ p: Int, forward: Bool) -> Int {
         guard let i = luoOrderFull.firstIndex(of: p) else { return p }
@@ -295,7 +297,11 @@ public class QimenEngine {
         return luoOrderFull[(i + (forward ? 1 : -1) + n) % n]
     }
     private func stepSkip(_ p: Int, forward: Bool) -> Int {
-        guard let i = luoOrderSkip.firstIndex(of: p) else { return p }
+        // 八门/八神不入中宫。若旬首或值符落在中宫，先从环行路径
+        // 的起点继续飞布，避免 5 不在 skip 序列时原地重复八次。
+        guard let i = luoOrderSkip.firstIndex(of: p) else {
+            return forward ? luoOrderSkip[0] : luoOrderSkip[luoOrderSkip.count - 1]
+        }
         let n = luoOrderSkip.count
         return luoOrderSkip[(i + (forward ? 1 : -1) + n) % n]
     }
@@ -306,7 +312,9 @@ public class QimenEngine {
         return cur
     }
     private func flySkip(start: Int, steps: Int, forward: Bool) -> Int {
-        var cur = start
+        var cur = luoOrderSkip.contains(start)
+            ? start
+            : (forward ? luoOrderSkip[0] : luoOrderSkip[luoOrderSkip.count - 1])
         let s = ((steps % 8) + 8) % 8
         for _ in 0..<s { cur = stepSkip(cur, forward: forward) }
         return cur
@@ -317,7 +325,9 @@ public class QimenEngine {
         return seq
     }
     private func flightSkip(from start: Int, forward: Bool) -> [Int] {
-        var seq = [Int](); var cur = start
+        var seq = [Int](); var cur = luoOrderSkip.contains(start)
+            ? start
+            : (forward ? luoOrderSkip[0] : luoOrderSkip[luoOrderSkip.count - 1])
         for _ in 0..<8 { seq.append(cur); cur = stepSkip(cur, forward: forward) }
         return seq
     }
@@ -425,7 +435,9 @@ public class QimenEngine {
         let stemToPalace = Dictionary(uniqueKeysWithValues: diPanStem.map { ($1, $0) })
         let xunToSixYi = ["戊", "己", "庚", "辛", "壬", "癸"]
         let xunHeadSixYi = xunToSixYi[xun]
-        let zhiFuPalace = stemToPalace[xunHeadSixYi]! // 值符/值使本宫（旬首六仪所在）
+        // 值符/值使本宫（旬首六仪所在）。正常盘面一定能找到旬首，
+        // 但保留安全回退，避免规则表扩展或异常输入导致整个分析页崩溃。
+        let zhiFuPalace = stemToPalace[xunHeadSixYi] ?? diPlacement.first ?? 1
         // 八门本宫：休坎、死坤、伤震、杜巽、景离、生艮、惊兑、开乾（中宫无门）。
         let doorPalaceToName: [Int: String] = [1: "休门", 2: "死门", 3: "伤门", 4: "杜门", 9: "景门", 8: "生门", 7: "惊门", 6: "开门"]
         let doorInfo: [String: (luck: String, ausp: Bool)] = Dictionary(

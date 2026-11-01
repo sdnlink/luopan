@@ -498,6 +498,7 @@ public struct FloorplanView: View {
         )
         auditedRooms = result.auditedRooms
         auditReport = result.report
+        FloorplanAuditStore.shared.update(result.report)
         lastAuditedHeading = effectiveHeading
         lastAuditedCentroid = centroid
         if let selectedID = selectedRoom?.id {
@@ -1854,8 +1855,45 @@ public struct FloorplanView: View {
         let bgImage = userFloorplanImage
 
         DispatchQueue.global(qos: .userInitiated).async { [self] in
-            let canvasSize = CGSize(width: 1080, height: 1920)
-            let renderer = UIGraphicsImageRenderer(size: canvasSize)
+            // The audit can contain more than six rooms/sector findings. Size
+            // the export from the complete report so no diagnosis or remedy is
+            // silently dropped when the image is generated.
+            let listTop: CGFloat = 1000
+            let bottomPadding: CGFloat = 48
+            let titleFont = UIFont.boldSystemFont(ofSize: 22)
+            let bodyFont = UIFont.systemFont(ofSize: 17)
+            let solutionFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
+            let bodyWidth: CGFloat = 920
+            func measuredRowHeight(_ item: FloorplanAuditItem) -> CGFloat {
+                let titleHeight = (item.title as NSString).boundingRect(
+                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: [.font: titleFont],
+                    context: nil
+                ).height
+                let loreHeight = (item.lore as NSString).boundingRect(
+                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: [.font: bodyFont],
+                    context: nil
+                ).height
+                let solution = "\(lang.t("floorplan_solution_prefix")) \(item.solution)"
+                let solutionHeight = (solution as NSString).boundingRect(
+                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: [.font: solutionFont],
+                    context: nil
+                ).height
+                // Keep the compact card for short Chinese strings, while
+                // allowing localized or user-authored remedies to wrap fully.
+                return max(138, ceil(16 + titleHeight + 8 + loreHeight + 8 + solutionHeight + 16))
+            }
+            let rowHeights = report.map(measuredRowHeight)
+            let canvasHeight = max(1920, listTop + rowHeights.reduce(0, +) + bottomPadding)
+            let canvasSize = CGSize(width: 1080, height: canvasHeight)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
 
         let image = renderer.image { ctx in
             let cg = ctx.cgContext
@@ -1944,10 +1982,9 @@ public struct FloorplanView: View {
             cg.fillEllipse(in: CGRect(x: cx - 14, y: cy - 14, width: 28, height: 28))
 
             // 3. 底部全屋体检清单
-            var cursorY: CGFloat = 1000
-            for item in report.prefix(6) {
-                guard cursorY + 138 <= 1880 else { break }
-                let rowRect = CGRect(x: 40, y: cursorY, width: 1000, height: 126)
+            var cursorY: CGFloat = listTop
+            for (item, rowHeight) in zip(report, rowHeights) {
+                let rowRect = CGRect(x: 40, y: cursorY, width: 1000, height: rowHeight - 12)
                 UIColor(red: 0.12, green: 0.12, blue: 0.16, alpha: 1.0).setFill()
                 UIBezierPath(roundedRect: rowRect, cornerRadius: 14).fill()
 
@@ -1955,22 +1992,23 @@ public struct FloorplanView: View {
                 tagColor.setFill()
                 cg.fillEllipse(in: CGRect(x: 64, y: cursorY + 24, width: 14, height: 14))
 
-                item.title.draw(at: CGPoint(x: 90, y: cursorY + 16), withAttributes: [
-                    .font: UIFont.boldSystemFont(ofSize: 22),
+                item.title.draw(in: CGRect(x: 90, y: cursorY + 16, width: 920, height: rowHeight - 16), withAttributes: [
+                    .font: titleFont,
                     .foregroundColor: UIColor.white
                 ])
-                item.lore.draw(in: CGRect(x: 90, y: cursorY + 48, width: 920, height: 34), withAttributes: [
-                    .font: UIFont.systemFont(ofSize: 17),
+                item.lore.draw(in: CGRect(x: 90, y: cursorY + 48, width: 920, height: rowHeight - 48), withAttributes: [
+                    .font: bodyFont,
                     .foregroundColor: UIColor.white.withAlphaComponent(0.78)
                 ])
-                "\(lang.t("floorplan_solution_prefix")) \(item.solution)".draw(
-                    in: CGRect(x: 90, y: cursorY + 84, width: 920, height: 34),
+                let solution = "\(lang.t("floorplan_solution_prefix")) \(item.solution)"
+                solution.draw(
+                    in: CGRect(x: 90, y: cursorY + 84, width: 920, height: rowHeight - 84),
                     withAttributes: [
-                        .font: UIFont.systemFont(ofSize: 17, weight: .semibold),
+                        .font: solutionFont,
                         .foregroundColor: UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 1.0)
                     ]
                 )
-                cursorY += 138
+                cursorY += rowHeight
             }
         }
 

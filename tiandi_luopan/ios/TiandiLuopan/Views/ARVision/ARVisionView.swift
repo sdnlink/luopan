@@ -685,7 +685,7 @@ public struct ARVisionView: View {
         .sheet(isPresented: $showPanoramaReport) {
             ShaPanoramaReportSheet(
                 records: shaStore.records,
-                heading: motion.headingState.facingAngle,
+                heading: shaStore.archive?.compassHeading ?? motion.headingState.facingAngle,
                 shaList: shaList
             )
         }
@@ -1519,6 +1519,7 @@ public struct ARVisionView: View {
             shaStore.addRecord(ExteriorShaRecord(
                 shaID: analysis.shaID,
                 bearingDegrees: targetCalculatedHeading,
+                capturedHeadingDegrees: motion.headingState.facingAngle,
                 elevationDegrees: targetElevationDegrees,
                 distanceMeters: dist,
                 confidence: analysis.confidence,
@@ -1545,6 +1546,7 @@ public struct ARVisionView: View {
         let record = ExteriorShaRecord(
             shaID: sha.id,
             bearingDegrees: targetCalculatedHeading,
+            capturedHeadingDegrees: motion.headingState.facingAngle,
             elevationDegrees: targetElevationDegrees,
             distanceMeters: dist,
             confidence: aiResult?.confidence,

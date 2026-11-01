@@ -8,20 +8,33 @@ public class TianJiShuEngine {
     
     private init() {}
     
-    // 生成高清古典宣纸长卷勘测报告图 (1080 x 6000)
+    // 生成高清古典宣纸长卷勘测报告图
     public func generateScrollImage(
         heading: Double,
         coordsDesc: String,
         solarTimeDesc: String,
         language: AppLanguage? = nil,
         isPro: Bool = true,
+        floorplanReport: [FloorplanAuditItem] = [],
+        panoramaArchive: PanoramaFengShuiArchive? = nil,
         reportDate: Date = Date()
     ) -> UIImage {
         // The canvas is extra tall because the scroll renders the full
         // harmonization suite: orientation, flying stars, water method,
         // qimen & eight mansions, purple-white guest stars, injurious
         // directions, exterior sha self-check, and the compliance notice.
-        let size = CGSize(width: 1080, height: 6000)
+        // A full survey can contain 24 water-method entries, all eight
+        // mansions and current AR/interior findings.  The former 6000 px
+        // canvas clipped those sections, so keep a larger upper bound and
+        // measure variable text blocks before advancing the cursor.
+        let archiveItemCount = (panoramaArchive?.exterior.count ?? 0)
+            + (panoramaArchive?.interior?.shaItems.count ?? 0)
+        let extraArchiveHeight = CGFloat(max(0, archiveItemCount - 12)) * 150.0
+        let extraFloorplanHeight = CGFloat(max(0, floorplanReport.count - 12)) * 180.0
+        // Reserve room for the complete nine-palace sections and date-selection
+        // details below. The per-record additions cover unusually large
+        // floorplan/AR archives without silently drawing past the bitmap.
+        let size = CGSize(width: 1080, height: 15000 + extraArchiveHeight + extraFloorplanHeight)
         // These dimensions describe the exported pixel size. The default
         // renderer scale follows the device's Retina factor and could turn
         // this into a 3240x18000 image, multiplying memory and render time.
@@ -56,6 +69,30 @@ public class TianJiShuEngine {
                 case .auto, .zhHans: return hans
                 }
             }
+
+            func drawMeasuredText(
+                _ text: String,
+                atY: CGFloat,
+                font: UIFont,
+                color: UIColor,
+                x: CGFloat = 100,
+                width: CGFloat = 880,
+                minimumHeight: CGFloat = 0
+            ) -> CGFloat {
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: font,
+                    .foregroundColor: color
+                ]
+                let measured = (text as NSString).boundingRect(
+                    with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                    options: [.usesLineFragmentOrigin, .usesFontLeading],
+                    attributes: attributes,
+                    context: nil
+                )
+                let height = max(minimumHeight, ceil(measured.height) + 10)
+                text.draw(in: CGRect(x: x, y: atY, width: width, height: height), withAttributes: attributes)
+                return height
+            }
             
             // 1. 宣纸底色 (温润米黄熟宣)
             let paperColor = UIColor(red: 247/255.0, green: 243/255.0, blue: 232/255.0, alpha: 1.0)
@@ -65,7 +102,7 @@ public class TianJiShuEngine {
             // 宣纸暗纹网格
             cg.setStrokeColor(UIColor(red: 235/255.0, green: 228/255.0, blue: 212/255.0, alpha: 0.6).cgColor)
             cg.setLineWidth(1)
-            for y in stride(from: 40, to: 5960, by: 40) {
+            for y in stride(from: 40, to: Int(size.height) - 40, by: 40) {
                 cg.move(to: CGPoint(x: 40, y: CGFloat(y)))
                 cg.addLine(to: CGPoint(x: 1040, y: CGFloat(y)))
             }
@@ -75,9 +112,9 @@ public class TianJiShuEngine {
             let vermilion = UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0) // 朱砂红
             cg.setStrokeColor(vermilion.cgColor)
             cg.setLineWidth(6)
-            cg.stroke(CGRect(x: 45, y: 45, width: 990, height: 5910))
+            cg.stroke(CGRect(x: 45, y: 45, width: 990, height: size.height - 90))
             cg.setLineWidth(2)
-            cg.stroke(CGRect(x: 55, y: 55, width: 970, height: 5890))
+            cg.stroke(CGRect(x: 55, y: 55, width: 970, height: size.height - 110))
             
             // 3. 卷首长卷标题
             let titleFont = UIFont.boldSystemFont(ofSize: 52)
@@ -230,11 +267,13 @@ public class TianJiShuEngine {
                 • 节气真太阳时：\(solarTimeDesc)
                 """
             }
-            p1Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 260), withAttributes: [
-                .font: bodyFont,
-                .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-            ])
-            curY += 250
+            curY += drawMeasuredText(
+                p1Text,
+                atY: curY,
+                font: bodyFont,
+                color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
+                minimumHeight: 80
+            ) + 20
             
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
             let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, useTiGua: useTiGua, date: reportDate)
@@ -312,11 +351,13 @@ public class TianJiShuEngine {
                 • 综合理气研判：\(xkChart.summaryAnalysis)
                 """
             }
-            p2Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 240), withAttributes: [
-                .font: bodyFont,
-                .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-            ])
-            curY += 230
+            curY += drawMeasuredText(
+                p2Text,
+                atY: curY,
+                font: bodyFont,
+                color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
+                minimumHeight: 80
+            ) + 20
             
             // 6. 第三部：杨公八路黄泉与消砂纳水
             let sec3Title = tr8(
@@ -343,17 +384,19 @@ public class TianJiShuEngine {
             var p3Text = "• \(hqLabel): \(hq.badgeText) · \(hq.waterDesc)\n"
             p3Text += "• \(bashaLabel): 【\(basha.localizedShaDir)】 · \(basha.remedy)\n"
             p3Text += "• \(waterLabel):\n"
-            for item in sanHeItems.prefix(3) {
+            for item in sanHeItems {
                 let verdict = item.isAuspicious
                     ? tr8("吉 · 宜来水纳气", "吉 · 宜來水納氣", "Auspicious · favorable inflow", "吉・来水歓迎", "길 · 내수 유입 권장", "Cát · nên đón nước vào tụ khí", "มงคล · ควรรับน้ำไหลเข้า", "Berkah · aliran masuk yang baik")
                     : tr8("忌 · 防破局流破", "忌 · 防破局流破", "Avoid · prevent draining the pattern", "忌・破局流出注意", "기 · 파국 유출 방지", "Kỵ · đề phòng nước chảy thoát phá cục", "อัปมงคล · ป้องกันน้ำไหลรั่วทำลายผัง", "Hindari · cegah aliran menguras energi")
                 p3Text += "  - \(item.localizedMountainName)\(lang.t("mountain_suffix"))【\(item.stage)】: \(verdict), \(item.lore)\n"
             }
-            p3Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 230), withAttributes: [
-                .font: bodyFont,
-                .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-            ])
-            curY += 220
+            curY += drawMeasuredText(
+                p3Text,
+                atY: curY,
+                font: bodyFont,
+                color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
+                minimumHeight: 80
+            ) + 20
             
             // 7. 第四部：时家奇门与八宅命卦
             let sec4Title = tr8(
@@ -431,11 +474,13 @@ public class TianJiShuEngine {
                 • 生气大吉尊方：\(bz.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "生气")方，宜作主卧或安奉神位。
                 """
             }
-            p4Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
-                .font: bodyFont,
-                .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-            ])
-            curY += 200
+            curY += drawMeasuredText(
+                p4Text,
+                atY: curY,
+                font: bodyFont,
+                color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
+                minimumHeight: 80
+            ) + 20
             
             // 8. 第五部：全屋空间调理与开光化煞清单
             let sec5Title = tr8(
@@ -469,11 +514,49 @@ public class TianJiShuEngine {
             \(xkChart.remedyAdvice)
             \(annualNote)
             """
-            p5Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 180), withAttributes: [
-                .font: bodyFont,
-                .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-            ])
-            curY += 170
+            curY += drawMeasuredText(
+                p5Text,
+                atY: curY,
+                font: bodyFont,
+                color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
+                minimumHeight: 80
+            ) + 20
+
+            // The summary above is intentionally short for the opening pages;
+            // these sections carry every palace cell so the exported scroll is
+            // a complete snapshot of the current engines rather than a list of
+            // only the most notable directions.
+            curY = drawFlyingStarsDetails(
+                ctx: cg,
+                curY: curY,
+                vermilion: vermilion,
+                renderLanguage: renderLanguage,
+                chart: xkChart
+            )
+            curY = drawQimenDetails(
+                ctx: cg,
+                curY: curY,
+                vermilion: vermilion,
+                renderLanguage: renderLanguage,
+                chart: qm
+            )
+            curY = drawZeRiDetails(
+                ctx: cg,
+                curY: curY,
+                vermilion: vermilion,
+                renderLanguage: renderLanguage,
+                analysis: zeri
+            )
+
+            if !floorplanReport.isEmpty {
+                curY = drawFloorplanAudit(
+                    ctx: cg,
+                    curY: curY,
+                    vermilion: vermilion,
+                    renderLanguage: renderLanguage,
+                    report: floorplanReport
+                )
+            }
             
             // 8.2 流年紫白客星调理与催旺（含家人影响维度）
             curY = drawPurpleWhiteRemedies(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage, pwChart: pwChart)
@@ -482,7 +565,13 @@ public class TianJiShuEngine {
             curY = drawBazhaiInjurious(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage, bz: bz)
             
             // 10. 形煞自查与化煞安宅（外部形煞通用化解清单）
-            curY = drawShaSelfCheck(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage)
+            curY = drawShaSelfCheck(
+                ctx: cg,
+                curY: curY,
+                vermilion: vermilion,
+                renderLanguage: renderLanguage,
+                archive: panoramaArchive
+            )
             
             // 9. 卷尾朱砂印鉴与落款
             let sealRect = CGRect(x: 780, y: curY + 20, width: 180, height: 180)
@@ -575,6 +664,199 @@ public class TianJiShuEngine {
         case .auto, .zhHans: return hans
         }
     }
+
+    // Current in-session floorplan findings.  The store is populated by the
+    // floorplan page after each audit; an empty report means no floorplan was
+    // provided and is intentionally omitted rather than replaced by a sample
+    // layout.
+    private func drawFloorplanAudit(
+        ctx: CGContext,
+        curY: CGFloat,
+        vermilion: UIColor,
+        renderLanguage: AppLanguage,
+        report: [FloorplanAuditItem]
+    ) -> CGFloat {
+        let title = tr8(
+            "户型现场审计 · 房间与缺角锦囊",
+            "戶型現場審計 · 房間與缺角錦囊",
+            "FLOORPLAN SURVEY · ROOM & CORNER REMEDIES",
+            "間取り現場監査・部屋と欠角の化解",
+            "평면 현장 감사 · 방과 결각 해법",
+            "KIỂM TRA MẶT BẰNG · PHÒNG VÀ GÓC KHUYẾT",
+            "ตรวจผังบ้าน · วิธีแก้ห้องและมุมเว้า",
+            "AUDIT DENAH · SOLUSI RUANG & SUDUT HILANG",
+            renderLanguage: renderLanguage
+        )
+        drawSectionHeader(ctx: ctx, title: title, atY: curY, vermilion: vermilion)
+        var y = curY + 62
+        let font = UIFont.systemFont(ofSize: 22)
+        let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        for item in report {
+            let line = "【\(item.severity)】\(item.title) · \(item.palace)\n\(item.lore)\n→ \(item.solution)"
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 14
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
+        }
+        return y
+    }
+
+    private func drawFlyingStarsDetails(
+        ctx: CGContext,
+        curY: CGFloat,
+        vermilion: UIColor,
+        renderLanguage: AppLanguage,
+        chart: XuanKongChart
+    ) -> CGFloat {
+        let title = tr8(
+            "玄空九宫全盘 · 山向星与逐宫锦囊",
+            "玄空九宮全盤 · 山向星與逐宮錦囊",
+            "XUAN KONG NINE PALACES · FULL STAR REMEDIES",
+            "玄空九宮全盤・山向星と各宮の化解",
+            "현공 구궁 전체 · 산향성 및 궁별 해법",
+            "CỬU CUNG HUYỀN KHÔNG · SAO VÀ CẨM NANG TỪNG CUNG",
+            "เก้าวังเสวียนคง · ดาวและเคล็ดลับทุกวัง",
+            "SEMBILAN ISTANA XUAN KONG · BINTANG & SOLUSI TIAP ISTANA",
+            renderLanguage: renderLanguage
+        )
+        drawSectionHeader(ctx: ctx, title: title, atY: curY, vermilion: vermilion)
+        var y = curY + 62
+        let font = UIFont.systemFont(ofSize: 22)
+        let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        for cell in chart.palaces {
+            let line = "【\(cell.localizedPalaceName)】 · 山星 \(cell.mountainStar) · 向星 \(cell.facingStar) · \(cell.localizedEvaluation)"
+            var displayLine = line
+            if cell.isShaWuHuang || cell.isShaErHei {
+                displayLine += " · \(cell.isShaWuHuang ? "五黄" : "二黑")"
+            }
+            let measured = (displayLine as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 12
+            displayLine.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
+        }
+        return y + 18
+    }
+
+    private func drawQimenDetails(
+        ctx: CGContext,
+        curY: CGFloat,
+        vermilion: UIColor,
+        renderLanguage: AppLanguage,
+        chart: QimenChart
+    ) -> CGFloat {
+        let title = tr8(
+            "奇门九宫全盘 · 门星神干与趋避锦囊",
+            "奇門九宮全盤 · 門星神干與趨避錦囊",
+            "QIMEN NINE PALACES · DOOR, STAR, DEITY & GUIDANCE",
+            "奇門九宮全盤・門星神干と吉凶",
+            "기문 구궁 전체 · 문성신간 및 길흉",
+            "CỬU CUNG KỲ MÔN · MÔN, TINH, THẦN, CAN VÀ CẨM NANG",
+            "เก้าวังขี่เหมิน · ประตู ดาว เทพ ก้านฟ้า และคำแนะนำ",
+            "SEMBILAN ISTANA QIMEN · GERBANG, BINTANG, DEWA & PETUNJUK",
+            renderLanguage: renderLanguage
+        )
+        drawSectionHeader(ctx: ctx, title: title, atY: curY, vermilion: vermilion)
+        var y = curY + 62
+        let font = UIFont.systemFont(ofSize: 22)
+        let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        for cell in chart.cells {
+            let line = "【\(cell.localizedPalaceName)】\(cell.localizedDoorName) · \(cell.localizedStarName) · \(cell.localizedGodName) · 天\(cell.tianStem)/地\(cell.diStem) · \(cell.doorLuck)"
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 12
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
+        }
+        let guidance = tr8(
+            "趋吉：\(chart.bestNavDirection)；避忌：\(chart.tabooDirections)；\(chart.bestNavReason)",
+            "趨吉：\(chart.bestNavDirection)；避忌：\(chart.tabooDirections)；\(chart.bestNavReason)",
+            "Favorable: \(chart.bestNavDirection); avoid: \(chart.tabooDirections); \(chart.bestNavReason)",
+            "吉方：\(chart.bestNavDirection)；忌方：\(chart.tabooDirections)；\(chart.bestNavReason)",
+            "길방: \(chart.bestNavDirection); 금기: \(chart.tabooDirections); \(chart.bestNavReason)",
+            "Cát: \(chart.bestNavDirection); tránh: \(chart.tabooDirections); \(chart.bestNavReason)",
+            "มงคล: \(chart.bestNavDirection); หลีกเลี่ยง: \(chart.tabooDirections); \(chart.bestNavReason)",
+            "Baik: \(chart.bestNavDirection); hindari: \(chart.tabooDirections); \(chart.bestNavReason)",
+            renderLanguage: renderLanguage
+        )
+        let measured = (guidance as NSString).boundingRect(
+            with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        )
+        let height = ceil(measured.height) + 12
+        guidance.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+        return y + height + 18
+    }
+
+    private func drawZeRiDetails(
+        ctx: CGContext,
+        curY: CGFloat,
+        vermilion: UIColor,
+        renderLanguage: AppLanguage,
+        analysis: ZeRiAnalysis
+    ) -> CGFloat {
+        let title = tr8(
+            "择日全案 · 神煞警告与宜忌锦囊",
+            "擇日全案 · 神煞警告與宜忌錦囊",
+            "DATE SELECTION · WARNINGS, DO & AVOID",
+            "擇日全案・神煞警告と宜忌",
+            "택일 전체 · 신살 경고 및 의기",
+            "TRẠCH NHẬT · CẢNH BÁO VÀ VIỆC NÊN/KHÔNG NÊN",
+            "ฤกษ์ยาม · คำเตือนและกิจกรรมควร/ห้าม",
+            "PEMILIHAN HARI · PERINGATAN DAN KEGIATAN",
+            renderLanguage: renderLanguage
+        )
+        drawSectionHeader(ctx: ctx, title: title, atY: curY, vermilion: vermilion)
+        var y = curY + 62
+        let font = UIFont.systemFont(ofSize: 22)
+        let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        var lines: [String] = [analysis.fourPillarsText, analysis.overallStatus]
+        if let warning = analysis.suiPoWarning { lines.append(warning) }
+        if let warning = analysis.yuePoWarning { lines.append(warning) }
+        if let warning = analysis.sittingClashWarning { lines.append(warning) }
+        if let warning = analysis.sanShaWarning { lines.append(warning) }
+        if !analysis.detailsText.isEmpty { lines.append(analysis.detailsText) }
+        let yiLabel = tr8("宜：", "宜：", "Do: ", "宜：", "권장: ", "Nên: ", "ควร: ", "Anjuran: ", renderLanguage: renderLanguage)
+        let jiLabel = tr8("忌：", "忌：", "Avoid: ", "忌：", "금기: ", "Tránh: ", "ห้าม: ", "Hindari: ", renderLanguage: renderLanguage)
+        let activitySeparator: String
+        switch renderLanguage {
+        case .en, .ko, .vi, .th, .id: activitySeparator = ", "
+        case .auto, .zhHans, .zhHant, .ja: activitySeparator = "、"
+        }
+        if !analysis.yiActivities.isEmpty { lines.append(yiLabel + analysis.yiActivities.joined(separator: activitySeparator)) }
+        if !analysis.jiActivities.isEmpty { lines.append(jiLabel + analysis.jiActivities.joined(separator: activitySeparator)) }
+        for line in lines {
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 12
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
+        }
+        return y + 18
+    }
     
     // 8.2 紫白流年客星调理与催旺（含家人影响维度）
     private func drawPurpleWhiteRemedies(ctx: CGContext, curY: CGFloat, vermilion: UIColor, renderLanguage: AppLanguage, pwChart: PurpleWhiteChart) -> CGFloat {
@@ -593,18 +875,21 @@ public class TianJiShuEngine {
         var y = curY + 62
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-        let notable = pwChart.palaceItems.filter { item in
-            item.isDanger25 || item.yearGuestStar == 5 || item.yearGuestStar == 2 ||
-            item.yearGuestStar == 9 || item.yearGuestStar == 8 ||
-            item.yearGuestStar == 4 || item.yearGuestStar == 6
-        }
-        for item in notable {
+        for item in pwChart.palaceItems {
             let line = "「\(item.palaceName)」\(item.advice)"
-            line.draw(in: CGRect(x: 100, y: y, width: 880, height: 100), withAttributes: [
+            let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: ink
-            ])
-            y += 95
+            ]
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 12
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
         }
         return y
     }
@@ -612,56 +897,132 @@ public class TianJiShuEngine {
     // 9. 八宅凶位化解与安镇（含家人影响维度）
     private func drawBazhaiInjurious(ctx: CGContext, curY: CGFloat, vermilion: UIColor, renderLanguage: AppLanguage, bz: BaZhaiAnalysis) -> CGFloat {
         let secTitle = tr8(
-            "八宅凶位 · 化解安镇",
-            "八宅凶位 · 化解安鎮",
-            "EIGHT MANSIONS · INJURIOUS DIRECTIONS",
-            "八宅凶位・化解と安鎮",
-            "팔택 흉위 · 화해와 안진",
-            "BÁT TRẠCH HUNG VỊ · HÓA GIẢI AN TRẤN",
-            "แปดเรือนทิศอัปมงคล · แก้เคล็ด",
-            "POSISI BURUK · PENANGKAL DELAPAN RUMAH",
+            "八宅八宫 · 吉凶化解安镇",
+            "八宅八宮 · 吉凶化解安鎮",
+            "EIGHT MANSIONS · ALL PALACE REMEDIES",
+            "八宅八宮・吉凶の化解と安鎮",
+            "팔택 팔궁 · 길흉 화해와 안진",
+            "BÁT TRẠCH BÁT CUNG · HÓA GIẢI TOÀN BỘ",
+            "แปดเรือนแปดวัง · แก้เคล็ดครบถ้วน",
+            "DELAPAN ISTANA · SEMUA PENANGKAL",
             renderLanguage: renderLanguage
         )
         drawSectionHeader(ctx: ctx, title: secTitle, atY: curY, vermilion: vermilion)
         var y = curY + 62
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-        let stars: [StarLuckType] = [.jueMing, .wuGui, .liuSha, .huoHai]
-        for item in bz.items where stars.contains(item.star) {
+        for item in bz.items {
             let line = "【\(item.star.localizedName) · \(item.localizedDirection)】\(item.star.localizedSuggestion)"
-            line.draw(in: CGRect(x: 100, y: y, width: 880, height: 140), withAttributes: [
+            let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: ink
-            ])
-            y += 132
+            ]
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 12
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
         }
         return y
     }
     
     // 10. 形煞自查与化煞安宅（外部形煞通用化解清单）
-    private func drawShaSelfCheck(ctx: CGContext, curY: CGFloat, vermilion: UIColor, renderLanguage: AppLanguage) -> CGFloat {
+    private func drawShaSelfCheck(
+        ctx: CGContext,
+        curY: CGFloat,
+        vermilion: UIColor,
+        renderLanguage: AppLanguage,
+        archive: PanoramaFengShuiArchive?
+    ) -> CGFloat {
         let secTitle = tr8(
-            "形煞自查 · 化煞安宅",
-            "形煞自查 · 化煞安宅",
-            "EXTERNAL SHA SELF-CHECK",
-            "形煞セルフチェック・化解と安宅",
-            "형살 자점 · 화살 안택",
-            "TỰ TRA HÌNH SÁT · HÓA SÁT",
-            "ตรวจสอบเครื่องหมายพิฆาต · แก้เคล็ด",
-            "PEMERIKSAAN SHA EKSTERNAL",
+            archive == nil ? "形煞自查 · 通用锦囊" : "形煞自查 · 当前现场记录",
+            archive == nil ? "形煞自查 · 通用錦囊" : "形煞自查 · 當前現場記錄",
+            archive == nil ? "EXTERNAL SHA · GENERAL REMEDIES" : "EXTERNAL SHA · CURRENT SURVEY",
+            archive == nil ? "形煞セルフチェック・一般的な化解" : "形煞セルフチェック・現場記録",
+            archive == nil ? "형살 자점 · 일반 화해" : "형살 자점 · 현장 기록",
+            archive == nil ? "TỰ TRA HÌNH SÁT · CẨM NANG CHUNG" : "TỰ TRA HÌNH SÁT · GHI NHẬN HIỆN TRƯỜNG",
+            archive == nil ? "ตรวจสอบเครื่องหมายพิฆาต · เคล็ดลับทั่วไป" : "ตรวจสอบเครื่องหมายพิฆาต · บันทึกภาคสนาม",
+            archive == nil ? "PEMERIKSAAN SHA · PENANGKAL UMUM" : "PEMERIKSAAN SHA · SURVEI SAAT INI",
             renderLanguage: renderLanguage
         )
         drawSectionHeader(ctx: ctx, title: secTitle, atY: curY, vermilion: vermilion)
         var y = curY + 62
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
-        for sha in ExteriorShaEngine.shared.database {
-            let line = "【\(sha.localizedName)】\(sha.localizedRemedySolution)"
-            line.draw(in: CGRect(x: 100, y: y, width: 880, height: 250), withAttributes: [
+        func drawLine(_ line: String) {
+            let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: ink
-            ])
-            y += 242
+            ]
+            let measured = (line as NSString).boundingRect(
+                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: attributes,
+                context: nil
+            )
+            let height = ceil(measured.height) + 14
+            line.draw(in: CGRect(x: 100, y: y, width: 880, height: height), withAttributes: attributes)
+            y += height
+        }
+
+        if let archive {
+            for record in archive.exterior {
+                let sha = ExteriorShaEngine.shared.database.first(where: { $0.id == record.shaID })
+                let name = sha?.localizedName ?? record.shaID
+                let remedy = sha?.localizedRemedySolution ?? ""
+                var metadata = String(format: "%.1f°", record.bearingDegrees)
+                metadata += String(format: " · 仰角 %.1f°", record.elevationDegrees)
+                if let distance = record.distanceMeters {
+                    metadata += String(format: " · %.1f m", distance)
+                }
+                if let confidence = record.confidence {
+                    metadata += String(format: " · %.0f%%", confidence * 100)
+                }
+                metadata += record.source == .ai ? " · AI" : " · 手动"
+                if let note = record.note, !note.isEmpty {
+                    metadata += " · " + note
+                }
+                drawLine("【\(name) · \(metadata)】\(remedy)")
+            }
+            if let interior = archive.interior {
+                let interiorSummaryText = tr8(
+                    "室内测绘：\(interior.scanMethod) · 房间 \(interior.rooms.count) · 墙体 \(interior.walls.count) · 门窗 \(interior.openings.count) · 风水评分 \(interior.fengshuiScore)",
+                    "室內測繪：\(interior.scanMethod) · 房間 \(interior.rooms.count) · 牆體 \(interior.walls.count) · 門窗 \(interior.openings.count) · 風水評分 \(interior.fengshuiScore)",
+                    "Interior survey: \(interior.scanMethod) · rooms \(interior.rooms.count) · walls \(interior.walls.count) · openings \(interior.openings.count) · score \(interior.fengshuiScore)",
+                    "室内測量：\(interior.scanMethod)・部屋 \(interior.rooms.count)・壁 \(interior.walls.count)・開口部 \(interior.openings.count)・スコア \(interior.fengshuiScore)",
+                    "실내 측량: \(interior.scanMethod) · 방 \(interior.rooms.count) · 벽 \(interior.walls.count) · 개구부 \(interior.openings.count) · 점수 \(interior.fengshuiScore)",
+                    "Khảo sát nội thất: \(interior.scanMethod) · phòng \(interior.rooms.count) · tường \(interior.walls.count) · cửa mở \(interior.openings.count) · điểm \(interior.fengshuiScore)",
+                    "สำรวจภายใน: \(interior.scanMethod) · ห้อง \(interior.rooms.count) · ผนัง \(interior.walls.count) · ช่องเปิด \(interior.openings.count) · คะแนน \(interior.fengshuiScore)",
+                    "Survei interior: \(interior.scanMethod) · ruang \(interior.rooms.count) · dinding \(interior.walls.count) · bukaan \(interior.openings.count) · skor \(interior.fengshuiScore)",
+                    renderLanguage: renderLanguage
+                )
+                let interiorSummary = interiorSummaryText + String(format: " · %.1f°", archive.compassHeading)
+                drawLine(interiorSummary)
+                for item in interior.shaItems {
+                    drawLine("【\(item.title) · \(item.severity.rawValue)】\(item.solution)")
+                }
+            }
+            if archive.exterior.isEmpty && archive.interior?.shaItems.isEmpty != false {
+                drawLine(tr8(
+                    "已建立现场档案，但当前没有可展示的形煞条目。",
+                    "已建立現場檔案，但目前沒有可展示的形煞條目。",
+                    "A survey archive exists, but it contains no sha findings.",
+                    "現場記録はありますが、形煞の検出項目はありません。",
+                    "현장 기록은 있지만 형살 항목이 없습니다.",
+                    "Đã có hồ sơ khảo sát nhưng chưa có mục hình sát.",
+                    "มีแฟ้มสำรวจแล้ว แต่ยังไม่มีรายการพิฆาต",
+                    "Arsip survei ada, tetapi tidak ada temuan sha.",
+                    renderLanguage: renderLanguage
+                ))
+            }
+        } else {
+            for sha in ExteriorShaEngine.shared.database {
+                drawLine("【\(sha.localizedName)】\(sha.localizedRemedySolution)")
+            }
         }
         return y
     }

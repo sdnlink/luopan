@@ -8,6 +8,15 @@ extension Notification.Name {
     /// import notification: importing a floorplan also restores its room
     /// layout, while editing a VR report must not overwrite that layout.
     public static let didUpdateHouseSpatialSurvey = Notification.Name("com.yanxiang.compass.didUpdateHouseSpatialSurvey")
+    public static let didUpdateMeasuredSpatialSurvey = Notification.Name("com.yanxiang.compass.didUpdateMeasuredSpatialSurvey")
+}
+
+/// Separate persistence slots prevent a hand-authored VR correction from
+/// replacing the latest hardware measurement. The legacy measured key remains
+/// unchanged so existing archives decode without migration.
+public enum SpatialSurveyArchiveKeys {
+    public static let measured = "latest_house_spatial_survey"
+    public static let virtual = "latest_vr_house_spatial_survey"
 }
 
 // MARK: - 3D 全屋测绘空间数据模型与全屋形煞引擎 (PRD 5.3 & 第7章)
@@ -170,6 +179,9 @@ public struct SpatialRoom3D: Identifiable, Codable {
     public let sizeY: Float
     public let sizeZ: Float
     public let areaSqMeters: Float
+    /// Optional yaw of the room's local rectangle. Older archives omit this
+    /// field and decode as zero rotation.
+    public let rotationY: Float?
 
     public var center: SIMD3<Float> { SIMD3<Float>(centerX, centerY, centerZ) }
     public var size: SIMD3<Float> { SIMD3<Float>(sizeX, sizeY, sizeZ) }
@@ -180,7 +192,8 @@ public struct SpatialRoom3D: Identifiable, Codable {
         type: FloorplanRoomType,
         center: SIMD3<Float>,
         size: SIMD3<Float>,
-        areaSqMeters: Float? = nil
+        areaSqMeters: Float? = nil,
+        rotationY: Float? = nil
     ) {
         self.id = id
         self.name = name
@@ -192,6 +205,28 @@ public struct SpatialRoom3D: Identifiable, Codable {
         self.sizeY = size.y
         self.sizeZ = size.z
         self.areaSqMeters = areaSqMeters ?? max(1.0, size.x * size.z)
+        self.rotationY = rotationY
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, type, centerX, centerY, centerZ, sizeX, sizeY, sizeZ,
+             areaSqMeters, rotationY
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.type = try c.decode(FloorplanRoomType.self, forKey: .type)
+        self.centerX = try c.decode(Float.self, forKey: .centerX)
+        self.centerY = try c.decode(Float.self, forKey: .centerY)
+        self.centerZ = try c.decode(Float.self, forKey: .centerZ)
+        self.sizeX = try c.decode(Float.self, forKey: .sizeX)
+        self.sizeY = try c.decode(Float.self, forKey: .sizeY)
+        self.sizeZ = try c.decode(Float.self, forKey: .sizeZ)
+        self.areaSqMeters = try c.decodeIfPresent(Float.self, forKey: .areaSqMeters)
+            ?? max(1.0, sizeX * sizeZ)
+        self.rotationY = try c.decodeIfPresent(Float.self, forKey: .rotationY)
     }
 }
 
@@ -394,6 +429,30 @@ public enum HouseSpatialSurveyEngine {
         var maxZ: Float = -.greatestFiniteMagnitude
         var maxH: Float = 2.8
 
+        func roomCorners(_ r: SpatialRoom3D) -> [SIMD2<Float>] {
+            let hx = r.sizeX * 0.5
+            let hz = r.sizeZ * 0.5
+            let localCorners = [
+                SIMD2<Float>(r.centerX - hx, r.centerZ - hz),
+                SIMD2<Float>(r.centerX + hx, r.centerZ - hz),
+                SIMD2<Float>(r.centerX + hx, r.centerZ + hz),
+                SIMD2<Float>(r.centerX - hx, r.centerZ + hz)
+            ]
+            guard let yaw = r.rotationY, yaw.isFinite, abs(yaw) > 1e-5 else {
+                return localCorners
+            }
+            let cosY = cos(yaw)
+            let sinY = sin(yaw)
+            return localCorners.map { p in
+                let dx = p.x - r.centerX
+                let dz = p.y - r.centerZ
+                return SIMD2<Float>(
+                    r.centerX + dx * cosY - dz * sinY,
+                    r.centerZ + dx * sinY + dz * cosY
+                )
+            }
+        }
+
         for w in walls {
             minX = min(minX, min(w.startX, w.endX))
             maxX = max(maxX, max(w.startX, w.endX))
@@ -420,10 +479,12 @@ public enum HouseSpatialSurveyEngine {
             maxH = max(maxH, o.posY + o.height * 0.5)
         }
         for r in rooms {
-            minX = min(minX, r.centerX - r.sizeX * 0.5)
-            maxX = max(maxX, r.centerX + r.sizeX * 0.5)
-            minZ = min(minZ, r.centerZ - r.sizeZ * 0.5)
-            maxZ = max(maxZ, r.centerZ + r.sizeZ * 0.5)
+            for corner in roomCorners(r) {
+                minX = min(minX, corner.x)
+                maxX = max(maxX, corner.x)
+                minZ = min(minZ, corner.y)
+                maxZ = max(maxZ, corner.y)
+            }
             maxH = max(maxH, r.sizeY)
         }
 
@@ -432,7 +493,15 @@ public enum HouseSpatialSurveyEngine {
 
         let spanX = max(1.5, maxX - minX)
         let spanZ = max(1.5, maxZ - minZ)
-        let usableArea = rooms.reduce(Float(0)) { $0 + $1.areaSqMeters }
+        let rawRoomArea = rooms.reduce(Float(0)) { total, room in
+            guard room.areaSqMeters.isFinite, room.areaSqMeters > 0 else { return total }
+            return total + room.areaSqMeters
+        }
+        // RoomPlan/VR room rectangles can overlap. Cap the summed area by the
+        // measured footprint so duplicate shared rooms cannot inflate the
+        // report's usable area, aspect ratio and score.
+        let footprintArea = max(1.0, spanX * spanZ)
+        let usableArea = min(rawRoomArea, footprintArea)
 
         // 2. 房屋主轴定向包围盒 (OBB)：以最长墙走向为基准建立房屋局部坐标系。
         //    斜向房屋（非正南正北）若用世界坐标 AABB 取中宫，九宫会切成斜切片，
@@ -447,17 +516,6 @@ public enum HouseSpatialSurveyEngine {
         func toWorld(_ p: SIMD2<Float>) -> SIMD2<Float> {
             SIMD2<Float>(p.x * cosA - p.y * sinA, p.x * sinA + p.y * cosA)
         }
-        func roomCorners(_ r: SpatialRoom3D) -> [SIMD2<Float>] {
-            let hx = r.sizeX * 0.5
-            let hz = r.sizeZ * 0.5
-            return [
-                SIMD2<Float>(r.centerX - hx, r.centerZ - hz),
-                SIMD2<Float>(r.centerX + hx, r.centerZ - hz),
-                SIMD2<Float>(r.centerX + hx, r.centerZ + hz),
-                SIMD2<Float>(r.centerX - hx, r.centerZ + hz)
-            ]
-        }
-
         // 先用墙体端点投影到局部坐标系。此前只要存在一个“房间推断框”
         // 就完全忽略墙体，RoomPlan 的房间框会把整屋尺寸缩小或平移；而把
         // 两类数据简单合并又会让家具推断框把实测墙体撑大。墙体是实测外壳
@@ -531,8 +589,19 @@ public enum HouseSpatialSurveyEngine {
             // A floorplan editor may expose an explicit user-selected Tai Ji
             // point. Use it for both the pillar and relative sha coordinates
             // so the 3D result cannot drift back to the envelope midpoint.
-            cx = override.x
-            cz = override.z
+            if obbUsable {
+                let local = toLocal(SIMD2<Float>(override.x, override.z))
+                let clamped = SIMD2<Float>(
+                    min(lMaxX, max(lMinX, local.x)),
+                    min(lMaxZ, max(lMinZ, local.y))
+                )
+                let world = toWorld(clamped)
+                cx = world.x
+                cz = world.y
+            } else {
+                cx = min(max(override.x, minX), maxX)
+                cz = min(max(override.z, minZ), maxZ)
+            }
         } else if roomAreaRatio < 0.75, let largest = rooms.max(by: { $0.areaSqMeters < $1.areaSqMeters }) {
             cx = largest.centerX
             cz = largest.centerZ

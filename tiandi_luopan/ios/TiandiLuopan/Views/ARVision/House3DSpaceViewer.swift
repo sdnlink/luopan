@@ -362,7 +362,8 @@ public struct House3DSpaceViewer: View {
                 type: type,
                 center: room.center,
                 size: room.size,
-                areaSqMeters: room.areaSqMeters
+                areaSqMeters: room.areaSqMeters,
+                rotationY: room.rotationY
             )
         }
         let rebuilt = HouseSpatialSurveyEngine.analyzeSpatialHouse(
@@ -375,6 +376,24 @@ public struct House3DSpaceViewer: View {
             compassHeading: survey.compassHeading
         )
         survey = rebuilt
+        // Keep corrections made in the viewer when the source is an actual
+        // AR/RoomPlan/VR survey. A hand-built 户型立极 projection has no
+        // measured archive authority and must remain session-local.
+        let archiveKey: String?
+        if survey.scanMethod.localizedCaseInsensitiveContains("VR") || survey.scanMethod.contains("仿真") {
+            archiveKey = SpatialSurveyArchiveKeys.virtual
+        } else if survey.scanMethod.contains("RoomPlan") || survey.scanMethod.contains("AR") {
+            archiveKey = SpatialSurveyArchiveKeys.measured
+        } else {
+            archiveKey = nil
+        }
+        if let archiveKey, let data = try? JSONEncoder().encode(survey) {
+            UserDefaults.standard.set(data, forKey: archiveKey)
+            let notification: Notification.Name = archiveKey == SpatialSurveyArchiveKeys.virtual
+                ? .didUpdateHouseSpatialSurvey
+                : .didUpdateMeasuredSpatialSurvey
+            NotificationCenter.default.post(name: notification, object: nil)
+        }
     }
 
     // MARK: - 底部控制条与形煞诊断浮层
@@ -901,7 +920,9 @@ public final class HouseSceneCoordinator: NSObject {
             rGeo.materials = [rMat]
             let rNode = SCNNode(geometry: rGeo)
             rNode.eulerAngles.x = -Float.pi / 2
-            rNode.eulerAngles.y = -axisAngle
+            // Room rectangles may carry their own measured yaw. Older
+            // surveys omit it and retain the historical whole-house axis.
+            rNode.eulerAngles.y = -(room.rotationY ?? axisAngle)
             rNode.position = SCNVector3(room.centerX, 0.01, room.centerZ)
             rNode.name = "\(room.name)：实测面积 \(String(format: "%.1f", room.areaSqMeters))㎡ · 面宽 \(String(format: "%.2f", room.sizeX))m × 进深 \(String(format: "%.2f", room.sizeZ))m"
             rootHouseNode.addChildNode(rNode)
@@ -1250,7 +1271,11 @@ public final class HouseSceneCoordinator: NSObject {
 
 public enum SurveyReportRenderer {
     public static func renderReportImage(survey: HouseSpatialSurvey, snapshot: UIImage) -> UIImage {
-        let size = CGSize(width: 1080, height: 1920)
+        // Keep every detected finding and its remedy in the exported image.
+        // The previous fixed canvas silently dropped entries after the fourth
+        // item when the report was shared.
+        let extraShaHeight = CGFloat(max(0, survey.shaItems.count - 4)) * 110.0
+        let size = CGSize(width: 1080, height: 1920 + extraShaHeight)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -1337,7 +1362,7 @@ public enum SurveyReportRenderer {
             )
 
             var curY = shaHeaderY + 45
-            for sha in survey.shaItems.prefix(4) {
+            for sha in survey.shaItems {
                 let badge = sha.severity == .critical ? "【严重】" : (sha.severity == .warning ? "【警示】" : "【纳吉】")
                 let lineTitle = "\(badge) \(sha.title) · \(sha.locationName)"
                 let titleColor = sha.severity == .critical ? UIColor.systemRed : (sha.severity == .warning ? UIColor.systemOrange : UIColor.systemGreen)

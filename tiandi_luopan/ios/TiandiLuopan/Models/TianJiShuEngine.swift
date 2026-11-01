@@ -519,7 +519,7 @@ public class TianJiShuEngine {
             curY += 62
             let injuriousStars: [StarLuckType] = [.jueMing, .wuGui, .liuSha, .huoHai]
             for item in bz.items where injuriousStars.contains(item.star) {
-                let bzLine = "【\(item.star.localizedName) · \(item.localizedDirection)】\(item.localizedSuggestion)"
+                let bzLine = "【\(item.star.localizedName) · \(item.localizedDirection)】\(item.star.localizedSuggestion)"
                 bzLine.draw(in: CGRect(x: 100, y: curY, width: 880, height: 140), withAttributes: [
                     .font: pwBodyFont,
                     .foregroundColor: inkColor

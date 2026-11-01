@@ -209,6 +209,10 @@ public struct BaZhaiPalaceItem: Identifiable {
     public let guaName: String
     public let star: StarLuckType
     
+    public var localizedSuggestion: String {
+        star.localizedSuggestion
+    }
+    
     public var localizedDirection: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let enDirs = ["North (Kan)", "Southwest (Kun)", "East (Zhen)", "Southeast (Xun)", "Northwest (Qian)", "West (Dui)", "Northeast (Gen)", "South (Li)"]

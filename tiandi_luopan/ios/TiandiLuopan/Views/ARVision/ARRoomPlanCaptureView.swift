@@ -740,10 +740,17 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let pos = SIMD3<Float>(obj.transform.columns.3.x, obj.transform.columns.3.y, obj.transform.columns.3.z)
                 let size = SIMD3<Float>(obj.dimensions.x, obj.dimensions.y, obj.dimensions.z)
                 let catStr = String(describing: obj.category)
+                // RoomPlan provides the object's local x-axis in the transform;
+                // preserve its yaw so the 3D viewer keeps beds, sofas and
+                // appliances aligned with the scanned room instead of drawing
+                // every object axis-aligned.
+                let axisX = obj.transform.columns.0
+                let yaw = atan2(axisX.z, axisX.x)
                 objects3D.append(SpatialObject3D(
                     category: catStr,
                     position: pos,
-                    size: size
+                    size: size,
+                    rotationY: yaw
                 ))
             }
         }

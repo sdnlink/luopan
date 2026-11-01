@@ -210,6 +210,17 @@ public struct House3DSpaceViewer: View {
             .padding(.horizontal, 10)
             .background(Color.black.opacity(0.55))
             .cornerRadius(8)
+
+            HStack(spacing: 5) {
+                Image(systemName: survey.scanMethod.contains("VR") ? "wand.and.stars" : "location.magnifyingglass")
+                Text("数据来源：\(survey.scanMethod)")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
+            }
+            .font(.adaptive(size: 9, weight: .semibold))
+            .foregroundColor(survey.scanMethod.contains("VR") ? .orange : .yanCyan)
+            .padding(.horizontal, 10)
         }
         .padding(12)
         .background(Color.black.opacity(0.85))
@@ -683,6 +694,16 @@ public final class HouseSceneCoordinator: NSObject {
         palaceGridMode: House3DSpaceViewer.PalaceGridMode,
         selectedShaItem: HouseSpatialShaItem?
     ) {
+        // Room type edits and fresh RoomPlan/AR scans replace the immutable
+        // survey value. Rebuild the geometry when that snapshot changes;
+        // previously only overlays were refreshed, leaving a stale 3D model
+        // on screen after the underlying floorplan changed.
+        if currentSurvey?.id != survey.id {
+            currentSurvey = survey
+            buildHouseGeometry(survey: survey)
+            buildDimensionsLines(survey: survey)
+            resetCamera(mode: viewMode)
+        }
         dimensionsNode.isHidden = !showDimensions
         shaAlertsNode.isHidden = !showShaAlerts
         baguaGridNode.isHidden = (palaceGridMode == .off)
@@ -699,8 +720,14 @@ public final class HouseSceneCoordinator: NSObject {
 
     public func resetCamera(mode: House3DSpaceViewer.ViewAngleMode) {
         guard let survey = currentSurvey else { return }
-        let cx = survey.centroidX
-        let cz = survey.centroidZ
+        // Keep the shell/floor centered on the measured envelope. The Tai Ji
+        // point may intentionally be moved to a main room, so using
+        // survey.centroid for the floor would shift the walls away from their
+        // measured coordinates.
+        let axisAngle = primaryAxisAngle(survey: survey)
+        let footprintCenter = measuredFootprintCenter(survey: survey, axisAngle: axisAngle)
+        let cx = footprintCenter.x
+        let cz = footprintCenter.y
         let maxSpan = max(survey.dimensions.totalWidth, survey.dimensions.totalDepth)
 
         SCNTransaction.begin()
@@ -730,10 +757,16 @@ public final class HouseSceneCoordinator: NSObject {
         rootHouseNode.childNodes.forEach { $0.removeFromParentNode() }
         shaAlertsNode.childNodes.forEach { $0.removeFromParentNode() }
 
-        let cx = survey.centroidX
-        let cz = survey.centroidZ
         let w = survey.dimensions.totalWidth
         let d = survey.dimensions.totalDepth
+        // Keep auxiliary geometry in the same local OBB frame as the measured
+        // walls.  Without this, a diagonal house got a world-aligned floor and
+        // reference grid even though its wall nodes followed their measured
+        // heading.
+        let axisAngle = primaryAxisAngle(survey: survey)
+        let footprintCenter = measuredFootprintCenter(survey: survey, axisAngle: axisAngle)
+        let cx = footprintCenter.x
+        let cz = footprintCenter.y
 
         let floorGeo = SCNPlane(width: CGFloat(w * 1.35), height: CGFloat(d * 1.35))
         let floorMat = SCNMaterial()
@@ -741,10 +774,11 @@ public final class HouseSceneCoordinator: NSObject {
         floorGeo.materials = [floorMat]
         let floorNode = SCNNode(geometry: floorGeo)
         floorNode.eulerAngles.x = -Float.pi / 2
-        floorNode.position = SCNVector3(cx, 0, cz)
+        floorNode.eulerAngles.y = -axisAngle
+        floorNode.position = SCNVector3(footprintCenter.x, 0, footprintCenter.y)
         rootHouseNode.addChildNode(floorNode)
 
-        addGridLines(centerX: cx, centerZ: cz, width: w * 1.3, depth: d * 1.3)
+        addGridLines(centerX: footprintCenter.x, centerZ: footprintCenter.y, width: w * 1.3, depth: d * 1.3, axisAngle: axisAngle)
 
         // 金色贯通天地的立极中宫光柱
         let pillarGeo = SCNCylinder(radius: 0.18, height: CGFloat(survey.dimensions.ceilingHeight * 1.5))
@@ -753,8 +787,8 @@ public final class HouseSceneCoordinator: NSObject {
         pillarMat.emission.contents = UIColor(red: 0.90, green: 0.70, blue: 0.20, alpha: 0.5)
         pillarGeo.materials = [pillarMat]
         let pillarNode = SCNNode(geometry: pillarGeo)
-        pillarNode.position = SCNVector3(cx, survey.dimensions.ceilingHeight * 0.75, cz)
-        pillarNode.name = "【全屋太极立极中心】三维坐标 (\(String(format: "%.1f, %.1f", cx, cz)))"
+        pillarNode.position = SCNVector3(survey.centroidX, survey.dimensions.ceilingHeight * 0.75, survey.centroidZ)
+        pillarNode.name = "【全屋太极立极中心】三维坐标 (\(String(format: "%.1f, %.1f", survey.centroidX, survey.centroidZ)))"
         rootHouseNode.addChildNode(pillarNode)
 
         let centerRingGeo = SCNTorus(ringRadius: 0.6, pipeRadius: 0.04)
@@ -762,7 +796,7 @@ public final class HouseSceneCoordinator: NSObject {
         ringMat.diffuse.contents = UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 0.9)
         centerRingGeo.materials = [ringMat]
         let ringNode = SCNNode(geometry: centerRingGeo)
-        ringNode.position = SCNVector3(cx, 0.02, cz)
+        ringNode.position = SCNVector3(survey.centroidX, 0.02, survey.centroidZ)
         rootHouseNode.addChildNode(ringNode)
 
         // 墙体
@@ -813,7 +847,10 @@ public final class HouseSceneCoordinator: NSObject {
             box.materials = [mat]
 
             let opNode = SCNNode(geometry: box)
-            opNode.position = SCNVector3(op.posX, Float(opH) * 0.5, op.posZ)
+            // RoomPlan stores the opening transform at its measured centre;
+            // retaining posY keeps windows and doors at their real sill/centre
+            // height instead of forcing every opening to start at half-height.
+            opNode.position = SCNVector3(op.posX, op.posY, op.posZ)
             let normAngle = atan2(op.normalZ, op.normalX)
             opNode.eulerAngles.y = -normAngle + Float.pi / 2
             opNode.name = "\(op.type.rawValue)：宽 \(String(format: "%.2f", op.width))m × 高 \(String(format: "%.2f", op.height))m · 鲁班尺【\(op.yangGateName)】字门"
@@ -842,8 +879,11 @@ public final class HouseSceneCoordinator: NSObject {
 
         // 房间地坪高亮
         for room in survey.rooms {
-            let rW = CGFloat(room.sizeX * 0.90)
-            let rD = CGFloat(room.sizeZ * 0.90)
+            // SpatialRoom3D dimensions are measured extents in metres. Keep
+            // them exact; shrinking every room to 90% made the rendered plan
+            // visibly disagree with the scanned walls and area readouts.
+            let rW = CGFloat(max(0.05, room.sizeX))
+            let rD = CGFloat(max(0.05, room.sizeZ))
             let rGeo = SCNPlane(width: rW, height: rD)
             let rMat = SCNMaterial()
             switch room.type {
@@ -861,22 +901,79 @@ public final class HouseSceneCoordinator: NSObject {
             rGeo.materials = [rMat]
             let rNode = SCNNode(geometry: rGeo)
             rNode.eulerAngles.x = -Float.pi / 2
+            rNode.eulerAngles.y = -axisAngle
             rNode.position = SCNVector3(room.centerX, 0.01, room.centerZ)
             rNode.name = "\(room.name)：实测面积 \(String(format: "%.1f", room.areaSqMeters))㎡ · 面宽 \(String(format: "%.2f", room.sizeX))m × 进深 \(String(format: "%.2f", room.sizeZ))m"
             rootHouseNode.addChildNode(rNode)
         }
 
+        // RoomPlan furniture/appliance objects are part of the measured
+        // survey. Render their real extents and captured yaw so the viewer
+        // reflects the observed interior instead of showing an empty shell.
+        for (idx, object) in survey.objects.enumerated() {
+            let width = CGFloat(max(0.05, object.sizeX))
+            let height = CGFloat(max(0.05, object.sizeY))
+            let depth = CGFloat(max(0.05, object.sizeZ))
+            let objectGeo = SCNBox(width: width, height: height, length: depth, chamferRadius: 0.02)
+            let objectMat = SCNMaterial()
+            objectMat.diffuse.contents = objectMaterialColor(for: object.category)
+            // Keep furniture readable in the measured scene. Walls and room
+            // overlays remain translucent, while an 82%-transparent furniture
+            // box looked like a missing object in the 3D result.
+            objectMat.transparency = 0.18
+            objectGeo.materials = [objectMat]
+
+            let objectNode = SCNNode(geometry: objectGeo)
+            // RoomPlan object transforms use the object centre as translation.
+            objectNode.position = SCNVector3(object.posX, object.posY, object.posZ)
+            if let yaw = object.rotationY, yaw.isFinite {
+                objectNode.eulerAngles.y = -yaw
+            }
+            objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(String(format: "%.2f", object.sizeX))m × \(String(format: "%.2f", object.sizeY))m × \(String(format: "%.2f", object.sizeZ))m"
+            rootHouseNode.addChildNode(objectNode)
+        }
+
         buildShaAlertVisuals(survey: survey)
+    }
+
+    private func objectMaterialColor(for category: String) -> UIColor {
+        let value = category.lowercased()
+        if value.contains("bed") || value.contains("床") {
+            return UIColor(red: 0.45, green: 0.65, blue: 0.95, alpha: 1)
+        }
+        if value.contains("sofa") || value.contains("chair") || value.contains("沙发") || value.contains("椅") {
+            return UIColor(red: 0.95, green: 0.65, blue: 0.35, alpha: 1)
+        }
+        if value.contains("table") || value.contains("desk") || value.contains("桌") {
+            return UIColor(red: 0.75, green: 0.48, blue: 0.25, alpha: 1)
+        }
+        if value.contains("toilet") || value.contains("bathtub") || value.contains("马桶") || value.contains("浴") {
+            return UIColor(red: 0.30, green: 0.85, blue: 0.85, alpha: 1)
+        }
+        if value.contains("stove") || value.contains("oven") || value.contains("冰箱") || value.contains("炉") {
+            return UIColor(red: 0.90, green: 0.35, blue: 0.25, alpha: 1)
+        }
+        return UIColor(red: 0.65, green: 0.70, blue: 0.78, alpha: 1)
     }
 
     // MARK: - 3D 尺寸标尺立体线条
     private func buildDimensionsLines(survey: HouseSpatialSurvey) {
         dimensionsNode.childNodes.forEach { $0.removeFromParentNode() }
-        let cx = survey.centroidX
-        let cz = survey.centroidZ
         let w = survey.dimensions.totalWidth
         let d = survey.dimensions.totalDepth
         let h = survey.dimensions.ceilingHeight
+        let axisAngle = primaryAxisAngle(survey: survey)
+        let footprintCenter = measuredFootprintCenter(survey: survey, axisAngle: axisAngle)
+        let cosAxis = cos(axisAngle)
+        let sinAxis = sin(axisAngle)
+
+        func worldPoint(localX: Float, localZ: Float, y: Float) -> SCNVector3 {
+            SCNVector3(
+                footprintCenter.x + localX * cosAxis - localZ * sinAxis,
+                y,
+                footprintCenter.y + localX * sinAxis + localZ * cosAxis
+            )
+        }
 
         let lineMat = SCNMaterial()
         lineMat.diffuse.contents = UIColor(red: 0.0, green: 0.85, blue: 0.95, alpha: 0.85)
@@ -884,21 +981,23 @@ public final class HouseSceneCoordinator: NSObject {
         let widthLineGeo = SCNBox(width: CGFloat(w), height: 0.015, length: 0.015, chamferRadius: 0)
         widthLineGeo.materials = [lineMat]
         let widthLineNode = SCNNode(geometry: widthLineGeo)
-        widthLineNode.position = SCNVector3(cx, 0.05, cz + d * 0.5 + 0.45)
+        widthLineNode.eulerAngles.y = -axisAngle
+        widthLineNode.position = worldPoint(localX: 0, localZ: d * 0.5 + 0.45, y: 0.05)
         widthLineNode.name = "面宽开间尺寸：\(String(format: "%.2f", w)) 米"
         dimensionsNode.addChildNode(widthLineNode)
 
         let depthLineGeo = SCNBox(width: 0.015, height: 0.015, length: CGFloat(d), chamferRadius: 0)
         depthLineGeo.materials = [lineMat]
         let depthLineNode = SCNNode(geometry: depthLineGeo)
-        depthLineNode.position = SCNVector3(cx + w * 0.5 + 0.45, 0.05, cz)
+        depthLineNode.eulerAngles.y = -axisAngle
+        depthLineNode.position = worldPoint(localX: w * 0.5 + 0.45, localZ: 0, y: 0.05)
         depthLineNode.name = "进深长度尺寸：\(String(format: "%.2f", d)) 米"
         dimensionsNode.addChildNode(depthLineNode)
 
         let heightLineGeo = SCNBox(width: 0.015, height: CGFloat(h), length: 0.015, chamferRadius: 0)
         heightLineGeo.materials = [lineMat]
         let heightLineNode = SCNNode(geometry: heightLineGeo)
-        heightLineNode.position = SCNVector3(cx - w * 0.5 - 0.45, h * 0.5, cz - d * 0.5 - 0.45)
+        heightLineNode.position = worldPoint(localX: -w * 0.5 - 0.45, localZ: -d * 0.5 - 0.45, y: h * 0.5)
         heightLineNode.name = "室内净层高尺寸：\(String(format: "%.2f", h)) 米"
         dimensionsNode.addChildNode(heightLineNode)
     }
@@ -914,6 +1013,13 @@ public final class HouseSceneCoordinator: NSObject {
         let d = survey.dimensions.totalDepth
         let cellW = CGFloat(w / 3.0)
         let cellD = CGFloat(d / 3.0)
+        // HouseSpatialSurveyEngine uses the longest wall as the OBB axis for
+        // its nine-palace analysis. Rotate this visual overlay by the same
+        // axis; otherwise a diagonal RoomPlan house receives a world-aligned
+        // grid that disagrees with the actual walls and centroid calculation.
+        let axisAngle = primaryAxisAngle(survey: survey)
+        let cosAxis = cos(axisAngle)
+        let sinAxis = sin(axisAngle)
 
         let facingGua = HouseSpatialSurveyEngine.guaForAngle(survey.compassHeading)
         let sittingAngle = (survey.compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
@@ -926,8 +1032,10 @@ public final class HouseSceneCoordinator: NSObject {
 
         for row in -1...1 {
             for col in -1...1 {
-                let cellX = cx + Float(col) * Float(cellW)
-                let cellZ = cz + Float(row) * Float(cellD)
+                let localX = Float(col) * Float(cellW)
+                let localZ = Float(row) * Float(cellD)
+                let cellX = cx + localX * cosAxis - localZ * sinAxis
+                let cellZ = cz + localX * sinAxis + localZ * cosAxis
 
                 let plane = SCNPlane(width: cellW * 0.95, height: cellD * 0.95)
                 let mat = SCNMaterial()
@@ -937,9 +1045,8 @@ public final class HouseSceneCoordinator: NSObject {
                     mat.diffuse.contents = UIColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 0.20)
                     nodeName = "【中宫太极】九运天心：运星 \(xkChart.period)"
                 } else {
-                    let relX = Double(col)
-                    let relZ = Double(row)
-                    let angleRad = atan2(relX, -relZ)
+                    let angleRad = atan2(Double(localX * cosAxis - localZ * sinAxis),
+                                         Double(-(localX * sinAxis + localZ * cosAxis)))
                     let angleDeg = (angleRad * 180.0 / Double.pi + 360.0).truncatingRemainder(dividingBy: 360.0)
                     let geoAngle = (angleDeg + survey.compassHeading).truncatingRemainder(dividingBy: 360.0)
                     let cellGua = HouseSpatialSurveyEngine.guaForAngle(geoAngle)
@@ -977,11 +1084,87 @@ public final class HouseSceneCoordinator: NSObject {
                 plane.materials = [mat]
                 let node = SCNNode(geometry: plane)
                 node.eulerAngles.x = -Float.pi / 2
+                node.eulerAngles.y = -axisAngle
                 node.position = SCNVector3(cellX, 0.012, cellZ)
                 node.name = nodeName
                 baguaGridNode.addChildNode(node)
             }
         }
+    }
+
+    private func primaryAxisAngle(survey: HouseSpatialSurvey) -> Float {
+        var bestLength: Float = 0
+        var bestAngle: Float = 0
+        for wall in survey.walls {
+            let dx = wall.endX - wall.startX
+            let dz = wall.endZ - wall.startZ
+            let length = simd_length(SIMD2<Float>(dx, dz))
+            guard length > 0.3 else { continue }
+            var angle = atan2(dz, dx)
+            if angle < 0 { angle += .pi }
+            if angle >= .pi { angle -= .pi }
+            if length > bestLength {
+                bestLength = length
+                bestAngle = angle
+            }
+        }
+        return bestAngle
+    }
+
+    /// Returns the measured footprint centre used by the floor, grid and
+    /// dimension annotations. A survey centroid can intentionally be moved to
+    /// a main room when a concave plan leaves the geometric centre outside the
+    /// usable area, so those reference aids must stay anchored to the wall
+    /// envelope while the Tai Ji pillar remains at `survey.centroid`.
+    private func measuredFootprintCenter(survey: HouseSpatialSurvey, axisAngle: Float) -> SIMD2<Float> {
+        let cosAxis = cos(axisAngle)
+        let sinAxis = sin(axisAngle)
+        var minX = Float.greatestFiniteMagnitude
+        var maxX = -Float.greatestFiniteMagnitude
+        var minZ = Float.greatestFiniteMagnitude
+        var maxZ = -Float.greatestFiniteMagnitude
+
+        for wall in survey.walls {
+            for point in [SIMD2<Float>(wall.startX, wall.startZ), SIMD2<Float>(wall.endX, wall.endZ)] {
+                let localX = point.x * cosAxis + point.y * sinAxis
+                let localZ = -point.x * sinAxis + point.y * cosAxis
+                minX = min(minX, localX)
+                maxX = max(maxX, localX)
+                minZ = min(minZ, localZ)
+                maxZ = max(maxZ, localZ)
+            }
+        }
+        if !(minX < maxX && minZ < maxZ) {
+            // Basic AR scans can contain horizontal planes without vertical
+            // wall anchors. Their room boxes still give us a useful footprint
+            // centre for the floor and dimension guides.
+            for room in survey.rooms {
+                let halfX = room.sizeX * 0.5
+                let halfZ = room.sizeZ * 0.5
+                for point in [
+                    SIMD2<Float>(room.centerX - halfX, room.centerZ - halfZ),
+                    SIMD2<Float>(room.centerX + halfX, room.centerZ - halfZ),
+                    SIMD2<Float>(room.centerX + halfX, room.centerZ + halfZ),
+                    SIMD2<Float>(room.centerX - halfX, room.centerZ + halfZ)
+                ] {
+                    let localX = point.x * cosAxis + point.y * sinAxis
+                    let localZ = -point.x * sinAxis + point.y * cosAxis
+                    minX = min(minX, localX)
+                    maxX = max(maxX, localX)
+                    minZ = min(minZ, localZ)
+                    maxZ = max(maxZ, localZ)
+                }
+            }
+        }
+        guard minX < maxX && minZ < maxZ else {
+            return SIMD2<Float>(survey.centroidX, survey.centroidZ)
+        }
+        let localCenterX = (minX + maxX) * 0.5
+        let localCenterZ = (minZ + maxZ) * 0.5
+        return SIMD2<Float>(
+            localCenterX * cosAxis - localCenterZ * sinAxis,
+            localCenterX * sinAxis + localCenterZ * cosAxis
+        )
     }
 
     private func buildShaAlertVisuals(survey: HouseSpatialSurvey) {
@@ -995,7 +1178,10 @@ public final class HouseSceneCoordinator: NSObject {
             sphereMat.emission.contents = alertColor.withAlphaComponent(0.6)
             sphereGeo.materials = [sphereMat]
             let sNode = SCNNode(geometry: sphereGeo)
-            sNode.position = SCNVector3(pos.x, max(0.5, pos.y), pos.z)
+            // Keep the measured vertical coordinate. Clamping every alert to
+            // 0.5 m made floor-level, ceiling-level and wall-level findings
+            // appear at the same height in the 3D scene.
+            sNode.position = SCNVector3(pos.x, pos.y, pos.z)
             sNode.name = "形煞【\(sha.title)】\(sha.locationName)：\(sha.detail)"
             shaAlertsNode.addChildNode(sNode)
 
@@ -1010,7 +1196,7 @@ public final class HouseSceneCoordinator: NSObject {
 
                     let beamNode = SCNNode(geometry: beamGeo)
                     let mid = (pos + targetPos) * 0.5
-                    beamNode.position = SCNVector3(mid.x, 1.2, mid.z)
+                    beamNode.position = SCNVector3(mid.x, mid.y, mid.z)
 
                     let dir = simd_normalize(targetPos - pos)
                     let pitch = asin(-dir.y)
@@ -1023,12 +1209,16 @@ public final class HouseSceneCoordinator: NSObject {
         }
     }
 
-    private func addGridLines(centerX: Float, centerZ: Float, width: Float, depth: Float) {
+    private func addGridLines(centerX: Float, centerZ: Float, width: Float, depth: Float, axisAngle: Float = 0) {
         let step: Float = 1.0
         let halfW = width * 0.5
         let halfD = depth * 0.5
 
         let gridNode = SCNNode()
+        // Child line positions are local to the measured OBB center, then the
+        // parent rotates the complete reference grid to the wall heading.
+        gridNode.position = SCNVector3(centerX, 0, centerZ)
+        gridNode.eulerAngles.y = -axisAngle
         let lineMat = SCNMaterial()
         lineMat.diffuse.contents = UIColor(white: 0.35, alpha: 0.3)
 
@@ -1037,7 +1227,7 @@ public final class HouseSceneCoordinator: NSObject {
             let line = SCNBox(width: CGFloat(width), height: 0.005, length: 0.02, chamferRadius: 0)
             line.materials = [lineMat]
             let node = SCNNode(geometry: line)
-            node.position = SCNVector3(centerX, 0.005, centerZ + z)
+            node.position = SCNVector3(0, 0.005, z)
             gridNode.addChildNode(node)
             z += step
         }
@@ -1047,7 +1237,7 @@ public final class HouseSceneCoordinator: NSObject {
             let line = SCNBox(width: 0.02, height: 0.005, length: CGFloat(depth), chamferRadius: 0)
             line.materials = [lineMat]
             let node = SCNNode(geometry: line)
-            node.position = SCNVector3(centerX + x, 0.005, centerZ)
+            node.position = SCNVector3(x, 0.005, 0)
             gridNode.addChildNode(node)
             x += step
         }

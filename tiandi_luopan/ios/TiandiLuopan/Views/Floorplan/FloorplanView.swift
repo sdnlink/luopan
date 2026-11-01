@@ -65,7 +65,9 @@ public struct FloorplanView: View {
     @State private var lastAuditedCentroid: CGPoint?
     @State private var didRestorePersistedLayout = false
     @State private var persistedSpatialSurvey: HouseSpatialSurvey? = nil
+    @State private var persistedVirtualSpatialSurvey: HouseSpatialSurvey? = nil
     @State private var show3DSpaceViewer: Bool = false
+    @State private var showVirtualSpaceViewer: Bool = false
     @State private var currentFloorplanSurvey: HouseSpatialSurvey? = nil
     @State private var showCurrentFloorplan3D: Bool = false
     @State private var showARSpatialSurvey: Bool = false
@@ -273,6 +275,11 @@ public struct FloorplanView: View {
                 House3DSpaceViewer(survey: s)
             }
         }
+        .sheet(isPresented: $showVirtualSpaceViewer) {
+            if let s = persistedVirtualSpatialSurvey {
+                House3DSpaceViewer(survey: s)
+            }
+        }
         .sheet(isPresented: $showCurrentFloorplan3D) {
             if let s = currentFloorplanSurvey {
                 House3DSpaceViewer(survey: s)
@@ -325,10 +332,7 @@ public struct FloorplanView: View {
             persistLayout()
         }
         .onReceive(NotificationCenter.default.publisher(for: .didImportRoomPlanFloorplan)) { _ in
-            if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
-               let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
-                persistedSpatialSurvey = s
-            }
+            reloadSpatialSurveyArchives()
             didRestorePersistedLayout = false
             persistedImageObjectID = nil
             restorePersistedLayoutIfNeeded()
@@ -338,10 +342,13 @@ public struct FloorplanView: View {
             // A VR correction updates the 3D archive but has no authority to
             // replace the editable floorplan layout. Keep the current rooms
             // and only refresh the “最近实测/VR 3D” snapshot button.
-            if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
+            if let sData = UserDefaults.standard.data(forKey: SpatialSurveyArchiveKeys.virtual),
                let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
-                persistedSpatialSurvey = s
+                persistedVirtualSpatialSurvey = s
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didUpdateMeasuredSpatialSurvey)) { _ in
+            reloadSpatialSurveyArchives()
         }
     }
 
@@ -366,8 +373,12 @@ public struct FloorplanView: View {
             UserDefaults.standard.set(data, forKey: savedLayoutKey)
         }
         if let survey = spatialSurvey, let surveyData = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(surveyData, forKey: "latest_house_spatial_survey")
+            UserDefaults.standard.set(surveyData, forKey: SpatialSurveyArchiveKeys.measured)
         }
+        // A newly imported measured plan becomes the new baseline; discard a
+        // VR correction from a previous property so it cannot appear beside
+        // the new measured snapshot.
+        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.virtual)
         if let imageURL = savedImageURL() {
             if let image = blueprintImage,
                let imageData = image.jpegData(compressionQuality: 0.85) ?? image.pngData() {
@@ -383,10 +394,7 @@ public struct FloorplanView: View {
     private func restorePersistedLayoutIfNeeded() {
         guard !didRestorePersistedLayout else { return }
         didRestorePersistedLayout = true
-        if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
-           let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
-            persistedSpatialSurvey = s
-        }
+        reloadSpatialSurveyArchives()
         guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
               let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data) else { return }
 
@@ -421,6 +429,32 @@ public struct FloorplanView: View {
         if let imageURL = Self.savedImageURL(),
            let image = UIImage(contentsOfFile: imageURL.path) {
             userFloorplanImage = image
+        }
+    }
+
+    /// Reads both archive slots and migrates the pre-split format where a VR
+    /// report could have been written into the measured key. Keeping one
+    /// canonical entry prevents duplicate 3D buttons after an app upgrade.
+    private func reloadSpatialSurveyArchives() {
+        persistedSpatialSurvey = nil
+        persistedVirtualSpatialSurvey = nil
+        if let sData = UserDefaults.standard.data(forKey: SpatialSurveyArchiveKeys.measured),
+           let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
+            let isVirtual = s.scanMethod.localizedCaseInsensitiveContains("VR") || s.scanMethod.contains("仿真")
+            if isVirtual {
+                if UserDefaults.standard.data(forKey: SpatialSurveyArchiveKeys.virtual) == nil,
+                   let data = try? JSONEncoder().encode(s) {
+                    UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.virtual)
+                }
+                UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.measured)
+                persistedVirtualSpatialSurvey = s
+            } else {
+                persistedSpatialSurvey = s
+            }
+        }
+        if let sData = UserDefaults.standard.data(forKey: SpatialSurveyArchiveKeys.virtual),
+           let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
+            persistedVirtualSpatialSurvey = s
         }
     }
 
@@ -694,6 +728,21 @@ public struct FloorplanView: View {
                     .padding(.horizontal, 7)
                     .padding(.vertical, 5)
                     .background(Color.yanGold.opacity(0.85))
+                    .foregroundColor(.black)
+                    .cornerRadius(6)
+                }
+            }
+
+            if persistedVirtualSpatialSurvey != nil {
+                Button(action: { showVirtualSpaceViewer = true }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "view.3d")
+                        Text("最近VR仿真3D")
+                    }
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(Color.orange.opacity(0.78))
                     .foregroundColor(.black)
                     .cornerRadius(6)
                 }
@@ -1028,6 +1077,13 @@ public struct FloorplanView: View {
             try? FileManager.default.removeItem(at: imageURL)
         }
         UserDefaults.standard.removeObject(forKey: Self.savedLayoutKey)
+        // A reset starts a new floorplan. Drop both measured and virtual
+        // snapshots so the 3D buttons cannot reopen geometry from a previous
+        // home after the visible canvas has been cleared.
+        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.measured)
+        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.virtual)
+        persistedSpatialSurvey = nil
+        persistedVirtualSpatialSurvey = nil
         refreshAudit(force: true)
     }
 

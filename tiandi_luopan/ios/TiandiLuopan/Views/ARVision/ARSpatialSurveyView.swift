@@ -203,8 +203,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private weak var sceneView: ARSCNView?
     private var cornerRoomAnchors: [ARAnchor] = []
+    private var lubanAnchors: [ARAnchor] = []
     private var cornerPinNodes: [SCNNode] = []
     private var cornerRooms: [SpatialRoom3D] = []
+    private var surveyHeadingDegrees: Double?
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastSemanticUpdateTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
@@ -344,7 +346,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         lastCapturedTimestamp = 0
         semanticCounts = [:]
         savedAnchorCount = 0
+        estimatedRoomHeightMeters = nil
+        hasLowBeamWarning = false
+        surveyHeadingDegrees = CompassMotionManager.shared.headingState.facingAngle
         clearLubanPoints()
+        clearCornerRooms()
         clearGroundBaguaOverlay()
         sceneView.session.pause()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
@@ -636,15 +642,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         var maxZ: Float = -.greatestFiniteMagnitude
 
         for plane in vertPlanes {
-            let col3 = plane.transform.columns.3
-            let col0 = plane.transform.columns.0
             let halfW = max(Float(0.4), plane.extent.x * 0.5)
             let h = max(Float(2.0), plane.extent.z)
-            let p1 = SIMD3<Float>(col3.x - col0.x * halfW, col3.y, col3.z - col0.z * halfW)
-            let p2 = SIMD3<Float>(col3.x + col0.x * halfW, col3.y, col3.z + col0.z * halfW)
+            let p1 = plane.transform * SIMD4<Float>(plane.center.x - halfW, plane.center.y, plane.center.z, 1.0)
+            let p2 = plane.transform * SIMD4<Float>(plane.center.x + halfW, plane.center.y, plane.center.z, 1.0)
             walls3D.append(SpatialWall3D(
-                start: p1,
-                end: p2,
+                start: SIMD3<Float>(p1.x, p1.y, p1.z),
+                end: SIMD3<Float>(p2.x, p2.y, p2.z),
                 height: h,
                 thickness: 0.18,
                 isLoadBearing: false
@@ -658,7 +662,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         if minX >= maxX { minX = -3.0; maxX = 3.0 }
         if minZ >= maxZ { minZ = -3.0; maxZ = 3.0 }
 
-        let heading = CompassMotionManager.shared.headingState.facingAngle
+        let heading = surveyHeadingDegrees ?? CompassMotionManager.shared.headingState.facingAngle
 
         // 不再硬编码门/窗占位：AR 平面测绘不提供真实门扇与窗洞，虚构会
         // 误导鲁班门光/开门见灶/玄空旺星等下游检测。门/窗数据由
@@ -681,17 +685,62 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         // 房间按水平平面（地板）推导：每个水平面 → 一个房间，类型按面积
         // 顺序规则分配（与 syncPlanesToFloorplan 降级口径一致）。
-        let horizontalPlanes = planes
-            .filter { $0.alignment == .horizontal }
-            .sorted { ($0.extent.x * $0.extent.z) > ($1.extent.x * $1.extent.z) }
-        for (idx, plane) in horizontalPlanes.prefix(8).enumerated() {
+        struct HorizontalCandidate {
+            var centerX: Float
+            var centerZ: Float
+            var minX: Float
+            var maxX: Float
+            var minZ: Float
+            var maxZ: Float
+            var y: Float
+        }
+        let rawHorizontal = planes.filter { $0.alignment == .horizontal }
+        let floorY = rawHorizontal.map {
+            let c = $0.transform * SIMD4<Float>($0.center.x, $0.center.y, $0.center.z, 1.0)
+            return c.y
+        }.min()
+        var horizontalCandidates: [HorizontalCandidate] = []
+        for plane in rawHorizontal {
             let center = plane.transform * SIMD4<Float>(plane.center.x, plane.center.y, plane.center.z, 1.0)
+            if let floorY, center.y > floorY + 0.35 { continue }
+            let corners = planeWorldCorners(for: plane)
+            let xs = corners.map(\.x)
+            let zs = corners.map(\.z)
+            guard let minX = xs.min(), let maxX = xs.max(), let minZ = zs.min(), let maxZ = zs.max() else { continue }
+            horizontalCandidates.append(HorizontalCandidate(
+                centerX: center.x, centerZ: center.z,
+                minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ, y: center.y
+            ))
+        }
+        horizontalCandidates.sort { ($0.maxX - $0.minX) * ($0.maxZ - $0.minZ) > ($1.maxX - $1.minX) * ($1.maxZ - $1.minZ) }
+        func boxesOverlap(_ lhs: HorizontalCandidate, _ rhs: HorizontalCandidate, gap: Float) -> Bool {
+            lhs.maxX + gap >= rhs.minX && rhs.maxX + gap >= lhs.minX &&
+            lhs.maxZ + gap >= rhs.minZ && rhs.maxZ + gap >= lhs.minZ
+        }
+        var mergedHorizontal: [HorizontalCandidate] = []
+        for candidate in horizontalCandidates {
+            guard let index = mergedHorizontal.firstIndex(where: { boxesOverlap($0, candidate, gap: 0.25) }) else {
+                mergedHorizontal.append(candidate)
+                continue
+            }
+            let existing = mergedHorizontal[index]
+            let minX = min(existing.minX, candidate.minX)
+            let maxX = max(existing.maxX, candidate.maxX)
+            let minZ = min(existing.minZ, candidate.minZ)
+            let maxZ = max(existing.maxZ, candidate.maxZ)
+            mergedHorizontal[index] = HorizontalCandidate(
+                centerX: (minX + maxX) * 0.5, centerZ: (minZ + maxZ) * 0.5,
+                minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ,
+                y: min(existing.y, candidate.y)
+            )
+        }
+        for (idx, candidate) in mergedHorizontal.prefix(8).enumerated() {
             let roomType: FloorplanRoomType = (idx == 0) ? .livingRoom : ((idx == 1) ? .masterBedroom : .study)
             rooms3D.append(SpatialRoom3D(
                 name: roomType.localizedName,
                 type: roomType,
-                center: SIMD3<Float>(center.x, roomH * 0.5, center.z),
-                size: SIMD3<Float>(max(Float(1.5), plane.extent.x), roomH, max(Float(1.5), plane.extent.z))
+                center: SIMD3<Float>(candidate.centerX, roomH * 0.5, candidate.centerZ),
+                size: SIMD3<Float>(max(Float(1.5), candidate.maxX - candidate.minX), roomH, max(Float(1.5), candidate.maxZ - candidate.minZ))
             ))
         }
         // 无水平平面（未扫描地板）时退化为单一客厅，并如实标注无房间分割
@@ -717,6 +766,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         )
         // 汇入全景形煞档案（与外部标注同源消费）
         ShaSurveyStore.shared.updateInterior(survey)
+        // Keep the ordinary AR result available to 户型立极 after this page
+        // closes. VR corrections use a separate archive slot and must not
+        // replace this measured snapshot.
+        if let data = try? JSONEncoder().encode(survey) {
+            UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
+            NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
+        }
         return survey
     }
 
@@ -743,8 +799,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             let worldCenter = plane.transform * SIMD4<Float>(plane.center.x, plane.center.y, plane.center.z, 1.0)
             let cx = CGFloat(worldCenter.x)
             let cz = CGFloat(worldCenter.z)
-            let w = max(CGFloat(0.25), CGFloat(plane.extent.x))
-            let d = max(CGFloat(0.25), CGFloat(plane.extent.z))
+            let corners = planeWorldCorners(for: plane)
+            let xs = corners.map { CGFloat($0.x) }
+            let zs = corners.map { CGFloat($0.z) }
+            let w = max(CGFloat(0.25), (xs.max() ?? CGFloat(worldCenter.x)) - (xs.min() ?? CGFloat(worldCenter.x)))
+            let d = max(CGFloat(0.25), (zs.max() ?? CGFloat(worldCenter.z)) - (zs.min() ?? CGFloat(worldCenter.z)))
             let isVert = (plane.alignment == .vertical)
             boxes.append(PlaneBox2D(centerX: cx, centerZ: cz, width: w, depth: d, isVertical: isVert))
             minX = min(minX, cx - w * 0.5)
@@ -911,6 +970,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         lubanNodeA = nil
         lubanNodeB = nil
         lubanLineNode = nil
+        for anchor in lubanAnchors {
+            sceneView?.session.remove(anchor: anchor)
+        }
+        lubanAnchors.removeAll()
     }
 
     /// Places a 3D Lu Ban ruler endpoint at the current center reticle hit position
@@ -938,22 +1001,21 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         guard let worldPos = resolvedWorldPos else { return false }
 
+        let isNewMeasurement = lubanPointA == nil || (lubanPointA != nil && lubanPointB != nil)
+        if isNewMeasurement {
+            clearLubanPoints()
+        }
+
         var anchorTransform = matrix_identity_float4x4
         anchorTransform.columns.3 = SIMD4<Float>(worldPos.x, worldPos.y, worldPos.z, 1.0)
         let anchor = ARAnchor(name: "luban-anchor", transform: anchorTransform)
         sceneView.session.add(anchor: anchor)
+        lubanAnchors.append(anchor)
 
-        if lubanPointA == nil || (lubanPointA != nil && lubanPointB != nil) {
-            clearLubanPoints()
+        if isNewMeasurement {
             lubanPointA = worldPos
-            let sphereNode = Self.makeMarkerNode(position: worldPos, color: UIColor(red: 0.0, green: 0.88, blue: 0.96, alpha: 0.95))
-            sceneView.scene.rootNode.addChildNode(sphereNode)
-            lubanNodeA = sphereNode
         } else if let pointA = lubanPointA {
             lubanPointB = worldPos
-            let sphereNode = Self.makeMarkerNode(position: worldPos, color: UIColor(red: 0.98, green: 0.80, blue: 0.25, alpha: 0.95))
-            sceneView.scene.rootNode.addChildNode(sphereNode)
-            lubanNodeB = sphereNode
 
             let span = simd_distance(pointA, worldPos)
             lubanSpanMeters = span
@@ -1000,12 +1062,6 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         cornerRoomAnchors.append(anchor)
 
         cornerPoints.append(pos)
-        let node = Self.makeMarkerNode(
-            position: pos,
-            color: UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 0.95)
-        )
-        sceneView.scene.rootNode.addChildNode(node)
-        cornerPinNodes.append(node)
         return true
     }
 
@@ -1013,24 +1069,52 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @discardableResult
     public func finishCornerRoom() -> Bool {
         guard cornerPoints.count >= 3 else { return false }
-        var minX: Float = .greatestFiniteMagnitude
-        var maxX: Float = -.greatestFiniteMagnitude
-        var minZ: Float = .greatestFiniteMagnitude
-        var maxZ: Float = -.greatestFiniteMagnitude
-        for p in cornerPoints {
-            minX = min(minX, p.x); maxX = max(maxX, p.x)
-            minZ = min(minZ, p.z); maxZ = max(maxZ, p.z)
+        let meanX = cornerPoints.reduce(Float(0)) { $0 + $1.x } / Float(cornerPoints.count)
+        let meanZ = cornerPoints.reduce(Float(0)) { $0 + $1.z } / Float(cornerPoints.count)
+        var covarianceXX: Float = 0
+        var covarianceXZ: Float = 0
+        var covarianceZZ: Float = 0
+        for point in cornerPoints {
+            let dx = point.x - meanX
+            let dz = point.z - meanZ
+            covarianceXX += dx * dx
+            covarianceXZ += dx * dz
+            covarianceZZ += dz * dz
         }
-        guard maxX - minX >= 1.0, maxZ - minZ >= 1.0 else {
+        // Principal-axis OBB keeps a diagonal or rotated hand-pinned room
+        // aligned with the measured corners. An axis-aligned AABB inflated
+        // the room and moved its 九宫 position whenever the user walked a
+        // diagonal wall.
+        let rotation = 0.5 * atan2(2.0 * covarianceXZ, covarianceXX - covarianceZZ)
+        let cosR = cos(rotation)
+        let sinR = sin(rotation)
+        var minLocalX: Float = .greatestFiniteMagnitude
+        var maxLocalX: Float = -.greatestFiniteMagnitude
+        var minLocalZ: Float = .greatestFiniteMagnitude
+        var maxLocalZ: Float = -.greatestFiniteMagnitude
+        for point in cornerPoints {
+            let dx = point.x - meanX
+            let dz = point.z - meanZ
+            let localX = dx * cosR + dz * sinR
+            let localZ = -dx * sinR + dz * cosR
+            minLocalX = min(minLocalX, localX); maxLocalX = max(maxLocalX, localX)
+            minLocalZ = min(minLocalZ, localZ); maxLocalZ = max(maxLocalZ, localZ)
+        }
+        guard maxLocalX - minLocalX >= 1.0, maxLocalZ - minLocalZ >= 1.0 else {
             clearCornerPins()
             return false
         }
+        let localCenterX = (minLocalX + maxLocalX) * 0.5
+        let localCenterZ = (minLocalZ + maxLocalZ) * 0.5
+        let centerX = meanX + localCenterX * cosR - localCenterZ * sinR
+        let centerZ = meanZ + localCenterX * sinR + localCenterZ * cosR
         let roomH = estimatedRoomHeightMeters ?? 2.8
         let room = SpatialRoom3D(
             name: FloorplanRoomType.livingRoom.localizedName,
             type: .livingRoom,
-            center: SIMD3<Float>((minX + maxX) * 0.5, roomH * 0.5, (minZ + maxZ) * 0.5),
-            size: SIMD3<Float>(maxX - minX, roomH, maxZ - minZ)
+            center: SIMD3<Float>(centerX, roomH * 0.5, centerZ),
+            size: SIMD3<Float>(maxLocalX - minLocalX, roomH, maxLocalZ - minLocalZ),
+            rotationY: rotation
         )
         cornerRooms.append(room)
         clearCornerPins()
@@ -1046,6 +1130,31 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         for anchor in cornerRoomAnchors { sceneView?.session.remove(anchor: anchor) }
         cornerRoomAnchors.removeAll()
         cornerPoints.removeAll()
+    }
+
+    private func clearCornerRooms() {
+        clearCornerPins()
+        cornerRooms.removeAll()
+        cornerRoomCount = 0
+    }
+
+    private func planeWorldCorners(for plane: ARPlaneAnchor) -> [SIMD3<Float>] {
+        let hx = plane.extent.x * 0.5
+        let hz = plane.extent.z * 0.5
+        return [
+            SIMD3<Float>((plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z - hz, 1.0)).x,
+                         (plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z - hz, 1.0)).y,
+                         (plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z - hz, 1.0)).z),
+            SIMD3<Float>((plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z - hz, 1.0)).x,
+                         (plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z - hz, 1.0)).y,
+                         (plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z - hz, 1.0)).z),
+            SIMD3<Float>((plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z + hz, 1.0)).x,
+                         (plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z + hz, 1.0)).y,
+                         (plane.transform * SIMD4<Float>(plane.center.x + hx, plane.center.y, plane.center.z + hz, 1.0)).z),
+            SIMD3<Float>((plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z + hz, 1.0)).x,
+                         (plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z + hz, 1.0)).y,
+                         (plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z + hz, 1.0)).z)
+        ]
     }
 
     /// Samples the LiDAR depth or raycast distance at any portrait-normalized
@@ -1166,6 +1275,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                 completion(.failure(ARSpatialSurveyError.sessionUnavailable))
                 return
             }
+            clearLubanPoints()
+            clearCornerRooms()
+            clearGroundBaguaOverlay()
             configuration.initialWorldMap = worldMap
             trackingState = .initializing
             mappingState = .extending
@@ -1306,6 +1418,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func stop() {
+        clearLubanPoints()
+        clearCornerRooms()
+        clearGroundBaguaOverlay()
         sceneView?.session.pause()
         sceneView?.session.delegate = nil
         sceneView?.delegate = nil
@@ -1325,6 +1440,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         largestPlaneWidth = nil
         largestPlaneDepth = nil
         semanticCounts = [:]
+        estimatedRoomHeightMeters = nil
+        hasLowBeamWarning = false
+        surveyHeadingDegrees = nil
     }
 
     public func session(_ session: ARSession, didUpdate frame: ARFrame) {
@@ -1651,7 +1769,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                     continue
                 }
                 let value = row[x]
-                if value.isFinite && value > 0 { valid += 1 }
+                if value.isFinite && value > 0.05 && value < 60.0 { valid += 1 }
             }
         }
         return Float(valid) / Float(total)
@@ -1705,6 +1823,16 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             node.name = "ar-luban-anchor"
             return node
         }
+        if anchor.name?.hasPrefix("corner-pin") == true {
+            let sphere = SCNSphere(radius: 0.016)
+            let mat = SCNMaterial()
+            mat.diffuse.contents = UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 0.95)
+            mat.lightingModel = .constant
+            sphere.materials = [mat]
+            let node = SCNNode(geometry: sphere)
+            node.name = "ar-corner-pin"
+            return node
+        }
         guard rendersSpatialMesh else { return nil }
         if let meshAnchor = anchor as? ARMeshAnchor {
             guard let geometry = meshGeometry(for: meshAnchor) else { return nil }
@@ -1718,9 +1846,16 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         node.name = "ar-spatial-plane"
         node.geometry = planeGeometry(for: planeAnchor)
         node.isHidden = !meshVisible
-        if planeAnchor.alignment == .horizontal {
-            node.eulerAngles.x = -.pi / 2
-        }
+        // ARSCNView supplies the anchor transform to this node; center is
+        // therefore applied in the anchor's local frame (the same convention
+        // used by ARPlaneAnchor's extent), rather than transformed a second
+        // time into world coordinates.
+        node.position = SCNVector3(planeAnchor.center.x, planeAnchor.center.y, planeAnchor.center.z)
+        // SCNPlane lies in local XY. Horizontal AR planes expose their second
+        // extent along local Z, so rotate the outline onto XZ. Vertical planes
+        // already use the anchor's upright frame and must retain zero roll;
+        // applying the horizontal rotation here made wall outlines lie flat.
+        node.eulerAngles.x = planeAnchor.alignment == .horizontal ? -.pi / 2 : 0
         return node
     }
 
@@ -1744,11 +1879,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
         lastPlaneGeometryUpdate[planeAnchor.identifier] = now
         node.geometry = planeGeometry(for: planeAnchor)
-        if planeAnchor.alignment == .horizontal {
-            node.eulerAngles.x = -.pi / 2
-        } else {
-            node.eulerAngles.x = 0
-        }
+        node.position = SCNVector3(planeAnchor.center.x, planeAnchor.center.y, planeAnchor.center.z)
+        node.eulerAngles.x = planeAnchor.alignment == .horizontal ? -.pi / 2 : 0
     }
 
     private func planeGeometry(for anchor: ARPlaneAnchor) -> SCNGeometry {
@@ -1779,7 +1911,12 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         )
 
         let faces = mesh.faces
-        let faceData = Data(bytes: faces.buffer.contents(), count: faces.count * faces.bytesPerIndex)
+        let indexCount = faces.count * 3
+        let faceByteCount = indexCount * faces.bytesPerIndex
+        guard faces.offset >= 0,
+              faces.offset + faceByteCount <= faces.buffer.length else { return nil }
+        let facePointer = faces.buffer.contents().advanced(by: faces.offset)
+        let faceData = Data(bytes: facePointer, count: faceByteCount)
         let element = SCNGeometryElement(
             data: faceData,
             primitiveType: .triangles,
@@ -1990,8 +2127,14 @@ public struct ARSpatialSurveyView: View {
 
     private var latestSurveyForVR: HouseSpatialSurvey? {
         if let currentSurveyReport { return currentSurveyReport }
-        guard let data = UserDefaults.standard.data(forKey: "latest_house_spatial_survey") else { return nil }
-        return try? JSONDecoder().decode(HouseSpatialSurvey.self, from: data)
+        let keys = [SpatialSurveyArchiveKeys.measured, SpatialSurveyArchiveKeys.virtual]
+        for key in keys {
+            if let data = UserDefaults.standard.data(forKey: key),
+               let survey = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: data) {
+                return survey
+            }
+        }
+        return nil
     }
 
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [

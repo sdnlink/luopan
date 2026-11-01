@@ -356,6 +356,14 @@ public class StoreKitIAPManager: ObservableObject {
         updateMirrorLocked(mirror)
     }
 
+    private func isSupportedProductID(_ productID: String) -> Bool {
+        if IAPProductID(rawValue: productID) != nil { return true }
+        // These IDs were shipped by earlier builds and are still valid
+        // transaction identifiers for consumable credit migration.
+        return productID == "com.yanxiang.compass.floorplan.single"
+            || productID == "com.yanxiang.luopan.floorplan.single"
+    }
+
     // MARK: - 商品信息请求 (StoreKit 2)
 
     public func fetchProducts() {
@@ -581,7 +589,7 @@ public class StoreKitIAPManager: ObservableObject {
 
     private func handleTransactionUpdate(_ transaction: Transaction) async {
         let pid = transaction.productID
-        guard IAPProductID(rawValue: pid) != nil else { return }
+        guard isSupportedProductID(pid) else { return }
 
         // 退款/撤销：立即权威对账。currentEntitlements 已不含该交易，
         // 验证覆写镜像即收回权益（订阅失效同理由到期逻辑处理）。

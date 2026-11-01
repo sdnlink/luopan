@@ -17,6 +17,9 @@ public struct ExteriorShaRecord: Identifiable, Codable, Equatable {
     public let id: UUID
     public let shaID: String          // ExteriorShaEngine database key（tianzhan/luchong/...）
     public let bearingDegrees: Double // 绝对方位角 0..360
+    /// Heading at capture time. Optional for backward-compatible decoding of
+    /// records created before capture headings were persisted.
+    public let capturedHeadingDegrees: Double?
     public let elevationDegrees: Double // 目标仰角（俯为负，仰为正）
     public let distanceMeters: Float?   // LiDAR/AR 深度；nil = 无深度数据
     public let confidence: Double?      // AI 置信度；手动标注为 nil
@@ -28,6 +31,7 @@ public struct ExteriorShaRecord: Identifiable, Codable, Equatable {
         id: UUID = UUID(),
         shaID: String,
         bearingDegrees: Double,
+        capturedHeadingDegrees: Double? = nil,
         elevationDegrees: Double = 0,
         distanceMeters: Float? = nil,
         confidence: Double? = nil,
@@ -38,6 +42,7 @@ public struct ExteriorShaRecord: Identifiable, Codable, Equatable {
         self.id = id
         self.shaID = shaID
         self.bearingDegrees = bearingDegrees
+        self.capturedHeadingDegrees = capturedHeadingDegrees
         self.elevationDegrees = elevationDegrees
         self.distanceMeters = distanceMeters
         self.confidence = confidence
@@ -46,9 +51,22 @@ public struct ExteriorShaRecord: Identifiable, Codable, Equatable {
         self.note = note
     }
 
-    /// 八宫（八方）索引：0=正北，每 45° 一格，随罗盘方位旋转
+    /// 八宫（八方）索引：绝对方位模式下 0=正北，每 45° 一格。
+    /// 全景报告会通过 `palaceIndex(relativeTo:)` 以采集基准朝向分组。
     public var palaceIndex: Int {
-        let norm = (bearingDegrees.truncatingRemainder(dividingBy: 360) + 360)
+        absolutePalaceIndex(for: bearingDegrees)
+    }
+
+    /// Eight-palace index relative to a survey baseline heading. This keeps
+    /// the report stable when a user turns the phone after taking records.
+    public func palaceIndex(relativeTo headingDegrees: Double) -> Int {
+        let relative = bearingDegrees - headingDegrees
+        return absolutePalaceIndex(for: relative)
+    }
+
+    private func absolutePalaceIndex(for bearing: Double) -> Int {
+        guard bearing.isFinite else { return 0 }
+        let norm = (bearing.truncatingRemainder(dividingBy: 360) + 360)
             .truncatingRemainder(dividingBy: 360)
         return Int(norm / 45.0) % 8
     }
@@ -115,11 +133,11 @@ public struct ShaPanoramaReport: Identifiable, Codable {
         self.records = records
     }
 
-    /// 按八宫分组（0=正北…7=西北），未扫描宫位为空数组
+    /// 按采集基准朝向的八宫分组（0=基准朝向…7=其余方位），未扫描宫位为空数组。
     public var palacesByIndex: [[ExteriorShaRecord]] {
         var result = Array(repeating: [ExteriorShaRecord](), count: 8)
         for record in records {
-            result[record.palaceIndex].append(record)
+            result[record.palaceIndex(relativeTo: headingDegrees)].append(record)
         }
         return result
     }
@@ -189,25 +207,54 @@ public final class ShaSurveyStore: ObservableObject {
     /// 最近一次室内体检（RoomPlan/LiDAR/户型图路径）
     @Published public private(set) var latestInterior: HouseSpatialSurvey?
 
-    private init() {}
+    private let storageKey = "tianji.sha_survey_store.v1"
+
+    private init() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
+        records = snapshot.records
+        latestInterior = snapshot.latestInterior
+    }
+
+    private struct Snapshot: Codable {
+        let records: [ExteriorShaRecord]
+        let latestInterior: HouseSpatialSurvey?
+    }
+
+    private func persist() {
+        let snapshot = Snapshot(records: records, latestInterior: latestInterior)
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        UserDefaults.standard.set(data, forKey: storageKey)
+    }
 
     public func addRecord(_ record: ExteriorShaRecord) {
         records.append(record)
+        persist()
     }
 
     public func updateInterior(_ survey: HouseSpatialSurvey?) {
         latestInterior = survey
+        persist()
     }
 
     public func clearRecords() {
         records.removeAll()
+        persist()
     }
 
     /// 室内外统一档案（任一侧有数据即非空）
     public var archive: PanoramaFengShuiArchive? {
         guard !records.isEmpty || latestInterior != nil else { return nil }
+        let capturedHeading = records.lazy
+            .compactMap { $0.capturedHeadingDegrees }
+            .first(where: { $0.isFinite })
+        let interiorHeading = latestInterior?.compassHeading
+        let fallbackHeading = CompassMotionManager.shared.headingState.facingAngle
+        let heading = [capturedHeading, interiorHeading, fallbackHeading]
+            .compactMap { $0 }
+            .first(where: { $0.isFinite }) ?? 0.0
         return PanoramaFengShuiArchive(
-            compassHeading: CompassMotionManager.shared.headingState.facingAngle,
+            compassHeading: heading,
             interior: latestInterior,
             exterior: records
         )

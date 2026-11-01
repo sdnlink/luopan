@@ -8,7 +8,12 @@ public struct ZeRiAnalysis {
     public let isAuspicious: Bool
     public let suiPoWarning: String?
     public let yuePoWarning: String?
+    /// True day/year/month San Sha calculation is not part of this lightweight
+    /// checker yet. Keep this nil rather than labelling a sitting-mountain
+    /// clash as San Sha.
     public let sanShaWarning: String?
+    /// Day branch clash with the selected sitting mountain.
+    public let sittingClashWarning: String?
     public let detailsText: String
     public let yiActivities: [String]
     public let jiActivities: [String]
@@ -147,7 +152,7 @@ public final class ZeRiEngine {
         var warnings: [String] = []
         var suiPo: String? = nil
         var yuePo: String? = nil
-        var sanSha: String? = nil
+        var sittingClash: String? = nil
         
         // 岁破冲煞：日支冲太岁年支
         if clashMap[dayBranch] == yearBranch {
@@ -212,23 +217,23 @@ public final class ZeRiEngine {
         if let sClash = clashMap[sittingBranch], sClash == dayBranch {
             switch lang {
             case .en:
-                sanSha = "Day branch clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
+                sittingClash = "Day branch clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
             case .zhHant:
-                sanSha = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.localizedName)山】，犯【衝山大忌】，切勿動土安門！"
+                sittingClash = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.localizedName)山】，犯【衝山大忌】，切勿動土安門！"
             case .ja:
-                sanSha = "本日の日支【\(dayBranch)】が坐山【\(sitting.localizedName)山】と直衝し、【衝山大忌】に該当します。"
+                sittingClash = "本日の日支【\(dayBranch)】が坐山【\(sitting.localizedName)山】と直衝し、【衝山大忌】に該当します。"
             case .ko:
-                sanSha = "오늘 일진【\(dayBranch)】이 좌산【\(sitting.localizedName)산】과 직충하여 【충산대기】를 범하니 동토와 안문을 피하세요!"
+                sittingClash = "오늘 일진【\(dayBranch)】이 좌산【\(sitting.localizedName)산】과 직충하여 【충산대기】를 범하니 동토와 안문을 피하세요!"
             case .vi:
-                sanSha = "Hôm nay chi ngày 【\(dayBranch)】 trực xung Tọa sơn 【\(sitting.localizedName)】 phạm 【Xung Sơn Đại Kỵ】!"
+                sittingClash = "Hôm nay chi ngày 【\(dayBranch)】 trực xung Tọa sơn 【\(sitting.localizedName)】 phạm 【Xung Sơn Đại Kỵ】!"
             case .th:
-                sanSha = "กิ่งดินวัน 【\(dayBranch)】 ปะทะทิศพิงบ้าน 【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
+                sittingClash = "กิ่งดินวัน 【\(dayBranch)】 ปะทะทิศพิงบ้าน 【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
             case .id:
-                sanSha = "Cabang hari bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
+                sittingClash = "Cabang hari bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
             case .auto, .zhHans:
-                sanSha = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
+                sittingClash = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }
-            if let sanSha = sanSha { warnings.append(sanSha) }
+            if let sittingClash = sittingClash { warnings.append(sittingClash) }
         }
         
         let isAuspicious = warnings.isEmpty
@@ -311,7 +316,8 @@ public final class ZeRiEngine {
             isAuspicious: isAuspicious,
             suiPoWarning: suiPo,
             yuePoWarning: yuePo,
-            sanShaWarning: sanSha,
+            sanShaWarning: nil,
+            sittingClashWarning: sittingClash,
             detailsText: details,
             yiActivities: yi,
             jiActivities: ji

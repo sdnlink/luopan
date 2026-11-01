@@ -646,10 +646,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.currentDeclination = declination
                 self.hasDeclination = true
                 self.hasCoreLocationTrueHeading = true
-            } else if self.hasDeclination {
-                self.trueHeading = (mag + self.currentDeclination + 360.0)
-                    .truncatingRemainder(dividingBy: 360.0)
             } else {
+                // trueHeading < 0 means Core Location no longer has a valid
+                // calibrated geographic heading. Do not keep advertising an
+                // old Core Location correction; the next valid location will
+                // refresh WMM and the true-north fallback.
+                self.hasCoreLocationTrueHeading = false
+                self.hasDeclination = false
+                self.currentDeclination = 0.0
                 self.trueHeading = mag
             }
             
@@ -691,6 +695,18 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             // 拒绝/受限/定位服务不可用/网络等任何非瞬态失败都视为失去定位，
             // 避免陈旧经纬度、磁偏角与太阳时继续参与术数计算。
             self.hasLocationFix = false
+            self.hasDeclination = false
+            self.hasCoreLocationTrueHeading = false
+            self.currentDeclination = 0.0
+            self.latitude = 0.0
+            self.longitude = 0.0
+            self.altitude = 0.0
+            self.speedKmH = 0.0
+            self.trueHeading = self.magneticHeading
+            self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
+            self.trueSolarTimeStr = "--:--:--"
+            self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+            self.updateResolvedState(force: true)
         }
     }
 

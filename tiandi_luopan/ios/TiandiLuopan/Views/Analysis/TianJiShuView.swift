@@ -257,6 +257,12 @@ public struct TianJiShuView: View {
                 let coordsDesc = motion.coordsDesc
                 let solarTimeDesc = motion.solarTimeDesc
                 let language = lang.effectiveLanguage
+                // Freeze the current indoor/outdoor survey archive together
+                // with the compass values. The renderer runs off the main
+                // queue, so reading the live store inside it could mix a new
+                // record with an older heading.
+                let panoramaArchive = ShaSurveyStore.shared.archive
+                let floorplanReport = FloorplanAuditStore.shared.latestReport
                 let reportDate = Date()
                 isGenerating = true
                 DispatchQueue.global(qos: .userInitiated).async {
@@ -265,6 +271,8 @@ public struct TianJiShuView: View {
                         coordsDesc: coordsDesc,
                         solarTimeDesc: solarTimeDesc,
                         language: language,
+                        floorplanReport: floorplanReport,
+                        panoramaArchive: panoramaArchive,
                         reportDate: reportDate
                     )
                     DispatchQueue.main.async {

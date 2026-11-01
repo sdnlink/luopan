@@ -207,6 +207,24 @@ public struct FloorplanAuditItem: Identifiable {
     }
 }
 
+/// Latest in-session floorplan audit consumed by the TianJi export. The
+/// report is intentionally kept as value data; it is refreshed after every
+/// audit and is not treated as a durable source of truth.
+public final class FloorplanAuditStore {
+    public static let shared = FloorplanAuditStore()
+    private init() {}
+
+    public private(set) var latestReport: [FloorplanAuditItem] = []
+
+    public func update(_ report: [FloorplanAuditItem]) {
+        latestReport = report
+    }
+
+    public func clear() {
+        latestReport.removeAll()
+    }
+}
+
 public class FloorplanEngine {
     public static let shared = FloorplanEngine()
     
@@ -482,16 +500,18 @@ public class FloorplanEngine {
             
             updatedRooms.append(r)
             
-            if audit.level != "平" {
-                auditReport.append(FloorplanAuditItem(
-                    id: "room-\(room.id)",
-                    title: "\(r.name) · \(audit.title)",
-                    palace: r.palaceName,
-                    severity: audit.level,
-                    lore: audit.lore,
-                    solution: audit.advice
-                ))
-            }
+            // Keep balanced rooms in the report as well. Their explanatory
+            // text and maintenance advice are part of the complete floorplan
+            // snapshot and must be available to the long-scroll export; the
+            // previous warning-only filter silently dropped those remedies.
+            auditReport.append(FloorplanAuditItem(
+                id: "room-\(room.id)",
+                title: "\(r.name) · \(audit.title)",
+                palace: r.palaceName,
+                severity: audit.level,
+                lore: audit.lore,
+                solution: audit.advice
+            ))
         }
 
         auditReport.append(contentsOf: missingCornerAudits(
@@ -636,19 +656,29 @@ public class FloorplanEngine {
 
         let sectorWidth = bounds.width / 3.0
         let sectorHeight = bounds.height / 3.0
-        let sectors: [CGRect] = [
-            CGRect(x: bounds.minX, y: bounds.minY, width: sectorWidth, height: sectorHeight),
-            CGRect(x: bounds.maxX - sectorWidth, y: bounds.minY, width: sectorWidth, height: sectorHeight),
-            CGRect(x: bounds.maxX - sectorWidth, y: bounds.maxY - sectorHeight, width: sectorWidth, height: sectorHeight),
-            CGRect(x: bounds.minX, y: bounds.maxY - sectorHeight, width: sectorWidth, height: sectorHeight)
-        ]
+        // Check every outer cell of the 3×3 bagua grid. The previous
+        // implementation only inspected the four corners, so a recessed
+        // middle section on the east/south/west/north edge was silently
+        // treated as a complete footprint.
+        var sectors: [CGRect] = []
+        for row in 0..<3 {
+            for column in 0..<3 {
+                guard row != 1 || column != 1 else { continue }
+                sectors.append(CGRect(
+                    x: bounds.minX + CGFloat(column) * sectorWidth,
+                    y: bounds.minY + CGFloat(row) * sectorHeight,
+                    width: sectorWidth,
+                    height: sectorHeight
+                ))
+            }
+        }
         let sectorArea = sectorWidth * sectorHeight
         guard sectorArea > 0 else { return [] }
 
         var results: [FloorplanAuditItem] = []
-        // A custom layout can contain several small rooms in one corner and
+        // A custom layout can contain several small rooms in one sector and
         // can also have a shifted Tai Ji point that maps two geometric
-        // corners to the same eight-gua sector. Keep the emitted gua set
+        // sectors to the same eight-gua sector. Keep the emitted gua set
         // stable so a SwiftUI ForEach never receives duplicate report IDs.
         var emittedGua = excludingGua
         for sector in sectors {
@@ -674,10 +704,10 @@ public class FloorplanEngine {
     }
 
     /// Returns the exact union area of axis-aligned room rectangles clipped to
-    /// one corner sector. Summing each overlap would count overlapping custom
-    /// rooms twice, while checking only one room misses a corner assembled from
+    /// one grid sector. Summing each overlap would count overlapping custom
+    /// rooms twice, while checking only one room misses a sector assembled from
     /// several smaller rooms. A sweep over the rectangles' x breakpoints keeps
-    /// this calculation deterministic and inexpensive (only four sectors).
+    /// this calculation deterministic and inexpensive (only eight sectors).
     private func coveredArea(of sector: CGRect, by rooms: [FloorplanRoom]) -> CGFloat {
         let clipped = rooms.compactMap { room -> CGRect? in
             let intersection = room.rect.intersection(sector)

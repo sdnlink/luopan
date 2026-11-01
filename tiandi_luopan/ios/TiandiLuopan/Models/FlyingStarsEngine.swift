@@ -83,8 +83,27 @@ public struct PalaceCell: Identifiable {
         }
     }
 
+    // Shared by the chart-level advice below when selecting activation
+    // palaces. File scope keeps the flag out of the public model API while
+    // allowing the chart to apply the same safety rule consistently.
+    fileprivate var hasEarthSha: Bool { isShaWuHuang || isShaErHei }
+
+    private func localizedEarthShaEvaluation(_ lang: AppLanguage) -> String {
+        switch lang {
+        case .en: return "Five Yellow/Two Black earth sha · Keep quiet and use a Metal remedy"
+        case .zhHant: return "五黃／二黑土煞 · 宜靜安金屬化解"
+        case .ja: return "五黄・二黒土煞 · 静かにして金属で化解"
+        case .ko: return "오황·이흑 토살 · 조용히 하고 금속으로 화해"
+        case .vi: return "Thổ sát Ngũ Hoàng/Nhị Hắc · Giữ tĩnh và dùng kim loại hóa giải"
+        case .th: return "เคราะห์ดินดาวห้าเหลือง/สองดำ · รักษาความสงบและใช้โลหะแก้"
+        case .id: return "Sha tanah 5-Kuning/2-Hitam · Jaga ketenangan dan gunakan logam"
+        case .auto, .zhHans: return "五黄／二黑土煞 · 宜静安金属化解"
+        }
+    }
+
     public var localizedEvaluation: String {
         let lang = LocalizationManager.shared.effectiveLanguage
+        if hasEarthSha { return localizedEarthShaEvaluation(lang) }
         switch lang {
         case .en:
             if mountainStar == activePeriod && facingStar == activePeriod { return "Double Current Stars · Wealth and people prosper" }
@@ -215,14 +234,14 @@ public struct PalaceCell: Identifiable {
     }
     
     public var evaluation: String {
-        if mountainStar == activePeriod && facingStar == activePeriod {
+        if hasEarthSha {
+            return "五黄／二黑土煞 · 宜静安金属化解"
+        } else if mountainStar == activePeriod && facingStar == activePeriod {
             return "当运双星会聚 · 财丁两旺"
         } else if facingStar == activePeriod {
             return "当旺财星照临 · 宜开门纳气"
         } else if mountainStar == activePeriod {
             return "当运丁星归位 · 人丁兴旺"
-        } else if isShaWuHuang || isShaErHei {
-            return "五黄二黑交加 · 宜静安铜化解"
         } else if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) {
             return "一六共宗 · 水清木秀催文昌"
         } else {
@@ -262,9 +281,12 @@ public struct XuanKongChart {
     /// 基于九宫飞星排盘动态推导的【催财旺气建议】
     public var wealthAdvice: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        let wangPalace = palaces.first(where: { $0.facingStar == period })
+        // Never recommend activation in a 5-Yellow/2-Black palace. The
+        // current-period star does not override an earth-sha warning.
+        let wangPalace = palaces.first(where: { $0.facingStar == period && !$0.hasEarthSha })
         let nextStar = (period % 9) + 1
-        let shengQiPalace = palaces.first(where: { !$0.isCenter && $0.facingStar == nextStar }) ?? palaces.first(where: { $0.facingStar == nextStar })
+        let shengQiPalace = palaces.first(where: { !$0.isCenter && $0.facingStar == nextStar && !$0.hasEarthSha })
+            ?? palaces.first(where: { $0.facingStar == nextStar && !$0.hasEarthSha })
         let wenchangPalace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 1 && $0.facingStar == 4) || ($0.mountainStar == 4 && $0.facingStar == 1) || ($0.mountainStar == 1 && $0.facingStar == 6) || ($0.mountainStar == 6 && $0.facingStar == 1)) })
         
         let wangName = wangPalace?.localizedPalaceName ?? ""
@@ -552,6 +574,7 @@ public final class FlyingStarsEngine {
     // 八卦宫位对应的洛书基础数字
     // 坎1, 坤2, 震3, 巽4, 中5, 乾6, 兑7, 艮8, 离9
     private let palaceNames = ["坎一宫 (正北)", "坤二宫 (西南)", "震三宫 (正东)", "巽四宫 (东南)", "天心五 (中宫)", "乾六宫 (西北)", "兑七宫 (正西)", "艮八宫 (东北)", "离九宫 (正南)"]
+    private let palaceTrigrams = ["坎", "坤", "震", "巽", "中", "乾", "兑", "艮", "离"]
     private let palaceDirections = ["正北", "西南", "正东", "东南", "中宫", "西北", "正西", "东北", "正南"]
     
     /// 24山正统替卦口诀映射表 (沈氏玄空替卦诀)：
@@ -772,7 +795,7 @@ public final class FlyingStarsEngine {
             let cell = PalaceCell(
                 id: i,
                 palaceName: palaceNames[i],
-                trigram: palaceNames[i].prefix(1).description,
+                trigram: palaceTrigrams[i],
                 direction: palaceDirections[i],
                 periodStar: basePeriod[i],
                 activePeriod: activePeriod,

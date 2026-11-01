@@ -111,7 +111,7 @@ jobs:
             --time "9:41" --batteryState charged --batteryLevel 100 --wifiBars 3 2>/dev/null || true
           # 后台以 --console-pty 启动：App 崩溃时控制台会输出
           # Swift fatal error / uncaught exception 等精确原因
-          (xcrun simctl launch --console-pty "$DUO_UDID" "$BUNDLE_ID" > app-console.log 2>&1 &)
+          (xcrun simctl launch --console-pty "$DUO_UDID" "$BUNDLE_ID" > app-console.log 2>&1 || true) &
           echo "Launched with console capture (background)"
 
       # --------------------------------------------------
@@ -124,9 +124,13 @@ jobs:
           # 等待启动、传感器初始化与首屏渲染
           sleep 15
           echo "===== Process check ====="
-          if ! xcrun simctl spawn "$DUO_UDID" launchctl list | grep -q "$BUNDLE_ID"; then
+          # 先完整落盘再 grep：pipefail 下 `launchctl list | grep -q` 会在匹配后
+          # 立即让 launchctl 收到 SIGPIPE(signal 13)，管道返回非零，把“进程存活”
+          # 误判为“进程不在”。落盘后 grep 文件可彻底消除该误判。
+          xcrun simctl spawn "$DUO_UDID" launchctl list > launchctl.out 2>&1 || true
+          if ! grep -q "$BUNDLE_ID" launchctl.out; then
             echo "::error::App process is not alive on iPhone Duo simulator"
-            xcrun simctl spawn "$DUO_UDID" launchctl list | tail -30 || true
+            tail -30 launchctl.out || true
             echo "===== App console (crash reason) ====="
             cat app-console.log 2>/dev/null | tail -100 || true
             echo "===== Crash reports ====="

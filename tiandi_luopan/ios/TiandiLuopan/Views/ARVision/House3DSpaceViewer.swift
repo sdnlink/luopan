@@ -784,8 +784,6 @@ public final class HouseSceneCoordinator: NSObject {
         // heading.
         let axisAngle = primaryAxisAngle(survey: survey)
         let footprintCenter = measuredFootprintCenter(survey: survey, axisAngle: axisAngle)
-        let cx = footprintCenter.x
-        let cz = footprintCenter.y
 
         let floorGeo = SCNPlane(width: CGFloat(w * 1.35), height: CGFloat(d * 1.35))
         let floorMat = SCNMaterial()

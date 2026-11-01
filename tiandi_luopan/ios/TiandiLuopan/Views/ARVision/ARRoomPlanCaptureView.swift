@@ -815,7 +815,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         var openings3D: [SpatialOpening3D] = []
         var objects3D: [SpatialObject3D] = []
         var rooms3D: [SpatialRoom3D] = []
-        var beams3D: [SpatialBeam3D] = []
+        let beams3D: [SpatialBeam3D] = []
 
         let uniqueWalls = deduplicated(rooms.flatMap { $0.walls }, id: { $0.identifier })
         let uniqueDoors = deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
@@ -1090,8 +1090,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let finalRoom = try? await self.roomBuilder.capturedRoom(from: data)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
-                    guard let self = self,
-                          self.captureGeneration == generation,
+                    guard self.captureGeneration == generation,
                           self.captureView?.captureSession === session,
                           self.isCapturing else { return }
                     if let finalRoom {

@@ -601,6 +601,102 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     /// points in gravityAndHeading world coordinates into a 2D top-down blueprint
     /// and syncs them directly to `FloorplanView`, enabling AR-to-Floorplan mapping
     /// even on iOS 14/15 or non-RoomPlan devices.
+    public func buildSpatialSurvey() -> HouseSpatialSurvey? {
+        guard let frame = sceneView?.session.currentFrame else { return nil }
+        let planes = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
+        guard !planes.isEmpty else { return nil }
+
+        var walls3D: [SpatialWall3D] = []
+        var openings3D: [SpatialOpening3D] = []
+        var beams3D: [SpatialBeam3D] = []
+        var rooms3D: [SpatialRoom3D] = []
+        var objects3D: [SpatialObject3D] = []
+
+        let vertPlanes = planes.filter { $0.alignment == .vertical }
+        var minX: Float = .greatestFiniteMagnitude
+        var maxX: Float = -.greatestFiniteMagnitude
+        var minZ: Float = .greatestFiniteMagnitude
+        var maxZ: Float = -.greatestFiniteMagnitude
+
+        for plane in vertPlanes {
+            let col3 = plane.transform.columns.3
+            let col0 = plane.transform.columns.0
+            let halfW = max(Float(0.4), plane.extent.x * 0.5)
+            let h = max(Float(2.0), plane.extent.z)
+            let p1 = SIMD3<Float>(col3.x - col0.x * halfW, col3.y, col3.z - col0.z * halfW)
+            let p2 = SIMD3<Float>(col3.x + col0.x * halfW, col3.y, col3.z + col0.z * halfW)
+            walls3D.append(SpatialWall3D(
+                start: p1,
+                end: p2,
+                height: h,
+                thickness: 0.18,
+                isLoadBearing: false
+            ))
+            minX = min(minX, min(p1.x, p2.x))
+            maxX = max(maxX, max(p1.x, p2.x))
+            minZ = min(minZ, min(p1.z, p2.z))
+            maxZ = max(maxZ, max(p1.z, p2.z))
+        }
+
+        if minX >= maxX { minX = -3.0; maxX = 3.0 }
+        if minZ >= maxZ { minZ = -3.0; maxZ = 3.0 }
+
+        let heading = CompassMotionManager.shared.headingState.facingAngle
+        let entrancePos = SIMD3<Float>((minX + maxX) * 0.5, 1.0, minZ)
+        let entranceNorm = SIMD3<Float>(0, 0, 1)
+        openings3D.append(SpatialOpening3D(
+            type: .entranceDoor,
+            position: entrancePos,
+            normal: entranceNorm,
+            width: 0.95,
+            height: 2.1
+        ))
+
+        if maxZ - minZ > 2.5 {
+            let winPos = SIMD3<Float>((minX + maxX) * 0.5, 1.3, maxZ)
+            openings3D.append(SpatialOpening3D(
+                type: .window,
+                position: winPos,
+                normal: SIMD3<Float>(0, 0, -1),
+                width: 1.8,
+                height: 1.5
+            ))
+        }
+
+        let roomH = estimatedRoomHeightMeters ?? 2.8
+        if hasLowBeamWarning {
+            beams3D.append(SpatialBeam3D(
+                start: SIMD3<Float>(minX, roomH - 0.25, (minZ + maxZ) * 0.5),
+                end: SIMD3<Float>(maxX, roomH - 0.25, (minZ + maxZ) * 0.5),
+                clearanceHeight: max(1.8, roomH - 0.35),
+                beamDepth: 0.35,
+                beamWidth: 0.28
+            ))
+        }
+
+        let spanX = max(Float(2.0), maxX - minX)
+        let spanZ = max(Float(2.0), maxZ - minZ)
+        let cx = (minX + maxX) * 0.5
+        let cz = (minZ + maxZ) * 0.5
+
+        rooms3D.append(SpatialRoom3D(
+            name: FloorplanRoomType.livingRoom.localizedName,
+            type: .livingRoom,
+            center: SIMD3<Float>(cx, roomH * 0.5, cz),
+            size: SIMD3<Float>(spanX, roomH, spanZ)
+        ))
+
+        return HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: "AR 空间点云与平面测绘",
+            walls: walls3D,
+            openings: openings3D,
+            beams: beams3D,
+            rooms: rooms3D,
+            objects: objects3D,
+            compassHeading: heading
+        )
+    }
+
     public func syncPlanesToFloorplan() -> Bool {
         guard let frame = sceneView?.session.currentFrame else { return false }
         let planes = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
@@ -1785,6 +1881,8 @@ public struct ARSpatialSurveyView: View {
     @State private var shareItem: ARSpatialShareItem?
     @State private var saveMessage: String?
     @State private var showRoomPlan = false
+    @State private var show3DSpaceViewer = false
+    @State private var currentSurveyReport: HouseSpatialSurvey? = nil
 
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [
         (.wall, "ar_spatial_wall", "rectangle.portrait"),
@@ -1909,6 +2007,25 @@ public struct ARSpatialSurveyView: View {
                         .accessibilityLabel(lang.t("ar_roomplan_title"))
                     }
 #endif
+                    Button(action: {
+                        if let survey = model.buildSpatialSurvey() {
+                            currentSurveyReport = survey
+                            show3DSpaceViewer = true
+                        }
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "cube.transparent")
+                                .font(.adaptive(size: 13, weight: .bold))
+                            Text("3D空间")
+                                .font(.adaptive(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.yanGold)
+                        .cornerRadius(14)
+                    }
+                    .accessibilityLabel("查看全屋3D空间布局与形煞")
                     Button(action: {
                         _ = model.toggleGroundBaguaOverlay()
                     }) {
@@ -2171,6 +2288,11 @@ public struct ARSpatialSurveyView: View {
         .cornerRadius(12)
         .sheet(item: $shareItem) { item in
             ARSpatialShareSheet(items: [item.item])
+        }
+        .sheet(isPresented: $show3DSpaceViewer) {
+            if let survey = currentSurveyReport {
+                House3DSpaceViewer(survey: survey)
+            }
         }
     }
 

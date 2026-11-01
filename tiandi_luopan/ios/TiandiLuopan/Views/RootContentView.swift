@@ -5,6 +5,7 @@ import UIKit
 extension Color {
     public static let yanCyan = Color(red: 0.0, green: 0.82, blue: 0.95)
     public static let yanBrown = Color(red: 0.65, green: 0.45, blue: 0.25)
+    public static let yanGold = Color(red: 0.95, green: 0.80, blue: 0.25)
 }
 
 // MARK: - iPad 与多设备全景屏幕字体自适应扩展 (Adaptive Typography)

@@ -110,7 +110,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             includingPropertiesForKeys: [.creationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else { return }
-        var reports = files.filter {
+        let reports = files.filter {
             ($0.pathExtension == "json" || $0.pathExtension == "usdz") &&
             $0.lastPathComponent.hasPrefix("TianJiYanXiang-RoomPlan-")
         }
@@ -121,14 +121,39 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             return (url, date, size)
         }
         .sorted { $0.date < $1.date }
-        let maxFiles = 24
+        guard !reports.isEmpty else { return }
+
+        // A multi-segment export contains one JSON plus one USDZ per segment.
+        // Pruning individual files can leave a JSON without its USDZ files (or
+        // vice versa), so group by export UUID and remove complete old batches.
+        func batchID(for url: URL) -> String {
+            let stem = url.deletingPathExtension().lastPathComponent
+            let prefix = "TianJiYanXiang-RoomPlan-"
+            let value = String(stem.dropFirst(prefix.count))
+            return value.components(separatedBy: "-segment-").first ?? value
+        }
+        var batches: [String: [(url: URL, date: Date, size: Int)]] = [:]
+        for report in reports {
+            batches[batchID(for: report.url), default: []].append(report)
+        }
+        var batchList = batches.map { key, files in
+            (id: key, files: files, date: files.map { $0.date }.min() ?? .distantPast,
+             size: files.reduce(0) { $0 + $1.size })
+        }
+        .sorted { $0.date < $1.date }
         let maxBytes = 40 * 1024 * 1024
-        var totalBytes = reports.reduce(0) { $0 + $1.size }
-        while reports.count > maxFiles || totalBytes > maxBytes {
-            guard let oldest = reports.first else { break }
-            try? FileManager.default.removeItem(at: oldest.url)
+        let maxBatches = 6
+        var totalBytes = batchList.reduce(0) { $0 + $1.size }
+        while batchList.count > maxBatches || totalBytes > maxBytes {
+            // Preserve the newest batch even when that one export itself is
+            // larger than the soft budget; deleting part of it would make the
+            // user's current share result unusable.
+            guard batchList.count > 1 else { break }
+            let oldest = batchList.removeFirst()
+            for file in oldest.files {
+                try? FileManager.default.removeItem(at: file.url)
+            }
             totalBytes -= oldest.size
-            reports.removeFirst()
         }
     }
 

@@ -280,7 +280,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         var totalBytes = maps.reduce(0) { $0 + $1.size }
         let maxFiles = 12
         let maxBytes = 80 * 1024 * 1024
-        while maps.count > maxFiles || totalBytes > maxBytes {
+        while (maps.count > maxFiles || totalBytes > maxBytes) && maps.count > 1 {
             guard let oldest = maps.first else { break }
             try? FileManager.default.removeItem(at: oldest.url)
             totalBytes -= oldest.size

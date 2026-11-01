@@ -19,7 +19,7 @@ jobs:
     # iPhone Duo 模拟器随 Xcode 27.1 提供；若 runner 工具链不足，下方
     # "Locate iPhone Duo Simulator" 步骤会明确报错并列出全部可用设备类型。
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       # --------------------------------------------------
@@ -112,7 +112,7 @@ jobs:
           xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID"
 
       # --------------------------------------------------
-      # 6. 冒烟测试：进程存活 + 主 Tab 截图
+      # 6. 冒烟测试：进程存活 + 默认语言主截图
       # --------------------------------------------------
       - name: Smoke Test (Process Alive + Main Screenshot)
         run: |
@@ -135,21 +135,34 @@ jobs:
           xcrun simctl io "$DUO_UDID" screenshot --display=1 duo-screenshots/duo-tab-0-main.png
 
       # --------------------------------------------------
-      # 7. 逐个 Tab 截图（外屏，折叠态默认显示器）
+      # 7. 外屏截图：全部 8 种支持语言 × 全部 Tab（折叠态默认显示器）
+      #    支持语言与 App 的 knownRegions / LocalizationManager 8 语种一致：
+      #    zh-Hans, zh-Hant, en, ja, ko, vi, th, id
       # --------------------------------------------------
-      - name: Capture Screenshots for All Tabs (Outer Display)
+      - name: Capture All Tabs for All Languages (Outer Display)
         run: |
           set -euo pipefail
           BUNDLE_ID="com.yanxiang.compass"
-          for i in 1 2 3 4; do
-            xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
-            xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" -selectedTab "$i"
-            sleep 8
-            # 外屏（LCD，--display=1）：必需，失败即中断
-            xcrun simctl io "$DUO_UDID" screenshot --display=1 "duo-screenshots/duo-tab-$i.png"
+          LANGS="zh-Hans zh-Hant en ja ko vi th id"
+          LOCALES="zh_CN zh_TW en_US ja_JP ko_KR vi_VN th_TH id_ID"
+          L=($LANGS); C=($LOCALES)
+          for ((k=0; k<${#L[@]}; k++)); do
+            lang="${L[$k]}"; locale="${C[$k]}"
+            echo "===== Outer display, language: $lang ($locale) ====="
+            mkdir -p "duo-screenshots/outer/$lang"
+            for i in 0 1 2 3 4; do
+              xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
+              # 每次启动都显式注入语言与地区，确保 8 种语言截图互不影响
+              xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" \
+                -selectedTab "$i" -AppleLanguages "($lang)" -AppleLocale "$locale"
+              sleep 8
+              # 外屏（LCD，--display=1）：必需，失败即中断
+              xcrun simctl io "$DUO_UDID" screenshot --display=1 "duo-screenshots/outer/$lang/duo-tab-$i.png"
+            done
           done
           echo "===== Outer screenshots ====="
-          ls -la duo-screenshots
+          find duo-screenshots/outer -type f | sort | wc -l
+          ls -R duo-screenshots/outer
 
       # --------------------------------------------------
       # 8. 安装 duoctl：命令行展开/旋转 iPhone Duo 模拟器
@@ -167,12 +180,12 @@ jobs:
           fi
 
       # --------------------------------------------------
-      # 9. 展开 iPhone Duo 并截图内屏（验证 7.6" 大屏布局）
+      # 9. 展开 iPhone Duo 并截图内屏（验证 7.6" 大屏布局，全部 8 语言）
       #    模拟器默认折叠；duoctl open 展开到 180° 并回读状态校验，
-      #    失败会报错而非静默成功。展开后逐个 Tab 重启 App 截图，
+      #    失败会报错而非静默成功。展开后按 8 语言 × 5 Tab 重启 App 截图，
       #    App 检测到 horizontalSizeClass==regular 自动启用大屏布局。
       # --------------------------------------------------
-      - name: Unfold & Capture Inner Display (duoctl)
+      - name: Unfold & Capture Inner Display for All Languages (duoctl)
         run: |
           set -euo pipefail
           BUNDLE_ID="com.yanxiang.compass"
@@ -188,15 +201,25 @@ jobs:
           duoctl state
           # App 纯竖屏：内屏展开默认横屏界面，旋转回竖屏
           duoctl rotate portrait || echo "::warning::duoctl rotate failed; continuing with current orientation"
-          for i in 0 1 2 3 4; do
-            xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
-            xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" -selectedTab "$i"
-            sleep 8
-            duoctl screenshot "duo-screenshots/duo-inner-unfolded-tab-$i.png" \
-              || echo "::warning::unfolded inner screenshot failed for tab $i"
+          LANGS="zh-Hans zh-Hant en ja ko vi th id"
+          LOCALES="zh_CN zh_TW en_US ja_JP ko_KR vi_VN th_TH id_ID"
+          L=($LANGS); C=($LOCALES)
+          for ((k=0; k<${#L[@]}; k++)); do
+            lang="${L[$k]}"; locale="${C[$k]}"
+            echo "===== Inner display (unfolded), language: $lang ($locale) ====="
+            mkdir -p "duo-screenshots/inner/$lang"
+            for i in 0 1 2 3 4; do
+              xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
+              xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" \
+                -selectedTab "$i" -AppleLanguages "($lang)" -AppleLocale "$locale"
+              sleep 8
+              duoctl screenshot "duo-screenshots/inner/$lang/duo-inner-unfolded-tab-$i.png" \
+                || echo "::warning::unfolded inner screenshot failed for tab $i (lang $lang)"
+            done
           done
           echo "===== Unfolded inner screenshots ====="
-          ls -la duo-screenshots/
+          find duo-screenshots/inner -type f | sort | wc -l
+          ls -R duo-screenshots/inner
 
       # --------------------------------------------------
       # 10. 上传截图与构建日志
@@ -227,12 +250,15 @@ jobs:
           echo "=========================================================================="
           echo "🧪 iPhone Duo 模拟器冒烟测试完成"
           echo " - 覆盖：iOS 27 runtime 构建、安装、权限、启动、进程存活"
-          echo " - 外屏（折叠态）：5 Tab 截图  LCD (--display=1, 1398x2034)"
-          echo " - 内屏（展开态）：duoctl open 展开 180° 后 5 Tab 截图（大屏布局）"
+          echo " - 语言：8 种支持语言全量（zh-Hans / zh-Hant / en / ja / ko / vi / th / id）"
+          echo " - 外屏（折叠态）：8 语言 × 5 Tab 截图  LCD (--display=1, 1398x2034)"
+          echo " - 内屏（展开态）：duoctl open 展开 180° 后 8 语言 × 5 Tab 截图（大屏布局）"
           echo ""
           echo "⚠️ 说明："
           echo "   1. 原生 simctl / XCUITest 无法控制折叠姿态；展开由 duoctl"
           echo "      （skarol/duoctl，私有 HID 事件注入）完成，依赖 Xcode 27.1+。"
           echo "   2. 若 duoctl 安装或 open 失败，本步骤自动跳过并告警，"
           echo "      不影响外屏验证；展开态大屏布局需在 Device Hub 或真机复核。"
+          echo "   3. 截图按 duo-screenshots/{outer,inner}/<语言>/ 组织，"
+          echo "      语言通过 -AppleLanguages/-AppleLocale 启动参数逐次注入。"
           echo "=========================================================================="

@@ -2,8 +2,6 @@ name: iPhone Duo Test
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, master]
 
 concurrency:
   group: iphone-duo-test-${{ github.ref }}

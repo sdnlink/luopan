@@ -701,7 +701,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             for (idx, door) in room.doors.enumerated() {
                 let pos = SIMD3<Float>(door.transform.columns.3.x, door.transform.columns.3.y, door.transform.columns.3.z)
                 let norm = SIMD3<Float>(door.transform.columns.2.x, door.transform.columns.2.y, door.transform.columns.2.z)
-                let isEntrance = (idx == 0 && rooms.first == room)
+                let isEntrance = (idx == 0 && rooms.first?.identifier == room.identifier)
                 openings3D.append(SpatialOpening3D(
                     type: isEntrance ? .entranceDoor : .interiorDoor,
                     position: pos,

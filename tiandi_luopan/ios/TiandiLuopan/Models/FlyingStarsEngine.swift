@@ -18,6 +18,7 @@ public struct PalaceCell: Identifiable {
     public let isShaErHei: Bool     // 是否二黑病符
     
     public var sittingStar: Int { mountainStar }
+    public var guaName: String { trigram }
     public var element: String {
         switch id {
         case 0: return "水"

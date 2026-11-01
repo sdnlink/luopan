@@ -485,6 +485,10 @@ public class StoreKitIAPManager: ObservableObject {
                         self.isProcessingPurchase = false
                         self.lastStatusMessage = LocalizationManager.shared.t("iap_purchase_deferred")
                     }
+                @unknown default:
+                    await MainActor.run {
+                        self.isProcessingPurchase = false
+                    }
                 }
             } catch {
                 await MainActor.run {
@@ -522,9 +526,10 @@ public class StoreKitIAPManager: ObservableObject {
         isProcessingPurchase = true
         Task {
             await verifyEntitlementsAsync()
-            var unlocked: [String] = []
-            if isVIP() { unlocked.append(IAPProductID.vipYearly.rawValue) }
-            if isLifetime() { unlocked.append(IAPProductID.proLifetime.rawValue) }
+            var unlockedList: [String] = []
+            if isVIP() { unlockedList.append(IAPProductID.vipYearly.rawValue) }
+            if isLifetime() { unlockedList.append(IAPProductID.proLifetime.rawValue) }
+            let unlocked = unlockedList
             await MainActor.run {
                 if unlocked.isEmpty {
                     // Consumable credits are intentionally not restorable by
@@ -760,12 +765,10 @@ public class StoreKitIAPManager: ObservableObject {
         var isLifetime = false
         var vipExpire: TimeInterval = 0
         var purchasedProductIDs: [String] = []
-        var hasVerifiedTransaction = false
 
         for await entitlement in Transaction.currentEntitlements {
             guard case .verified(let tx) = entitlement else { continue }
             guard let product = IAPProductID(rawValue: tx.productID) else { continue }
-            hasVerifiedTransaction = true
             purchasedProductIDs.append(tx.productID)
             switch product {
             case .proLifetime:
@@ -791,14 +794,19 @@ public class StoreKitIAPManager: ObservableObject {
         mirror.vipExpireDate = vipExpire
         mirror.purchasedProductIDs = purchasedProductIDs.sorted()
         updateMirrorLocked(mirror)
+        let floorplanCredits = mirror.floorplanCredits
+        let tianjiCredits = mirror.tianjiCredits
         entitlementLock.unlock()
+
+        let finalLifetime = isLifetime
+        let finalVipExpire = vipExpire
 
         // 发布 UI（主线程）
         await MainActor.run {
-            self.isVIPUser = isLifetime || (vipExpire > Date().timeIntervalSince1970)
-            self.isLifetimeUser = isLifetime
-            self.floorplanCreditsCount = mirror.floorplanCredits
-            self.tianjiCreditsCount = mirror.tianjiCredits
+            self.isVIPUser = finalLifetime || (finalVipExpire > Date().timeIntervalSince1970)
+            self.isLifetimeUser = finalLifetime
+            self.floorplanCreditsCount = floorplanCredits
+            self.tianjiCreditsCount = tianjiCredits
         }
     }
 

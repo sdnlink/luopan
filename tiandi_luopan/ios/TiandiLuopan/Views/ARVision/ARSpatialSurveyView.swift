@@ -2118,6 +2118,8 @@ public struct ARSpatialSurveyView: View {
     @StateObject private var model = ARSpatialSurveyModel()
     @StateObject private var fallbackCameraModel = CameraPreviewController()
     @Environment(\.presentationMode) private var presentationMode
+    @ObservedObject private var iap = StoreKitIAPManager.shared
+    @State private var showPaywall = false
     @State private var isSavingMap = false
     @State private var shareItem: ARSpatialShareItem?
     @State private var saveMessage: String?
@@ -2248,6 +2250,10 @@ public struct ARSpatialSurveyView: View {
                     if #available(iOS 16.0, *),
                        ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
                         Button(action: {
+                            if !iap.hasUnlockedVIP {
+                                showPaywall = true
+                                return
+                            }
                             model.pause()
                             showRoomPlan = true
                         }) {
@@ -2262,6 +2268,10 @@ public struct ARSpatialSurveyView: View {
                     }
 #endif
                     Button(action: {
+                        if !iap.hasUnlockedVIP {
+                            showPaywall = true
+                            return
+                        }
                         if let survey = model.buildSpatialSurvey() {
                             currentSurveyReport = survey
                             show3DSpaceViewer = true
@@ -2280,7 +2290,13 @@ public struct ARSpatialSurveyView: View {
                         .cornerRadius(14)
                     }
                     .accessibilityLabel("查看当前实测全屋3D空间布局与形煞")
-                    Button(action: { showVRSurvey = true }) {
+                    Button(action: {
+                        if !iap.hasUnlockedVIP {
+                            showPaywall = true
+                            return
+                        }
+                        showVRSurvey = true
+                    }) {
                         HStack(spacing: 3) {
                             Image(systemName: "view.3d")
                                 .font(.adaptive(size: 13, weight: .bold))
@@ -2627,6 +2643,9 @@ public struct ARSpatialSurveyView: View {
             // that measured geometry so users can correct/complete it. An
             // empty simulation is only used before the first scan.
             VRSpatialSurveyView(initialSurvey: latestSurveyForVR)
+        }
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
         }
     }
 

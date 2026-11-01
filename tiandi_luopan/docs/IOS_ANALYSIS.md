@@ -14,7 +14,7 @@
 ## 本轮修复（2026-10-28）
 
 - 修正 Xcode 工程的本地化区域清单，加入 `en`、`zh-Hans` 和 `zh-Hant`，并将开发区域统一为实际存在的 `zh-Hans.lproj`，确保三个 `.lproj` 资源在 Xcode 与归档产物中均被识别。
-- 统一发布版本为 `1.3.1 (131)`。工程构建设置是唯一版本来源，`Info.plist` 改为读取 `MARKETING_VERSION` 与 `CURRENT_PROJECT_VERSION`，避免设置页、归档元数据和安装包版本不一致。
+- 统一发布版本为 `1.3.2 (132)`。工程构建设置是唯一版本来源，`Info.plist` 改为读取 `MARKETING_VERSION` 与 `CURRENT_PROJECT_VERSION`，避免设置页、归档元数据和安装包版本不一致。
 - 修复 `tools/generate_pbxproj.py` 会用只包含四个旧 Swift 文件的模板覆盖现有工程的问题；现在检测到已存在的工程会保留其完整 Sources/Frameworks 配置，缺失工程时直接报错，避免生成不可编译的 iOS 项目。
 - 将 `InfoPlist.strings` 的简体、繁体和英文资源加入 Xcode 的 `PBXVariantGroup` 与 Resources 构建阶段；隐私授权提示和系统应用名称现在会随系统语言正确本地化。
 - 修正 Swift 符号审计脚本的工作目录依赖，并识别 `private(set)` 的已发布状态；从仓库根目录或 `tiandi_luopan` 目录运行时都能得到一致结果，缺失成员会让检查失败。

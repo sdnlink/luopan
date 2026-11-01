@@ -807,6 +807,10 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
         let findings = Self.computeSpatialFengshuiFindings(for: combined)
         let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading)
+        if commitToHistory {
+            // 仅在正式提交扫描房间时更新全景形煞档案的室内侧
+            ShaSurveyStore.shared.updateInterior(survey)
+        }
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room

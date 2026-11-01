@@ -445,7 +445,7 @@ public struct ARVisionView: View {
     @State private var showSpatialSurvey: Bool = false
     @State private var latestSnapshotImage: UIImage?
     @State private var showSnapshotShareSheet: Bool = false
-    @State private var shaRecords: [ExteriorShaRecord] = []
+    @ObservedObject private var shaStore = ShaSurveyStore.shared
     @State private var showPanoramaReport: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
@@ -684,7 +684,7 @@ public struct ARVisionView: View {
         }
         .sheet(isPresented: $showPanoramaReport) {
             ShaPanoramaReportSheet(
-                records: shaRecords,
+                records: shaStore.records,
                 heading: motion.headingState.facingAngle,
                 shaList: shaList
             )
@@ -1287,7 +1287,7 @@ public struct ARVisionView: View {
             // 现场标注与全景报告入口
             HStack(spacing: 8) {
                 Button(action: markCurrentSha) {
-                    Label("\(lang.t("ar_mark_sha")) (\(shaRecords.count))", systemImage: "mappin.and.ellipse")
+                    Label("\(lang.t("ar_mark_sha")) (\(shaStore.records.count))", systemImage: "mappin.and.ellipse")
                         .font(.adaptive(size: 10, weight: .bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -1516,7 +1516,7 @@ public struct ARVisionView: View {
                 y: min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
             )
             let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: sample) : nil
-            shaRecords.append(ExteriorShaRecord(
+            shaStore.addRecord(ExteriorShaRecord(
                 shaID: analysis.shaID,
                 bearingDegrees: targetCalculatedHeading,
                 elevationDegrees: targetElevationDegrees,
@@ -1551,7 +1551,7 @@ public struct ARVisionView: View {
             source: aiResult == nil ? .manual : .ai,
             note: aiResult == nil ? nil : "three-frame-temporal-consensus"
         )
-        shaRecords.append(record)
+        shaStore.addRecord(record)
     }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
@@ -2202,6 +2202,21 @@ private struct ShaPanoramaReportSheet: View {
                     Text("\(lang.t("ar_panorama_heading")): \(String(format: "%.1f", heading))°")
                         .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
+
+                    // 室内外统一档案：室内体检条目与外部标注合计
+                    if let interior = ShaSurveyStore.shared.latestInterior {
+                        HStack(spacing: 8) {
+                            Image(systemName: "house.and.flag.fill")
+                                .foregroundColor(.brown)
+                            Text("\(lang.t("ar_panorama_interior")): \(interior.shaItems.count) · \(lang.t("ar_panorama_total")): \(records.count + interior.shaItems.count)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                        .padding(8)
+                        .background(Color.brown.opacity(0.08))
+                        .cornerRadius(8)
+                    }
 
                     if records.isEmpty {
                         Text(lang.t("ar_panorama_none"))

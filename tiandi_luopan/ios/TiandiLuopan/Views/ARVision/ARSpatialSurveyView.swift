@@ -2250,10 +2250,6 @@ public struct ARSpatialSurveyView: View {
                     if #available(iOS 16.0, *),
                        ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
                         Button(action: {
-                            if !iap.hasUnlockedVIP {
-                                showPaywall = true
-                                return
-                            }
                             model.pause()
                             showRoomPlan = true
                         }) {
@@ -2268,10 +2264,6 @@ public struct ARSpatialSurveyView: View {
                     }
 #endif
                     Button(action: {
-                        if !iap.hasUnlockedVIP {
-                            showPaywall = true
-                            return
-                        }
                         if let survey = model.buildSpatialSurvey() {
                             currentSurveyReport = survey
                             show3DSpaceViewer = true

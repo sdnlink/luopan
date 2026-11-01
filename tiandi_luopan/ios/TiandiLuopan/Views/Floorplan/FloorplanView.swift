@@ -604,27 +604,16 @@ public struct FloorplanView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-            // AR 空间测绘 / RoomPlan 扫描快速入口
+            // AR 空间测绘 / RoomPlan 扫描快速入口 (全景形煞AR实测免费开放)
             Button(action: {
-                if !iap.hasUnlockedVIP {
-                    paywallDefaultProduct = .vipYearly
-                    showPaywall = true
-                    return
-                }
                 showARSpatialSurvey = true
             }) {
-                HStack(spacing: 2) {
-                    Image(systemName: iap.hasUnlockedVIP ? "viewfinder" : "lock.fill")
-                    if !iap.hasUnlockedVIP {
-                        Text(lang.t("vip_badge_title"))
-                            .font(.adaptive(size: 8, weight: .bold))
-                    }
-                }
-                .font(.adaptive(size: 11, weight: .bold))
-                .padding(6)
-                .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
-                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                .cornerRadius(6)
+                Image(systemName: "viewfinder")
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .padding(6)
+                    .background(Color(red: 0.95, green: 0.80, blue: 0.25).opacity(0.22))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(6)
             }
             .accessibilityLabel(lang.t("ar_spatial_survey"))
             
@@ -747,8 +736,9 @@ public struct FloorplanView: View {
             }
 
             if let survey = persistedSpatialSurvey {
+                let isVR = survey.scanMethod.contains("VR") || survey.scanMethod.contains("仿真")
                 Button(action: {
-                    if !iap.hasUnlockedVIP {
+                    if isVR && !iap.hasUnlockedVIP {
                         paywallDefaultProduct = .vipYearly
                         showPaywall = true
                         return
@@ -756,9 +746,9 @@ public struct FloorplanView: View {
                     show3DSpaceViewer = true
                 }) {
                     HStack(spacing: 3) {
-                        Image(systemName: iap.hasUnlockedVIP ? "cube.transparent" : "lock.fill")
-                        Text(survey.scanMethod.contains("VR") ? "最近VR仿真3D" : "最近实测3D")
-                        if !iap.hasUnlockedVIP {
+                        Image(systemName: isVR && !iap.hasUnlockedVIP ? "lock.fill" : "cube.transparent")
+                        Text(isVR ? "最近VR仿真3D" : "最近实测3D")
+                        if isVR && !iap.hasUnlockedVIP {
                             Text(lang.t("vip_badge_title"))
                                 .font(.adaptive(size: 8, weight: .bold))
                                 .padding(.horizontal, 3)

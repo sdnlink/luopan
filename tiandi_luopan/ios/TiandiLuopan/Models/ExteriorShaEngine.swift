@@ -356,86 +356,86 @@ public struct ExteriorShaItem: Identifiable, Codable {
         switch lang {
         case .en:
             switch id {
-            case "tianzhan": return "1. Hang an authentic Mountain-Sea Mirror or convex Bagua mirror;\n2. Plant broad-leaved evergreen plants on the balcony as a wind buffer;\n3. Install an opaque porch screen to break direct incoming wind."
-            case "luchong":  return "1. Place a Taishan Stone Shi Gandang monument at the entrance;\n2. Design a winding entryway to slow and harmonize incoming qi flow;\n3. Position a pair of consecrated pure brass Qilin facing the road."
-            case "fangong":  return "1. Position an Obsidian Dragon Turtle facing outward;\n2. Place curved lush greenery along window ledges as an energetic buffer;\n3. Hang Five Emperor Coins with Vajra pestle indoors."
-            case "tantou":   return "1. Hang a convex brass Bagua mirror to reflect peering energy;\n2. Place a pure brass rooster facing the corner to dispel stealth disturbance;\n3. Keep translucent venetian blinds closed during daylight."
-            case "chuanxin": return "1. Lay yellow jade Seven-Star array on the floor to ground Earth qi;\n2. Install a sunken solid brass threshold at the entrance;\n3. Place a heavy solid-wood cabinet at the foyer to retain qi."
-            case "huoxing":  return "1. Place natural white quartz crystal sphere or obsidian array to counter Fire;\n2. Hang two strings of Six Emperor brass coins near the window;\n3. Integrate ocean blue decorative textiles to balance Five Elements."
-            case "baihu":    return "1. Place a consecrated pure brass Dragon holding a pearl on the left side;\n2. Position a heavy green jade Taishan stone on the right to subdue the Tiger;\n3. Increase lighting intensity and tall furniture placement on the left."
-            case "gejiao":   return "1. Build tall planter boxes and shrubs on the balcony as a buffer;\n2. Place a pair of brass Pixiu facing the waterway to guard wealth;\n3. Install thick soundproofing laminated Low-E double glazing."
+            case "tianzhan": return "① Shield (do first · free): Place a row of tall broad-leaf plants (monstera, money tree) taller than the sill, or add thick sheer curtains, on the window/balcony facing the gap. → Effect: Softens the wind and visual pressure from the gap; covers the affected window/balcony.\n② Block (low cost): If the front door lines up with the gap-facing window, put a half-height cabinet or openwork screen at the entry so the room is not seen straight through. → Effect: Stops the through-draft and stabilizes airflow across the home.\n③ Anchor (optional): For a stronger remedy, hang a convex bagua mirror or Mountain-Sea mirror facing the gap, tilted down 3-5°, never aimed at a neighbor's windows. → Effect: Acts only on that facing direction; keep neighborly harmony."
+            case "luchong":  return "① Shield (do first · free): Place a threshold stone or mat at the door and a curtain inside; put a tall plant on a window facing the road. → Effect: Eases the pressure of the straight road pointing at the door; covers the main door and the facing window.\n② Block (low cost): Add a low hedge or screen outside so the entry path turns a corner. → Effect: Turns the direct rush into a gentler flow; benefits the whole home.\n③ Anchor (optional): Hang a Mountain-Sea or bagua mirror above the door, slightly tilted down toward the road, not aimed at neighbors. → Effect: Acts only on the facing direction."
+            case "fangong":  return "① Shield (do first · free): Arrange curved greenery or potted plants on the window/balcony on the bow side. → Effect: Eases the pressure of the bow facing the home; covers the affected window/balcony.\n② Block (low cost): Place a round table, rug or curved sofa on the bow side instead of sharp-edged furniture. → Effect: Softens the outward-pulling energy and stabilizes that area.\n③ Anchor (optional): Put obsidian, a Shi Gandang stone or Five-Emperor coins on the bow side, facing outward. → Effect: Acts only on that direction; optional reinforcement."
+            case "tantou":   return "① Shield (do first · free): Keep sheer curtains or blinds drawn during the day on windows facing the peering corner. → Effect: Blocks the line of sight; covers that window.\n② Block (low cost): Place tall plants (ivy, pothos) on the sill to screen the corner. → Effect: Visual isolation; reduces the feeling of being watched.\n③ Anchor (optional): Hang a convex bagua mirror toward the peering building, not aimed at neighbor windows. → Effect: Acts only on that direction."
+            case "chuanxin": return "① Block (do first · free): If the door lines up with a back window, place a cabinet, screen or thick curtain across the path. → Effect: Stops the straight through-draft and stabilizes airflow.\n② Shield (low cost): Add rugs, plants on sills and heavy furniture against walls to slow the airflow. → Effect: Slows the rushing air; improves comfort and stability.\n③ Anchor (optional): Put Five-Emperor coins or a small Shi Gandang inside the threshold. → Effect: Entry area; optional reinforcement."
+            case "huoxing":  return "① Shield (do first · free): Hang sheer curtains or blinds on windows facing the sharp corner. → Effect: Visual buffer; covers that window.\n② Block (low cost): Place water-grown plants (pothos, ivy) on the sill to ease dryness. → Effect: Harmonizes fire dryness in that area.\n③ Anchor (optional): Use obsidian, crystal or blue decor to suppress fire; avoid red in this direction. → Effect: Acts only on that direction; avoid red."
+            case "baihu":    return "① Balance (do first · free): Add a floor lamp, tall furniture or tall plants on the left (Azure Dragon) side to even out the visual height. → Effect: Balances the room's energy and eases the right-side pressure.\n② Shield (low cost): If there is construction or a tall building on the right, hang heavy curtains on that side. → Effect: Blocks noise and visual disturbance.\n③ Anchor (optional): Place a Taishan stone or Qilin ornament on the left. → Effect: Symbolic reinforcement only."
+            case "gejiao":   return "① Shield (do first · free): Put tall potted plants or planters on the balcony/windows beside the road. → Effect: Buffers the fast flow; covers the road-side.\n② Block (low cost): Use thicker glass or double curtains on the road-side windows to reduce noise. → Effect: Reduces sound and visual disturbance.\n③ Anchor (optional): Place a Pixiu or Shi Gandang facing the road/water. → Effect: Acts on that direction; optional reinforcement."
             default: return remedySolution
             }
         case .zhHant:
             switch id {
-            case "tianzhan": return "1. 懸掛正品開光純銅山海鎮或九宮八卦凸鏡；\n2. 陽台密植闊葉盆栽形成擋風屏障；\n3. 玄關設山水屏風阻隔直衝煞氣。"
-            case "luchong": return "1. 門前安置泰山石敢當；\n2. 設曲折玄關使直氣轉緩；\n3. 窗內安放開光麒麟朝向路衝。"
-            case "fangong": return "1. 擺放黑曜石八卦龍龜；\n2. 窗台以弧形綠植緩衝；\n3. 室內懸掛五帝錢金剛杵。"
-            case "tantou": return "1. 掛凸面銅八卦鏡反彈窺視；\n2. 擺放昂首純銅公雞；\n3. 白天關閉百葉窗簾。"
-            case "chuanxin": return "1. 地面鋪黃玉七星陣聚土氣；\n2. 大門設真銅門檻；\n3. 玄關擺厚重實木櫃藏風聚氣。"
-            case "huoxing": return "1. 安放白水晶球或黑曜石陣；\n2. 窗邊懸掛六帝古錢；\n3. 以藍色水波紋織物調和五行。"
-            case "baihu": return "1. 左側擺純銅祥龍吐珠；\n2. 右方白虎位安置青玉泰山石；\n3. 增強左側燈光與家具高度。"
-            case "gejiao": return "1. 陽台築高盆花壇與灌木；\n2. 向急流方供放銅貔貅；\n3. 安裝厚質隔音 Low-E 玻璃。"
+            case "tianzhan": return "① 擋（先做·免費）：正對樓縫的窗前或陽台，擺一排高過窗台的闊葉綠植（龜背竹、發財樹），或加厚紗簾。→ 影響：減輕夾縫直衝的氣流與視覺壓迫，覆蓋對縫的窗和陽台。\n② 隔（低成本）：若大門與對縫窗成一直線，玄關放半高鞋櫃或鏤空屏風，進門不一目望穿。→ 影響：阻斷穿堂直通，穩定全屋氣流。\n③ 鎮（可選）：正對縫口掛凸面八卦鏡或山海鎮，鏡面朝外、略下傾3-5度，勿照鄰家門窗。→ 影響：僅作用該沖射方位；注意鄰里關係。"
+            case "luchong": return "① 擋（先做·免費）：門口放門檻石或門墊，門內掛門簾；正對路的窗台放一盆高綠植。→ 影響：弱化直路沖門的壓迫感，覆蓋大門與正沖窗。\n② 隔（低成本）：門外加半高綠籬或屏風，讓進門動線拐個彎。→ 影響：直沖氣流轉為緩行，全宅受益。\n③ 鎮（可選）：大門上方掛山海鎮或八卦鏡，朝路方向微下傾，勿照鄰居。→ 影響：僅針對沖射方位。"
+            case "fangong": return "① 擋（先做·免費）：反弓一側窗外擺弧形綠植或盆栽，形成半圓緩衝。→ 影響：緩解弧頂正對的壓迫感，覆蓋反弓側窗/陽台。\n② 隔（低成本）：室內反弓方向放圓形茶几、地毯或弧形沙發，避免直角家具直沖。→ 影響：柔化離心氣流，穩定該區域氣場。\n③ 鎮（可選）：反弓方位放黑曜石、石敢當或五帝錢，面朝弧外。→ 影響：僅針對該方位；可選強化。"
+            case "tantou": return "① 擋（先做·免費）：對探頭方向的窗，白天拉上紗簾或百葉。→ 影響：阻斷視線交叉，覆蓋該窗。\n② 隔（低成本）：窗台擺高綠植（長春藤、綠蘿），遮擋探頭角。→ 影響：視覺隔離，緩解被窺感。\n③ 鎮（可選）：凸面八卦鏡朝探頭方掛，勿照鄰家門窗。→ 影響：僅針對該方位。"
+            case "chuanxin": return "① 隔（先做·免費）：門與後窗成直線時，在動線正中放玄關櫃、屏風或掛厚門簾。→ 影響：阻斷穿堂直通，穩定全屋氣流。\n② 擋（低成本）：地面鋪地毯、窗台放綠植、重家具靠牆，減緩氣流速度。→ 影響：降低直穿氣流速度，改善室溫與安穩感。\n③ 鎮（可選）：入戶門檻內放五帝錢或小號石敢當。→ 影響：入戶區域；可選強化。"
+            case "huoxing": return "① 擋（先做·免費）：正對尖角的窗掛紗簾或百葉。→ 影響：視覺緩衝，覆蓋該窗。\n② 隔（低成本）：窗台擺水養植物（水培綠蘿、常春藤），緩解乾燥。→ 影響：調和火燥，覆蓋該區域。\n③ 鎮（可選）：放黑曜石、水晶或藍色裝飾物壓火氣；此方位忌紅色。→ 影響：僅針對該方位；忌紅色。"
+            case "baihu": return "① 補（先做·免費）：左側（青龍方）加落地燈、高大家具或高大綠植，平衡左右視覺高度。→ 影響：平衡客廳/書房氣場，緩解右側壓迫。\n② 擋（低成本）：右側若臨施工或高樓，靠右窗掛厚窗簾遮擋。→ 影響：遮擋噪音與視線干擾。\n③ 鎮（可選）：左側放泰山石或麒麟擺件。→ 影響：僅象徵性補強。"
+            case "gejiao": return "① 擋（先做·免費）：臨路一側陽台或窗前擺高盆綠植或花壇。→ 影響：緩衝急流，覆蓋臨路側。\n② 隔（低成本）：臨路窗換厚玻璃或加雙層窗簾，降低噪音。→ 影響：減少聲煞與視覺干擾。\n③ 鎮（可選）：近路/水方向放貔貅或石敢當。→ 影響：該方位；可選強化。"
             default: return remedySolution
             }
         case .ja:
             switch id {
-            case "tianzhan": return "1. 純銅の山海鎮または凸面八卦鏡を設置する；\n2. ベランダに広葉樹の観葉植物を密に配置して風を遮る；\n3. 玄関に間仕切りスクリーンを置いて直射風を和らげる。"
-            case "luchong":  return "1. 玄関前に泰山石敢当を配置する；\n2. 玄関を屈折構造にして気の流れを緩やかにする；\n3. 道路に向かって開光麒麟の置物を一対配置する。"
-            case "fangong":  return "1. 外側に向けて黒曜石の龍亀を置く；\n2. 窓辺に緑の観葉植物を半円状に配置して緩衝する；\n3. 室内に五帝銭を吊るす。"
-            case "tantou":   return "1. 凸面銅八卦鏡で視線エネルギーを反射する；\n2. 銅製の雄鶏の置物を角に向けて配置する；\n3. 日中はブラインドカーテンを下ろしておく。"
-            case "chuanxin": return "1. 床に黄玉七星陣を配置して地の気を安定させる；\n2. 玄関に真鍮製敷居を設置する；\n3. 重厚な木製キャビネットを置いて気を留める。"
-            case "huoxing":  return "1. 天然白水晶球または黒曜石を置いて火気を鎮める；\n2. 窓辺に六帝銭を吊るす；\n3. 青色系の布製品を取り入れて五行の調和を図る。"
-            case "baihu":    return "1. 左側（青龍側）に真鍮製の龍の置物を配置する；\n2. 右側（白虎側）に重量感のある石を配置して鎮める；\n3. 左側の照明を明るくし背の高い家具を配置する。"
-            case "gejiao":   return "1. ベランダに背の高いプランターや低木を配置する；\n2. 急流に向けて銅製貔貅を一対配置する；\n3. 遮音性の高い二重サッシガラスを設置する。"
+            case "tianzhan": return "① 遮る（先にやる・無料）：ビルの隙間に向いた窓やベランダに、窓台より高い広葉の観葉植物（モンステラ、パキラ）を並べるか、厚手のレースカーテンを付ける。→ 効果：隙間からの風と視覚的圧迫を和らげ、向かい合う窓・ベランダに効果。\n② 区切る（低コスト）：玄関ドアと隙間側の窓が一直線なら、玄関にハーフカウンターや透かし屏風を置き、入ってすぐ見通せないようにする。→ 効果：貫通気流を遮断し、家全体の空気の流れを安定。\n③ 鎮める（任意）：隙間の正面に凸面八卦鏡や山海鎮を掛け、鏡面を外に向けて3-5度下向きにし、隣家の窓に向けない。→ 効果：その対面方向のみに作用。近隣への配慮を忘れずに。"
+            case "luchong": return "① 遮る（先にやる・無料）：玄関に敷居石かマットを置き、内側にカーテンを掛ける。道路に向いた窓には背の高い植物を置く。→ 効果：直線道路が門に突き刺さる圧迫感を和らげ、玄関と正面の窓に効果。\n② 区切る（低コスト）：門の外に低い生垣や屏風を置き、入り口の動線を曲げる。→ 効果：直進する気を緩やかな流れに変え、家全体に良い影響。\n③ 鎮める（任意）：門の上に山海鎮や八卦鏡を掛け、道路方向へ少し下向きに。隣家に向けない。→ 効果：正面の方向のみに作用。"
+            case "fangong": return "① 遮る（先にやる・無料）：反弓側の窓やベランダに弓なりに緑や鉢植えを並べ、半円の緩衝帯を作る。→ 効果：弧の頂点が家に面する圧迫感を和らげ、反弓側の窓・ベランダに効果。\n② 区切る（低コスト）：室内の反弓方向に丸テーブルや円形ラグ、曲線のソファを置き、角のある家具を避ける。→ 効果：外へ引く気を柔らげ、その場所の気を安定。\n③ 鎮める（任意）：反弓方位に黒曜石、石敢当、五帝銭を弧の外側に向けて置く。→ 効果：その方向のみに作用。任意の補強。"
+            case "tantou": return "① 遮る（先にやる・無料）：覗き込んでくる建物の角に向いた窓は、日中レースカーテンやブラインドを閉じる。→ 効果：視線の交差を遮断し、その窓に効果。\n② 区切る（低コスト）：窓台に背の高い植物（アイビー、ポトス）を置き、角を隠す。→ 効果：視覚的に隔離し、見られている感覚を緩和。\n③ 鎮める（任意）：凸面八卦鏡を覗き込み方向に掛ける。隣家の窓に向けない。→ 効果：その方向のみに作用。"
+            case "chuanxin": return "① 区切る（先にやる・無料）：玄関ドアと裏窓が一直線なら、動線の中央に玄関収納、屏風、厚手のカーテンを置く。→ 効果：貫通気流を遮断し、家全体の空気の流れを安定。\n② 遮る（低コスト）：床にカーペット、窓台に植物、重い家具を壁際に置き、気流を遅くする。→ 効果：直進する空気の速度を下げ、室温と安定感が改善。\n③ 鎮める（任意）：玄関の敷居内に五帝銭か小型の石敢当を置く。→ 効果：玄関エリア。任意の補強。"
+            case "huoxing": return "① 遮る（先にやる・無料）：尖った角に向いた窓にレースカーテンやブラインドを掛ける。→ 効果：視覚的な緩衝となり、その窓に効果。\n② 区切る（低コスト）：窓台に水耕の植物（ポトス、アイビー）を置き、乾燥を和らげる。→ 効果：火気の乾燥を調和し、その場所に効果。\n③ 鎮める（任意）：黒曜石、水晶、青系の装飾で火気を抑える。この方位は赤を避ける。→ 効果：その方向のみに作用。赤色は避ける。"
+            case "baihu": return "① 補う（先にやる・無料）：左側（青龍側）にフロアランプ、背の高い家具、大きな観葉植物を置き、左右の視覚的高さを揃える。→ 効果：リビング・書斎の気を均衡させ、右側の圧迫を緩和。\n② 遮る（低コスト）：右側に工事や高層ビルがある場合、右側の窓に厚手のカーテンを掛ける。→ 効果：騒音と視覚的干渉を遮断。\n③ 鎮める（任意）：左側に泰山石や麒麟の置物を置く。→ 効果：象徴的な補強のみ。"
+            case "gejiao": return "① 遮る（先にやる・無料）：道路側のベランダや窓の前に背の高い鉢植えやプランターを置く。→ 効果：急流の気を緩衝し、道路側に効果。\n② 区切る（低コスト）：道路側の窓を厚いガラスにするか二重カーテンにし、騒音を下げる。→ 効果：音と視覚的干渉を軽減。\n③ 鎮める（任意）：道路・水の方向に貔貅か石敢当を置く。→ 効果：その方向のみに作用。任意の補強。"
             default: return remedySolution
             }
         case .ko:
             switch id {
-            case "tianzhan": return "1. 산해진 또는 볼록 팔괘경 설치;\n2. 발코니에 넓은 잎 식물을 빽빽이 배치하여 방풍벽 형성;\n3. 현관에 파티션을 두어 강한 바람 완화."
-            case "luchong":  return "1. 출입구에 태산석감당 설치;\n2. 굴절형 현관을 조성하여 직진하는 기운 완화;\n3. 도로를 향해 기린상 한 쌍 배치."
-            case "fangong":  return "1. 바깥을 향해 흑요석 용귀 배치;\n2. 창가에 반원형 화분을 두어 완충작용 조성;\n3. 실내에 오제전 걸기."
-            case "tantou":   return "1. 볼록 팔괘경으로 시선 반사;\n2. 구리 닭 조형물을 모서리를 향해 배치;\n3. 주간에는 블라인드를 내려 시선 차단."
-            case "chuanxin": return "1. 바닥에 황옥 칠성진을 두어 지기 안정화;\n2. 현관에 황동 문턱 설치;\n3. 묵직한 원목 수납장 배치로 기운 보존."
-            case "huoxing":  return "1. 백수정구나 흑요석을 배치하여 화기 제어;\n2. 창가에 육제전 걸기;\n3. 푸른색 계열 패브릭으로 오행 조화 도모."
-            case "baihu":    return "1. 좌측 청룡방에 황동 용 조형물 배치;\n2. 우측 백호방에 무거운 태산석을 놓아 진압;\n3. 좌측 조명을 밝히고 높은 가구 배치."
-            case "gejiao":   return "1. 발코니에 키 큰 화단과 관목 배치;\n2. 급류를 향해 황동 비휴 한 쌍 배치;\n3. 차음 성능이 우수한 복층 유리 설치."
+            case "tianzhan": return "① 막기(먼저 하세요·무료): 건물 틈을 향한 창문이나 베란다에 창틀보다 높은 넓은 잎 식물(몬스테라, 파키라)을 늘어놓거나 두꺼운 커튼을 답니다. → 효과: 틈새에서 오는 바람과 시각적 압박을 줄이며, 틈을 마주한 창문·베란다에 효과.\n② 구분(저비용): 현관문과 틈 쪽 창문이 일직선이면 현관에 반 높이 수납장이나 칸막이를 두어 들어와서 바로 보이지 않게 합니다. → 효과: 관통 기류를 차단하고 집 전체의 기운 흐름을 안정시킵니다.\n③ 진정(선택): 틈 정면에 볼록 팔괘경이나 산해진을 걸되, 경면을 바깥으로 3-5도 아래로 기울이고 이웃집 창문을 향하지 않게 합니다. → 효과: 해당 방향에만 작용. 이웃 관계에 주의."
+            case "luchong": return "① 막기(먼저 하세요·무료): 현관에 문턱석이나 매트를 두고 안쪽에 커튼을 답니다. 길을 향한 창가에는 키 큰 화분을 둡니다. → 효과: 직선 도로가 문을 겨누는 압박감을 줄이며 현관과 정면 창에 효과.\n② 구분(저비용): 문 밖에 낮은 울타리나 칸막이를 두어 진입 동선이 꺾이게 합니다. → 효과: 직진하던 기운을 완만하게 바꿔 집 전체에 이롭습니다.\n③ 진정(선택): 대문 위에 산해진이나 팔괘경을 걸고 도로 쪽으로 약간 아래를 향하게 합니다. 이웃을 향하지 마세요. → 효과: 정면 방향에만 작용."
+            case "fangong": return "① 막기(먼저 하세요·무료): 반궁(활처럼 휜) 쪽 창문이나 베란다에 곡선으로 화분을 배치해 반원 완충대를 만듭니다. → 효과: 활 끝이 집을 향하는 압박감을 줄이며 반궁 쪽 창·베란다에 효과.\n② 구분(저비용): 실내 반궁 방향에 원형 테이블·원형 러그·곡선 소파를 두고 각진 가구를 피합니다. → 효과: 밖으로 빨아내는 기운을 부드럽게 하고 그 공간의 기를 안정시킵니다.\n③ 진정(선택): 반궁 방위에 흑요석, 석감당, 오제전을 활 바깥쪽으로 향해 둡니다. → 효과: 해당 방향에만 작용. 선택 보강."
+            case "tantou": return "① 막기(먼저 하세요·무료): 엿보는 건물 모서리를 향한 창은 낮에 커튼이나 블라인드를 내립니다. → 효과: 시선 교차를 차단하며 해당 창에 효과.\n② 구분(저비용): 창틀에 키 큰 식물(담쟁이, 포토스)을 두어 모서리를 가립니다. → 효과: 시각적으로 격리되어 엿보임을 덜 느끼게 합니다.\n③ 진정(선택): 볼록 팔괘경을 엿보는 방향으로 겁니다. 이웃 창문을 향하지 마세요. → 효과: 해당 방향에만 작용."
+            case "chuanxin": return "① 구분(먼저 하세요·무료): 현관문과 뒷창문이 일직선이면 동선 한가운데 현관 수납장, 칸막이, 두꺼운 커튼을 둡니다. → 효과: 관통 기류를 차단하고 집 전체의 공기 흐름을 안정시킵니다.\n② 막기(저비용): 바닥에 카펫, 창틀에 화분, 무거운 가구는 벽 쪽에 두어 기류 속도를 늦춥니다. → 효과: 직통 기류 속도를 낮춰 온도와 안정감을 개선합니다.\n③ 진정(선택): 현관 문턱 안쪽에 오제전이나 소형 석감당을 둡니다. → 효과: 현관 영역. 선택 보강."
+            case "huoxing": return "① 막기(먼저 하세요·무료): 뾰족한 모서리를 향한 창에 커튼이나 블라인드를 답니다. → 효과: 시각적 완충, 해당 창에 효과.\n② 구분(저비용): 창틀에 수경 식물(포토스, 담쟁이)을 두어 건조함을 줄입니다. → 효과: 화기의 건조함을 조화시키며 해당 공간에 효과.\n③ 진정(선택): 흑요석·수정·파란색 장식품으로 화기를 누릅니다. 이 방위에서는 빨간색을 피하세요. → 효과: 해당 방향에만 작용. 빨간색 금지."
+            case "baihu": return "① 보완(먼저 하세요·무료): 왼쪽(청룡방)에 스탠드 조명, 키 큰 가구, 큰 화분을 두어 좌우 시각 높이를 맞춥니다. → 효과: 거실·서재의 기운 균형을 잡고 오른쪽 압박을 완화합니다.\n② 막기(저비용): 오른쪽에 공사장이나 고층 건물이 있으면 오른쪽 창에 두꺼운 커튼을 답니다. → 효과: 소음과 시선 간섭을 차단합니다.\n③ 진정(선택): 왼쪽에 태산석이나 기린 장식품을 둡니다. → 효과: 상징적 보강일 뿐입니다."
+            case "gejiao": return "① 막기(먼저 하세요·무료): 도로 쪽 베란다나 창 앞에 키 큰 화분이나 화단을 둡니다. → 효과: 빠른 기류를 완충하며 도로 쪽에 효과.\n② 구분(저비용): 도로 쪽 창을 두꺼운 유리로 바꾸거나 이중 커튼을 달아 소음을 낮춥니다. → 효과: 소음과 시각적 간섭을 줄입니다.\n③ 진정(선택): 도로·물 방향에 비휴나 석감당을 둡니다. → 효과: 해당 방향에만 작용. 선택 보강."
             default: return remedySolution
             }
         case .vi:
             switch id {
-            case "tianzhan": return "1. Treo Sơn Hải Trấn hoặc gương Bát Quái lồi bằng đồng;\n2. Đặt chậu cây lá rộng ở ban công tạo tấm chắn gió;\n3. Bố trí bình phong ở huyền quan để cản luồng khí xung trực diện."
-            case "luchong":  return "1. Đặt đá Thái Sơn Thạch Cảm Đương trước cửa;\n2. Thiết kế huyền quan uốn lượn để giảm tốc luồng khí xộc thẳng;\n3. Đặt một đôi Kỳ Lân bằng đồng quay đầu hướng ra đường."
-            case "fangong":  return "1. Đặt Long Quy thạch anh đen quay đầu hướng ra ngoài;\n2. Xếp hàng cây xanh dạng vòng cung trên bậu cửa sổ;\n3. Treo chuỗi tiền Ngũ Đế gia hộ trong nhà."
-            case "tantou":   return "1. Treo gương Bát Quái lồi bằng đồng phản xạ ánh nhìn;\n2. Đặt tượng Gà trống bằng đồng hướng về góc nhọn;\n3. Thường xuyên kéo rèm lá sách vào ban ngày."
-            case "chuanxin": return "1. Rải thất tinh trận hoàng ngọc để tụ địa khí;\n2. Làm ngạch cửa bằng đồng thau kiên cố;\n3. Đặt tủ gỗ nặng ở huyền quan để giữ khí."
-            case "huoxing":  return "1. Đặt quả cầu thạch anh trắng hoặc thạch anh đen giải trừ hỏa khí;\n2. Treo hai chuỗi tiền Lục Đế cạnh cửa sổ;\n3. Bổ sung vật dụng màu xanh lam để cân bằng Ngũ Hành."
-            case "baihu":    return "1. Đặt tượng Rồng ngậm ngọc bằng đồng bên Thanh Long (trái);\n2. Đặt đá phong thủy trấn áp bên Bạch Hổ (phải);\n3. Tăng cường ánh sáng và bố trí kệ tủ cao bên trái."
-            case "gejiao":   return "1. Trồng bồn cây cao và cây bụi ở ban công làm đệm cản;\n2. Đặt một đôi Tỳ Hưu bằng đồng hướng về dòng nước chảy xiết;\n3. Dùng cửa kính cách âm dày Low-E hai lớp."
+            case "tianzhan": return "① Chắn (làm trước·miễn phí): Đặt hàng cây lá rộng cao hơn bậu cửa (cây monstera, kim tiền) hoặc rèm vải dày ở cửa sổ/ban công đối diện khe nhà. → Ảnh hưởng: Giảm luồng gió và áp lực thị giác từ khe hở; phủ cửa sổ/ban công đối diện.\n② Chặn (chi phí thấp): Nếu cửa chính thẳng hàng với cửa sổ đối diện khe, đặt tủ nửa cao hoặc vách ngăn ở huyền quan để không nhìn thông thẳng. → Ảnh hưởng: Chặn luồng gió xuyên phòng, ổn định khí lưu toàn nhà.\n③ Trấn (tùy chọn): Treo gương Bát Quái lồi hoặc Sơn Hải Trấn đối diện khe, mặt gương hướng ra ngoài nghiêng xuống 3-5 độ, không chiếu vào cửa sổ nhà hàng xóm. → Ảnh hưởng: Chỉ tác động vào hướng xung đó; giữ hòa khí láng giềng."
+            case "luchong": return "① Chắn (làm trước·miễn phí): Đặt bậc cửa hoặc thảm ở cửa chính và rèm bên trong; đặt chậu cây cao trên cửa sổ hướng ra đường. → Ảnh hưởng: Giảm áp lực đường thẳng đâm vào cửa; phủ cửa chính và cửa sổ đối diện.\n② Chặn (chi phí thấp): Thêm hàng rào thấp hoặc vách ngăn ngoài cửa để lối vào rẽ góc. → Ảnh hưởng: Biến luồng xung thẳng thành dòng chảy nhẹ; toàn nhà được lợi.\n③ Trấn (tùy chọn): Treo Sơn Hải Trấn hoặc gương Bát Quái trên cửa, hơi nghiêng xuống về phía đường, không hướng vào nhà hàng xóm. → Ảnh hưởng: Chỉ tác động vào hướng xung."
+            case "fangong": return "① Chắn (làm trước·miễn phí): Xếp cây xanh hoặc chậu cảnh cong theo phía cung ôm để tạo đệm bán nguyệt. → Ảnh hưởng: Giảm áp lực đỉnh cung đối diện; phủ cửa sổ/ban công phía cung ôm.\n② Chặn (chi phí thấp): Đặt bàn tròn, thảm tròn hoặc sofa cong ở phía cung ôm thay cho đồ nội thất góc cạnh. → Ảnh hưởng: Làm mềm luồng khí ly tâm, ổn định khí trường khu vực đó.\n③ Trấn (tùy chọn): Đặt thạch anh đen, Thạch Cảm Đương hoặc tiền Ngũ Đế ở phía cung ôm, hướng ra ngoài. → Ảnh hưởng: Chỉ tác động hướng đó; gia cố tùy chọn."
+            case "tantou": return "① Chắn (làm trước·miễn phí): Kéo rèm mỏng hoặc mành vào ban ngày ở cửa sổ hướng về góc thò ra. → Ảnh hưởng: Chặn giao thoa ánh nhìn; phủ cửa sổ đó.\n② Chặn (chi phí thấp): Đặt cây cao (trường xuân, trầu bà) trên bậu cửa để che góc nhìn. → Ảnh hưởng: Cách ly thị giác, giảm cảm giác bị nhìn.\n③ Trấn (tùy chọn): Treo gương Bát Quái lồi về phía tòa nhà thò ra, không chiếu vào cửa sổ hàng xóm. → Ảnh hưởng: Chỉ tác động hướng đó."
+            case "chuanxin": return "① Chặn (làm trước·miễn phí): Nếu cửa chính thẳng hàng với cửa sổ sau, đặt tủ, vách ngăn hoặc rèm dày giữa luồng đi. → Ảnh hưởng: Chặn luồng gió xuyên thẳng, ổn định khí lưu.\n② Chắn (chi phí thấp): Trải thảm, đặt cây trên bậu cửa và đồ nội thất nặng sát tường để làm chậm khí lưu. → Ảnh hưởng: Giảm tốc luồng khí, cải thiện nhiệt độ và cảm giác an ổn.\n③ Trấn (tùy chọn): Đặt tiền Ngũ Đế hoặc Thạch Cảm Đương nhỏ trong ngạch cửa. → Ảnh hưởng: Khu vực cửa vào; gia cố tùy chọn."
+            case "huoxing": return "① Chắn (làm trước·miễn phí): Treo rèm mỏng hoặc mành ở cửa sổ hướng về góc nhọn. → Ảnh hưởng: Đệm thị giác; phủ cửa sổ đó.\n② Chặn (chi phí thấp): Đặt cây thủy sinh (trầu bà, trường xuân) trên bậu cửa để giảm khô. → Ảnh hưởng: Điều hòa hỏa khí khô nóng tại khu vực đó.\n③ Trấn (tùy chọn): Dùng thạch anh đen, pha lê hoặc vật trang trí màu xanh để dập hỏa; hướng này tránh màu đỏ. → Ảnh hưởng: Chỉ tác động hướng đó; tránh màu đỏ."
+            case "baihu": return "① Cân bằng (làm trước·miễn phí): Thêm đèn sàn, đồ nội thất cao hoặc cây cao ở phía trái (Thanh Long) để cân bằng chiều cao thị giác. → Ảnh hưởng: Cân bằng khí trường phòng khách/phòng sách, giảm áp lực phía phải.\n② Chắn (chi phí thấp): Nếu phía phải có công trường hoặc tòa nhà cao, treo rèm dày ở cửa sổ bên phải. → Ảnh hưởng: Chặn tiếng ồn và nhiễu thị giác.\n③ Trấn (tùy chọn): Đặt Thạch Cảm Đương hoặc tượng Kỳ Lân ở phía trái. → Ảnh hưởng: Chỉ mang ý nghĩa biểu trưng."
+            case "gejiao": return "① Chắn (làm trước·miễn phí): Đặt chậu cây cao hoặc bồn hoa ở ban công/cửa sổ phía sát đường. → Ảnh hưởng: Đệm dòng khí nhanh; phủ phía sát đường.\n② Chặn (chi phí thấp): Thay kính dày hoặc treo rèm đôi ở cửa sổ sát đường để giảm tiếng ồn. → Ảnh hưởng: Giảm tạp âm và nhiễu thị giác.\n③ Trấn (tùy chọn): Đặt Tỳ Hưu hoặc Thạch Cảm Đương hướng ra đường/nước. → Ảnh hưởng: Tác động hướng đó; gia cố tùy chọn."
             default: return remedySolution
             }
         case .th:
             switch id {
-            case "tianzhan": return "1. แขวนกระจกซานไห่เจิ้นหรือกระจกนูนแปดทิศทองเหลือง;\n2. ปลูกไม้ใบกว้างริมระเบียงเป็นแนวกั้นลม;\n3. ตั้งฉากกั้นบริเวณโถงทางเข้าชะลอแรงลมปะทะ"
-            case "luchong":  return "1. วางหินไท่ซานกันตังหน้าทางเข้า;\n2. ออกแบบโถงทางเข้าให้คดเคี้ยวเพื่อชะลอกระแสชี่;\n3. ตั้งกิเลนทองเหลืองคู่หันหน้าสู่ทิศทางถนนพุ่งชน"
-            case "fangong":  return "1. วางเต่ามังกรหินออบซิเดียนหันหน้าออกด้านนอก;\n2. จัดวางไม้กระถางโค้งตามขอบหน้าต่างเป็นกันชน;\n3. แขวนเหรียญห้าจักรพรรดิคุ้มครองภายในห้อง"
-            case "tantou":   return "1. แขวนกระจกนูนแปดทิศสะท้อนพลังแอบมอง;\n2. ตั้งไก่ทองเหลืองหันไปทางมุมตึกแหลม;\n3. ปิดมู่ลี่กรองแสงในเวลากลางวัน"
-            case "chuanxin": return "1. วางค่ายเจ็ดดาวหินหยกเหลืองเพื่อดูดซับพลังดิน;\n2. ติดตั้งธรณีประตูทองเหลืองแท้ที่ทางเข้า;\n3. วางตู้ไม้เนื้อแข็งที่โถงทางเข้าเพื่อกักเก็บพลังชี่"
-            case "huoxing":  return "1. วางลูกแก้วควอตซ์ขาวหรือหินออบซิเดียนสยบธาตุไฟ;\n2. แขวนเหรียญหกจักรพรรดิริมหน้าต่าง;\n3. ใช้ของตกแต่งโทนสีน้ำเงินครามเพื่อปรับสมดุลธาตุทั้งห้า"
-            case "baihu":    return "1. วางมังกรทองเหลืองคาบแก้วทางฝั่งซ้าย (มังกรเขียว);\n2. วางหินไท่ซานหยกเขียวกดทับฝั่งขวา (เสือขาว);\n3. เพิ่มความสว่างและจัดวางเฟอร์นิเจอร์ทรงสูงไว้ฝั่งซ้าย"
-            case "gejiao":   return "1. จัดสวนกระถางทรงสูงและไม้พุ่มริมระเบียงเป็นกันชน;\n2. วางปี่เซียะทองเหลืองคู่หันรับกระแสน้ำเพื่อเรียกทรัพย์;\n3. ติดตั้งหน้าต่างกระจกสองชั้น Low-E ป้องกันเสียงรบกวน"
+            case "tianzhan": return "① บัง (ทำก่อน·ฟรี): วางต้นไม้ใบกว้างสูงกว่าขอบหน้าต่าง (มอนสเตอรา ต้นเงิน) หรือติดม่านทึบที่หน้าต่าง/ระเบียงที่หันเข้าช่องตึก → ผล: ลดลมและแรงกดทางสายตาจากช่องว่าง ครอบคลุมหน้าต่าง/ระเบียงที่หันเข้าช่อง\n② กั้น (ต้นทุนต่ำ): ถ้าประตูหน้าตรงกับหน้าต่างที่หันเข้าช่อง วางตู้ครึ่งสูงหรือฉากโปร่งที่โถงทางเข้า อย่าให้มองทะลุถึงสุด → ผล: ตัดลมทะลุตรง ทำลมในบ้านให้คงที่\n③ สะกด (ทางเลือก): แขวนกระจกนูนแปดทิศหรือซานไห่เจิ้นหันเข้าช่อง เอียงลง 3-5 องศา อย่าชี้ไปที่หน้าต่างเพื่อนบ้าน → ผล: มีผลเฉพาะทิศที่ปะทะนั้น ดูแลไมตรีกับเพื่อนบ้าน"
+            case "luchong": return "① บัง (ทำก่อน·ฟรี): วางหินธรณีประตูหรือพรมที่ประตูและม่านด้านใน วางต้นไม้สูงที่หน้าต่างหันทางถนน → ผล: ลดแรงกดของถนนตรงที่พุ่งเข้าประตู ครอบคลุมประตูหลักและหน้าต่างที่หันตรง\n② กั้น (ต้นทุนต่ำ): วางรั้วเตี้ยหรือฉากนอกประตูให้ทางเข้าอ้อมมุม → ผล: เปลี่ยนกระแสตรงเป็นทางอ้อม เจริญทั้งบ้าน\n③ สะกด (ทางเลือก): แขวนซานไห่เจิ้นหรือกระจกแปดทิศเหนือประตู เอียงลงทางถนนเล็กน้อย อย่าชี้เพื่อนบ้าน → ผล: มีผลเฉพาะทิศที่ปะทะ"
+            case "fangong": return "① บัง (ทำก่อน·ฟรี): จัดต้นไม้หรือกระถางโค้งตามทิศโค้งน้ำ/ถนนเพื่อเป็นเกราะครึ่งวงกลม → ผล: ลดแรงกดของส่วนโค้งที่หันเข้าบ้าน ครอบคลุมหน้าต่าง/ระเบียงด้านโค้ง\n② กั้น (ต้นทุนต่ำ): วางโต๊ะกลม พรมกลม หรือโซฟาโค้งในทิศโค้งแทนเฟอร์นิเจอร์มุมแหลม → ผล: ทำให้นิวเคลียสแรงเหวี่ยงนุ่มลง ทำให้พื้นที่นั้นคงที่\n③ สะกด (ทางเลือก): วางหินออบซิเดียน ศิลากั้นตัง หรือเหรียญห้าจักรพรรดิที่ทิศโค้ง หันออกนอก → ผล: มีผลเฉพาะทิศนั้น เสริมได้ตามต้องการ"
+            case "tantou": return "① บัง (ทำก่อน·ฟรี): ปิดม่านบางหรือมู่ลี่ตอนกลางวันที่หน้าต่างหันมุมตึกที่โผล่ → ผล: กั้นสายตา ครอบคลุมหน้าต่างนั้น\n② กั้น (ต้นทุนต่ำ): วางต้นไม้สูง (ไม้เลื้อย โพทอส) บนขอบหน้าต่างบังมุม → ผล: แยกสายตา ลดความรู้สึกถูกจ้อง\n③ สะกด (ทางเลือก): แขวนกระจกนูนแปดทิศไปทางตึกที่โผล่ อย่าชี้หน้าต่างเพื่อนบ้าน → ผล: มีผลเฉพาะทิศนั้น"
+            case "chuanxin": return "① กั้น (ทำก่อน·ฟรี): ถ้าประตูหน้าตรงกับหน้าต่างหลัง วางตู้ ฉาก หรือม่านหนากลางทางเดิน → ผล: ตัดลมทะลุตรง ทำให้กระแสลมคงที่\n② บัง (ต้นทุนต่ำ): ปูพรม วางต้นไม้ที่ขอบหน้าต่าง และเฟอร์นิเจอร์หนักชิดผนังเพื่อชะลอกระแสลม → ผล: ชะลอความเร็วลม ปรับอุณหภูมิและความมั่นคงในบ้าน\n③ สะกด (ทางเลือก): วางเหรียญห้าจักรพรรดิหรือศิลากั้นตังเล็กในธรณีประตู → ผล: บริเวณประตูเข้า เสริมได้ตามต้องการ"
+            case "huoxing": return "① บัง (ทำก่อน·ฟรี): ติดม่านบางหรือมู่ลี่ที่หน้าต่างหันมุมแหลม → ผล: เกราะทางสายตา ครอบคลุมหน้าต่างนั้น\n② กั้น (ต้นทุนต่ำ): วางต้นไม้น้ำ (โพทอส ไม้เลื้อย) บนขอบหน้าต่างลดความแห้ง → ผล: ลดความร้อนแห้งของธาตุไฟในบริเวณนั้น\n③ สะกด (ทางเลือก): ใช้หินออบซิเดียน ผลึก หรือของตกแต่งสีน้ำเงินสะกดไฟ ทิศนี้ห้ามสีแดง → ผล: มีผลเฉพาะทิศนั้น ห้ามใช้สีแดง"
+            case "baihu": return "① ถ่วง (ทำก่อน·ฟรี): เพิ่มโคมไฟตั้งพื้น เฟอร์นิเจอร์สูง หรือต้นไม้สูงทางซ้าย (มังกรเขียว) ให้สมดุลความสูงสายตา → ผล: ถ่วงสมดุลพลังห้องนั่งเล่น/ห้องหนังสือ ลดแรงกดด้านขวา\n② บัง (ต้นทุนต่ำ): ถ้าด้านขวามีงานก่อสร้างหรือตึกสูง ม่านหนาที่หน้าต่างขวา → ผล: บังเสียงและการรบกวนทางสายตา\n③ สะกด (ทางเลือก): วางศิลาไท่ซานหรือกิเลนทางซ้าย → ผล: เสริมเชิงสัญลักษณ์เท่านั้น"
+            case "gejiao": return "① บัง (ทำก่อน·ฟรี): วางกระถางสูงหรือสวนกระถางที่ระเบียง/หน้าต่างด้านติดถนน → ผล: กันกระแสเร็ว ครอบคลุมด้านติดถนน\n② กั้น (ต้นทุนต่ำ): เปลี่ยนกระจกหนาหรือม่านสองชั้นที่หน้าต่างติดถนนลดเสียง → ผล: ลดเสียงและสายตารบกวน\n③ สะกด (ทางเลือก): วางปี่เซียะหรือศิลากั้นตังหันทางถนน/น้ำ → ผล: มีผลเฉพาะทิศนั้น เสริมได้ตามต้องการ"
             default: return remedySolution
             }
         case .id:
             switch id {
-            case "tianzhan": return "1. Gantung cermin Shan Hai Zhen atau cermin cembung Bagua kuningan;\n2. Tanam tanaman berdaun lebar di balkon sebagai penahan angin;\n3. Pasang penyekat di teras masuk untuk memecah angin kencang."
-            case "luchong":  return "1. Letakkan batu Taishan Shi Gandang di pintu masuk;\n2. Rancang lorong masuk berliku untuk memperlambat aliran qi;\n3. Posisikan sepasang Qilin kuningan menghadap ke arah jalan."
-            case "fangong":  return "1. Tempatkan Kura-kura Naga Obsidian menghadap ke luar;\n2. Susun tanaman hijau melengkung di tepi jendela sebagai penyangga energi;\n3. Gantung Koin Lima Kaisar di dalam ruangan."
-            case "tantou":   return "1. Gantung cermin cembung Bagua untuk memantulkan energi intipan;\n2. Pasang patung ayam jago kuningan menghadap sudut tajam;\n3. Tutup tirai venetian pada siang hari."
-            case "chuanxin": return "1. Letakkan formasi Tujuh Bintang giok kuning di lantai untuk menstabilkan qi bumi;\n2. Pasang ambang pintu kuningan kokoh di pintu masuk;\n3. Tempatkan lemari kayu solid di ruang depan untuk menahan qi."
-            case "huoxing":  return "1. Letakkan bola kristal kuarsa putih atau obsidian untuk meredam api;\n2. Gantung dua untai Koin Enam Kaisar di dekat jendela;\n3. Gunakan kain bernuansa biru laut untuk menyeimbangkan Lima Elemen."
-            case "baihu":    return "1. Letakkan patung Naga kuningan memegang mutiara di sisi kiri (Naga Hijau);\n2. Letakkan batu Taishan berat di sisi kanan untuk menundukkan Harimau;\n3. Tingkatkan pencahayaan dan tata perabot tinggi di sisi kiri."
-            case "gejiao":   return "1. Buat kotak tanaman tinggi dan semak di balkon sebagai penyangga;\n2. Tempatkan sepasang Pixiu kuningan menghadap aliran air untuk menjaga rezeki;\n3. Pasang jendela kaca ganda Low-E kedap suara."
+            case "tianzhan": return "① Halau (lakukan dulu·gratis): Taruh deretan tanaman berdaun lebar lebih tinggi dari kusen (monstera, pohon uang) atau tirai tebal di jendela/balkon yang menghadap celah gedung. → Efek: Meredam angin dan tekanan visual dari celah; mencakup jendela/balkon yang menghadap celah.\n② Sekat (biaya rendah): Jika pintu depan segaris dengan jendela menghadap celah, taruh kabinet setengah tinggi atau skrin tembus pandang di pintu masuk agar tidak tembus pandang. → Efek: Menghentikan aliran tembus, menstabilkan sirkulasi udara rumah.\n③ Tanam (opsional): Gantung cermin Bagua cembung atau Shan Hai Zhen menghadap celah, miring ke bawah 3-5°, jangan arahkan ke jendela tetangga. → Efek: Hanya bekerja pada arah yang menghadap itu; jaga kerukunan tetangga."
+            case "luchong": return "① Halau (lakukan dulu·gratis): Taruh batu ambang atau keset di pintu dan tirai di dalam; taruh tanaman tinggi di jendela menghadap jalan. → Efek: Meredam tekanan jalan lurus yang mengarah ke pintu; mencakup pintu utama dan jendela menghadap.\n② Sekat (biaya rendah): Tambahkan pagar rendah atau skrin di luar agar jalur masuk berbelok. → Efek: Mengubah aliran langsung menjadi pelan; menguntungkan seluruh rumah.\n③ Tanam (opsional): Gantung Shan Hai Zhen atau cermin Bagua di atas pintu, agak miring ke bawah ke arah jalan, jangan arahkan ke tetangga. → Efek: Hanya bekerja pada arah hadap."
+            case "fangong": return "① Halau (lakukan dulu·gratis): Susun tanaman atau pot melengkung di jendela/balkon sisi busur untuk membuat penyangga setengah lingkaran. → Efek: Meredam tekanan lengkung yang menghadap rumah; mencakup jendela/balkon sisi busur.\n② Sekat (biaya rendah): Taruh meja bundar, karpet bundar atau sofa melengkung di sisi busur, hindari furnitur bersudut tajam. → Efek: Melunakkan energi yang menarik keluar, menstabilkan area itu.\n③ Tanam (opsional): Taruh obsidian, batu Shi Gandang atau Koin Lima Kaisar di sisi busur, menghadap keluar. → Efek: Hanya bekerja pada arah itu; penguatan opsional."
+            case "tantou": return "① Halau (lakukan dulu·gratis): Tutup tirai tipis atau kerai pada siang hari di jendela menghadap sudut bangunan yang mengintip. → Efek: Memblokir pertemuan pandangan; mencakup jendela itu.\n② Sekat (biaya rendah): Taruh tanaman tinggi (ivy, pothos) di kusen untuk menutupi sudut. → Efek: Isolasi visual, mengurangi rasa diawasi.\n③ Tanam (opsional): Gantung cermin Bagua cembung ke arah bangunan pengintip, jangan ke jendela tetangga. → Efek: Hanya bekerja pada arah itu."
+            case "chuanxin": return "① Sekat (lakukan dulu·gratis): Jika pintu depan segaris dengan jendela belakang, taruh kabinet, skrin atau tirai tebal di tengah jalur. → Efek: Menghentikan aliran tembus, menstabilkan sirkulasi udara.\n② Halau (biaya rendah): Tambahkan karpet, tanaman di kusen dan furnitur berat di dekat dinding untuk memperlambat aliran udara. → Efek: Memperlambat udara, memperbaiki kenyamanan dan stabilitas.\n③ Tanam (opsional): Taruh Koin Lima Kaisar atau Shi Gandang kecil di dalam ambang pintu. → Efek: Area masuk; penguatan opsional."
+            case "huoxing": return "① Halau (lakukan dulu·gratis): Pasang tirai tipis atau kerai di jendela menghadap sudut tajam. → Efek: Penyangga visual; mencakup jendela itu.\n② Sekat (biaya rendah): Taruh tanaman air (pothos, ivy) di kusen untuk mengurangi kekeringan. → Efek: Menyelaraskan kekeringan api di area itu.\n③ Tanam (opsional): Gunakan obsidian, kristal atau dekorasi biru untuk menekan api; hindari merah di arah ini. → Efek: Hanya bekerja pada arah itu; hindari merah."
+            case "baihu": return "① Seimbang (lakukan dulu·gratis): Tambahkan lampu lantai, furnitur tinggi atau tanaman tinggi di sisi kiri (Naga Hijau) untuk meratakan tinggi visual. → Efek: Menyeimbangkan energi ruang tamu/ruang kerja, meredakan tekanan sisi kanan.\n② Halau (biaya rendah): Jika ada konstruksi atau gedung tinggi di kanan, gantung tirai tebal di jendela kanan. → Efek: Memblokir kebisingan dan gangguan visual.\n③ Tanam (opsional): Taruh batu Taishan atau ornamen Qilin di kiri. → Efek: Hanya penguatan simbolis."
+            case "gejiao": return "① Halau (lakukan dulu·gratis): Taruh pot tanaman tinggi atau taman pot di balkon/jendela sisi jalan. → Efek: Menyangga aliran cepat; mencakup sisi jalan.\n② Sekat (biaya rendah): Gunakan kaca lebih tebal atau tirai ganda di jendela sisi jalan untuk mengurangi kebisingan. → Efek: Mengurangi suara dan gangguan visual.\n③ Tanam (opsional): Taruh Pixiu atau Shi Gandang menghadap jalan/air. → Efek: Bekerja pada arah itu; penguatan opsional."
             default: return remedySolution
             }
         case .auto, .zhHans:
@@ -625,7 +625,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "气流受文丘里效应加速形成高速风刃，主血光之灾、官非破财、心脑血管突发疾厄",
             severity: .critical,
             classicalText: "《雪心赋》云：天斩迎面立，屋裂气难聚。两楼夹一罅，形同剑下劈。",
-            remedySolution: "1. 悬挂正品开光纯铜【山海镇】或【九宫八卦凸镜】化解罡风；\n2. 阳台窗前密植阔叶盆栽形成绿色生态挡风屏障；\n3. 室内玄关设双面山水透光屏风阻隔直冲煞气。"
+            remedySolution: "① 挡（先做·免费）：正对楼缝的窗前或阳台，摆一排高过窗台的阔叶绿植（龟背竹、发财树），或加厚纱帘。→ 影响：减轻夹缝直冲的气流与视觉压迫，覆盖对缝的窗和阳台。\n② 隔（低成本）：若大门与对缝窗成一直线，玄关放半高鞋柜或镂空屏风，进门不一眼望穿。→ 影响：阻断穿堂直通，稳定全屋气流。\n③ 镇（可选）：正对缝口挂凸面八卦镜或山海镇，镜面朝外、略下倾3-5度，勿照邻家门窗。→ 影响：仅作用该冲射方位；注意邻里关系。"
         ),
         ExteriorShaItem(
             id: "luchong",
@@ -635,7 +635,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "一条直路一条枪，车流动能化作无形猛兽直冲宅气，主破耗连连、意外伤灾、人丁不安",
             severity: .critical,
             classicalText: "《堪舆指要》云：直冲门前最难当，暗箭伤人人莫详。",
-            remedySolution: "1. 门前立【泰山石敢当】重器镇宅，稳固地基气场；\n2. 设玄关形成九曲水回流之局，使气直则缓、曲则有情；\n3. 窗内安放一对纯铜【开光麒麟】，头朝路冲方向纳气化煞。"
+            remedySolution: "① 挡（先做·免费）：门口放门槛石或门垫，门内挂门帘；正对路的窗台放一盆高绿植。→ 影响：弱化直路冲门的压迫感，覆盖大门与正冲窗。\n② 隔（低成本）：门外加半高绿篱或屏风，让进门动线拐个弯。→ 影响：直冲气流转为缓行，全宅受益。\n③ 镇（可选）：大门上方挂山海镇或八卦镜，朝路方向微下倾，勿照邻居。→ 影响：仅针对冲射方位。"
         ),
         ExteriorShaItem(
             id: "fangong",
@@ -645,7 +645,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "离心力将财气与贵人运向外甩离，形成无情冲撞，主子孙叛逆、破大财、官讼缠身",
             severity: .warning,
             classicalText: "《地理五诀》云：反弓无情水，犹如弯刀割。居者难安泰，钱财随水折。",
-            remedySolution: "1. 摆放【黑曜石八卦龙龟】背向化解冲煞；\n2. 窗台安置半圆型绿色植被弧阵缓冲离心煞气；\n3. 室内向反弓方挂置【五帝钱金刚杵】镇摄金木交战之刑。"
+            remedySolution: "① 挡（先做·免费）：反弓一侧窗外摆弧形绿植或盆栽，形成半圆缓冲。→ 影响：缓解弧顶正对的压迫感，覆盖反弓侧窗/阳台。\n② 隔（低成本）：室内反弓方向放圆形茶几、地毯或弧形沙发，避免直角家具直冲。→ 影响：柔化离心气流，稳定该区域气场。\n③ 镇（可选）：反弓方位放黑曜石、石敢当或五帝钱，面朝弧外。→ 影响：仅针对该方位；可选强化。"
         ),
         ExteriorShaItem(
             id: "tantou",
@@ -655,7 +655,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "暗中窥测，主招引暗室小人、遭盗窃欺诈、婚外暗昧之情或突发名誉受损",
             severity: .warning,
             classicalText: "《撼龙经》云：头低偷窥探，小人暗中乱。纵有万贯财，亦防暗中算。",
-            remedySolution: "1. 挂置【凸面铜八卦镜】反弹窥测气场；\n2. 室内面向探头方摆放一只昂首纯铜【大号神公鸡】破除阴邪暗窥；\n3. 长期拉上微透光百叶窗帘，阻绝视线交锋。"
+            remedySolution: "① 挡（先做·免费）：对探头方向的窗，白天拉上纱帘或百叶。→ 影响：阻断视线交叉，覆盖该窗。\n② 隔（低成本）：窗台摆高绿植（长春藤、绿萝），遮挡探头角。→ 影响：视觉隔离，缓解被窥感。\n③ 镇（可选）：凸面八卦镜朝探头方挂，勿照邻家门窗。→ 影响：仅针对该方位。"
         ),
         ExteriorShaItem(
             id: "chuanxin",
@@ -665,7 +665,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "地气空洞不稳定，泄气极速，主财气不聚、肠胃脾胃虚寒、居者缺乏安全感",
             severity: .warning,
             classicalText: "《青囊经》云：地脉不凝，宅气空腾。穿心走气，贫困无依。",
-            remedySolution: "1. 室内地面铺设【黄玉七星阵】聚引大地土气；\n2. 大门入户处设下沉式真铜条门槛压胜稳气；\n3. 摆放厚重实木玄关柜以藏风聚气。"
+            remedySolution: "① 隔（先做·免费）：门与后窗成直线时，在动线正中放玄关柜、屏风或挂厚门帘。→ 影响：阻断穿堂直通，稳定全屋气流。\n② 挡（低成本）：地面铺地毯、窗台放绿植、重家具靠墙，减缓气流速度。→ 影响：降低直穿气流速度，改善室温与安稳感。\n③ 镇（可选）：入户门槛内放五帝钱或小号石敢当。→ 影响：入户区域；可选强化。"
         ),
         ExteriorShaItem(
             id: "huoxing",
@@ -675,7 +675,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "火金相克，火燥生煞，主口舌官非、视力疾厄、皮肤炎肿、脾气暴躁易燃",
             severity: .warning,
             classicalText: "《疑龙经》云：尖角冲克火星飞，灾殃临门人不归。",
-            remedySolution: "1. 安放【天然白水晶球】或【黑曜石阵】以水克火化燥气；\n2. 窗边悬挂【特制两串六帝古钱】泄化燥火；\n3. 增加蓝色/水波纹装饰织物调和五行平衡。"
+            remedySolution: "① 挡（先做·免费）：正对尖角的窗挂纱帘或百叶。→ 影响：视觉缓冲，覆盖该窗。\n② 隔（低成本）：窗台摆水养植物（水培绿萝、常春藤），缓解干燥。→ 影响：调和火燥，覆盖该区域。\n③ 镇（可选）：放黑曜石、水晶或蓝色装饰物压火气；此方位忌红色。→ 影响：仅针对该方位；忌红色。"
         ),
         ExteriorShaItem(
             id: "baihu",
@@ -685,7 +685,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "青龙委靡，白虎张狂，主阴盛阳衰、妇人专权暴烈、男丁运势受压抑阻滞",
             severity: .minor,
             classicalText: "《水龙经》云：宁叫青龙高万丈，莫教白虎昂半寸。",
-            remedySolution: "1. 在左侧（青龙方）高处摆放一尊纯铜【祥龙吐珠】助旺龙气；\n2. 在右方白虎位安置【青玉泰山石】稳稳压伏；\n3. 提升左侧室内灯光照度与高大家具布局。"
+            remedySolution: "① 补（先做·免费）：左侧（青龙方）加落地灯、高大家具或高大绿植，平衡左右视觉高度。→ 影响：平衡客厅/书房气场，缓解右侧压迫。\n② 挡（低成本）：右侧若临施工或高楼，靠右窗挂厚窗帘遮挡。→ 影响：遮挡噪音与视线干扰。\n③ 镇（可选）：左侧放泰山石或麒麟摆件。→ 影响：仅象征性补强。"
         ),
         ExteriorShaItem(
             id: "gejiao",
@@ -695,7 +695,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "气流疾走拔除地气，财运大起大落，根基虚浮，青年得志但晚运易倾颓",
             severity: .minor,
             classicalText: "《地理正宗》云：水逼楼脚急，根浅风难立。",
-            remedySolution: "1. 阳台处筑造高盆花坛灌木，构筑人工台座阻滞泄气；\n2. 屋内向急流方供放一对【生肖铜貔貅】咬财纳吉；\n3. 运用厚质隔音挡气Low-E玻璃窗增强气密性。"
+            remedySolution: "① 挡（先做·免费）：临路一侧阳台或窗前摆高盆绿植或花坛。→ 影响：缓冲急流，覆盖临路侧。\n② 隔（低成本）：临路窗换厚玻璃或加双层窗帘，降低噪音。→ 影响：减少声煞与视觉干扰。\n③ 镇（可选）：近路/水方向放貔貅或石敢当。→ 影响：该方位；可选强化。"
         )
     ]
 }

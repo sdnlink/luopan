@@ -400,131 +400,131 @@ public class PurpleWhiteEngine {
             switch lang {
             case .en:
                 if isDanger25 {
-                    advice = "[2-5 Severe Taboo] Illness Star meets Five Yellow. Hang 6-Emperor coins & brass gourd."
+                    advice = "[2-5 Double Taboo] Illness Star meets Five Yellow. What to do: Hang a brass gourd or 6-Emperor coins here; no drilling, no red. → Effect: Mainly health and disputes; covers this palace area."
                 } else if hasFiveYellow {
-                    advice = "[Five Yellow Taboo] Annual or monthly Earth sha; avoid drilling and place a pacifying cure."
+                    advice = "[Five Yellow] Avoid drilling or hammering walls. What to do: Place a pacifying water vessel or brass item to settle Earth qi. → Effect: Eases health and financial-loss risk in this direction."
                 } else if hasIllnessStar {
-                    advice = "[Illness Star] Guard digestion & health; utilize copper feng shui items."
+                    advice = "[Illness Star] What to do: Place a brass item to drain the energy; keep this area ventilated and dry. → Effect: Health-related; covers this palace."
                 } else if yStar == 9 {
-                    advice = "[Auspicious Star] 9-Purple brings joy & vitality; display fresh plants."
+                    advice = "[9-Purple Auspicious] What to do: Display red/green plants or warm-toned decor. → Effect: Supports romance, celebrations and new family members; covers this palace."
                 } else if yStar == 8 {
-                    advice = "[Wealth Star] Favors real estate and prosperity accumulation."
+                    advice = "[8-White Wealth] What to do: Keep it tidy; place a gathering ornament or cash box. → Effect: Supports property and wealth accumulation."
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "[Noble Stars] Favors scholarly achievements and career advancement."
+                    advice = "[Noble Stars] What to do: Set up a desk lamp or study area, place a Wen Chang tower or green plant. → Effect: Supports study and career advancement."
                 } else {
-                    advice = "Balanced energy; maintain regular harmonious arrangement."
+                    advice = "Balanced energy. What to do: Keep it clean and ventilated as usual. → Effect: No special treatment needed."
                 }
             case .zhHant:
                 if isDanger25 {
-                    advice = "【二五交加重煞】病符逢五黃，宜懸掛六帝古錢與銅葫蘆化解"
+                    advice = "【二五交加】病符逢五黃。做法：此方位掛銅葫蘆或六帝錢；忌動土、忌紅色。→ 影響：主要管健康與是非口舌，覆蓋該宮區域。"
                 } else if hasFiveYellow {
-                    advice = "【歲月五黃】不宜動土鑽牆，宜安放安忍水安撫土氣"
+                    advice = "【五黃】忌動土鑽牆。做法：放安忍水或銅器壓住土氣。→ 影響：管該方位健康與破財風險。"
                 } else if hasIllnessStar {
-                    advice = "【病符臨門】注意脾胃與婦科，宜用銅制風水法物化洩"
+                    advice = "【病符】做法：放銅制器物洩化，保持該方位通風乾燥。→ 影響：管健康，覆蓋該宮。"
                 } else if yStar == 9 {
-                    advice = "【當令吉星】九紫喜慶星飛臨，宜擺放紅綠綠植催旺姻緣添丁"
+                    advice = "【九紫喜慶】做法：擺紅/綠植物或暖色裝飾催旺。→ 影響：利姻緣添丁喜慶，覆蓋該宮。"
                 } else if yStar == 8 {
-                    advice = "【左輔財星】利田宅田莊，聚氣生財"
+                    advice = "【八白財星】做法：保持整潔，放聚氣擺件或錢箱。→ 影響：利田宅聚財。"
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【吉星臨宮】文昌與武貴齊聚，利學業仕途升遷"
+                    advice = "【文昌吉星】做法：設書桌台燈，放文昌塔或綠植。→ 影響：利學業仕途。"
                 } else {
-                    advice = "氣場安平，按日常居家格局調理即可"
+                    advice = "氣場平穩。做法：保持整潔通風即可。→ 影響：無需特別調理。"
                 }
             case .ja:
                 if isDanger25 {
-                    advice = "【二五交加の大煞】病符と五黄が重なる。六帝古銭や真鍮瓢箪で化解"
+                    advice = "【二五交加の大煞】病符と五黄が重なる。やり方：この方位に銅製の瓢箪か六帝銭を掛ける。動土・赤は避ける。→ 効果：主に健康とトラブルに作用し、この宮の領域に効果。"
                 } else if hasFiveYellow {
-                    advice = "【年月五黄】動土や壁の穴あけを避け、安忍水で土気を鎮めると吉"
+                    advice = "【五黄】動土や壁の穴あけを避ける。やり方：安忍水か銅製品で土気を鎮める。→ 効果：この方位の健康と散財リスクを緩和。"
                 } else if hasIllnessStar {
-                    advice = "【病符臨門】消化器や婦人科系に注意、銅製風水アイテムで泄気"
+                    advice = "【病符】やり方：銅製品を置いて気を泄し、この場所は風通しよく乾燥させる。→ 効果：健康関連。この宮に効果。"
                 } else if yStar == 9 {
-                    advice = "【当令吉星】九紫喜慶星が巡る、観葉植物を飾り良縁や慶事を促進"
+                    advice = "【九紫喜慶】やり方：赤や緑の植物、暖色の飾りを置く。→ 効果：良縁・慶事・にぎわいに吉。この宮に効果。"
                 } else if yStar == 8 {
-                    advice = "【左輔財星】不動産や蓄財に利があり、正財運を高めます"
+                    advice = "【八白財星】やり方：整理整頓し、気を集める置物か財布箱を置く。→ 効果：不動産・蓄財に有利。"
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【吉星臨宮】文昌と武貴が集い、学業成就や出世栄達に吉"
+                    advice = "【文昌吉星】やり方：机とスタンドライトを置き、文昌塔か観葉植物を飾る。→ 効果：学業・出世に吉。"
                 } else {
-                    advice = "気場は穏やかです。日常の調和の取れたインテリアを維持してください"
+                    advice = "気場は穏やか。やり方：いつも通り清潔で風通しよく保つ。→ 効果：特別な調理は不要。"
                 }
             case .ko:
                 if isDanger25 {
-                    advice = "【이오교가 대살】병부성과 오황이 겹치니 육제전과 구리 호리병으로 화해"
+                    advice = "【이오교가】병부성과 오황이 겹침. 방법: 이 방위에 구리 호리병이나 육제전을 겁니다. 토목·빨간색 금지. → 효과: 주로 건강과 구설에 작용, 이 궁 영역에 효과."
                 } else if hasFiveYellow {
-                    advice = "【세월 오황】토목 공사나 벽 뚫기를 피하고 안인수로 토기를 안정시킵니다"
+                    advice = "【오황】토목 공사나 벽 뚫기를 피합니다. 방법: 안인수나 구리 제품으로 토기를 안정시킵니다. → 효과: 이 방위의 건강과 파재 위험 완화."
                 } else if hasIllnessStar {
-                    advice = "【병부 임문】소화기와 건강에 유의하고 동제 풍수 용품으로 설기합니다"
+                    advice = "【병부】방법: 구리 제품을 두어 기운을 빼고, 이곳은 통풍·건조하게 유지합니다. → 효과: 건강 관련. 이 궁에 효과."
                 } else if yStar == 9 {
-                    advice = "【당령 길성】구자 희경성이 임하니 화분을 두어 인연과 경사를 촉진합니다"
+                    advice = "【구자 희경】방법: 빨강/초록 식물이나 따뜻한 색 장식을 둡니다. → 효과: 인연·경사·번영에 길. 이 궁에 효과."
                 } else if yStar == 8 {
-                    advice = "【좌보 재성】부동산과 재물 축적에 유리하며 재운을 모읍니다"
+                    advice = "【팔백 재성】방법: 정리 정돈하고 기를 모으는 장식품이나 돈통을 둡니다. → 효과: 부동산·저축에 유리."
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【길성 임궁】문창과 무귀가 모여 학업과 승진 출세에 길합니다"
+                    advice = "【문창 길성】방법: 책상과 스탠드를 두고 문창탑이나 화분을 둡니다. → 효과: 학업·출세에 길."
                 } else {
-                    advice = "기운이 안정되어 평소의 정돈된 인테리어를 유지하시면 됩니다"
+                    advice = "기운이 안정됨. 방법: 평소처럼 청결하고 통풍 잘 유지. → 효과: 특별한 조치 불필요."
                 }
             case .vi:
                 if isDanger25 {
-                    advice = "【Nhị Ngũ Giao Gia Trọng Sát】Bệnh Phù gặp Ngũ Hoàng, nên treo tiền lục đế và hồ lô đồng."
+                    advice = "【Nhị Ngũ Giao Gia】Bệnh Phù gặp Ngũ Hoàng. Cách làm: Treo hồ lô đồng hoặc tiền lục đế ở hướng này; tránh động thổ và màu đỏ. → Ảnh hưởng: Chủ yếu về sức khỏe và thị phi; phủ khu vực cung này."
                 } else if hasFiveYellow {
-                    advice = "【Tuế Nguyệt Ngũ Hoàng】Tránh động thổ khoan tường, đặt an nhẫn thủy để hóa giải."
+                    advice = "【Ngũ Hoàng】Tránh động thổ khoan tường. Cách làm: Đặt an nhẫn thủy hoặc vật bằng đồng để trấn thổ khí. → Ảnh hưởng: Giảm rủi ro sức khỏe và hao tài ở hướng này."
                 } else if hasIllnessStar {
-                    advice = "【Bệnh Phù Lâm Môn】Chú ý tỳ vị sức khỏe, nên dùng vật phẩm phong thủy bằng đồng."
+                    advice = "【Bệnh Phù】Cách làm: Đặt vật bằng đồng để tiết khí; giữ nơi này thông thoáng khô ráo. → Ảnh hưởng: Liên quan sức khỏe; phủ cung này."
                 } else if yStar == 9 {
-                    advice = "【Đương Lệnh Cát Tinh】Cửu Tử hỷ khánh lâm môn, bày cây cảnh trợ duyên thêm đinh."
+                    advice = "【Cửu Tử Hỷ Khánh】Cách làm: Bày cây đỏ/xanh hoặc vật trang trí tông ấm. → Ảnh hưởng: Trợ duyên, tin vui, thêm nhân khẩu; phủ cung này."
                 } else if yStar == 8 {
-                    advice = "【Tả Phụ Tài Tinh】Lợi điền sản gia nghiệp, tụ khí sinh tài."
+                    advice = "【Bát Bạch Tài Tinh】Cách làm: Giữ gọn gàng, đặt vật tụ khí hoặc hộp tiền. → Ảnh hưởng: Lợi điền sản và tích tài."
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【Cát Tinh Lâm Cung】Văn Xương hội tụ Vũ Quý, lợi học hành thi cử và thăng tiến quan lộ."
+                    advice = "【Văn Xương Cát Tinh】Cách làm: Đặt bàn học, đèn bàn, tháp Văn Xương hoặc cây xanh. → Ảnh hưởng: Lợi học hành và công danh."
                 } else {
-                    advice = "Khí trường bình hòa, duy trì bố cục ngăn nắp hài hòa là tốt."
+                    advice = "Khí trường bình hòa. Cách làm: Giữ sạch sẽ thông thoáng như thường. → Ảnh hưởng: Không cần điều chỉnh đặc biệt."
                 }
             case .th:
                 if isDanger25 {
-                    advice = "【สองห้าประจันเคราะห์ใหญ่】ดาวพยาธิปะทะดาวห้าเหลือง ควรแขวนเหรียญหกจักรพรรดิและน้ำเต้าทองเหลือง"
+                    advice = "【สองห้าประจัน】ดาวพยาธิปะทะดาวห้าเหลือง วิธีทำ: แขวนน้ำเต้าทองเหลืองหรือเหรียญหกจักรพรรดิที่ทิศนี้ ห้ามขุดเจาะและห้ามสีแดง → ผล: หลักเรื่องสุขภาพและปากเสียง ครอบคลุมพื้นที่นั้น"
                 } else if hasFiveYellow {
-                    advice = "【เคราะห์ดาวห้าเหลือง】ห้ามขุดเจาะหรือกระทบกระเทือนดิน ควรตั้งอ่างน้ำสงบระงับพลังดิน"
+                    advice = "【ดาวห้าเหลือง】ห้ามขุดเจาะผนัง วิธีทำ: ตั้งอ่างน้ำสงบหรือของทองเหลืองระงับพลังดิน → ผล: ลดเสี่ยงสุขภาพและเสียทรัพย์ที่ทิศนี้"
                 } else if hasIllnessStar {
-                    advice = "【ดาวพยาธิเยือน】ระวังระบบทางเดินอาหารและสุขภาพ ควรใช้วัตถุมงคลทองเหลืองระบายพิษ"
+                    advice = "【ดาวพยาธิ】วิธีทำ: วางของทองเหลืองระบายพลัง ดูแลที่แห่งนี้โปร่งและแห้ง → ผล: เรื่องสุขภาพ ครอบคลุมพื้นที่นั้น"
                 } else if yStar == 9 {
-                    advice = "【ดาวมงคลปัจจุบัน】ดาวเก้าม่วงมงคล เสริมต้นไม้เขียวสดใสรับโชคลาภและความรัก"
+                    advice = "【ดาวเก้าม่วงมงคล】วิธีทำ: วางต้นไม้เขียวหรือของแต่งโทนอุ่น → ผล: เสริมความรัก ข่าวดี และความเจริญ ครอบคลุมพื้นที่นั้น"
                 } else if yStar == 8 {
-                    advice = "【ดาวโชคลาภแปดขาว】ส่งเสริมที่ดิน ทรัพย์สิน ความมั่งคั่งมั่งมี"
+                    advice = "【ดาวแปดขาวทรัพย์】วิธีทำ: เก็บให้เป็นระเบียบ วางของรวมพลังหรือกล่องเงิน → ผล: ส่งเสริมที่ดินและการสะสมทรัพย์"
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【ดาวมงคลชุมนุม】ดาวบุ๋นและบู๊เกื้อหนุน ดีต่อการศึกษา ความก้าวหน้าในหน้าที่การงาน"
+                    advice = "【ดาวมงคลบุ๋นบู๊】วิธีทำ: จัดโต๊ะเรียนโคมไฟ วางหอเวินชางหรือต้นไม้ → ผล: ส่งเสริมการเรียนและความก้าวหน้า"
                 } else {
-                    advice = "พลังงานสมดุลสงบ รักษาความสะอาดและเป็นระเบียบเรียบร้อยตามปกติ"
+                    advice = "พลังสงบดี วิธีทำ: ดูแลสะอาดโปร่งตามปกติ → ผล: ไม่ต้องปรับพิเศษ"
                 }
             case .id:
                 if isDanger25 {
-                    advice = "【Petaka Berat 2-5】Bintang Penyakit bertemu Bintang 5 Kuning. Gantung koin 6 Kaisar & labu tembaga."
+                    advice = "【Tabu Ganda 2-5】Bintang Penyakit bertemu 5-Kuning. Cara: Gantung labu kuningan atau koin 6 Kaisar di arah ini; jangan bor, hindari merah. → Efek: Terutama kesehatan dan pertikaian; mencakup area istana ini."
                 } else if hasFiveYellow {
-                    advice = "【Sha 5 Kuning】Hindari renovasi dan pengeboran; pasang air penenang untuk meredakan energi tanah."
+                    advice = "【5-Kuning】Hindari bor tembok. Cara: Letakkan wadah air penenang atau benda kuningan untuk menstabilkan energi tanah. → Efek: Mengurangi risiko kesehatan dan kehilangan uang di arah ini."
                 } else if hasIllnessStar {
-                    advice = "【Bintang Penyakit】Jaga kesehatan pencernaan; gunakan ornamen tembaga untuk menyerap energi buruk."
+                    advice = "【Bintang Penyakit】Cara: Letakkan benda kuningan untuk menyalurkan energi; jaga area ini berventilasi dan kering. → Efek: Terkait kesehatan; mencakup istana ini."
                 } else if yStar == 9 {
-                    advice = "【Bintang Keberuntungan】9-Ungu membawa sukacita & vitalitas; pajang tanaman hijau segar."
+                    advice = "【9-Ungu Keberuntungan】Cara: Pajang tanaman merah/hijau atau dekorasi bernada hangat. → Efek: Mendukung asmara, kabar baik, dan tambahan anggota keluarga; mencakup istana ini."
                 } else if yStar == 8 {
-                    advice = "【Bintang Rezeki】Menguntungkan properti dan akumulasi kekayaan berkah."
+                    advice = "【8-Putih Rezeki】Cara: Jaga rapi, taruh hiasan pengumpul energi atau kotak uang. → Efek: Mendukung properti dan akumulasi kekayaan."
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【Bintang Bangsawan】Mendukung prestasi akademis dan kemajuan karier."
+                    advice = "【Bintang Bangsawan】Cara: Siapkan meja belajar dan lampu, taruh menara Wen Chang atau tanaman hijau. → Efek: Mendukung pendidikan dan kemajuan karier."
                 } else {
-                    advice = "Energi seimbang dan tenang; pertahankan penataan ruangan yang harmonis."
+                    advice = "Energi seimbang. Cara: Jaga bersih dan berventilasi seperti biasa. → Efek: Tidak perlu perlakuan khusus."
                 }
             case .auto, .zhHans:
                 if isDanger25 {
-                    advice = "【二五交加重煞】病符逢五黄，宜悬挂六帝古钱与铜葫芦化解"
+                    advice = "【二五交加】病符逢五黄。做法：此方位挂铜葫芦或六帝钱；忌动土、忌红色。→ 影响：主要管健康与是非口舌，覆盖该宫区域。"
                 } else if hasFiveYellow {
-                    advice = "【岁月五黄】不宜动土钻墙，宜安放安忍水安抚土气"
+                    advice = "【五黄】忌动土钻墙。做法：放安忍水或铜器压住土气。→ 影响：管该方位健康与破财风险。"
                 } else if hasIllnessStar {
-                    advice = "【病符临门】注意脾胃与妇科，宜用铜制风水法物化泄"
+                    advice = "【病符】做法：放铜制器物泄化，保持该方位通风干燥。→ 影响：管健康，覆盖该宫。"
                 } else if yStar == 9 {
-                    advice = "【当令吉星】九紫喜庆星飞临，宜摆放红绿绿植催旺姻缘添丁"
+                    advice = "【九紫喜庆】做法：摆红/绿植物或暖色装饰催旺。→ 影响：利姻缘添丁喜庆，覆盖该宫。"
                 } else if yStar == 8 {
-                    advice = "【左辅财星】利田宅田庄，聚气生财"
+                    advice = "【八白财星】做法：保持整洁，放聚气摆件或钱箱。→ 影响：利田宅聚财。"
                 } else if yStar == 1 || yStar == 4 || yStar == 6 {
-                    advice = "【吉星临宫】文昌与武贵齐聚，利学业仕途升迁"
+                    advice = "【文昌吉星】做法：设书桌台灯，放文昌塔或绿植。→ 影响：利学业仕途。"
                 } else {
-                    advice = "气场安平，按日常居家格局调理即可"
+                    advice = "气场平稳。做法：保持整洁通风即可。→ 影响：无需特别调理。"
                 }
             }
             

@@ -8,7 +8,7 @@ public class TianJiShuEngine {
     
     private init() {}
     
-    // 生成高清古典宣纸长卷勘测报告图 (1080 x 2400)
+    // 生成高清古典宣纸长卷勘测报告图 (1080 x 6000)
     public func generateScrollImage(
         heading: Double,
         coordsDesc: String,
@@ -17,10 +17,14 @@ public class TianJiShuEngine {
         isPro: Bool = true,
         reportDate: Date = Date()
     ) -> UIImage {
-        let size = CGSize(width: 1080, height: 2400)
+        // The canvas is extra tall because the scroll renders the full
+        // harmonization suite: orientation, flying stars, water method,
+        // qimen & eight mansions, purple-white guest stars, injurious
+        // directions, exterior sha self-check, and the compliance notice.
+        let size = CGSize(width: 1080, height: 6000)
         // These dimensions describe the exported pixel size. The default
         // renderer scale follows the device's Retina factor and could turn
-        // this into a 3240x7200 image, multiplying memory and render time.
+        // this into a 3240x18000 image, multiplying memory and render time.
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
@@ -61,7 +65,7 @@ public class TianJiShuEngine {
             // 宣纸暗纹网格
             cg.setStrokeColor(UIColor(red: 235/255.0, green: 228/255.0, blue: 212/255.0, alpha: 0.6).cgColor)
             cg.setLineWidth(1)
-            for y in stride(from: 40, to: 2360, by: 40) {
+            for y in stride(from: 40, to: 5960, by: 40) {
                 cg.move(to: CGPoint(x: 40, y: CGFloat(y)))
                 cg.addLine(to: CGPoint(x: 1040, y: CGFloat(y)))
             }
@@ -71,9 +75,9 @@ public class TianJiShuEngine {
             let vermilion = UIColor(red: 178/255.0, green: 34/255.0, blue: 34/255.0, alpha: 1.0) // 朱砂红
             cg.setStrokeColor(vermilion.cgColor)
             cg.setLineWidth(6)
-            cg.stroke(CGRect(x: 45, y: 45, width: 990, height: 2310))
+            cg.stroke(CGRect(x: 45, y: 45, width: 990, height: 5910))
             cg.setLineWidth(2)
-            cg.stroke(CGRect(x: 55, y: 55, width: 970, height: 2290))
+            cg.stroke(CGRect(x: 55, y: 55, width: 970, height: 5890))
             
             // 3. 卷首长卷标题
             let titleFont = UIFont.boldSystemFont(ofSize: 52)
@@ -465,11 +469,85 @@ public class TianJiShuEngine {
             \(xkChart.remedyAdvice)
             \(annualNote)
             """
-            p5Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 210), withAttributes: [
+            p5Text.draw(in: CGRect(x: 100, y: curY, width: 880, height: 180), withAttributes: [
                 .font: bodyFont,
                 .foregroundColor: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
             ])
-            curY += 200
+            curY += 170
+            
+            // 8.2 流年紫白客星调理与催旺（含家人影响维度）
+            let pwSecTitle = tr8(
+                "紫白流年 · 客星调理与催旺",
+                "紫白流年 · 客星調理與催旺",
+                "PURPLE-WHITE YEAR · GUEST STAR REMEDIES",
+                "紫白流年・客星の調理と催旺",
+                "자백 유년 · 객성 조리와 최왕",
+                "TỬ BẠCH LƯU NIÊN · ĐIỀU LÝ KHÁCH TINH",
+                "ดาวม่วงขาวประจำปี · ปรับดาวเยือนและเสริมพลัง",
+                "BINTANG UNGU-PUTIH · PENYESUAIAN BINTANG TAMU"
+            )
+            drawSectionHeader(ctx: cg, title: pwSecTitle, atY: curY, vermilion: vermilion)
+            curY += 62
+            let pwBodyFont = UIFont.systemFont(ofSize: 22)
+            let inkColor = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
+            let notablePalaces = pwChart.palaceItems.filter { item in
+                item.isDanger25 || item.yearGuestStar == 5 || item.yearGuestStar == 2 ||
+                item.yearGuestStar == 9 || item.yearGuestStar == 8 ||
+                item.yearGuestStar == 4 || item.yearGuestStar == 6
+            }
+            for item in notablePalaces {
+                let pwLine = "「\(item.palaceName)」\(item.advice)"
+                pwLine.draw(in: CGRect(x: 100, y: curY, width: 880, height: 100), withAttributes: [
+                    .font: pwBodyFont,
+                    .foregroundColor: inkColor
+                ])
+                curY += 95
+            }
+            
+            // 9. 八宅凶位化解与安镇（含家人影响维度）
+            let bzSecTitle = tr8(
+                "八宅凶位 · 化解安镇",
+                "八宅凶位 · 化解安鎮",
+                "EIGHT MANSIONS · INJURIOUS DIRECTIONS",
+                "八宅凶位・化解と安鎮",
+                "팔택 흉위 · 화해와 안진",
+                "BÁT TRẠCH HUNG VỊ · HÓA GIẢI AN TRẤN",
+                "แปดเรือนทิศอัปมงคล · แก้เคล็ด",
+                "POSISI BURUK · PENANGKAL DELAPAN RUMAH"
+            )
+            drawSectionHeader(ctx: cg, title: bzSecTitle, atY: curY, vermilion: vermilion)
+            curY += 62
+            let injuriousStars: [StarLuckType] = [.jueMing, .wuGui, .liuSha, .huoHai]
+            for item in bz.items where injuriousStars.contains(item.star) {
+                let bzLine = "【\(item.star.localizedName) · \(item.localizedDirection)】\(item.localizedSuggestion)"
+                bzLine.draw(in: CGRect(x: 100, y: curY, width: 880, height: 140), withAttributes: [
+                    .font: pwBodyFont,
+                    .foregroundColor: inkColor
+                ])
+                curY += 132
+            }
+            
+            // 10. 形煞自查与化煞安宅（外部形煞通用化解清单）
+            let shaSecTitle = tr8(
+                "形煞自查 · 化煞安宅",
+                "形煞自查 · 化煞安宅",
+                "EXTERNAL SHA SELF-CHECK",
+                "形煞セルフチェック・化解と安宅",
+                "형살 자점 · 화살 안택",
+                "TỰ TRA HÌNH SÁT · HÓA SÁT",
+                "ตรวจสอบเครื่องหมายพิฆาต · แก้เคล็ด",
+                "PEMERIKSAAN SHA EKSTERNAL"
+            )
+            drawSectionHeader(ctx: cg, title: shaSecTitle, atY: curY, vermilion: vermilion)
+            curY += 62
+            for sha in ExteriorShaEngine.shared.database {
+                let shaLine = "【\(sha.localizedName)】\(sha.localizedRemedySolution)"
+                shaLine.draw(in: CGRect(x: 100, y: curY, width: 880, height: 250), withAttributes: [
+                    .font: pwBodyFont,
+                    .foregroundColor: inkColor
+                ])
+                curY += 242
+            }
             
             // 9. 卷尾朱砂印鉴与落款
             let sealRect = CGRect(x: 780, y: curY + 20, width: 180, height: 180)
@@ -528,6 +606,23 @@ public class TianJiShuEngine {
                 .font: UIFont.systemFont(ofSize: 22, weight: .bold),
                 .foregroundColor: UIColor(red: 70/255.0, green: 50/255.0, blue: 35/255.0, alpha: 1.0)
             ])
+            
+            // 11. 卷尾合规免责声明 (Compliance & disclaimer)
+            let disclaimer = tr8(
+                "温馨提示：本长卷依据传统堪舆文化整理，仅供文化研究与娱乐参考，不构成医疗、法律、金融或投资建议，亦不承诺任何实际效果。请理性看待，涉及健康、财产等重大事项请咨询相关专业人士。",
+                "溫馨提示：本長卷依據傳統堪輿文化整理，僅供文化研究與娛樂參考，不構成醫療、法律、金融或投資建議，亦不承諾任何實際效果。請理性看待，涉及健康、財產等重大事項請諮詢相關專業人士。",
+                "Note: This scroll is compiled from traditional Feng Shui culture and is provided for cultural study and entertainment only. It does not constitute medical, legal, financial or investment advice, nor does it promise any actual outcome. Please view it rationally and consult qualified professionals on matters of health, property and other major decisions.",
+                "ご案内：本書は伝統的な風水文化に基づき編纂され、文化的な研究・娯楽の参考のみを目的としています。医療・法律・金融・投資に関する助言ではなく、いかなる実際の効果も保証するものではありません。理性をもってご覧いただき、健康・財産など重要な事項は専門家にご相談ください。",
+                "안내: 본 장권은 전통 풍수 문화를 바탕으로 정리되었으며 문화 연구 및 오락 참고용일 뿐, 의료·법률·금융·투자 자문을 제공하지 않으며 어떠한 실제 효과도 보장하지 않습니다. 합리적으로 판단하시고 건강·재산 등 중대한 사항은 전문가와 상담하시기 바랍니다.",
+                "Lưu ý: Trường quyển này được biên soạn theo văn hóa Phong Thủy truyền thống, chỉ để tham khảo nghiên cứu văn hóa và giải trí, không phải lời khuyên y tế, pháp lý, tài chính hay đầu tư, cũng không hứa hẹn bất kỳ kết quả thực tế nào. Hãy nhìn nhận hợp lý; các vấn đề quan trọng như sức khỏe, tài sản vui lòng tham vấn chuyên gia.",
+                "หมายเหตุ: ม้วนนี้จัดทำขึ้นตามวัฒนธรรมฮวงจุ้ยโบราณ เพื่อการศึกษาวัฒนธรรมและความบันเทิงเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์ กฎหมาย การเงินหรือการลงทุน และไม่รับประกันผลลัพธ์จริงใด ๆ โปรดพิจารณาอย่างมีสติ เรื่องสำคัญด้านสุขภาพและทรัพย์สินควรปรึกษาผู้เชี่ยวชาญ",
+                "Catatan: Gulungan ini disusun berdasarkan budaya Feng Shui tradisional, hanya untuk kajian budaya dan hiburan; bukan nasihat medis, hukum, keuangan atau investasi, dan tidak menjanjikan hasil nyata apa pun. Harap disikapi secara rasional; untuk hal penting seperti kesehatan dan properti, konsultasikan dengan ahli."
+            )
+            let disclaimerAttr: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 20),
+                .foregroundColor: UIColor(red: 120/255.0, green: 100/255.0, blue: 80/255.0, alpha: 1.0)
+            ]
+            disclaimer.draw(in: CGRect(x: 100, y: curY + 260, width: 880, height: 180), withAttributes: disclaimerAttr)
         }
     }
     

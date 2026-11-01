@@ -428,6 +428,7 @@ public struct VRSpatialSurveyView: View {
         case .bathroom: return .cyan
         case .balcony: return .green
         case .door: return .yellow
+        case .missingCorner: return .red
         }
     }
 }

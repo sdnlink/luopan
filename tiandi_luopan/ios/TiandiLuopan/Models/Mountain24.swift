@@ -383,7 +383,7 @@ public extension CompassHeadingState {
     ///              且距该缝 ≤ 0.7°（≈ 距最近山中心 ≥ 6.8°）；
     /// 小空亡(差错) = 距任一山边界 ≤ 1.0°（距最近山中心 ≥ 6.5°）；
     /// 兼向 = 距山中心 1.5°~6.5°；其余为正向纯清。
-    public var kongWangLevel: KongWangLevel {
+    var kongWangLevel: KongWangLevel {
         let a = (facingAngle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         let center = (facingMountain.centerAngle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
         var rawDelta = abs(a - center)

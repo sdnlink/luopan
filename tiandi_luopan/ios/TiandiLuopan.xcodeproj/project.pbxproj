@@ -66,6 +66,9 @@
 		1073 /* ARRoomPlanCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2073 /* ARRoomPlanCaptureView.swift */; };
 		1074 /* HouseSpatialSurveyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2074 /* HouseSpatialSurveyModel.swift */; };
 		1075 /* House3DSpaceViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2075 /* House3DSpaceViewer.swift */; };
+		1076 /* ShaSurveyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2076 /* ShaSurveyModels.swift */; };
+		1077 /* GeometryUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2077 /* GeometryUtils.swift */; };
+		1078 /* VRSpatialSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2078 /* VRSpatialSurveyView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -141,6 +144,9 @@
 		2073 /* ARRoomPlanCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/ARRoomPlanCaptureView.swift"; sourceTree = "<group>"; };
 		2074 /* HouseSpatialSurveyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/HouseSpatialSurveyModel.swift"; sourceTree = "<group>"; };
 		2075 /* House3DSpaceViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/House3DSpaceViewer.swift"; sourceTree = "<group>"; };
+		2076 /* ShaSurveyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ShaSurveyModels.swift"; sourceTree = "<group>"; };
+		2077 /* GeometryUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/GeometryUtils.swift"; sourceTree = "<group>"; };
+		2078 /* VRSpatialSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/VRSpatialSurveyView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -221,9 +227,12 @@
 				2070 /* WorldMagneticModel.swift */,
 				2071 /* OnDeviceShaAnalyzer.swift */,
 				2074 /* HouseSpatialSurveyModel.swift */,
+				2076 /* ShaSurveyModels.swift */,
+				2077 /* GeometryUtils.swift */,
 				2072 /* ARSpatialSurveyView.swift */,
 				2073 /* ARRoomPlanCaptureView.swift */,
 				2075 /* House3DSpaceViewer.swift */,
+				2078 /* VRSpatialSurveyView.swift */,
 				2013 /* InfoPlist.strings */,
 				2090 /* Localizable.strings */,
 
@@ -409,6 +418,9 @@
 				1073 /* ARRoomPlanCaptureView.swift in Sources */,
 				1074 /* HouseSpatialSurveyModel.swift in Sources */,
 				1075 /* House3DSpaceViewer.swift in Sources */,
+				1076 /* ShaSurveyModels.swift in Sources */,
+				1077 /* GeometryUtils.swift in Sources */,
+				1078 /* VRSpatialSurveyView.swift in Sources */,
 
 
 

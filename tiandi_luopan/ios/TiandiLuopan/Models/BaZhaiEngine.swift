@@ -19,6 +19,19 @@ public enum StarLuckType: String, Codable {
         }
     }
     
+    public var name: String {
+        switch self {
+        case .shengQi: return "生气"
+        case .yanNian: return "延年"
+        case .tianYi:  return "天医"
+        case .fuWei:   return "伏位"
+        case .jueMing: return "绝命"
+        case .wuGui:   return "五鬼"
+        case .liuSha:  return "六煞"
+        case .huoHai:  return "祸害"
+        }
+    }
+    
     public var localizedName: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {

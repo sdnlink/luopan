@@ -951,7 +951,7 @@ public final class HouseSceneCoordinator: NSObject {
                             } else {
                                 mat.diffuse.contents = UIColor(red: 0.85, green: 0.30, blue: 0.25, alpha: 0.15)
                             }
-                            nodeName = "【八宅·\(cellGua)宫】\(item.direction)：【\(item.star.name)】(\(item.star.luckLevel.title))"
+                            nodeName = "【八宅·\(cellGua)宫】\(item.direction)：【\(item.star.name)】(\(item.star.isAuspicious ? "吉" : "凶"))"
                         } else {
                             mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
                             nodeName = "【\(cellGua)宫】"

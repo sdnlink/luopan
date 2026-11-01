@@ -1257,11 +1257,32 @@ extension HouseSpatialSurvey {
             s += "13\n\(String(format: "%.3f", mx))\n23\n\(String(format: "%.3f", my))\n33\n0.0\n"
             s += "70\n32\n3\nDIMENSIONS\n1\n\(label)\n"
         }
-        // 全屋净距（OBB 跨度值为真实开间/进深，绘图坐标仍取世界系）
-        appendAlignedDim(minX, -minZ, maxX, -minZ, "全屋开间 \(String(format: "%.2f", lSpanX))m")
-        appendAlignedDim(minX, -maxZ, maxX, -maxZ, "全屋开间 \(String(format: "%.2f", lSpanX))m")
-        appendAlignedDim(minX, -minZ, minX, -maxZ, "全屋进深 \(String(format: "%.2f", lSpanZ))m")
-        appendAlignedDim(maxX, -minZ, maxX, -maxZ, "全屋进深 \(String(format: "%.2f", lSpanZ))m")
+        // 全屋净距：在导出器内独立求全屋外框 AABB（墙/开口/房间端点），
+        // 不依赖 analyzeSpatialHouse 局部变量作用域。
+        var dMinX: Float = .greatestFiniteMagnitude
+        var dMaxX: Float = -.greatestFiniteMagnitude
+        var dMinZ: Float = .greatestFiniteMagnitude
+        var dMaxZ: Float = -.greatestFiniteMagnitude
+        for w in walls {
+            dMinX = min(dMinX, min(w.startX, w.endX)); dMaxX = max(dMaxX, max(w.startX, w.endX))
+            dMinZ = min(dMinZ, min(w.startZ, w.endZ)); dMaxZ = max(dMaxZ, max(w.startZ, w.endZ))
+        }
+        for op in openings {
+            dMinX = min(dMinX, op.posX); dMaxX = max(dMaxX, op.posX)
+            dMinZ = min(dMinZ, op.posZ); dMaxZ = max(dMaxZ, op.posZ)
+        }
+        for r in rooms {
+            dMinX = min(dMinX, r.centerX - r.sizeX * 0.5); dMaxX = max(dMaxX, r.centerX + r.sizeX * 0.5)
+            dMinZ = min(dMinZ, r.centerZ - r.sizeZ * 0.5); dMaxZ = max(dMaxZ, r.centerZ + r.sizeZ * 0.5)
+        }
+        if dMinX >= dMaxX { dMinX = -3.0; dMaxX = 3.0 }
+        if dMinZ >= dMaxZ { dMinZ = -3.0; dMaxZ = 3.0 }
+        let dSpanX = max(1.5, dMaxX - dMinX)
+        let dSpanZ = max(1.5, dMaxZ - dMinZ)
+        appendAlignedDim(dMinX, -dMinZ, dMaxX, -dMinZ, "全屋开间 \(String(format: "%.2f", dSpanX))m")
+        appendAlignedDim(dMinX, -dMaxZ, dMaxX, -dMaxZ, "全屋开间 \(String(format: "%.2f", dSpanX))m")
+        appendAlignedDim(dMinX, -dMinZ, dMinX, -dMaxZ, "全屋进深 \(String(format: "%.2f", dSpanZ))m")
+        appendAlignedDim(dMaxX, -dMinZ, dMaxX, -dMaxZ, "全屋进深 \(String(format: "%.2f", dSpanZ))m")
         // 主要房间净距
         for r in rooms.sorted(by: { $0.areaSqMeters > $1.areaSqMeters }).prefix(3) {
             let rMinX = r.centerX - r.sizeX * 0.5

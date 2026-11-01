@@ -18,6 +18,12 @@ private struct SavedFloorplanLayout: Codable {
     let hasFloorplanAccess: Bool
 }
 
+/// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
+private struct RoomCandidate: Equatable {
+    var rect: CGRect
+    var polygonPoints: [CGPoint]?
+}
+
 public struct FloorplanView: View {
     public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
@@ -48,6 +54,8 @@ public struct FloorplanView: View {
     @State private var isDetectingRooms: Bool = false
     @State private var roomDetectionGeneration: Int = 0
     @State private var roomDetectionMessage: String?
+    @State private var calibratedWidthText: String = ""
+    @State private var calibratedDepthText: String = ""
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
     @State private var showNewRoomTypePicker = false
@@ -138,6 +146,8 @@ public struct FloorplanView: View {
 
                         if userFloorplanImage != nil {
                             roomDetectionBar()
+                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                            roomCalibrationBar()
                                 .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                         }
 
@@ -693,6 +703,42 @@ public struct FloorplanView: View {
         .padding(.horizontal, 16)
     }
 
+    /// 实测尺寸标定：输入开间/进深（米），估算真实户型面积
+    private var estimatedAreaSqm: Double? {
+        let width = Double(calibratedWidthText.replacingOccurrences(of: ",", with: "."))
+        let depth = Double(calibratedDepthText.replacingOccurrences(of: ",", with: "."))
+        guard let width = width, let depth = depth, width > 0, depth > 0 else { return nil }
+        return width * depth
+    }
+
+    private func roomCalibrationBar() -> some View {
+        HStack(spacing: 6) {
+            Text(lang.t("floorplan_calibrate"))
+                .font(.adaptive(size: 10, weight: .bold))
+                .foregroundColor(.white.opacity(0.75))
+            TextField(lang.t("floorplan_width_hint"), text: $calibratedWidthText)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(.adaptive(size: 12))
+                .frame(width: 64)
+            Text("×")
+                .font(.adaptive(size: 10))
+                .foregroundColor(.white.opacity(0.5))
+            TextField(lang.t("floorplan_depth_hint"), text: $calibratedDepthText)
+                .keyboardType(.decimalPad)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .font(.adaptive(size: 12))
+                .frame(width: 64)
+            if let area = estimatedAreaSqm {
+                Text(String(format: "≈ %.1f ㎡", area))
+                    .font(.adaptive(size: 10, weight: .bold))
+                    .foregroundColor(Color.yanCyan)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+    }
+
     private func roomLayoutTools() -> some View {
         HStack(spacing: 8) {
             Button(action: centerFromRoomLayout) {
@@ -872,25 +918,8 @@ public struct FloorplanView: View {
     }
 
     private func centerFromRoomLayout() {
-        let validRooms = rooms.filter {
-            $0.type != .missingCorner && $0.rect.width > 0 && $0.rect.height > 0
-        }
-        let totalArea = validRooms.reduce(0.0) { partial, room in
-            partial + Double(room.rect.width * room.rect.height)
-        }
-        guard totalArea > 0 else { return }
-        let weightedX = validRooms.reduce(0.0) { partial, room in
-            let area = Double(room.rect.width * room.rect.height)
-            return partial + Double(room.rect.midX) * area
-        }
-        let weightedY = validRooms.reduce(0.0) { partial, room in
-            let area = Double(room.rect.width * room.rect.height)
-            return partial + Double(room.rect.midY) * area
-        }
-        centroid = CGPoint(
-            x: max(0.05, min(0.95, weightedX / totalArea)),
-            y: max(0.05, min(0.95, weightedY / totalArea))
-        )
+        // 立极中宫：按房间真实面积（多边形优先）加权质心
+        centroid = FloorplanEngine.roomsCentroid(rooms)
         persistLayout()
     }
 
@@ -994,10 +1023,11 @@ public struct FloorplanView: View {
         .cornerRadius(8)
     }
 
-    /// Runs a lightweight Vision rectangle pass over the imported plan. Room
-    /// names cannot be inferred reliably from a photograph, so the detected
-    /// boxes are applied as layout suggestions to the existing room labels and
-    /// remain fully editable by the user.
+    /// Runs a lightweight Vision pass over the imported plan: a rectangle
+    /// channel plus a closed-contour channel. Room names are still editable
+    /// by the user, but the detected polygons (not just boxes) let the layout
+    /// follow the real wall lines, and extra detected regions are added as new
+    /// rooms instead of being discarded.
     private func detectRoomLayout() {
         guard !rooms.isEmpty else {
             roomDetectionMessage = lang.t("floorplan_detect_failed")
@@ -1014,41 +1044,128 @@ public struct FloorplanView: View {
         let generation = roomDetectionGeneration
         let sourceImage = image
         DispatchQueue.global(qos: .userInitiated).async {
-            let request = VNDetectRectanglesRequest()
-            request.minimumConfidence = 0.35
-            request.minimumSize = 0.04
-            request.minimumAspectRatio = 0.15
-            request.maximumAspectRatio = 6.0
-            request.maximumObservations = 32
-
-            do {
-                let handler = VNImageRequestHandler(
-                    cgImage: cgImage,
-                    orientation: orientation,
-                    options: [:]
-                )
-                try handler.perform([request])
-                let candidates = Self.normalizedRoomCandidates(
-                    from: request.results as? [VNRectangleObservation] ?? []
-                )
-                DispatchQueue.main.async { [self] in
-                    guard generation == roomDetectionGeneration,
-                          userFloorplanImage === sourceImage else { return }
-                    isDetectingRooms = false
-                    guard !candidates.isEmpty else {
-                        roomDetectionMessage = lang.t("floorplan_detect_failed")
-                        return
-                    }
-                    applyRoomCandidates(candidates)
-                }
-            } catch {
-                DispatchQueue.main.async { [self] in
-                    guard generation == roomDetectionGeneration,
-                          userFloorplanImage === sourceImage else { return }
-                    isDetectingRooms = false
+            // 通道 1：矩形检测（高置信度矩形，适合规整线稿）
+            let rectCandidates = Self.detectRectCandidates(
+                cgImage: cgImage,
+                orientation: orientation
+            )
+            // 通道 2：闭合轮廓多边形（VNDetectContoursRequest 自带对比度
+            // 增强与灰度化，适配照片拍摄的图纸）
+            let contourCandidates = Self.detectContourCandidates(
+                cgImage: cgImage,
+                orientation: orientation
+            )
+            let merged = Self.mergeCandidates(
+                rectCandidates: rectCandidates,
+                contourCandidates: contourCandidates
+            )
+            DispatchQueue.main.async { [self] in
+                guard generation == roomDetectionGeneration,
+                      userFloorplanImage === sourceImage else { return }
+                isDetectingRooms = false
+                guard !merged.isEmpty else {
                     roomDetectionMessage = lang.t("floorplan_detect_failed")
+                    return
                 }
+                applyRoomCandidates(merged)
             }
+        }
+    }
+
+    /// 矩形通道：VNDetectRectanglesRequest + 归一化/去重
+    private static func detectRectCandidates(cgImage: CGImage, orientation: CGImagePropertyOrientation) -> [CGRect] {
+        let request = VNDetectRectanglesRequest()
+        request.minimumConfidence = 0.35
+        request.minimumSize = 0.04
+        request.minimumAspectRatio = 0.15
+        request.maximumAspectRatio = 6.0
+        request.maximumObservations = 32
+        do {
+            let handler = VNImageRequestHandler(
+                cgImage: cgImage,
+                orientation: orientation,
+                options: [:]
+            )
+            try handler.perform([request])
+            return normalizedRoomCandidates(
+                from: request.results as? [VNRectangleObservation] ?? []
+            )
+        } catch {
+            return []
+        }
+    }
+
+    /// 轮廓通道：VNDetectContoursRequest → 近似闭合的顶层轮廓 → 多边形候选
+    private static func detectContourCandidates(cgImage: CGImage, orientation: CGImagePropertyOrientation) -> [(rect: CGRect, points: [CGPoint])] {
+        let request = VNDetectContoursRequest()
+        request.contrastAdjustment = 2.0
+        request.detectsDarkOnLight = true
+        request.maximumImageDimension = 640
+        do {
+            let handler = VNImageRequestHandler(
+                cgImage: cgImage,
+                orientation: orientation,
+                options: [:]
+            )
+            try handler.perform([request])
+            guard let observation = request.results?.first else { return [] }
+            return contourRoomCandidates(from: observation)
+        } catch {
+            return []
+        }
+    }
+
+    /// 把顶层闭合轮廓转成房间候选（面积过滤 + 面积降序）
+    private static func contourRoomCandidates(from observation: VNContoursObservation) -> [(rect: CGRect, points: [CGPoint])] {
+        var result: [(rect: CGRect, points: [CGPoint])] = []
+        for contour in observation.topLevelContours {
+            let rawPoints = contour.normalizedPoints
+            guard rawPoints.count >= 4 else { continue }
+            // Vision 坐标 y 向上（左下原点）→ 翻转为 UIKit y 向下
+            let flipped = rawPoints.map { CGPoint(x: $0.x, y: 1 - $0.y) }
+            // 轮廓首尾接近即视为闭合房间边界
+            let first = flipped.first ?? .zero
+            let last = flipped.last ?? .zero
+            guard hypot(last.x - first.x, last.y - first.y) < 0.03 else { continue }
+            guard let bounds = GeometryUtils.polygonBounds(flipped) else { continue }
+            guard bounds.width >= 0.08, bounds.height >= 0.06,
+                  bounds.width * bounds.height >= 0.012,
+                  bounds.width * bounds.height <= 0.78 else { continue }
+            result.append((bounds, flipped))
+        }
+        return result.sorted {
+            ($0.rect.width * $0.rect.height) > ($1.rect.width * $1.rect.height)
+        }
+    }
+
+    /// 双通道候选合并：矩形优先入列，轮廓补齐；IoU > 0.55 视为同区域去重
+    private static func mergeCandidates(
+        rectCandidates: [CGRect],
+        contourCandidates: [(rect: CGRect, points: [CGPoint])]
+    ) -> [RoomCandidate] {
+        var merged: [RoomCandidate] = []
+        for rect in rectCandidates {
+            let overlaps = merged.contains { existing in
+                let intersection = existing.rect.intersection(rect)
+                guard !intersection.isNull else { return false }
+                let unionArea = existing.rect.union(rect).width * existing.rect.union(rect).height
+                return unionArea > 0 && (intersection.width * intersection.height) / unionArea > 0.55
+            }
+            if !overlaps { merged.append(RoomCandidate(rect: rect, polygonPoints: nil)) }
+        }
+        for contour in contourCandidates {
+            let overlaps = merged.contains { existing in
+                let intersection = existing.rect.intersection(contour.rect)
+                guard !intersection.isNull else { return false }
+                let unionArea = existing.rect.union(contour.rect).width * existing.rect.union(contour.rect).height
+                return unionArea > 0 && (intersection.width * intersection.height) / unionArea > 0.55
+            }
+            if !overlaps {
+                merged.append(RoomCandidate(rect: contour.rect, polygonPoints: contour.points))
+            }
+        }
+        return merged.sorted {
+            ($0.rect.width * $0.rect.height) > ($1.rect.width * $1.rect.height)
         }
     }
 
@@ -1095,29 +1212,55 @@ public struct FloorplanView: View {
         }
     }
 
-    private func applyRoomCandidates(_ candidates: [CGRect]) {
+    private func applyRoomCandidates(_ candidates: [RoomCandidate]) {
         guard !rooms.isEmpty else { return }
         roomsBeforeDetection = rooms
         centroidBeforeDetection = centroid
         let orderedRoomIndices = rooms.indices.filter { rooms[$0].type != .missingCorner }.sorted {
             rooms[$0].rect.width * rooms[$0].rect.height > rooms[$1].rect.width * rooms[$1].rect.height
         }
-        let orderedCandidates = candidates.prefix(orderedRoomIndices.count)
+        let orderedCandidates = candidates.sorted {
+            ($0.rect.width * $0.rect.height) > ($1.rect.width * $1.rect.height)
+        }
         var updatedRooms = rooms
-        for (offset, candidate) in orderedCandidates.enumerated() {
-            updatedRooms[orderedRoomIndices[offset]].rect = candidate
+        // 1) 匹配覆盖：候选按面积降序匹配现有房间（保留类型与名称，更新边界）
+        let matchCount = min(orderedRoomIndices.count, orderedCandidates.count)
+        for offset in 0..<matchCount {
+            let candidate = orderedCandidates[offset]
+            var room = updatedRooms[orderedRoomIndices[offset]]
+            room.rect = candidate.rect
+            room.polygonPoints = candidate.polygonPoints
+            updatedRooms[orderedRoomIndices[offset]] = room
+        }
+        // 2) 超出房间数的候选 → 新增房间（规则推断类型，后续可逐间修改）
+        let addedCount = max(0, orderedCandidates.count - orderedRoomIndices.count)
+        if addedCount > 0 {
+            for candidate in orderedCandidates.dropFirst(orderedRoomIndices.count) {
+                let areaRatio = candidate.rect.width * candidate.rect.height
+                let aspectRatio = candidate.rect.width / max(candidate.rect.height, 0.0001)
+                let type = FloorplanEngine.inferRoomType(
+                    areaRatio: areaRatio,
+                    aspectRatio: aspectRatio,
+                    existing: updatedRooms
+                ) ?? .study
+                updatedRooms.append(FloorplanRoom(
+                    name: type.localizedName,
+                    type: type,
+                    rect: candidate.rect,
+                    polygonPoints: candidate.polygonPoints
+                ))
+            }
         }
         rooms = updatedRooms
         isEditingRooms = true
-
-        if let firstCandidate = orderedCandidates.first {
-            let union = orderedCandidates.dropFirst().reduce(firstCandidate) { $0.union($1) }
-            if !union.isNull, union.width > 0, union.height > 0 {
-                centroid = CGPoint(x: union.midX, y: union.midY)
-            }
-        }
+        // 3) 立极中宫：按真实多边形面积加权质心
+        centroid = FloorplanEngine.roomsCentroid(updatedRooms)
         persistLayout()
-        roomDetectionMessage = "\(lang.t("floorplan_detected")) \(orderedCandidates.count)"
+        if addedCount > 0 {
+            roomDetectionMessage = "\(lang.t("floorplan_detected")) \(matchCount) · +\(addedCount)"
+        } else {
+            roomDetectionMessage = "\(lang.t("floorplan_detected")) \(matchCount)"
+        }
         refreshAudit(force: true)
     }
 
@@ -1337,18 +1480,60 @@ public struct FloorplanView: View {
             }
         }) {
             ZStack {
-                RoundedRectangle(cornerRadius: 6)
+                if let pts = room.polygonPoints, pts.count >= 3 {
+                    // 识别出的真实墙线轮廓：按多边形绘制（矩形仅作兜底边界）
+                    Path { path in
+                        let first = pts[0]
+                        path.move(to: CGPoint(
+                            x: layoutRect.minX + first.x * layoutRect.width,
+                            y: layoutRect.minY + first.y * layoutRect.height
+                        ))
+                        for p in pts.dropFirst() {
+                            path.addLine(to: CGPoint(
+                                x: layoutRect.minX + p.x * layoutRect.width,
+                                y: layoutRect.minY + p.y * layoutRect.height
+                            ))
+                        }
+                        path.closeSubpath()
+                    }
                     .fill(bgColor)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(
-                                strokeColor,
-                                style: StrokeStyle(
-                                    lineWidth: isMissingCorner || isBad ? 1.5 : 1,
-                                    dash: isMissingCorner ? [5, 3] : []
-                                )
+                        Path { path in
+                            let first = pts[0]
+                            path.move(to: CGPoint(
+                                x: layoutRect.minX + first.x * layoutRect.width,
+                                y: layoutRect.minY + first.y * layoutRect.height
+                            ))
+                            for p in pts.dropFirst() {
+                                path.addLine(to: CGPoint(
+                                    x: layoutRect.minX + p.x * layoutRect.width,
+                                    y: layoutRect.minY + p.y * layoutRect.height
+                                ))
+                            }
+                            path.closeSubpath()
+                        }
+                        .stroke(
+                            strokeColor,
+                            style: StrokeStyle(
+                                lineWidth: isMissingCorner || isBad ? 1.5 : 1,
+                                dash: isMissingCorner ? [5, 3] : []
                             )
+                        )
                     )
+                } else {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(bgColor)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(
+                                    strokeColor,
+                                    style: StrokeStyle(
+                                        lineWidth: isMissingCorner || isBad ? 1.5 : 1,
+                                        dash: isMissingCorner ? [5, 3] : []
+                                    )
+                                )
+                        )
+                }
                 
                 VStack(spacing: 2) {
                     Image(systemName: room.type.iconName)

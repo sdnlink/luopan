@@ -404,15 +404,15 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             let col = hit.worldTransform.columns.3
             floorPos = SIMD3<Float>(col.x, col.y, col.z)
             if let plane = hit.anchor as? ARPlaneAnchor {
-                resolvedSpan = min(4.2, max(1.8, min(plane.extent.x, plane.extent.z) * 0.92))
+                resolvedSpan = min(4.2, max(1.8, min(plane.planeExtent.width, plane.planeExtent.height) * 0.92))
             }
         } else if let largestHoriz = frame.anchors
             .compactMap({ $0 as? ARPlaneAnchor })
             .filter({ $0.alignment == .horizontal })
-            .max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
+            .max(by: { $0.planeExtent.width * $0.planeExtent.height < $1.planeExtent.width * $1.planeExtent.height }) {
             let col = largestHoriz.transform.columns.3
             floorPos = SIMD3<Float>(col.x, col.y, col.z)
-            resolvedSpan = min(4.2, max(1.8, min(largestHoriz.extent.x, largestHoriz.extent.z) * 0.92))
+            resolvedSpan = min(4.2, max(1.8, min(largestHoriz.planeExtent.width, largestHoriz.planeExtent.height) * 0.92))
         } else {
             let cam = frame.camera.transform
             let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
@@ -642,8 +642,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         var maxZ: Float = -.greatestFiniteMagnitude
 
         for plane in vertPlanes {
-            let halfW = max(Float(0.4), plane.extent.x * 0.5)
-            let h = max(Float(2.0), plane.extent.z)
+            let halfW = max(Float(0.4), plane.planeExtent.width * 0.5)
+            let h = max(Float(2.0), plane.planeExtent.height)
             let p1 = plane.transform * SIMD4<Float>(plane.center.x - halfW, plane.center.y, plane.center.z, 1.0)
             let p2 = plane.transform * SIMD4<Float>(plane.center.x + halfW, plane.center.y, plane.center.z, 1.0)
             walls3D.append(SpatialWall3D(
@@ -1139,8 +1139,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     private func planeWorldCorners(for plane: ARPlaneAnchor) -> [SIMD3<Float>] {
-        let hx = plane.extent.x * 0.5
-        let hz = plane.extent.z * 0.5
+        let hx = plane.planeExtent.width * 0.5
+        let hz = plane.planeExtent.height * 0.5
         return [
             SIMD3<Float>((plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z - hz, 1.0)).x,
                          (plane.transform * SIMD4<Float>(plane.center.x - hx, plane.center.y, plane.center.z - hz, 1.0)).y,
@@ -1554,14 +1554,14 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             let h = maxY - minY
             estimatedRoomHeightMeters = h
             hasLowBeamWarning = (h < 2.42)
-        } else if let maxVertH = planes.filter({ $0.alignment == .vertical }).map({ $0.extent.z }).max(),
+        } else if let maxVertH = planes.filter({ $0.alignment == .vertical }).map({ $0.planeExtent.height }).max(),
                   maxVertH >= 1.85 && maxVertH <= 5.2 {
             estimatedRoomHeightMeters = maxVertH
             hasLowBeamWarning = (maxVertH < 2.42)
         }
-        if let largest = planes.max(by: { $0.extent.x * $0.extent.z < $1.extent.x * $1.extent.z }) {
-            largestPlaneWidth = largest.extent.x
-            largestPlaneDepth = largest.extent.z
+        if let largest = planes.max(by: { $0.planeExtent.width * $0.planeExtent.height < $1.planeExtent.width * $1.planeExtent.height }) {
+            largestPlaneWidth = largest.planeExtent.width
+            largestPlaneDepth = largest.planeExtent.height
         } else {
             largestPlaneWidth = nil
             largestPlaneDepth = nil
@@ -1884,7 +1884,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     private func planeGeometry(for anchor: ARPlaneAnchor) -> SCNGeometry {
-        let plane = SCNPlane(width: CGFloat(anchor.extent.x), height: CGFloat(anchor.extent.z))
+        let plane = SCNPlane(width: CGFloat(anchor.planeExtent.width), height: CGFloat(anchor.planeExtent.height))
         let material = SCNMaterial()
         material.diffuse.contents = UIColor.systemTeal.withAlphaComponent(0.75)
         material.fillMode = .lines

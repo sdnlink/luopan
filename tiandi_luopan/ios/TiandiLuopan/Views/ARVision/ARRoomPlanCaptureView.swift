@@ -29,6 +29,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var estimatedAreaSqMeters: Float = 0
     @Published public private(set) var scannedRoomCount = 0
     @Published public private(set) var spatialFindings: [String] = []
+    @Published public private(set) var currentSpatialSurvey: HouseSpatialSurvey?
     @Published public private(set) var isCapturing = false
     @Published public private(set) var didFinish = false
     @Published public private(set) var errorMessage: String?
@@ -665,6 +666,132 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         return Array(findings.prefix(3))
     }
 
+    public static func buildSpatialSurvey(from rooms: [CapturedRoom], heading: Double) -> HouseSpatialSurvey? {
+        guard !rooms.isEmpty else { return nil }
+        var walls3D: [SpatialWall3D] = []
+        var openings3D: [SpatialOpening3D] = []
+        var objects3D: [SpatialObject3D] = []
+        var rooms3D: [SpatialRoom3D] = []
+        var beams3D: [SpatialBeam3D] = []
+
+        for room in rooms {
+            for wall in room.walls {
+                let c = wall.transform.columns.3
+                let ax = wall.transform.columns.0
+                let half = wall.dimensions.x * 0.5
+                let start = SIMD3<Float>(c.x - ax.x * half, c.y - wall.dimensions.y * 0.5, c.z - ax.z * half)
+                let end = SIMD3<Float>(c.x + ax.x * half, c.y - wall.dimensions.y * 0.5, c.z + ax.z * half)
+                walls3D.append(SpatialWall3D(
+                    start: start,
+                    end: end,
+                    height: wall.dimensions.y,
+                    thickness: max(0.10, wall.dimensions.z),
+                    isLoadBearing: false
+                ))
+            }
+
+            for (idx, door) in room.doors.enumerated() {
+                let pos = SIMD3<Float>(door.transform.columns.3.x, door.transform.columns.3.y, door.transform.columns.3.z)
+                let norm = SIMD3<Float>(door.transform.columns.2.x, door.transform.columns.2.y, door.transform.columns.2.z)
+                let isEntrance = (idx == 0 && rooms.first == room)
+                openings3D.append(SpatialOpening3D(
+                    type: isEntrance ? .entranceDoor : .interiorDoor,
+                    position: pos,
+                    normal: norm,
+                    width: door.dimensions.x,
+                    height: door.dimensions.y
+                ))
+            }
+
+            for win in room.windows {
+                let pos = SIMD3<Float>(win.transform.columns.3.x, win.transform.columns.3.y, win.transform.columns.3.z)
+                let norm = SIMD3<Float>(win.transform.columns.2.x, win.transform.columns.2.y, win.transform.columns.2.z)
+                let isBalcony = win.dimensions.y >= 1.9
+                openings3D.append(SpatialOpening3D(
+                    type: isBalcony ? .balconyDoor : .window,
+                    position: pos,
+                    normal: norm,
+                    width: win.dimensions.x,
+                    height: win.dimensions.y
+                ))
+            }
+
+            for op in room.openings {
+                let pos = SIMD3<Float>(op.transform.columns.3.x, op.transform.columns.3.y, op.transform.columns.3.z)
+                let norm = SIMD3<Float>(op.transform.columns.2.x, op.transform.columns.2.y, op.transform.columns.2.z)
+                openings3D.append(SpatialOpening3D(
+                    type: .opening,
+                    position: pos,
+                    normal: norm,
+                    width: op.dimensions.x,
+                    height: op.dimensions.y
+                ))
+            }
+
+            for obj in room.objects {
+                let pos = SIMD3<Float>(obj.transform.columns.3.x, obj.transform.columns.3.y, obj.transform.columns.3.z)
+                let size = SIMD3<Float>(obj.dimensions.x, obj.dimensions.y, obj.dimensions.z)
+                let catStr = String(describing: obj.category)
+                objects3D.append(SpatialObject3D(
+                    category: catStr,
+                    position: pos,
+                    size: size
+                ))
+            }
+        }
+
+        var roomTypeSet = Set<FloorplanRoomType>()
+        for obj in objects3D {
+            let type: FloorplanRoomType?
+            switch obj.category {
+            case "bed":
+                type = roomTypeSet.contains(.masterBedroom) ? .secondBedroom : .masterBedroom
+            case "sofa", "television":
+                type = .livingRoom
+            case "stove", "oven", "refrigerator":
+                type = .kitchen
+            case "toilet", "bathtub":
+                type = .bathroom
+            case "table":
+                type = roomTypeSet.contains(.livingRoom) ? .study : nil
+            default:
+                type = nil
+            }
+            if let t = type, !roomTypeSet.contains(t) {
+                roomTypeSet.insert(t)
+                rooms3D.append(SpatialRoom3D(
+                    name: t.localizedName,
+                    type: t,
+                    center: obj.position,
+                    size: SIMD3<Float>(max(2.5, obj.size.x * 2.0), 2.8, max(2.5, obj.size.z * 2.0))
+                ))
+            }
+        }
+
+        if !roomTypeSet.contains(.livingRoom), let env = compute2DEnvelope(for: rooms) {
+            let cx = (env.minX + env.maxX) * 0.5
+            let cz = (env.minZ + env.maxZ) * 0.5
+            let w = max(2.0, (env.maxX - env.minX) * 0.55)
+            let d = max(2.0, (env.maxZ - env.minZ) * 0.55)
+            rooms3D.append(SpatialRoom3D(
+                name: FloorplanRoomType.livingRoom.localizedName,
+                type: .livingRoom,
+                center: SIMD3<Float>(cx, 1.4, cz),
+                size: SIMD3<Float>(w, 2.8, d)
+            ))
+        }
+
+        return HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: "LiDAR RoomPlan 测绘",
+            walls: walls3D,
+            openings: openings3D,
+            beams: beams3D,
+            rooms: rooms3D,
+            objects: objects3D,
+            compassHeading: heading
+        )
+    }
+
     private func updateMetrics(from room: CapturedRoom, commitToHistory: Bool = false) {
         let combined = capturedRoomsHistory + [room]
         let wallCount = combined.reduce(0) { $0 + $1.walls.count }
@@ -678,6 +805,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
         let findings = Self.computeSpatialFengshuiFindings(for: combined)
+        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading)
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room
@@ -696,6 +824,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             self.estimatedDepthMeters = depth
             self.estimatedAreaSqMeters = area
             self.spatialFindings = findings
+            self.currentSpatialSurvey = survey
         }
     }
 
@@ -769,6 +898,7 @@ public struct ARRoomPlanSurveyView: View {
     @Environment(\.presentationMode) private var presentationMode
     @State private var shareItem: ARRoomPlanShareItem?
     @State private var reportMessage: String?
+    @State private var show3DViewer: Bool = false
 
     public init() {}
 
@@ -808,6 +938,22 @@ public struct ARRoomPlanSurveyView: View {
                                 .clipShape(Circle())
                         }
                         .accessibilityLabel("继续加扫下一间")
+                        if model.currentSpatialSurvey != nil {
+                            Button(action: { show3DViewer = true }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "cube.transparent")
+                                        .font(.adaptive(size: 13, weight: .bold))
+                                    Text("3D空间")
+                                        .font(.adaptive(size: 10, weight: .bold))
+                                }
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 6)
+                                .background(Color.yanGold)
+                                .cornerRadius(14)
+                            }
+                            .accessibilityLabel("查看全屋3D空间布局与形煞")
+                        }
                         Button(action: syncToFloorplan) {
                             Image(systemName: "scope")
                                 .font(.adaptive(size: 13, weight: .bold))
@@ -907,6 +1053,11 @@ public struct ARRoomPlanSurveyView: View {
         .onDisappear { model.stop() }
         .sheet(item: $shareItem) { item in
             ARRoomPlanShareSheet(items: item.urls)
+        }
+        .sheet(isPresented: $show3DViewer) {
+            if let survey = model.currentSpatialSurvey {
+                House3DSpaceViewer(survey: survey)
+            }
         }
     }
 

@@ -114,7 +114,7 @@
   - **两针之间的金黄色虚线弧**：标注两针相差的角度，即**当地地磁偏角（Magnetic Declination）**。
 * **原理与算法**：
   - 地磁北极与地理北极并不重合，且地磁偏角随全球经纬度和时间演变。例如北京地区当前地磁偏西约 7.3°。
-  - iOS 版本使用 **WMM 2020-2025 离线地磁模型**结合 GPS 经纬度/海拔计算当地磁偏角；定位尚未可用时再使用 Core Location 的真北航向作为临时兜底。
+  - iOS 版本使用 **WMM 2025-2030 离线地磁模型**结合 GPS 经纬度/海拔计算当地磁偏角；定位尚未可用时再使用 Core Location 的真北航向作为临时兜底。
   - 界面同时输出 `磁: 正东 92° · 卯山 | 真: 正东 84° (偏西7.3°)`。
 * **核心用途**：破解传统罗盘与现代建筑图纸无法对齐的难题。古时杨公设立天盘缝针就是因为发现了地磁偏角。本系统让测量者在磁方位与真方位之间任意切换对照。
 
@@ -220,15 +220,17 @@
    - 支持在屏幕实景中直接点击或自由拖拽靶心，对准远方壁刀墙角、电塔或路口；
    - 基于相机视角几何学模型，系统动态解算靶点相对于当前向首的偏角偏移量（如 `偏向首右 22.4°`）及所对应的二十四山与八卦宫位。
 4. **AI 智能形煞扫描与经典形峦知识库**：
-   - 动态金色光束扫描雷达动效，结合形家形煞深度模型；
+   - 动态金色光束扫描雷达动效，结合设备端图像几何候选分析；
    - 支持八大经典形煞分类详查：**火形壁刀煞**、**天斩绝煞**、**直冲枪煞**、**反弓水煞**、**窥头煞**、**顶心电杆**、**尖角火煞**、**白虎动土**；
    - 结构化三段论展示：
      - **📜 古法易象赋文**（正统堪舆经典判词）；
      - **🔬 现代人居物理原理解析**（流体力学狭管效应、微气旋剪切、光污染与次声波压迫）；
-     - **🛡️ 针对性三阶化解微调清单**（遮挡缓气、折射化泄、镇宅固本实操指南）。
+   - **🛡️ 针对性三阶化解微调清单**（遮挡缓气、折射化泄、镇宅固本实操指南）。
 5. **大师级 AR 勘测全案存证快照**：
    - 一键合成相机/实景底图、发光天心十道、形煞锁定靶框及底部黑金半透明防伪存证印章卡片；
    - 自动加盖立向山度、八卦卦宫、空亡纯清诊断、真太阳时、节气四柱干支、GPS 经纬度/海拔、存证防伪编号及红色朱砂印鉴，支持高分辨率保存与分享。
+
+> **iOS 原生实现边界**：`OnDeviceShaAnalyzer` 使用 Vision 的矩形/轮廓几何候选、深度证据和三帧一致性判断，不包含训练好的 Core ML 建筑语义模型，也不会把图像上传到服务器。实际原生结果应视为候选标注，不能替代专业建筑或道路识别。
 
 ---
 
@@ -307,12 +309,12 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 ## 5. iPhone (iOS) 版本编译与安装指南
 
-本仓库现已全面提供适用于 **iPhone (iOS 14.0+)** 的移植版本与标准安装包：
+本仓库现已全面提供适用于 **iPhone/iPad (iOS 16.0+)** 的原生版本与构建流程：
 
 ### 5.1 产物与工程路径
-* **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.1.ipa`
-* **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj`（Swift 5.x + **纯 SwiftUI** + CoreLocation + CoreMotion + ARKit + StoreKit）
-* **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（可选。原生 App 本身是纯 SwiftUI 壳，**不通过 WKWebView 渲染该目录**；`www` 仅由 `tools/serve_ios_web.py` 在局域网内作为免签 PWA 提供服务，详见 5.3 方式 4）
+* **iOS 安装包 (IPA)**：构建后生成于 `dist-ios/YanXiangCompass-v1.3.1.ipa`（该目录和 IPA 当前未提交到仓库）
+* **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj`（Swift 5.x + **纯 SwiftUI** + CoreLocation + CoreMotion + ARKit + StoreKit 2）；原生 App 不使用 `WKWebView`，也不会渲染 `www` 目录
+* **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（与原生 App 独立的 Web 版资源，仅由 `tools/serve_ios_web.py` 在局域网内提供免签 PWA，详见 5.3 方式 4）
 
 ### 5.2 资源生成与打包（重要：真实 IPA 仍需 macOS）
 
@@ -320,7 +322,7 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 1. 提取并生成全套高清 iOS AppIcon / PWA 图标资源；
 2. 重新生成 Web 适配核心（`prepare_ios_web.py`）；
-3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.1.ipa`。
+3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.1.ipa`。`dist-ios/` 是本地构建目录，仓库不预置可直接安装的 IPA。
 
 > **⚠️ 关于“在 Windows 上打包 IPA”的说明**
 > 一个可被设备安装的、**经过 Apple 签名**的 IPA 必须依赖 macOS + Xcode（`xcodebuild` / `codesign`）或 Apple 的云构建链编译出真实的 Mach-O 可执行文件。**Windows 环境无法完成这一步。**
@@ -356,14 +358,16 @@ python tools/serve_ios_web.py
 iPhone 连接同一 Wi-Fi，用 Safari 打开控制台输出的局域网网址，点击底部分享按钮 -> **「添加到主屏幕」**，即可免签名作为独立全屏 App 运行。
 
 > 该 PWA 模式加载的是 `ios/TiandiLuopan/www/` 内的 **Web 版**实现（与方式 2 的纯原生 SwiftUI App 是两套独立代码）。它适合无 Mac 时的临时体验/演示，功能与性能不及原生工程。
+>
+> **定位风险**：`prepare_ios_web.py` 当前在 Web GPS 启动 3 秒内没有拿到定位时，会暂时写入北京示例坐标（39.9042°N, 116.4074°E）。因此 PWA 可能显示北京坐标和对应真太阳时；在获得有效定位前不要把该数据用于实际勘测，生产使用应移除或禁用此兜底。
 
 ### 5.5 Apple In-App Purchase (IAP) 原生内购与付费权益接入
 
-iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMessageHandler` 双向桥接通道，符合 App Store 审核准则（支持非消耗品与自动续期订阅恢复购买）：
+iOS 原生工程使用 **StoreKit 2** 完成 App Store 内购；原生 App 是纯 SwiftUI，不通过 `WKWebView` 或 `WKScriptMessageHandler` 承载业务页面。`www` PWA 只提供 Web 端展示和原生桥接兼容代码，不负责发放真实内购权益。生产环境应以 Apple 的交易/收据服务端验证结果作为最终权益来源，本地缓存只用于短暂展示和离线状态镜像。
 
-* **原生管理器**：[`StoreKitIAPManager.swift`](file:///e:/code/android/tiandi_luopan/ios/TiandiLuopan/StoreKitIAPManager.swift)
+* **原生管理器**：[`StoreKitIAPManager.swift`](ios/TiandiLuopan/StoreKitIAPManager.swift)
 * **商品配置清单 (Apple App Store Connect)**：
-  | 商品 ID (Product Identifier) | 类型 | 官方参考定价 | 权益说明 |
+  | 商品 ID (Product Identifier) | 类型 | 源码注释参考价（以 StoreKit 本地化价格为准） | 权益说明 |
   | :--- | :--- | :--- | :--- |
   | `com.yanxiang.compass.vip.yearly` | 自动续期订阅 (Auto-Renewable) | ¥198/年 | 演象·年度堪舆会员（解锁全场景全息交互、奇门全息排盘、紫白客星布防、宣纸长图无限导出） |
   | `com.yanxiang.compass.pro.lifetime` | 非消耗品 (Non-Consumable) | ¥298 | 演象·大师终身专业版（一次付费，终身永久享受所有专业特权与未来算法升级） |
@@ -373,26 +377,21 @@ iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMess
 * **审核合规保障**：
   - 支持 **恢复已购项目 (Restore Purchases)**，一键找回已购权益；
   - 界面提供用户服务协议、隐私保护政策弹窗与自动续费订阅扣款详细说明；
-  - Web 预览环境下内置友好交易模拟，支持无缝测试付费流程。
+  - 四个商品均通过 StoreKit 2 的商品/交易接口处理：年度自动续期订阅、终身非消耗品、户型单次消耗品、天机长卷单次消耗品；正式发布前应在 App Store Connect 配置商品，并由服务端校验 Apple 交易后再授予生产权益。
 
-### 5.6 全聚合多渠道收银台与 VIP 付费功能醒目标注
+### 5.6 VIP 付费功能醒目标注
 
-为了满足全球华人及国内用户的多元支付诉求，并在合规体验下提升商业变现转化率，系统已升级全聚合收银台与全场景 VIP 专属标识体系：
+当前 iOS 原生工程只通过 `StoreKit 2` 使用 App Store 内购，未实现微信、支付宝、银联、信用卡或 Apple Pay 聚合收银台，也没有对应的 iOS Universal Links/支付 SDK。`tools/implement_multichannel_cashier.py` 等脚本属于 Web 资源实验/历史实现，不能作为原生 iOS 支付能力说明。
 
-1. **多渠道聚合支付支持**：
-   - **微信支付 (WeChat Pay)**：支持扫码支付、微信零钱、储蓄卡与信用卡；Android 端支持 `weixin://` Scheme 唤起，iOS 端支持 Universal Links 与 Scheme 智能拦截；
-   - **支付宝 (Alipay)**：支持扫码/跳转手机支付宝，支持余额宝、花呗分期及各大银行绑定卡；
-   - **银联云闪付 / 银行卡 (UnionPay)**：支持各大国有与商业银行银联卡快速收银，支持 `upwallet://` 原生拉起；
-   - **国际信用卡 (Visa / Mastercard / JCB / Amex / 大来卡)**：内置专业级 3D 仿真实体卡预览卡片，自动基于 IIN/BIN 号段识别发卡组织（Visa、Mastercard、UnionPay），集成 **Luhn 算法校验**、有效期格式化与动态汇率估算（USD、EUR、HKD）；
-   - **Apple Pay**：针对 iOS 原生运行环境无缝提供安全触控/面容支付。
+当前原生 UI 的付费标识和门控包括：
 
-2. **付费功能醒目标注布局 (视觉规范)**：
+1. **付费功能醒目标注布局 (视觉规范)**：
    - **顶部功能栏**：【📜 天机书】右上角配置金色 `VIP` 高对比度角标；
    - **底部导航栏**：【户型立极】与【玄空理气】配置常驻炫彩 `VIP` 胶囊徽章；
    - **罗盘关键信息栏**：【八路黄泉水法】与【时空客星与奇门】配置醒目金边 `VIP` 标签；
    - **玄空理气各大专业卡片**：【下元九运·玄空九宫飞星盘】、【紫白飞星】、【杨公形气·八路黄泉】、【时家奇门遁甲】及【福宅天机堪舆全案长图】标题处均标注呼吸微光效果的 `👑 VIP绝学` / `👑 VIP专属` 徽章；
    - **户型立极看板**：【全屋功能区合规体检看板】标题处配以 `👑 全案体检` 标识；
-   - **体验策略**：所有标注 VIP 的功能均支持基础盘面预览，用户点击高级研判或导出时将弹出尊享收银台，兼顾体验与转化。
+   - **体验策略**：当前实现使用 `VIPPaywallSheet`，用户点击受限分析或导出时进入 StoreKit 2 收银台；具体价格以 StoreKit 返回的本地化商品价格为准。
 
 ### 5.7 国际化多语言支持 (i18n) 与系统语言自适应
 
@@ -404,9 +403,9 @@ iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMess
    - **🇬🇧 English (`en`)**：面向国际用户与海外爱好者的专业术语英译（如 "Later Bagua", "Pure True Axis", "120 FenJin Division", "Yellow Springs Law", "Flying Stars"）。
 
 2. **多模态跟随系统与即时响应**：
-   - **原生广播联动**：Android 端监听 `onConfigurationChanged` 与 `Locale.getDefault()`，iOS 端结合 `Locale.preferredLanguages`，在用户变更系统语言时通过 `onSystemLanguageUpdate` 原生管道即时更新 Web 界面；
-   - **Web 标准监听**：自动监听浏览器 `languagechange` 事件与 `navigator.languages` 探测序列；
-   - **双轨控制**：用户既可选择默认的 **「📱 跟随系统」**，亦可通过顶部栏 `🌐 语言` 按钮或设置弹窗随时手动锁定特定语言，偏好自动持久化至本地存储。
+   - **原生实现**：SwiftUI 使用 `LocalizationManager`，通过 `Locale.preferredLanguages` 解析系统语言，并在设置页持久化用户选择；原生页面不依赖 Web 的 `onSystemLanguageUpdate` 管道；
+   - **Web 实现**：`www` PWA 维护自己的浏览器语言和资源逻辑，与原生 SwiftUI 本地化状态相互独立；
+   - **双轨控制**：原生用户可选择默认的 **「📱 跟随系统」**，或在设置页锁定指定语言。
 
 ---
 
@@ -415,7 +414,7 @@ iOS 原生工程全面支持 **Apple StoreKit** 框架，已打通 `WKScriptMess
 为了突破传统数字罗盘“数据密布却结论模糊”的技术瓶颈，项目已正式确立 **YanXiang 2.0** 架构升级方案与全套产品设计规范，全面融合**三元九运玄空飞星、八宅明镜命卦、AR 镜头实景天心透视、户型图立极定中宫、以及渐进式白话/专业双模呈现体系**。
 
 * 完整架构拓扑、数学模型与详细 PRD 规范请参阅：  
-  👉 **[演象 · 天地全息时空罗盘 2.0 产品设计方案与架构规划文档 (docs/PRODUCT_DESIGN.md)](file:///e:/code/android/tiandi_luopan/docs/PRODUCT_DESIGN.md)**
+  👉 **[演象 · 天地全息时空罗盘 2.0 产品设计方案与架构规划文档](docs/PRODUCT_DESIGN.md)**
 
 ### 2.0 升级核心四梁八柱：
 1. **即时决策层（大白话断语）**：让买房与居家小白一秒看懂坐向好坏、空亡警报与财位文昌位；

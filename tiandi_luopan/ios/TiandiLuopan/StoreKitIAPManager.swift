@@ -73,18 +73,23 @@ public protocol StoreKitIAPManagerDelegate: AnyObject {
     func iapManagerDidRestorePurchases(unlockedProductIds: [String])
 }
 
-// MARK: - StoreKit 2 管理器
+// MARK: - StoreKit 2 管理器（验证为主、本地为辅的权益模型）
 
-/// 基于 StoreKit 2（Product / Transaction / AppTransaction）实现的 IAP 管理器。
-/// 相比 StoreKit 1 + 本地手写收据验签：
-/// - 商品元数据：`Product.products(for:)`
-/// - 购买：`Product.purchase()`（Swift 原生 async/await）
-/// - 权益权威源：`Transaction.currentEntitlements`（订阅续期/退款/跨设备自动同步）
-/// - 交易监听：`Transaction.updates` AsyncSequence（替代 SKPaymentTransactionObserver）
-/// - 收据校验：`AppTransaction` / `.verified` 交易由 Apple 在系统层签名并校验，
-///   删除约 700 行自实现的 ASN.1/PKCS#7/RSA-ECDSA 手写验签。
-/// 本地 UserDefaults + Keychain HMAC 封印仅作为**轻量缓存层**（快速读取），
-/// 权威裁决始终来自 StoreKit 2 系统级验证。
+/// 权益计算逻辑（对应业务要求）：
+/// 1. 购买成功 ≠ 永久拥有会员。年度订阅的会员状态只由
+///    `Transaction.currentEntitlements` 中**当前有效**的订阅交易决定，
+///    到期日采用苹果权威 `expirationDate`，订阅失效即撤销，不存在“买断”误判。
+/// 2. 自动续订 ≠ 当前订阅始终有效。每次权威验证都重新读取
+///    `currentEntitlements`：续费成功则刷新到期日，扣款失败/用户取消续订
+///    则到期后自动消失（不是本地 +365 天推算）。
+/// 3. 删除 App 后重装可恢复。重装后本地无任何数据，权益完全由
+///    `currentEntitlements` 驱动恢复（苹果按账号同步未撤销交易）。
+/// 4. 退款及时撤销。`Transaction.updates` 推送撤销交易（revocationDate）
+///    时立即权威对账；若 App 未运行，系统保留该事件，启动/回前台时
+///    `currentEntitlements` 已不含退款交易，对账即收回。
+/// 5. 本地缓存不代替苹果交易验证。本地仅保存“最近一次苹果验证结果的
+///    全量镜像”（带 Keychain HMAC 封印防篡改），且只由权威验证覆写；
+///    无验证背书（重装/首次启动）不显示任何权益，验证完成前保持锁定。
 public class StoreKitIAPManager: ObservableObject {
 
     public static let shared = StoreKitIAPManager()
@@ -104,84 +109,251 @@ public class StoreKitIAPManager: ObservableObject {
     @Published public private(set) var lastStatusMessage: String?
     @Published public private(set) var lastCompletedProductID: String?
 
-    public var hasUnlockedVIP: Bool {
-        // 轻量校验：仅读取本地持久化权益并比对到期时间，避免 SwiftUI 每次重绘
-        // 都触发 StoreKit 异步查询（主线程重活）。
-        // 权威裁决在 init、购买完成、恢复购买、Transaction.updates 事件、
-        // 回到前台(refreshEntitlements) 时执行，这些路径调用 verifyEntitlementsAsync()
-        // 对账 StoreKit 2 entitlement（订阅续期/退款/换机恢复自动同步）。
-        if UserDefaults.standard.bool(forKey: kIsLifetime) { return true }
-        if UserDefaults.standard.bool(forKey: kIsVIP) {
-            let expire = UserDefaults.standard.double(forKey: kVIPExpireDate)
-            if expire == 0 || Date().timeIntervalSince1970 < expire { return true }
-        }
-        return false
+    // MARK: - 权益镜像模型
+
+    /// 本地权益镜像：唯一被 UI 读取的本地数据，只由权威验证覆写。
+    /// - 验证段（isLifetime / vipExpireDate / purchasedProductIDs）：由
+    ///   `Transaction.currentEntitlements` 全量覆写，权威验证完成即覆盖，
+    ///   订阅失效/退款后覆写为空即撤销。
+    /// - 账本段（floorplanCredits / tianjiCredits）：消费型商品本地记账，
+    ///   仅在苹果已验证交易背书下增减；验证覆写不触碰账本段。
+    /// - isAuthoritative == false 仅表示一次性从旧版（v1 标志）迁移的数据，
+    ///   启动后立即被首次权威验证覆盖。
+    private struct EntitlementMirror: Codable {
+        var verifiedAt: Date
+        var isAuthoritative: Bool
+        var isLifetime: Bool
+        var vipExpireDate: TimeInterval
+        var floorplanCredits: Int
+        var tianjiCredits: Int
+        var purchasedProductIDs: [String]
     }
 
-    public var canUseFloorplan: Bool {
-        return hasUnlockedVIP || floorplanCreditsCount > 0
-    }
-
-    public var canUseTianji: Bool {
-        return hasUnlockedVIP || tianjiCreditsCount > 0
-    }
-
-    /// Whether StoreKit has returned at least one valid product. Product
-    /// metadata requests can fail independently from payment transactions;
-    /// exposing this state lets paywalls offer an explicit retry instead of
-    /// leaving every price at the loading placeholder.
-    public var hasAvailableProducts: Bool {
-        !availableProducts.isEmpty
-    }
-
-    /// A storefront can return only a subset of the requested identifiers
-    /// (for example while a new product is still propagating). Expose the
-    /// per-product state so purchase buttons do not offer an item whose price
-    /// is still unavailable.
-    public func hasProduct(for productID: IAPProductID) -> Bool {
-        availableProducts[productID.rawValue] != nil
-    }
-
-    private var availableProducts: [String: Product] = [:]
-    private var lastProductsFetchDate: Date?
-    private let productsRetryInterval: TimeInterval = 30
-    private let entitlementLock = NSLock()
-    private var transactionListener: Task<Void, Never>?
-
-    // 本地持久化权益 Keys（轻量缓存层）
+    private let kMirrorKey = "yx_iap_entitlement_mirror_v2"
+    private let kMirrorSealKey = "yx_iap_entitlement_mirror_seal"
+    private let kKeychainSealAccount = "com.yanxiang.compass.iap.seal.key"
+    private let kLegacyKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
+    // 旧版（v1）本地标志，仅供一次性迁移读取，不再作为权益真值
     private let kIsVIP = "yx_iap_is_vip"
     private let kIsLifetime = "yx_iap_is_lifetime"
     private let kVIPExpireDate = "yx_iap_vip_expire_date"
     private let kFloorplanCredits = "yx_iap_floorplan_credits"
     private let kTianjiCredits = "yx_iap_tianji_credits"
     private let kProcessedTransactionIDs = "yx_iap_processed_transaction_ids"
-    private let kEntitlementSeal = "yx_iap_entitlement_hmac_seal"
-    private let kKeychainSealAccount = "com.yanxiang.compass.iap.seal.key"
-    private let kLegacyKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
 
-    // StoreKit 2 权威校验快照（内存缓存，主线程读写）
-    private var entitlementSnapshot: ReceiptValidationResult?
-    /// 是否已完成至少一次 StoreKit 2 权威校验（未完成前不清除本地权益，
-    /// 避免升级启动瞬间误伤正常用户）。
-    private var entitlementSnapshotIsAuthoritative: Bool = false
+    private var availableProducts: [String: Product] = [:]
+    private var lastProductsFetchDate: Date?
+    private let productsRetryInterval: TimeInterval = 30
+    private let entitlementLock = NSLock()
+    private var transactionListener: Task<Void, Never>?
+    private var verificationTask: Task<Void, Never>?
+    /// 内存镜像（主线程读写），避免 SwiftUI 每帧 JSON 解码 + HMAC
+    private var cachedMirror: EntitlementMirror?
+    private var cachedMirrorLoadedFromStorage = false
+
+    // MARK: - 初始化
 
     private init() {
-        // 启动即读本地缓存（立即可用），权威对账异步进行
-        self.isVIPUser = isVIP()
-        self.isLifetimeUser = isLifetime()
-        self.floorplanCreditsCount = floorplanCredits()
-        self.tianjiCreditsCount = tianjiCredits()
+        // 1. 一次性迁移旧版 v1 标志到镜像（带封印，权威验证会立即覆盖）
+        migrateLegacyEntitlementsIfNeeded()
+        // 2. 同步读取镜像用于启动即时的 UI 反馈；无镜像（重装/首启）保持锁定
+        let mirror = currentMirror()
+        self.isVIPUser = mirror.map { $0.isLifetime || $0.vipExpireDate > Date().timeIntervalSince1970 } ?? false
+        self.isLifetimeUser = mirror?.isLifetime ?? false
+        self.floorplanCreditsCount = mirror?.floorplanCredits ?? 0
+        self.tianjiCreditsCount = mirror?.tianjiCredits ?? 0
+        // 3. 交易监听（续期/退款/跨设备恢复/Ask to Buy 结果）
         listenForTransactions()
-        Task { await verifyEntitlementsAsync() }
+        // 4. 权威对账（currentEntitlements 驱动，验证完成即覆写镜像）
+        runVerification()
         fetchProducts()
     }
 
     deinit {
         transactionListener?.cancel()
+        verificationTask?.cancel()
     }
 
     public func purchase(productId: String) {
         purchaseProduct(id: productId)
+    }
+
+    // MARK: - 权益镜像（本地缓存层，绝不独立裁决权益）
+
+    private func freshEmptyMirror() -> EntitlementMirror {
+        EntitlementMirror(verifiedAt: Date(),
+                          isAuthoritative: false,
+                          isLifetime: false,
+                          vipExpireDate: 0,
+                          floorplanCredits: 0,
+                          tianjiCredits: 0,
+                          purchasedProductIDs: [])
+    }
+
+    /// 读内存镜像（带锁）；首次访问从磁盘读取并校验 HMAC 封印（篡改视为无镜像）。
+    /// 所有镜像内存访问都在 entitlementLock 保护下，避免异步对账与 UI 查询竞争。
+    private func currentMirror() -> EntitlementMirror? {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        return currentMirrorLocked()
+    }
+
+    /// 假设调用方已持有 entitlementLock。
+    private func currentMirrorLocked() -> EntitlementMirror? {
+        if !cachedMirrorLoadedFromStorage {
+            cachedMirror = readMirrorFromStorage()
+            cachedMirrorLoadedFromStorage = true
+        }
+        return cachedMirror
+    }
+
+    private func readMirrorFromStorage() -> EntitlementMirror? {
+        guard let data = UserDefaults.standard.data(forKey: kMirrorKey),
+              let seal = UserDefaults.standard.string(forKey: kMirrorSealKey),
+              let mirror = try? JSONDecoder().decode(EntitlementMirror.self, from: data),
+              computeMirrorSeal(mirror) == seal else {
+            return nil
+        }
+        return mirror
+    }
+
+    /// 覆写镜像（带锁）。
+    private func updateMirror(_ mirror: EntitlementMirror) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        updateMirrorLocked(mirror)
+    }
+
+    /// 假设调用方已持有 entitlementLock。
+    private func updateMirrorLocked(_ mirror: EntitlementMirror) {
+        cachedMirror = mirror
+        cachedMirrorLoadedFromStorage = true
+        let data = (try? JSONEncoder().encode(mirror)) ?? Data()
+        UserDefaults.standard.set(data, forKey: kMirrorKey)
+        UserDefaults.standard.set(computeMirrorSeal(mirror), forKey: kMirrorSealKey)
+    }
+
+    private func computeMirrorSeal(_ mirror: EntitlementMirror) -> String {
+        let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))"
+        let key = deviceSealSymmetricKey()
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// 一次性迁移 v1 本地标志（仅当镜像不存在时执行）。
+    /// 迁移数据 isAuthoritative=false：立即显示（老用户不闪锁），
+    /// 启动后的首次权威验证会将其完全覆盖（包括正确收回已退款的权益）。
+    private func migrateLegacyEntitlementsIfNeeded() {
+        guard currentMirror() == nil else { return }
+        let defaults = UserDefaults.standard
+        let hasLegacyData = defaults.object(forKey: kIsVIP) != nil
+            || defaults.object(forKey: kIsLifetime) != nil
+            || defaults.object(forKey: kVIPExpireDate) != nil
+            || defaults.object(forKey: kFloorplanCredits) != nil
+            || defaults.object(forKey: kTianjiCredits) != nil
+        guard hasLegacyData else { return }
+        var mirror = freshEmptyMirror()
+        mirror.isLifetime = defaults.bool(forKey: kIsLifetime)
+        mirror.vipExpireDate = defaults.double(forKey: kVIPExpireDate)
+        mirror.floorplanCredits = defaults.integer(forKey: kFloorplanCredits)
+        mirror.tianjiCredits = defaults.integer(forKey: kTianjiCredits)
+        updateMirror(mirror)
+    }
+
+    // MARK: - 权益查询（只读镜像；无验证背书不显示权益）
+
+    public var hasUnlockedVIP: Bool {
+        // 镜像缺失（重装/首启）→ 返回 false 保持锁定；权威验证由
+        // init / refreshEntitlements / 购买完成 / updates 事件持续驱动。
+        guard let mirror = currentMirror() else { return false }
+        if mirror.isLifetime { return true }
+        if mirror.vipExpireDate > Date().timeIntervalSince1970 { return true }
+        return false
+    }
+
+    public var canUseFloorplan: Bool {
+        return hasUnlockedVIP || (currentMirror()?.floorplanCredits ?? 0) > 0
+    }
+
+    public var canUseTianji: Bool {
+        return hasUnlockedVIP || (currentMirror()?.tianjiCredits ?? 0) > 0
+    }
+
+    public func isVIP() -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let mirror = currentMirrorLocked() else { return false }
+        if mirror.isLifetime { return true }
+        return mirror.vipExpireDate > Date().timeIntervalSince1970
+    }
+
+    public func isLifetime() -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        return currentMirrorLocked()?.isLifetime ?? false
+    }
+
+    public func floorplanCredits() -> Int {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        return currentMirrorLocked()?.floorplanCredits ?? 0
+    }
+
+    public func tianjiCredits() -> Int {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        return currentMirrorLocked()?.tianjiCredits ?? 0
+    }
+
+    private func isVIPUnlocked() -> Bool {
+        guard let mirror = currentMirrorLocked() else { return false }
+        if mirror.isLifetime { return true }
+        return mirror.vipExpireDate > Date().timeIntervalSince1970
+    }
+
+    // MARK: - 消费型商品记账（仅苹果已验证交易背书下增减）
+
+    public func consumeFloorplanCredit() -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let mirror = currentMirrorLocked() else { return false }
+        if isVIPUnlocked() { return true }
+        guard mirror.floorplanCredits > 0 else { return false }
+        var updated = mirror
+        updated.floorplanCredits -= 1
+        updateMirrorLocked(updated)
+        let remain = updated.floorplanCredits
+        DispatchQueue.main.async { [weak self] in self?.floorplanCreditsCount = remain }
+        return true
+    }
+
+    public func consumeTianjiCredit() -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let mirror = currentMirrorLocked() else { return false }
+        if isVIPUnlocked() { return true }
+        guard mirror.tianjiCredits > 0 else { return false }
+        var updated = mirror
+        updated.tianjiCredits -= 1
+        updateMirrorLocked(updated)
+        let remain = updated.tianjiCredits
+        DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
+        return true
+    }
+
+    /// 购买成功（已验证交易）后为消费型商品记账 +1。
+    /// 订阅/非消耗品**不在这里直接写入**，统一由权威验证覆写镜像。
+    private func applyConsumableCreditIfNeeded(productID: String) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        let isFloorplan = productID == IAPProductID.floorplanSingle.rawValue
+            || productID == "com.yanxiang.compass.floorplan.single"
+            || productID == "com.yanxiang.luopan.floorplan.single"
+        let isTianji = productID == IAPProductID.tianjiSingle.rawValue
+        guard isFloorplan || isTianji else { return }
+        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+        if isFloorplan { mirror.floorplanCredits += 1 } else { mirror.tianjiCredits += 1 }
+        updateMirrorLocked(mirror)
     }
 
     // MARK: - 商品信息请求 (StoreKit 2)
@@ -260,7 +432,7 @@ public class StoreKitIAPManager: ObservableObject {
         do {
             _ = try await AppTransaction.refresh()
             await verifyEntitlementsAsync()
-            return entitlementSnapshot?.isTrusted ?? false
+            return (currentMirror()?.isAuthoritative ?? false)
         } catch {
             return false
         }
@@ -406,7 +578,8 @@ public class StoreKitIAPManager: ObservableObject {
         let pid = transaction.productID
         guard IAPProductID(rawValue: pid) != nil else { return }
 
-        // 退款/撤销：立即以 StoreKit 2 权威对账收回对应权益
+        // 退款/撤销：立即权威对账。currentEntitlements 已不含该交易，
+        // 验证覆写镜像即收回权益（订阅失效同理由到期逻辑处理）。
         if transaction.revocationDate != nil {
             await verifyEntitlementsAsync()
             return
@@ -416,11 +589,12 @@ public class StoreKitIAPManager: ObservableObject {
         // 与购买路径共用 claimTransaction 幂等去重，避免同一笔交易重复记账
         guard claimTransaction(txId) else { return }
 
-        unlockEntitlement(for: pid,
-                          transactionDate: transaction.purchaseDate,
-                          expirationDate: transaction.expirationDate,
-                          extendSubscription: true)
+        // 消费型商品：仅在本交易已验证背书下记账
+        applyConsumableCreditIfNeeded(productID: pid)
         await transaction.finish()
+
+        // 订阅/非消耗品：不直接写本地，由权威验证覆写（续期刷新到期日）
+        await verifyEntitlementsAsync()
 
         await MainActor.run {
             self.isProcessingPurchase = false
@@ -438,11 +612,13 @@ public class StoreKitIAPManager: ObservableObject {
             return
         }
 
-        unlockEntitlement(for: pid,
-                          transactionDate: transaction.purchaseDate,
-                          expirationDate: transaction.expirationDate,
-                          extendSubscription: true)
+        // 消费型商品记账（已验证背书）
+        applyConsumableCreditIfNeeded(productID: pid)
         await transaction.finish()
+
+        // 订阅/非消耗品权益：交由权威验证从 currentEntitlements 覆写，
+        // 绝不因“购买成功”直接点亮本地会员标志。
+        await verifyEntitlementsAsync()
 
         await MainActor.run {
             self.isProcessingPurchase = false
@@ -464,115 +640,14 @@ public class StoreKitIAPManager: ObservableObject {
         return true
     }
 
-    // MARK: - 权益本地管理（轻量缓存层）
+    // MARK: - 商品价格与状态
 
-    private func unlockEntitlement(for pid: String,
-                                   transactionDate: Date? = nil,
-                                   expirationDate: Date? = nil,
-                                   extendSubscription: Bool = true) {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        let defaults = UserDefaults.standard
-        if pid == IAPProductID.proLifetime.rawValue {
-            defaults.set(true, forKey: kIsLifetime)
-            defaults.set(true, forKey: kIsVIP)
-        } else if pid == IAPProductID.vipYearly.rawValue {
-            if let expirationDate = expirationDate {
-                // StoreKit 2 权威到期时间：订阅续期由 App Store 管理，
-                // expirationDate 即续期后的真实到期日，本地不再自行累加 365 天。
-                let ts = expirationDate.timeIntervalSince1970
-                defaults.set(ts, forKey: kVIPExpireDate)
-                defaults.set(ts > Date().timeIntervalSince1970, forKey: kIsVIP)
-            } else {
-                // 回退路径（理论上 StoreKit 2 始终提供 expirationDate）：
-                // 使用 StoreKit 交易时间计算订阅周期，恢复旧交易时不会从“恢复当天”凭空续期。
-                let oldExpiry = defaults.double(forKey: kVIPExpireDate)
-                if extendSubscription {
-                    defaults.set(true, forKey: kIsVIP)
-                    let purchaseDate = transactionDate ?? Date()
-                    // StoreKit can deliver a completed transaction after a
-                    // temporary network outage. If its transaction date is more
-                    // than a year old and no previous local expiry exists, using
-                    // that date would unlock the purchase and immediately expire
-                    // it. A completed purchase must grant one full local period;
-                    // a still-active previous period remains the base for renewal.
-                    let baseDate = max(Date(), max(purchaseDate, Date(timeIntervalSince1970: oldExpiry)))
-                    let expireDate = baseDate.addingTimeInterval(365 * 24 * 3600)
-                    defaults.set(expireDate.timeIntervalSince1970, forKey: kVIPExpireDate)
-                } else if let restoredDate = transactionDate {
-                    // A restore can come from another device after the local
-                    // entitlement has expired. Rebuild the same original period
-                    // without adding another year every time Restore is tapped.
-                    let restoredExpiry = restoredDate.addingTimeInterval(365 * 24 * 3600)
-                    let effectiveExpiry = max(oldExpiry, restoredExpiry.timeIntervalSince1970)
-                    defaults.set(effectiveExpiry, forKey: kVIPExpireDate)
-                    defaults.set(effectiveExpiry > Date().timeIntervalSince1970, forKey: kIsVIP)
-                } else {
-                    defaults.set(oldExpiry > Date().timeIntervalSince1970, forKey: kIsVIP)
-                }
-            }
-        } else if pid == IAPProductID.floorplanSingle.rawValue || pid == "com.yanxiang.compass.floorplan.single" || pid == "com.yanxiang.luopan.floorplan.single" {
-            let current = defaults.integer(forKey: kFloorplanCredits)
-            defaults.set(current + 1, forKey: kFloorplanCredits)
-        } else if pid == IAPProductID.tianjiSingle.rawValue {
-            let current = defaults.integer(forKey: kTianjiCredits)
-            defaults.set(current + 1, forKey: kTianjiCredits)
-        }
-        updateEntitlementSealLocked()
-        defaults.synchronize()
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.isVIPUser = self.isVIP()
-            self.isLifetimeUser = self.isLifetime()
-            self.floorplanCreditsCount = self.floorplanCredits()
-            self.tianjiCreditsCount = self.tianjiCredits()
-        }
+    public var hasAvailableProducts: Bool {
+        !availableProducts.isEmpty
     }
 
-    public func isVIP() -> Bool {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        return isVIPUnlocked()
-    }
-
-    private func isVIPUnlocked() -> Bool {
-        guard verifyEntitlementIntegrityLocked() else { return false }
-        let defaults = UserDefaults.standard
-        if defaults.bool(forKey: kIsLifetime) { return true }
-        if defaults.bool(forKey: kIsVIP) {
-            let expire = defaults.double(forKey: kVIPExpireDate)
-            if expire == 0 {
-                // Migrate installations created before subscription expiry was
-                // persisted. Treat the legacy flag as one transition period
-                // instead of granting an annual product forever.
-                let migratedExpiry = Date().addingTimeInterval(365 * 24 * 3600).timeIntervalSince1970
-                defaults.set(migratedExpiry, forKey: kVIPExpireDate)
-                updateEntitlementSealLocked()
-                return true
-            }
-            if Date().timeIntervalSince1970 < expire {
-                return true
-            }
-            defaults.set(false, forKey: kIsVIP)
-            updateEntitlementSealLocked()
-        }
-        return false
-    }
-
-    /// Re-evaluate time-based entitlements when the app returns to foreground.
-    /// 先同步刷新本地缓存（即时反馈），再异步跑 StoreKit 2 权威对账。
-    public func refreshEntitlements() {
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                self?.refreshEntitlements()
-            }
-            return
-        }
-        self.isVIPUser = isVIP()
-        self.isLifetimeUser = isLifetime()
-        self.floorplanCreditsCount = floorplanCredits()
-        self.tianjiCreditsCount = tianjiCredits()
-        Task { await verifyEntitlementsAsync() }
+    public func hasProduct(for productID: IAPProductID) -> Bool {
+        availableProducts[productID.rawValue] != nil
     }
 
     public func localizedPrice(for productID: IAPProductID) -> String {
@@ -584,77 +659,6 @@ public class StoreKitIAPManager: ObservableObject {
         // StoreKit 2 的 displayPrice 已按当前 storefront 与语言格式化
         let price = product.displayPrice
         return price.isEmpty ? LocalizationManager.shared.t("price_unavailable") : price
-    }
-
-    public func isLifetime() -> Bool {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        guard verifyEntitlementIntegrityLocked() else { return false }
-        return UserDefaults.standard.bool(forKey: kIsLifetime)
-    }
-
-    public func floorplanCredits() -> Int {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        guard verifyEntitlementIntegrityLocked() else { return 0 }
-        return UserDefaults.standard.integer(forKey: kFloorplanCredits)
-    }
-
-    public func tianjiCredits() -> Int {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        guard verifyEntitlementIntegrityLocked() else { return 0 }
-        return UserDefaults.standard.integer(forKey: kTianjiCredits)
-    }
-
-    public func consumeFloorplanCredit() -> Bool {
-        entitlementLock.lock()
-        let defaults = UserDefaults.standard
-        let result: (success: Bool, remain: Int?)
-        if isVIPUnlocked() {
-            result = (true, nil)
-        } else {
-            let credits = defaults.integer(forKey: kFloorplanCredits)
-            if credits > 0 {
-                let remain = credits - 1
-                defaults.set(remain, forKey: kFloorplanCredits)
-                updateEntitlementSealLocked()
-                defaults.synchronize()
-                result = (true, remain)
-            } else {
-                result = (false, nil)
-            }
-        }
-        entitlementLock.unlock()
-        if let remain = result.remain {
-            DispatchQueue.main.async { [weak self] in self?.floorplanCreditsCount = remain }
-        }
-        return result.success
-    }
-
-    public func consumeTianjiCredit() -> Bool {
-        entitlementLock.lock()
-        let defaults = UserDefaults.standard
-        let result: (success: Bool, remain: Int?)
-        if isVIPUnlocked() {
-            result = (true, nil)
-        } else {
-            let credits = defaults.integer(forKey: kTianjiCredits)
-            if credits > 0 {
-                let remain = credits - 1
-                defaults.set(remain, forKey: kTianjiCredits)
-                updateEntitlementSealLocked()
-                defaults.synchronize()
-                result = (true, remain)
-            } else {
-                result = (false, nil)
-            }
-        }
-        entitlementLock.unlock()
-        if let remain = result.remain {
-            DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
-        }
-        return result.success
     }
 
     public func getStatusJSON() -> String {
@@ -692,22 +696,26 @@ public class StoreKitIAPManager: ObservableObject {
         return "[]"
     }
 
-    // MARK: - StoreKit 2 权威权益校验 (替代本地 ASN.1/CMS 验签)
+    // MARK: - 权威权益验证（验证为主）
 
-    /// 同步入口：返回最近一次 StoreKit 2 权威校验的快照。
+    /// 同步入口：基于最近一次权威验证镜像构建结果。
     /// StoreKit 2 的 AppTransaction 与已验证交易由 Apple 在系统层签名并校验，
     /// App 不再需要自行解析 ASN.1/PKCS#7 或维护本地收据文件哈希。
     public func verifyReceipt() -> ReceiptValidationResult {
-        if let snapshot = entitlementSnapshot {
-            return snapshot
+        guard let mirror = currentMirror(), mirror.isAuthoritative else {
+            return emptyReceiptResult()
         }
-        return emptyReceiptResult()
-    }
-
-    /// 使权威快照失效（下一次 verifyReceipt() 返回空，直至重新对账）。
-    private func invalidateReceiptCache() {
-        entitlementSnapshot = nil
-        entitlementSnapshotIsAuthoritative = false
+        return ReceiptValidationResult(
+            isValidContainer: true,
+            bundleIDMatched: true,   // currentEntitlements 交易已由系统验证绑定本 App
+            purchasedProductIDs: Set(mirror.purchasedProductIDs),
+            latestExpirationDate: mirror.vipExpireDate > 0
+                ? Date(timeIntervalSince1970: mirror.vipExpireDate)
+                : nil,
+            receiptSHA256: "",
+            certificateChainValid: true,
+            signatureValid: true
+        )
     }
 
     private func emptyReceiptResult() -> ReceiptValidationResult {
@@ -722,126 +730,79 @@ public class StoreKitIAPManager: ObservableObject {
         )
     }
 
-    /// StoreKit 2 权威对账：
-    /// 1. AppTransaction（整体收据，系统级验证）；
-    /// 2. Transaction.currentEntitlements（当前有效的订阅与非消耗品权益，
-    ///    含退款撤销后的自动移除与换机恢复）；
-    /// 3. 以结果对账本地缓存层（点亮/收回 VIP、终身版与到期日）。
+    /// 启动权威验证（去重：同一时刻只跑一轮）。
+    private func runVerification() {
+        guard verificationTask == nil else { return }
+        verificationTask = Task { [weak self] in
+            await self?.verifyEntitlementsAsync()
+            self?.verificationTask = nil
+        }
+    }
+
+    /// Re-evaluate time-based entitlements when the app returns to foreground.
+    /// 权威对账：以 Transaction.currentEntitlements 覆写镜像验证段。
+    public func refreshEntitlements() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshEntitlements()
+            }
+            return
+        }
+        runVerification()
+    }
+
+    /// StoreKit 2 权威对账（唯一允许覆写验证段的路径）：
+    /// 1. Transaction.currentEntitlements —— 系统级验证的当前有效权益
+    ///    （订阅含权威 expirationDate；退款交易已自动移除）；
+    /// 2. 全量覆写镜像验证段：有效则点亮/刷新到期日，失效/退款则收回；
+    /// 3. 账本段（消费型 credits）不在此覆写，由已验证交易记账维护。
     private func verifyEntitlementsAsync() async {
-        // 1. AppTransaction：整体收据系统级验证
-        var appTxVerified = false
-        var appBundleID: String?
-        if let appTx = try? await AppTransaction.shared {
-            switch appTx {
-            case .verified(let tx):
-                appTxVerified = true
-                appBundleID = tx.appBundleID
-            case .unverified(_, _):
+        var isLifetime = false
+        var vipExpire: TimeInterval = 0
+        var purchasedProductIDs: [String] = []
+        var hasVerifiedTransaction = false
+
+        for await entitlement in Transaction.currentEntitlements {
+            guard case .verified(let tx) = entitlement else { continue }
+            guard let product = IAPProductID(rawValue: tx.productID) else { continue }
+            hasVerifiedTransaction = true
+            purchasedProductIDs.append(tx.productID)
+            switch product {
+            case .proLifetime:
+                // 非消耗品：未撤销则永久有效（退款后自动移出 currentEntitlements）
+                isLifetime = true
+            case .vipYearly:
+                // 自动续订订阅：以苹果权威到期日为准；续费成功即刷新，
+                // 取消续订/扣款失败则到期后自动失效
+                if let exp = tx.expirationDate {
+                    vipExpire = max(vipExpire, exp.timeIntervalSince1970)
+                }
+            default:
                 break
             }
         }
 
-        // 2. 当前权益（订阅 + 非消耗品）。消费型商品（credits）由本地记账，
-        //    StoreKit 不恢复消费型商品（与旧实现一致）。
-        var purchasedIDs = Set<String>()
-        var expiryDates: [Date] = []
-        var hasVerifiedEntitlement = false
-        for await entitlement in Transaction.currentEntitlements {
-            guard case .verified(let tx) = entitlement else { continue }
-            guard IAPProductID(rawValue: tx.productID) != nil else { continue }
-            hasVerifiedEntitlement = true
-            purchasedIDs.insert(tx.productID)
-            if let exp = tx.expirationDate {
-                expiryDates.append(exp)
-            }
-        }
-
-        // 3. 组装快照
-        let expectedBundleID = Bundle.main.bundleIdentifier ?? "com.yanxiang.compass"
-        let bundleMatched: Bool
-        if let appBundleID = appBundleID {
-            bundleMatched = (appBundleID == expectedBundleID) || (appBundleID == "com.yanxiang.compass")
-        } else {
-            // 无 AppTransaction（如全新安装尚未产生收据）时，
-            // 以是否存在系统级验证通过的权益交易作为 BundleID 绑定依据
-            bundleMatched = !purchasedIDs.isEmpty
-        }
-        let containerValid = appTxVerified || hasVerifiedEntitlement
-
-        let snapshot = ReceiptValidationResult(
-            isValidContainer: containerValid,
-            bundleIDMatched: bundleMatched,
-            purchasedProductIDs: purchasedIDs,
-            latestExpirationDate: expiryDates.max(),
-            receiptSHA256: "",
-            certificateChainValid: containerValid,
-            signatureValid: containerValid
-        )
-        entitlementSnapshot = snapshot
-        entitlementSnapshotIsAuthoritative = true
-        reconcileEntitlementsWithReceipt(snapshot)
-
-        await MainActor.run {
-            self.isVIPUser = self.isVIP()
-            self.isLifetimeUser = self.isLifetime()
-            self.floorplanCreditsCount = self.floorplanCredits()
-            self.tianjiCreditsCount = self.tianjiCredits()
-        }
-    }
-
-    /// 用 StoreKit 2 权威结果对账本地缓存层：点亮/收回终身版与年度 VIP。
-    private func reconcileEntitlementsWithReceipt(_ receipt: ReceiptValidationResult) {
-        guard receipt.isTrusted else { return }
+        // 覆写镜像验证段（保留账本段；消费型商品不因验证清零/恢复）
         entitlementLock.lock()
-        defer { entitlementLock.unlock() }
+        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+        mirror.verifiedAt = Date()
+        mirror.isAuthoritative = true
+        mirror.isLifetime = isLifetime
+        mirror.vipExpireDate = vipExpire
+        mirror.purchasedProductIDs = purchasedProductIDs.sorted()
+        updateMirrorLocked(mirror)
+        entitlementLock.unlock()
 
-        let defaults = UserDefaults.standard
-        var didChange = false
-
-        // 1. 终身买断版对齐：存在已验证终身商品则点亮；权威结果中不含（已退款/未购）则收回
-        let hasLifetimeInReceipt = receipt.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue)
-        if hasLifetimeInReceipt {
-            if !defaults.bool(forKey: kIsLifetime) || !defaults.bool(forKey: kIsVIP) {
-                defaults.set(true, forKey: kIsLifetime)
-                defaults.set(true, forKey: kIsVIP)
-                didChange = true
-            }
-        } else if defaults.bool(forKey: kIsLifetime) {
-            // StoreKit 2 权威结果经系统级验证，其中不含终身版（被退款/撤销）即收回
-            defaults.set(false, forKey: kIsLifetime)
-            didChange = true
-        }
-
-        // 2. 年度订阅会员对齐：存在已验证年度交易且未退款，比对并采用权威到期日；
-        //    权威结果中既无年度订阅也无终身版，则立即收回 VIP
-        let hasYearlyInReceipt = receipt.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
-        if hasYearlyInReceipt {
-            let currentExpiry = defaults.double(forKey: kVIPExpireDate)
-            if let receiptExpiry = receipt.latestExpirationDate?.timeIntervalSince1970, receiptExpiry > currentExpiry {
-                defaults.set(receiptExpiry, forKey: kVIPExpireDate)
-                defaults.set(receiptExpiry > Date().timeIntervalSince1970, forKey: kIsVIP)
-                didChange = true
-            } else if currentExpiry > Date().timeIntervalSince1970 && !defaults.bool(forKey: kIsVIP) {
-                defaults.set(true, forKey: kIsVIP)
-                didChange = true
-            }
-        } else if !hasLifetimeInReceipt {
-            // 权威结果既无终身版，也无有效年度订阅（已被 Apple 退款/撤回）：立即收回 VIP
-            let currentExpiry = defaults.double(forKey: kVIPExpireDate)
-            if defaults.bool(forKey: kIsVIP) || currentExpiry > 0 {
-                defaults.set(false, forKey: kIsVIP)
-                defaults.set(0.0, forKey: kVIPExpireDate)
-                didChange = true
-            }
-        }
-
-        if didChange {
-            updateEntitlementSealLocked()
-            defaults.synchronize()
+        // 发布 UI（主线程）
+        await MainActor.run {
+            self.isVIPUser = isLifetime || (vipExpire > Date().timeIntervalSince1970)
+            self.isLifetimeUser = isLifetime
+            self.floorplanCreditsCount = mirror.floorplanCredits
+            self.tianjiCreditsCount = mirror.tianjiCredits
         }
     }
 
-    // MARK: - Keychain HMAC 防篡改保护（本地缓存层）
+    // MARK: - Keychain HMAC 防篡改保护（镜像封印）
 
     /// 获取或生成保存在 Keychain 中的设备级 256-bit HMAC 密钥（向下兼容旧版 Keychain 账户迁移）
     private func deviceSealSymmetricKey() -> SymmetricKey {
@@ -896,81 +857,5 @@ public class StoreKitIAPManager: ObservableObject {
         SecItemDelete(addQuery as CFDictionary)
         SecItemAdd(addQuery as CFDictionary, nil)
         return SymmetricKey(data: derivedKeyData)
-    }
-
-    private func computeEntitlementSealLocked() -> String {
-        let defaults = UserDefaults.standard
-        let isVip = defaults.bool(forKey: kIsVIP) ? 1 : 0
-        let isLife = defaults.bool(forKey: kIsLifetime) ? 1 : 0
-        let expireBits = Int64(defaults.double(forKey: kVIPExpireDate).rounded())
-        let fpCredits = defaults.integer(forKey: kFloorplanCredits)
-        let tjCredits = defaults.integer(forKey: kTianjiCredits)
-        let payload = "v1|\(isVip)|\(isLife)|\(expireBits)|\(fpCredits)|\(tjCredits)"
-        let key = deviceSealSymmetricKey()
-        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
-        return Data(mac).map { String(format: "%02x", $0) }.joined()
-    }
-
-    private func updateEntitlementSealLocked() {
-        let seal = computeEntitlementSealLocked()
-        UserDefaults.standard.set(seal, forKey: kEntitlementSeal)
-    }
-
-    /// 校验 UserDefaults 中的本地权益缓存是否被篡改；若检测到篡改则拒绝并回滚。
-    /// 权威背书来自 StoreKit 2 快照（entitlementSnapshot）：
-    /// - HMAC 封印匹配 → 本地缓存可信；
-    /// - 封印不匹配且权威校验已完成 → 以权威结果重签或清除伪造权益；
-    /// - 封印不匹配且权威校验尚未完成（启动瞬间）→ 乐观保留，等待异步对账裁决。
-    private func verifyEntitlementIntegrityLocked() -> Bool {
-        let defaults = UserDefaults.standard
-        let hasAnyClaimedEntitlement =
-            defaults.bool(forKey: kIsVIP) ||
-            defaults.bool(forKey: kIsLifetime) ||
-            defaults.integer(forKey: kFloorplanCredits) > 0 ||
-            defaults.integer(forKey: kTianjiCredits) > 0
-
-        guard hasAnyClaimedEntitlement else { return true }
-
-        let expectedSeal = computeEntitlementSealLocked()
-        if let storedSeal = defaults.string(forKey: kEntitlementSeal),
-           storedSeal == expectedSeal {
-            return true
-        }
-
-        // 封印不匹配：以 StoreKit 2 权威快照背书（升级后首次运行或外部篡改）
-        if entitlementSnapshotIsAuthoritative, let snapshot = entitlementSnapshot {
-            if snapshot.isTrusted {
-                // 仅保留权威结果确认过的非消耗型/订阅权益并重新加签
-                let allowLifetime = snapshot.purchasedProductIDs.contains(IAPProductID.proLifetime.rawValue)
-                let allowYearly = snapshot.purchasedProductIDs.contains(IAPProductID.vipYearly.rawValue)
-                defaults.set(allowLifetime, forKey: kIsLifetime)
-                defaults.set(allowLifetime || allowYearly, forKey: kIsVIP)
-                let processedIDs = defaults.stringArray(forKey: kProcessedTransactionIDs) ?? []
-                let hasFloorplanInReceipt = snapshot.purchasedProductIDs.contains(IAPProductID.floorplanSingle.rawValue)
-                    || snapshot.purchasedProductIDs.contains("com.yanxiang.compass.floorplan.single")
-                    || snapshot.purchasedProductIDs.contains("com.yanxiang.luopan.floorplan.single")
-                if !hasFloorplanInReceipt && processedIDs.isEmpty {
-                    defaults.set(0, forKey: kFloorplanCredits)
-                }
-                if !snapshot.purchasedProductIDs.contains(IAPProductID.tianjiSingle.rawValue) && processedIDs.isEmpty {
-                    defaults.set(0, forKey: kTianjiCredits)
-                }
-                updateEntitlementSealLocked()
-                return allowLifetime || allowYearly || !processedIDs.isEmpty
-            } else {
-                // 权威校验完成且确认无有效权益：判定为本地篡改，立即清除伪造权益
-                defaults.set(false, forKey: kIsVIP)
-                defaults.set(false, forKey: kIsLifetime)
-                defaults.set(0.0, forKey: kVIPExpireDate)
-                defaults.set(0, forKey: kFloorplanCredits)
-                defaults.set(0, forKey: kTianjiCredits)
-                updateEntitlementSealLocked()
-                return false
-            }
-        }
-
-        // 权威校验尚未完成（启动瞬间/离线启动）：乐观保留，
-        // 后续 verifyEntitlementsAsync() 完成对账后自然裁决。
-        return true
     }
 }

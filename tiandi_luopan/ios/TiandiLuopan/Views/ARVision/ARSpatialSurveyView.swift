@@ -302,13 +302,6 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             trackingState = .unavailable
             return
         }
-        // 无 LiDAR 硬件：不启动持续 AR 扫描会话
-        guard Self.isLiDARSupported else {
-            lidarAvailable = false
-            trackingState = .unavailable
-            mappingState = .limited
-            return
-        }
 
         let configuration = ARWorldTrackingConfiguration()
         configuration.planeDetection = [.horizontal, .vertical]
@@ -1906,6 +1899,7 @@ public struct ARSpatialSurveyView: View {
     @State private var showRoomPlan = false
     @State private var show3DSpaceViewer = false
     @State private var currentSurveyReport: HouseSpatialSurvey? = nil
+    @State private var showVRSurvey = false
 
     private static let semanticTypes: [(ARMeshClassification, String, String)] = [
         (.wall, "ar_spatial_wall", "rectangle.portrait"),
@@ -1921,13 +1915,10 @@ public struct ARSpatialSurveyView: View {
 
     public var body: some View {
         ZStack {
-            if ARWorldTrackingConfiguration.isSupported && ARSpatialSurveyModel.isLiDARSupported {
+            if ARWorldTrackingConfiguration.isSupported {
                 ARSpatialPreviewView(model: model)
                     .ignoresSafeArea()
                 centerReticle
-            } else if ARWorldTrackingConfiguration.isSupported {
-                // 无 LiDAR 硬件：不启动持续扫描会话，引导使用户型图识别
-                liDARUnsupportedOverlay
             } else {
                 CameraPreviewView(controller: fallbackCameraModel, isActive: !showRoomPlan)
                     .ignoresSafeArea()
@@ -1997,7 +1988,7 @@ public struct ARSpatialSurveyView: View {
                     Text(lang.t("ar_spatial_survey"))
                         .font(.adaptive(size: 16, weight: .bold))
                         .foregroundColor(.white)
-                    Text(model.lidarAvailable ? lang.t("ar_spatial_lidar_available") : lang.t("ar_spatial_lidar_unavailable"))
+                    Text(model.lidarAvailable ? lang.t("ar_spatial_lidar_available") : lang.t("ar_spatial_ar_mode"))
                         .font(.adaptive(size: 10, weight: .medium))
                         .foregroundColor(model.lidarAvailable ? .green : .orange)
                 }
@@ -2052,6 +2043,20 @@ public struct ARSpatialSurveyView: View {
                         .cornerRadius(14)
                     }
                     .accessibilityLabel("查看全屋3D空间布局与形煞")
+                    Button(action: { showVRSurvey = true }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "view.3d")
+                                .font(.adaptive(size: 13, weight: .bold))
+                            Text(lang.t("vr_survey_title"))
+                                .font(.adaptive(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.8))
+                        .cornerRadius(14)
+                    }
+                    .accessibilityLabel(lang.t("vr_survey_title"))
                     Button(action: {
                         _ = model.toggleGroundBaguaOverlay()
                     }) {
@@ -2331,6 +2336,9 @@ public struct ARSpatialSurveyView: View {
                 }
             }
         }
+        .fullScreenCover(isPresented: $showVRSurvey) {
+            VRSpatialSurveyView()
+        }
     }
 
     private func saveMap() {
@@ -2441,36 +2449,6 @@ public struct ARSpatialSurveyView: View {
         .padding(20)
         .background(Color.black.opacity(0.72))
         .cornerRadius(14)
-        .padding(24)
-    }
-
-    /// 无 LiDAR 设备的降级引导：不启动持续扫描，推荐户型图识别完成立极
-    private var liDARUnsupportedOverlay: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "wave.3.right.circle")
-                .font(.adaptive(size: 46))
-                .foregroundColor(.orange)
-            Text(lang.t("ar_spatial_lidar_required_title"))
-                .font(.adaptive(size: 15, weight: .bold))
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-            Text(lang.t("ar_spatial_lidar_required_body"))
-                .font(.adaptive(size: 12))
-                .foregroundColor(.white.opacity(0.78))
-                .multilineTextAlignment(.center)
-            Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                Text(lang.t("ar_spatial_lidar_use_floorplan"))
-                    .font(.adaptive(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
-                    .background(Color.yanCyan)
-                    .cornerRadius(16)
-            }
-        }
-        .padding(22)
-        .background(Color.black.opacity(0.78))
-        .cornerRadius(16)
         .padding(24)
     }
 }

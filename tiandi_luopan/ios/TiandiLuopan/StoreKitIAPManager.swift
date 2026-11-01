@@ -794,17 +794,16 @@ public class StoreKitIAPManager: ObservableObject {
         }
 
         // 覆写镜像验证段（保留账本段；消费型商品不因验证清零/恢复）
-        entitlementLock.lock()
-        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
-        mirror.verifiedAt = Date()
-        mirror.isAuthoritative = true
-        mirror.isLifetime = isLifetime
-        mirror.vipExpireDate = vipExpire
-        mirror.purchasedProductIDs = purchasedProductIDs.sorted()
-        updateMirrorLocked(mirror)
-        let floorplanCredits = mirror.floorplanCredits
-        let tianjiCredits = mirror.tianjiCredits
-        entitlementLock.unlock()
+        let (floorplanCredits, tianjiCredits) = entitlementLock.withLock {
+            var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+            mirror.verifiedAt = Date()
+            mirror.isAuthoritative = true
+            mirror.isLifetime = isLifetime
+            mirror.vipExpireDate = vipExpire
+            mirror.purchasedProductIDs = purchasedProductIDs.sorted()
+            updateMirrorLocked(mirror)
+            return (mirror.floorplanCredits, mirror.tianjiCredits)
+        }
 
         let finalLifetime = isLifetime
         let finalVipExpire = vipExpire

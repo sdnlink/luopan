@@ -1913,10 +1913,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let faces = mesh.faces
         let indexCount = faces.count * 3
         let faceByteCount = indexCount * faces.bytesPerIndex
-        guard faces.offset >= 0,
-              faces.offset + faceByteCount <= faces.buffer.length else { return nil }
-        let facePointer = faces.buffer.contents().advanced(by: faces.offset)
-        let faceData = Data(bytes: facePointer, count: faceByteCount)
+        // ARGeometryElement exposes the index buffer from its first index;
+        // unlike SCNGeometryElement it has no public offset property. Each
+        // triangle contributes three indices, so size the data accordingly.
+        guard faceByteCount <= faces.buffer.length else { return nil }
+        let faceData = Data(bytes: faces.buffer.contents(), count: faceByteCount)
         let element = SCNGeometryElement(
             data: faceData,
             primitiveType: .triangles,

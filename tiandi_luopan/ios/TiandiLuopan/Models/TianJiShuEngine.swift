@@ -84,7 +84,7 @@ public class TianJiShuEngine {
                     .foregroundColor: color
                 ]
                 let measured = (text as NSString).boundingRect(
-                    with: CGSize(width: width, height: .greatestFiniteMagnitude),
+                    with: CGSize(width: width, height: CGFloat.greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: attributes,
                     context: nil
@@ -120,7 +120,6 @@ public class TianJiShuEngine {
             let titleFont = UIFont.boldSystemFont(ofSize: 52)
             let subTitleFont = UIFont.systemFont(ofSize: 26, weight: .semibold)
             let bodyFont = UIFont.systemFont(ofSize: 24)
-            let sectionFont = UIFont.boldSystemFont(ofSize: 32)
             
             let titleText = tr8(
                 "福 宅 天 机 勘 舆 全 案 书",
@@ -695,7 +694,7 @@ public class TianJiShuEngine {
         for item in report {
             let line = "【\(item.severity)】\(item.title) · \(item.palace)\n\(item.lore)\n→ \(item.solution)"
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -737,7 +736,7 @@ public class TianJiShuEngine {
                 displayLine += " · \(cell.isShaWuHuang ? "五黄" : "二黑")"
             }
             let measured = (displayLine as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -775,7 +774,7 @@ public class TianJiShuEngine {
         for cell in chart.cells {
             let line = "【\(cell.localizedPalaceName)】\(cell.localizedDoorName) · \(cell.localizedStarName) · \(cell.localizedGodName) · 天\(cell.tianStem)/地\(cell.diStem) · \(cell.doorLuck)"
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -796,7 +795,7 @@ public class TianJiShuEngine {
             renderLanguage: renderLanguage
         )
         let measured = (guidance as NSString).boundingRect(
-            with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+            with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: attributes,
             context: nil
@@ -846,7 +845,7 @@ public class TianJiShuEngine {
         if !analysis.jiActivities.isEmpty { lines.append(jiLabel + analysis.jiActivities.joined(separator: activitySeparator)) }
         for line in lines {
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -882,7 +881,7 @@ public class TianJiShuEngine {
                 .foregroundColor: ink
             ]
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -918,7 +917,7 @@ public class TianJiShuEngine {
                 .foregroundColor: ink
             ]
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil
@@ -959,7 +958,7 @@ public class TianJiShuEngine {
                 .foregroundColor: ink
             ]
             let measured = (line as NSString).boundingRect(
-                with: CGSize(width: 880, height: .greatestFiniteMagnitude),
+                with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: attributes,
                 context: nil

@@ -498,18 +498,6 @@ public class QimenEngine {
         case .auto, .zhHans: centerGod = "元极"
         default: centerGod = "元极"
         }
-        let centerStar: String
-        switch lang {
-        case .en: centerStar = "Tian Qin"
-        case .ko: centerStar = "천금성"
-        case .vi: centerStar = "Thiên Cầm"
-        case .zhHant: centerStar = "天禽星"
-        case .ja: centerStar = "天禽星"
-        case .id: centerStar = "Tian Qin"
-        case .auto, .zhHans: centerStar = "天禽星"
-        default: centerStar = "天禽星"
-        }
-
         var byPalace = [Int: (door: String, luck: String, ausp: Bool, star: String, god: String, tian: String, di: String)]()
         for p in 1...9 {
             if p == 5 {

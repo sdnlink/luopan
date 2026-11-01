@@ -265,7 +265,7 @@ public struct VRSpatialSurveyView: View {
                 }
             }
             HStack(spacing: 8) {
-                Button(action: { addRoom(atCenter: nil, in: nil) }) {
+                Button(action: { addRoom(at: nil, in: nil) }) {
                     Label(lang.t("vr_survey_add_room"), systemImage: "plus.square.on.square")
                         .font(.adaptive(size: 11, weight: .semibold))
                         .foregroundColor(.white)

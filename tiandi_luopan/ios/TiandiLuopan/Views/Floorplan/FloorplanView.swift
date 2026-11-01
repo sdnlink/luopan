@@ -1122,7 +1122,7 @@ public struct FloorplanView: View {
             let rawPoints = contour.normalizedPoints
             guard rawPoints.count >= 4 else { continue }
             // Vision 坐标 y 向上（左下原点）→ 翻转为 UIKit y 向下
-            let flipped = rawPoints.map { CGPoint(x: $0.x, y: 1 - $0.y) }
+            let flipped = rawPoints.map { CGPoint(x: CGFloat($0.x), y: CGFloat(1 - $0.y)) }
             // 轮廓首尾接近即视为闭合房间边界
             let first = flipped.first ?? .zero
             let last = flipped.last ?? .zero

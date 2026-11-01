@@ -798,11 +798,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         let weightedX = floorplanRooms.reduce(0.0) { $0 + Double($1.rect.midX) } / Double(max(1, floorplanRooms.count))
         let weightedY = floorplanRooms.reduce(0.0) { $0 + Double($1.rect.midY) } / Double(max(1, floorplanRooms.count))
+        let currentSurvey = buildSpatialSurvey()
         FloorplanView.persistRoomPlanImport(
             rooms: floorplanRooms,
             centroid: CGPoint(x: weightedX, y: weightedY),
             blueprintImage: blueprint,
-            compassHeading: CompassMotionManager.shared.headingState.facingAngle
+            compassHeading: CompassMotionManager.shared.headingState.facingAngle,
+            spatialSurvey: currentSurvey
         )
         return true
     }

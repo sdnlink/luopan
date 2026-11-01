@@ -377,7 +377,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             rooms: generatedRooms,
             centroid: centroid,
             blueprintImage: blueprint,
-            compassHeading: resolvedHeading
+            compassHeading: resolvedHeading,
+            spatialSurvey: currentSpatialSurvey
         )
         return true
     }

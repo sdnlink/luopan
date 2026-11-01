@@ -56,6 +56,8 @@ public struct FloorplanView: View {
     @State private var lastAuditedHeading: Double?
     @State private var lastAuditedCentroid: CGPoint?
     @State private var didRestorePersistedLayout = false
+    @State private var persistedSpatialSurvey: HouseSpatialSurvey? = nil
+    @State private var show3DSpaceViewer: Bool = false
     @State private var showARSpatialSurvey: Bool = false
     @State private var exportedReportImage: UIImage? = nil
     @State private var showReportShareSheet: Bool = false
@@ -242,6 +244,11 @@ public struct FloorplanView: View {
                 FloorplanReportShareSheet(items: [reportImage])
             }
         }
+        .sheet(isPresented: $show3DSpaceViewer) {
+            if let s = persistedSpatialSurvey {
+                House3DSpaceViewer(survey: s)
+            }
+        }
         .onChange(of: lang.effectiveLanguage) { _ in
             // Keep the user's room geometry while refreshing language-dependent
             // sample labels and diagnostics.
@@ -289,6 +296,10 @@ public struct FloorplanView: View {
             persistLayout()
         }
         .onReceive(NotificationCenter.default.publisher(for: .didImportRoomPlanFloorplan)) { _ in
+            if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
+               let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
+                persistedSpatialSurvey = s
+            }
             didRestorePersistedLayout = false
             persistedImageObjectID = nil
             restorePersistedLayoutIfNeeded()
@@ -300,7 +311,8 @@ public struct FloorplanView: View {
         rooms: [FloorplanRoom],
         centroid: CGPoint,
         blueprintImage: UIImage?,
-        compassHeading: Double? = nil
+        compassHeading: Double? = nil,
+        spatialSurvey: HouseSpatialSurvey? = nil
     ) {
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
         let resolvedHeading = compassHeading.map { normalizedHeading($0) } ?? CompassMotionManager.shared.headingState.facingAngle
@@ -314,6 +326,9 @@ public struct FloorplanView: View {
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: savedLayoutKey)
+        }
+        if let survey = spatialSurvey, let surveyData = try? JSONEncoder().encode(survey) {
+            UserDefaults.standard.set(surveyData, forKey: "latest_house_spatial_survey")
         }
         if let imageURL = savedImageURL() {
             if let image = blueprintImage,
@@ -330,6 +345,10 @@ public struct FloorplanView: View {
     private func restorePersistedLayoutIfNeeded() {
         guard !didRestorePersistedLayout else { return }
         didRestorePersistedLayout = true
+        if let sData = UserDefaults.standard.data(forKey: "latest_house_spatial_survey"),
+           let s = try? JSONDecoder().decode(HouseSpatialSurvey.self, from: sData) {
+            persistedSpatialSurvey = s
+        }
         guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
               let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data) else { return }
 
@@ -603,6 +622,21 @@ public struct FloorplanView: View {
                 .cornerRadius(6)
             }
             
+            if let survey = persistedSpatialSurvey {
+                Button(action: { show3DSpaceViewer = true }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "cube.transparent")
+                        Text("3D空间")
+                    }
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(Color.yanGold.opacity(0.85))
+                    .foregroundColor(.black)
+                    .cornerRadius(6)
+                }
+            }
+
             // 重置立极点
             Button(action: {
                 centroid = CGPoint(x: 0.5, y: 0.5)

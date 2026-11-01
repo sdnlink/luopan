@@ -665,7 +665,182 @@ public enum HouseSpatialSurveyEngine {
             score -= 6
         }
 
-        return HouseSpatialSurvey(
+
+        // I. 进门见灶检测 (开门见灶·钱财多耗)
+        let mainDoors = openings.filter { $0.type == .entranceDoor }
+        for door in mainDoors {
+            let dPos = SIMD2<Float>(door.posX, door.posZ)
+            let dNorm = SIMD2<Float>(door.normalX, door.normalZ)
+            for stove in stoves {
+                let sPos = SIMD2<Float>(stove.posX, stove.posZ)
+                let delta = sPos - dPos
+                let dist = simd_length(delta)
+                guard dist >= 1.2 && dist <= 7.0 else { continue }
+                let ray = delta / dist
+                let alignment = simd_dot(dNorm, ray)
+                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
+                if alignment >= 0.78 && lateral <= 1.1 {
+                    shaItems.append(HouseSpatialShaItem(
+                        title: "开门见灶 (财气多耗)",
+                        severity: .critical,
+                        locationName: "入户大门 ⟷ 厨灶",
+                        detail: String(format: "入户门开启正对厨房炉灶 (间距 %.1f 米)，大门纳入门气直冲灶火，主财气虚耗、存蓄不丰。", dist),
+                        fengshuiLore: "《阳宅集成》云：'开门见灶，钱财多耗'。灶为一家食禄之源，宜藏不宜露。",
+                        solution: "在大门与厨房之间设置玄关柜或挂隔断门帘，平时厨房推拉门常闭以避穿冲。",
+                        coordinate: door.position,
+                        vectorEnd: stove.position
+                    ))
+                    score -= 10
+                    break
+                }
+            }
+        }
+
+        // J. 开门见厕检测 (秽气迎门)
+        let bathroomRooms = rooms.filter { $0.type == .bathroom }
+        for door in mainDoors {
+            let dPos = SIMD2<Float>(door.posX, door.posZ)
+            let dNorm = SIMD2<Float>(door.normalX, door.normalZ)
+            for bRoom in bathroomRooms {
+                let bPos = SIMD2<Float>(bRoom.centerX, bRoom.centerZ)
+                let delta = bPos - dPos
+                let dist = simd_length(delta)
+                guard dist >= 1.2 && dist <= 6.5 else { continue }
+                let ray = delta / dist
+                let alignment = simd_dot(dNorm, ray)
+                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
+                if alignment >= 0.80 && lateral <= 1.2 {
+                    shaItems.append(HouseSpatialShaItem(
+                        title: "开门见厕 (秽气迎门)",
+                        severity: .warning,
+                        locationName: "入户大门 ⟷ 卫生间",
+                        detail: String(format: "大门入口正冲卫生间 (间距 %.1f 米)，外来吉气甫入宅即染污秽，主家运退窒、招惹小人。", dist),
+                        fengshuiLore: "《八宅明镜》云：'门为气口，厕乃浊泉；气口冲浊，福禄散亡'。",
+                        solution: "卫生间门加装闭门器保持常闭，悬挂过膝半透布帘，门内放置水种阔叶绿植净化浊气。",
+                        coordinate: door.position,
+                        vectorEnd: bRoom.center
+                    ))
+                    score -= 8
+                    break
+                }
+            }
+        }
+
+        // K. 厨厕贴壁相克 (水火同壁)
+        let kitchenRooms = rooms.filter { $0.type == .kitchen }
+        for k in kitchenRooms {
+            for b in bathroomRooms {
+                let dist = simd_distance(SIMD2<Float>(k.centerX, k.centerZ), SIMD2<Float>(b.centerX, b.centerZ))
+                let minAllowedDist = (k.sizeX + b.sizeX) * 0.45
+                if dist <= minAllowedDist + 0.35 {
+                    shaItems.append(HouseSpatialShaItem(
+                        title: "厨厕同壁 (水火相战)",
+                        severity: .warning,
+                        locationName: "厨房 ⟷ 卫生间相隔",
+                        detail: "厨房灶台居所与卫生间共用一面实体隔墙，坎水逼近离火，易致家人脾胃不适、情绪焦躁。",
+                        fengshuiLore: "孤阳燥火与独阴浊水共处一壁，冷热相激，阴阳失和。",
+                        solution: "灶台与马桶避免贴在同一面隔墙的正反两侧，墙面采用土黄色瓷砖以'土'通关化解。",
+                        coordinate: k.center,
+                        vectorEnd: b.center
+                    ))
+                    score -= 6
+                    break
+                }
+            }
+        }
+
+        // L. 床头悬空无靠 (无靠山煞)
+        for bed in beds {
+            let bPos = SIMD2<Float>(bed.posX, bed.posZ)
+            var minDistToWall: Float = .greatestFiniteMagnitude
+            for w in walls {
+                let w1 = SIMD2<Float>(w.startX, w.startZ)
+                let w2 = SIMD2<Float>(w.endX, w.endZ)
+                let d = distancePointToSegment(point: bPos, segA: w1, segB: w2)
+                minDistToWall = min(minDistToWall, d)
+            }
+            if minDistToWall > 1.35 {
+                shaItems.append(HouseSpatialShaItem(
+                    title: "床头悬空 (靠山虚浮)",
+                    severity: .warning,
+                    locationName: "卧床周围空间",
+                    detail: String(format: "卧床四周远离实体承重墙 (最近墙体 %.1f 米)，床头悬空无依，主睡眠不实、事业贵人缺乏。", minDistToWall),
+                    fengshuiLore: "《撼龙经》云：'人有靠则安，床有靠则稳'。床头紧贴实墙方有踏实依靠。",
+                    solution: "将床头移位紧贴实墙；若户型限制无法移位，可加装高大厚实的实木靠背板作人造靠山。",
+                    coordinate: bed.position
+                ))
+                score -= 7
+                break
+            }
+        }
+
+        // M. 暗室无窗 (孤阴重闭)
+        let bedrooms = rooms.filter { $0.type == .masterBedroom || $0.type == .secondBedroom }
+        let windows = openings.filter { $0.type == .window || $0.type == .balconyDoor }
+        for br in bedrooms {
+            let bPos = SIMD2<Float>(br.centerX, br.centerZ)
+            var nearestWindowDist: Float = .greatestFiniteMagnitude
+            for win in windows {
+                let wPos = SIMD2<Float>(win.posX, win.posZ)
+                nearestWindowDist = min(nearestWindowDist, simd_distance(bPos, wPos))
+            }
+            if nearestWindowDist > 4.5 && windows.count > 0 {
+                shaItems.append(HouseSpatialShaItem(
+                    title: "暗室无窗 (孤阴凝滞)",
+                    severity: .warning,
+                    locationName: br.name,
+                    detail: "卧室内缺乏采光外窗，自然光线与空气对流匮乏，久居阴气偏盛，易感神疲乏力。",
+                    fengshuiLore: "《疑龙经》云：'无窗则气闭，阴盛则阳衰'。起居之所当见曦光，阴阳交泰。",
+                    solution: "房门上方加装透光玻璃气窗或百叶排风，室内增加全光谱暖白照明，摆放开光黄玉聚阳阵。",
+                    coordinate: br.center
+                ))
+                score -= 6
+                break
+            }
+        }
+
+        // N. 八宅吉凶宫位体检 (基于罗盘实测朝向)
+        let facingGua = guaForAngle(compassHeading)
+        let sittingAngle = (compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
+        let sittingGua = guaForAngle(sittingAngle)
+        let bazhai = BaZhaiEngine.shared.analyze(sittingPalace: sittingGua, facingPalace: facingGua)
+
+        for room in rooms {
+            let relX = room.centerX - cx
+            let relZ = room.centerZ - cz
+            let angleFromCenterRad = atan2(Double(relX), Double(-relZ))
+            let angleFromCenterDeg = (angleFromCenterRad * 180.0 / Double.pi + 360.0).truncatingRemainder(dividingBy: 360.0)
+            let geoAngle = (angleFromCenterDeg + compassHeading).truncatingRemainder(dividingBy: 360.0)
+            let roomGua = guaForAngle(geoAngle)
+
+            if let item = bazhai.items.first(where: { $0.guaName == roomGua }) {
+                if room.type == .bathroom && (item.star == .shengQi || item.star == .yanNian || item.star == .tianYi) {
+                    shaItems.append(HouseSpatialShaItem(
+                        title: "吉位落水 (污秽吉星)",
+                        severity: .critical,
+                        locationName: "\(room.name) · 落于【\(item.star.name)】大吉方",
+                        detail: String(format: "卫生间落在全屋八宅【%@】大吉方，吉星被浊水浸润，易减损屋主财官运势与健康气运。", item.star.name),
+                        fengshuiLore: "《八宅明镜》云：'吉星落厕，吉亦成殃'。生气延年宜作卧房书斋，不宜落水。",
+                        solution: "卫生间马桶上方摆放一盆金边虎尾兰以木吸水，挂置开光纯铜葫芦收敛秽气护持吉星。",
+                        coordinate: room.center
+                    ))
+                    score -= 12
+                } else if (room.type == .masterBedroom || room.type == .secondBedroom) && (item.star == .tianYi || item.star == .yanNian || item.star == .shengQi) {
+                    shaItems.append(HouseSpatialShaItem(
+                        title: "卧房得位 (吉星拱照)",
+                        severity: .auspicious,
+                        locationName: "\(room.name) · 居【\(item.star.name)】方",
+                        detail: String(format: "卧房安于全屋八宅【%@】吉位，居之安稳祥和、身心康泰、纳吉迎祥。", item.star.name),
+                        fengshuiLore: "《阳宅三要》云：'门主灶配，吉星得位，富贵双全'。",
+                        solution: "吉位得宜，床头朝向顺合吉方，保持室内整洁明亮即可长保吉运。",
+                        coordinate: room.center
+                    ))
+                    score += 5
+                }
+            }
+        }
+
+                return HouseSpatialSurvey(
             scanMethod: scanMethod,
             dimensions: dimensions,
             walls: walls,
@@ -680,7 +855,23 @@ public enum HouseSpatialSurveyEngine {
         )
     }
 
-    // MARK: - 几何辅助计算
+
+    /// 罗盘度数对应的八卦方位
+    public static func guaForAngle(_ angleDeg: Double) -> String {
+        let normalized = (angleDeg.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+        switch normalized {
+        case 22.5..<67.5: return "艮"
+        case 67.5..<112.5: return "震"
+        case 112.5..<157.5: return "巽"
+        case 157.5..<202.5: return "离"
+        case 202.5..<247.5: return "坤"
+        case 247.5..<292.5: return "兑"
+        case 292.5..<337.5: return "乾"
+        default: return "坎"
+        }
+    }
+
+        // MARK: - 几何辅助计算
 
     private static func lineSegmentIntersection(
         p1: SIMD2<Float>, p2: SIMD2<Float>,

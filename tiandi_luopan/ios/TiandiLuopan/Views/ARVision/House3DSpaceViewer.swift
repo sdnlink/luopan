@@ -7,7 +7,7 @@ import UIKit
 
 public struct House3DSpaceViewer: View {
     @ObservedObject private var lang = LocalizationManager.shared
-    public let survey: HouseSpatialSurvey
+    @State public var survey: HouseSpatialSurvey
     @Environment(\.presentationMode) private var presentationMode
     
     @State private var viewMode: ViewAngleMode = .perspective
@@ -18,6 +18,8 @@ public struct House3DSpaceViewer: View {
     @State private var inspectedElementDesc: String? = nil
     @State private var sceneCoordinator: HouseSceneCoordinator? = nil
     @State private var shareSheetItem: SurveyShareReportItem? = nil
+    @State private var showRoomTypePanel: Bool = false
+    @State private var editRoomTypeMap: [UUID: FloorplanRoomType] = [:]
 
     public enum ViewAngleMode: String, CaseIterable {
         case perspective = "3D透视"
@@ -32,7 +34,7 @@ public struct House3DSpaceViewer: View {
     }
 
     public init(survey: HouseSpatialSurvey) {
-        self.survey = survey
+        self._survey = State(initialValue: survey)
     }
 
     public var body: some View {
@@ -62,11 +64,33 @@ public struct House3DSpaceViewer: View {
             VStack(spacing: 8) {
                 topMetricsHeader
 
+                // 立极点落空警示（严重凹凸缺角户型中宫回退主功能区）
+                if survey.centroidIndirect {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.adaptive(size: 12, weight: .bold))
+                            .foregroundColor(.orange)
+                        Text("立极点落空警示：户型凹凸缺角严重（面积比 < 75%），立极中宫已回退至主功能区重心，请以主厅立极为准")
+                            .font(.adaptive(size: 10, weight: .semibold))
+                            .foregroundColor(.orange)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.15))
+                    .cornerRadius(10)
+                    .transition(.opacity)
+                }
+
                 if let desc = inspectedElementDesc {
                     inspectedElementBanner(desc: desc)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
+                if showRoomTypePanel {
+                    roomTypePanel
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 Spacer()
                 // 底部形煞卡片与视角控制条
                 bottomControlPanel
@@ -122,6 +146,22 @@ public struct House3DSpaceViewer: View {
                     .cornerRadius(12)
                 }
                 .accessibilityLabel("导出工业级 AutoCAD DXF 矢量测绘图")
+
+                // 毛坯房房间类型设定（一键切换类型即时刷新形煞报告）
+                Button(action: { showRoomTypePanel.toggle() }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "door.sliding.left.hand.closed")
+                            .font(.adaptive(size: 11, weight: .bold))
+                        Text("房间")
+                            .font(.adaptive(size: 10, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 5)
+                    .background(showRoomTypePanel ? Color.orange : Color.white.opacity(0.85))
+                    .cornerRadius(12)
+                }
+                .accessibilityLabel("毛坯房房间类型设定")
 
                 // 导出与分享长图存证
                 Button(action: exportAndShareReport) {
@@ -226,6 +266,104 @@ public struct House3DSpaceViewer: View {
         if score >= 85 { return .green }
         if score >= 70 { return .orange }
         return .red
+    }
+
+    // MARK: - 毛坯房房间类型设定面板（冷启动交互修正）
+    private var roomTypePanel: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text("房间类型设定（毛坯房/空置房）")
+                    .font(.adaptive(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Button(action: { showRoomTypePanel = false }) {
+                    Text("完成")
+                        .font(.adaptive(size: 11, weight: .bold))
+                        .foregroundColor(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.yanGold)
+                        .cornerRadius(10)
+                }
+            }
+            if survey.rooms.isEmpty {
+                Text("暂无可设定房间，请先完成测绘")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.7))
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 5) {
+                        ForEach(survey.rooms) { room in
+                            HStack {
+                                Text(room.name)
+                                    .font(.adaptive(size: 11, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .frame(width: 66, alignment: .leading)
+                                    .lineLimit(1)
+                                Text(String(format: "%.1f㎡", room.areaSqMeters))
+                                    .font(.adaptive(size: 10, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.6))
+                                    .frame(width: 52, alignment: .trailing)
+                                Picker(room.name, selection: roomTypeBinding(room)) {
+                                    ForEach(FloorplanRoomType.allCases) { t in
+                                        Text(t.localizedName).tag(t)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .font(.adaptive(size: 11))
+                                .tint(.yanCyan)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(9)
+                        }
+                    }
+                }
+                .frame(maxHeight: 190)
+            }
+            Text("切换类型后形煞报告即时重算（毛坯房默认按面积启发式预判）")
+                .font(.adaptive(size: 9))
+                .foregroundColor(.white.opacity(0.55))
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.82))
+        .cornerRadius(14)
+    }
+
+    private func roomTypeBinding(_ room: SpatialRoom3D) -> Binding<FloorplanRoomType> {
+        Binding(
+            get: { editRoomTypeMap[room.id] ?? room.type },
+            set: { newType in
+                editRoomTypeMap[room.id] = newType
+                applyRoomType(newType, for: room)
+            }
+        )
+    }
+
+    /// 将房间改为指定类型并即时重跑全屋形煞分析，刷新 3D 模型与报告
+    private func applyRoomType(_ type: FloorplanRoomType, for room: SpatialRoom3D) {
+        var updatedRooms = survey.rooms
+        if let idx = updatedRooms.firstIndex(where: { $0.id == room.id }) {
+            updatedRooms[idx] = SpatialRoom3D(
+                id: room.id,
+                name: type.localizedName,
+                type: type,
+                center: room.center,
+                size: room.size,
+                areaSqMeters: room.areaSqMeters
+            )
+        }
+        let rebuilt = HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: survey.scanMethod,
+            walls: survey.walls,
+            openings: survey.openings,
+            beams: survey.beams,
+            rooms: updatedRooms,
+            objects: survey.objects,
+            compassHeading: survey.compassHeading
+        )
+        survey = rebuilt
     }
 
     // MARK: - 底部控制条与形煞诊断浮层

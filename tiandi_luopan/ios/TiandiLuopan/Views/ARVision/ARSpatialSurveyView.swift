@@ -196,8 +196,15 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var currentStandingPalace: String?
     @Published public private(set) var estimatedRoomHeightMeters: Float?
     @Published public private(set) var hasLowBeamWarning: Bool = false
+    /// 手动角落打点测绘（Corner-pin Polygon）：弱纹理墙面辅助精准房间
+    @Published public var cornerPinActive: Bool = false
+    @Published public private(set) var cornerPoints: [SIMD3<Float>] = []
+    @Published public private(set) var cornerRoomCount: Int = 0
 
     private weak var sceneView: ARSCNView?
+    private var cornerRoomAnchors: [ARAnchor] = []
+    private var cornerPinNodes: [SCNNode] = []
+    private var cornerRooms: [SpatialRoom3D] = []
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastSemanticUpdateTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
@@ -696,6 +703,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                 size: SIMD3<Float>(spanX, roomH, spanZ)
             ))
         }
+        // 合并手动角落打点生成的精准房间（Corner-pin Polygon）
+        rooms3D.append(contentsOf: cornerRooms)
 
         let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(
             scanMethod: "AR 平面测绘（基础）",
@@ -959,6 +968,84 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             lubanLineNode = lineNode
         }
         return true
+    }
+
+    // MARK: - 手动角落打点连续测绘 (Corner-pin Polygon)
+    /// 在屏幕中央准星处落一个墙角点。弱纹理墙面（纯白乳胶漆）平面检测易漂移，
+    /// 用户依次点出 ≥3 个墙角可快速拉出精准房间，弥补 ARPlaneAnchor 拼接断裂。
+    @discardableResult
+    public func pinCornerPoint() -> Bool {
+        guard cornerPinActive else { return false }
+        guard let sceneView = sceneView, let frame = sceneView.session.currentFrame else { return false }
+        let center = projectionCenter(of: sceneView)
+        var worldPos: SIMD3<Float>?
+        if let result = sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .any)
+            .flatMap({ sceneView.session.raycast($0).first })
+            ?? sceneView.raycastQuery(from: center, allowing: .existingPlaneGeometry, alignment: .any)
+                .flatMap({ sceneView.session.raycast($0).first }) {
+            let col = result.worldTransform.columns.3
+            worldPos = SIMD3<Float>(col.x, col.y, col.z)
+        } else if let dist = distance, dist > 0.05, dist < 30.0 {
+            let camTransform = frame.camera.transform
+            let camPos = SIMD3<Float>(camTransform.columns.3.x, camTransform.columns.3.y, camTransform.columns.3.z)
+            let forward = -SIMD3<Float>(camTransform.columns.2.x, camTransform.columns.2.y, camTransform.columns.2.z)
+            worldPos = camPos + simd_normalize(forward) * dist
+        }
+        guard let pos = worldPos else { return false }
+
+        var anchorTransform = matrix_identity_float4x4
+        anchorTransform.columns.3 = SIMD4<Float>(pos.x, pos.y, pos.z, 1.0)
+        let anchor = ARAnchor(name: "corner-pin", transform: anchorTransform)
+        sceneView.session.add(anchor: anchor)
+        cornerRoomAnchors.append(anchor)
+
+        cornerPoints.append(pos)
+        let node = Self.makeMarkerNode(
+            position: pos,
+            color: UIColor(red: 1.0, green: 0.55, blue: 0.0, alpha: 0.95)
+        )
+        sceneView.scene.rootNode.addChildNode(node)
+        cornerPinNodes.append(node)
+        return true
+    }
+
+    /// 完成当前打点房间：角点数 ≥3 时以多边形包围盒生成一个精准房间并重跑报告
+    @discardableResult
+    public func finishCornerRoom() -> Bool {
+        guard cornerPoints.count >= 3 else { return false }
+        var minX: Float = .greatestFiniteMagnitude
+        var maxX: Float = -.greatestFiniteMagnitude
+        var minZ: Float = .greatestFiniteMagnitude
+        var maxZ: Float = -.greatestFiniteMagnitude
+        for p in cornerPoints {
+            minX = min(minX, p.x); maxX = max(maxX, p.x)
+            minZ = min(minZ, p.z); maxZ = max(maxZ, p.z)
+        }
+        guard maxX - minX >= 1.0, maxZ - minZ >= 1.0 else {
+            clearCornerPins()
+            return false
+        }
+        let roomH = estimatedRoomHeightMeters ?? 2.8
+        let room = SpatialRoom3D(
+            name: FloorplanRoomType.livingRoom.localizedName,
+            type: .livingRoom,
+            center: SIMD3<Float>((minX + maxX) * 0.5, roomH * 0.5, (minZ + maxZ) * 0.5),
+            size: SIMD3<Float>(maxX - minX, roomH, maxZ - minZ)
+        )
+        cornerRooms.append(room)
+        clearCornerPins()
+        cornerRoomCount = cornerRooms.count
+        _ = buildSpatialSurvey()
+        return true
+    }
+
+    /// 清空当前未完成的打点（含 3D 标记与 ARAnchor）
+    public func clearCornerPins() {
+        for node in cornerPinNodes { node.removeFromParentNode() }
+        cornerPinNodes.removeAll()
+        for anchor in cornerRoomAnchors { sceneView?.session.remove(anchor: anchor) }
+        cornerRoomAnchors.removeAll()
+        cornerPoints.removeAll()
     }
 
     /// Samples the LiDAR depth or raycast distance at any portrait-normalized
@@ -2079,6 +2166,55 @@ public struct ARSpatialSurveyView: View {
                             .clipShape(Circle())
                     }
                     .accessibilityLabel(lang.t("ar_spatial_measure"))
+                    // 手动角落打点连续测绘（Corner-pin Polygon）：弱纹理墙面防拼接漂移
+                    Button(action: {
+                        model.cornerPinActive.toggle()
+                        if !model.cornerPinActive { model.clearCornerPins() }
+                    }) {
+                        Image(systemName: model.cornerPinActive ? "hand.draw.fill" : "hand.draw")
+                            .font(.adaptive(size: 13, weight: .bold))
+                            .foregroundColor(model.cornerPinActive ? .black : .white)
+                            .padding(9)
+                            .background(model.cornerPinActive ? Color.orange : Color.black.opacity(0.55))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("手动角落打点测绘（Corner-pin Polygon）")
+                    if model.cornerPinActive {
+                        Button(action: { _ = model.pinCornerPoint() }) {
+                            VStack(spacing: 1) {
+                                Image(systemName: "plus")
+                                    .font(.adaptive(size: 11, weight: .bold))
+                                Text("\(model.cornerPoints.count)")
+                                    .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
+                            }
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.orange.opacity(0.85))
+                            .clipShape(Circle())
+                        }
+                        .accessibilityLabel("落一个墙角点")
+                        Button(action: { _ = model.finishCornerRoom() }) {
+                            Text("完成")
+                                .font(.adaptive(size: 10, weight: .bold))
+                                .foregroundColor(.black)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 7)
+                                .background(Color.yanGold)
+                                .cornerRadius(12)
+                        }
+                        .disabled(model.cornerPoints.count < 3)
+                        .opacity(model.cornerPoints.count < 3 ? 0.4 : 1.0)
+                        .accessibilityLabel("完成当前打点房间")
+                        Button(action: { model.clearCornerPins() }) {
+                            Image(systemName: "trash")
+                                .font(.adaptive(size: 11, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.red.opacity(0.75))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("清空当前打点")
+                    }
                     Button(action: {
                         model.toggleMeshVisibility()
                     }) {

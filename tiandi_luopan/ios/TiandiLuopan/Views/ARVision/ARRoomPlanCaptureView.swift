@@ -33,6 +33,13 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var isCapturing = false
     @Published public private(set) var didFinish = false
     @Published public private(set) var errorMessage: String?
+    /// 结算页罗盘校准旋钮产生的朝向微调量（度），叠加到 initialCompassHeading 上
+    @Published public var headingOffsetDegrees: Double = 0.0
+    /// 当前生效的大门朝向（初始罗盘读数 + 用户校准微调），供结算页展示
+    public var effectiveHeadingForDisplay: Double {
+        let h = (initialCompassHeading + headingOffsetDegrees).truncatingRemainder(dividingBy: 360.0)
+        return h >= 0 ? h : h + 360.0
+    }
 
     private weak var captureView: RoomCaptureView?
     private var latestRoom: CapturedRoom?
@@ -769,7 +776,29 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             }
         }
 
-        if !roomTypeSet.contains(.livingRoom), let env = compute2DEnvelope(for: rooms) {
+        if roomTypeSet.isEmpty {
+            // 毛坯房/空置房冷启动：无家具物象可分类时，按各房间包围盒面积降序启发式预判
+            // （客厅 > 主卧 > 次卧 > 书房 > 卫浴 > 厨房），保证卧室/厨卫形煞可触发；
+            // 用户可在 3D 查看器点击房间一键修正类型并即时刷新报告。
+            let fallbackTypes: [FloorplanRoomType] = [.livingRoom, .masterBedroom, .secondBedroom, .study, .bathroom, .kitchen]
+            let roomEnv = rooms.enumerated().compactMap { (_, r) -> (Float, Float, Float, Float)? in
+                guard let env = Self.compute2DEnvelope(for: [r]) else { return nil }
+                return (env.minX, env.maxX, env.minZ, env.maxZ)
+            }
+            .sorted { ($0.1 - $0.0) * ($0.3 - $0.2) > ($1.1 - $1.0) * ($1.3 - $1.2) }
+            for (order, item) in roomEnv.enumerated() {
+                let t = fallbackTypes[min(order, fallbackTypes.count - 1)]
+                let (minX, maxX, minZ, maxZ) = item
+                let w = max(1.5, maxX - minX)
+                let d = max(1.5, maxZ - minZ)
+                rooms3D.append(SpatialRoom3D(
+                    name: t.localizedName,
+                    type: t,
+                    center: SIMD3<Float>((minX + maxX) * 0.5, 1.4, (minZ + maxZ) * 0.5),
+                    size: SIMD3<Float>(w, 2.8, d)
+                ))
+            }
+        } else if !roomTypeSet.contains(.livingRoom), let env = compute2DEnvelope(for: rooms) {
             let cx = (env.minX + env.maxX) * 0.5
             let cz = (env.minZ + env.maxZ) * 0.5
             let w = max(2.0, (env.maxX - env.minX) * 0.55)
@@ -806,7 +835,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
         let findings = Self.computeSpatialFengshuiFindings(for: combined)
-        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading)
+        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading + headingOffsetDegrees)
         if commitToHistory {
             // 仅在正式提交扫描房间时更新全景形煞档案的室内侧
             ShaSurveyStore.shared.updateInterior(survey)
@@ -835,6 +864,19 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
     public func captureSession(_ session: RoomCaptureSession, didUpdate room: CapturedRoom) {
         updateMetrics(from: room, commitToHistory: false)
+    }
+
+    /// 结算页罗盘校准旋钮回调：以实测罗盘度数为准微调大门朝向，立即重算报告并同步全景档案
+    public func applyHeadingOffset(_ offsetDegrees: Double) {
+        headingOffsetDegrees = offsetDegrees
+        guard !capturedRoomsHistory.isEmpty else { return }
+        let combined = capturedRoomsHistory
+        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading + headingOffsetDegrees)
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.currentSpatialSurvey = survey
+            ShaSurveyStore.shared.updateInterior(survey)
+        }
     }
 
     public func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
@@ -959,6 +1001,51 @@ public struct ARRoomPlanSurveyView: View {
                             }
                             .accessibilityLabel("查看全屋3D空间布局与形煞")
                         }
+                        // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
+                        VStack(spacing: 2) {
+                            Text(String(format: "大门朝向 %.1f°", model.effectiveHeadingForDisplay))
+                                .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
+                                .foregroundColor(.white)
+                            HStack(spacing: 3) {
+                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 5.0) }) {
+                                    Text("−5°")
+                                        .font(.adaptive(size: 9, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.orange)
+                                        .cornerRadius(8)
+                                }
+                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 1.0) }) {
+                                    Text("−1°")
+                                        .font(.adaptive(size: 9, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.85))
+                                        .cornerRadius(8)
+                                }
+                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 1.0) }) {
+                                    Text("+1°")
+                                        .font(.adaptive(size: 9, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.85))
+                                        .cornerRadius(8)
+                                }
+                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 5.0) }) {
+                                    Text("+5°")
+                                        .font(.adaptive(size: 9, weight: .bold))
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.orange)
+                                        .cornerRadius(8)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("大门朝向罗盘校准旋钮")
                         Button(action: syncToFloorplan) {
                             Image(systemName: "scope")
                                 .font(.adaptive(size: 13, weight: .bold))

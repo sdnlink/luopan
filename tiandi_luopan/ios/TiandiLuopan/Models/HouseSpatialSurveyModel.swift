@@ -313,10 +313,16 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
     public let compassHeading: Double
     public let shaItems: [HouseSpatialShaItem]
     public let fengshuiScore: Int
+    /// 立极中宫是否采用回退口径（严重凹凸户型时落到主功能区/最大房间中心）。
+    /// 可选值以保证旧存档 JSON 解码兼容。
+    public let isCentroidIndirect: Bool?
 
     public var centroid: SIMD3<Float> {
         SIMD3<Float>(centroidX, centroidY, centroidZ)
     }
+
+    /// 立极中宫是否落空回退（安全解包）
+    public var centroidIndirect: Bool { isCentroidIndirect ?? false }
 
     public init(
         id: UUID = UUID(),
@@ -331,7 +337,8 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         centroid: SIMD3<Float>,
         compassHeading: Double,
         shaItems: [HouseSpatialShaItem],
-        fengshuiScore: Int
+        fengshuiScore: Int,
+        isCentroidIndirect: Bool? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -348,6 +355,7 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         self.compassHeading = compassHeading
         self.shaItems = shaItems
         self.fengshuiScore = max(0, min(100, fengshuiScore))
+        self.isCentroidIndirect = isCentroidIndirect
     }
 }
 
@@ -400,39 +408,113 @@ public enum HouseSpatialSurveyEngine {
         let spanX = max(1.5, maxX - minX)
         let spanZ = max(1.5, maxZ - minZ)
         let usableArea = rooms.reduce(Float(0)) { $0 + $1.areaSqMeters }
-        let grossArea = max(usableArea * 1.22, spanX * spanZ)
+
+        // 2. 房屋主轴定向包围盒 (OBB)：以最长墙走向为基准建立房屋局部坐标系。
+        //    斜向房屋（非正南正北）若用世界坐标 AABB 取中宫，九宫会切成斜切片，
+        //    此处统一转到局部坐标（Local Space）分宫，再转回世界坐标。
+        let axisAngle = primaryAxisAngle(walls: walls)
+        let cosA = cos(axisAngle)
+        let sinA = sin(axisAngle)
+
+        func toLocal(_ p: SIMD2<Float>) -> SIMD2<Float> {
+            SIMD2<Float>(p.x * cosA + p.y * sinA, -p.x * sinA + p.y * cosA)
+        }
+        func toWorld(_ p: SIMD2<Float>) -> SIMD2<Float> {
+            SIMD2<Float>(p.x * cosA - p.y * sinA, p.x * sinA + p.y * cosA)
+        }
+        func roomCorners(_ r: SpatialRoom3D) -> [SIMD2<Float>] {
+            let hx = r.sizeX * 0.5
+            let hz = r.sizeZ * 0.5
+            return [
+                SIMD2<Float>(r.centerX - hx, r.centerZ - hz),
+                SIMD2<Float>(r.centerX + hx, r.centerZ - hz),
+                SIMD2<Float>(r.centerX + hx, r.centerZ + hz),
+                SIMD2<Float>(r.centerX - hx, r.centerZ + hz)
+            ]
+        }
+
+        // 房间在房屋局部坐标系的 AABB → 全屋真实开间/进深（OBB 跨度）
+        var lMinX: Float = .greatestFiniteMagnitude
+        var lMaxX: Float = -.greatestFiniteMagnitude
+        var lMinZ: Float = .greatestFiniteMagnitude
+        var lMaxZ: Float = -.greatestFiniteMagnitude
+        for room in rooms {
+            for corner in roomCorners(room) {
+                let lc = toLocal(corner)
+                lMinX = min(lMinX, lc.x); lMaxX = max(lMaxX, lc.x)
+                lMinZ = min(lMinZ, lc.y); lMaxZ = max(lMaxZ, lc.y)
+            }
+        }
+        var obbUsable = lMinX < lMaxX && lMinZ < lMaxZ
+        if !obbUsable {
+            // 无房间几何时退回墙端点局部包围盒
+            for w in walls {
+                for corner in [SIMD2<Float>(w.startX, w.startZ), SIMD2<Float>(w.endX, w.endZ)] {
+                    let lc = toLocal(corner)
+                    lMinX = min(lMinX, lc.x); lMaxX = max(lMaxX, lc.x)
+                    lMinZ = min(lMinZ, lc.y); lMaxZ = max(lMaxZ, lc.y)
+                }
+            }
+            obbUsable = lMinX < lMaxX && lMinZ < lMaxZ
+        }
+        let lSpanX = obbUsable ? max(1.5, lMaxX - lMinX) : spanX
+        let lSpanZ = obbUsable ? max(1.5, lMaxZ - lMinZ) : spanZ
+        let lCx = obbUsable ? (lMinX + lMaxX) * 0.5 : 0.0
+        let lCz = obbUsable ? (lMinZ + lMaxZ) * 0.5 : 0.0
+
+        let grossArea = max(usableArea * 1.22, lSpanX * lSpanZ)
 
         let dimensions = HouseDimensions(
-            totalWidth: spanX,
-            totalDepth: spanZ,
+            totalWidth: lSpanX,
+            totalDepth: lSpanZ,
             ceilingHeight: maxH,
             grossFloorArea: grossArea,
-            usableFloorArea: max(usableArea, spanX * spanZ * 0.78)
+            usableFloorArea: max(usableArea, lSpanX * lSpanZ * 0.78)
         )
 
-        // 2. 确定立极中宫点 (Centroid)
-        let cx = (minX + maxX) * 0.5
-        let cz = (minZ + maxZ) * 0.5
+        // 3. 立极中宫点 (Centroid)：优先 OBB 局部中心转回世界坐标；
+        //    严重凹凸缺角（面积比 < 75%）时采用"主功能区重心法"（面积最大房间中心），
+        //    避免立极点落到屋外走廊/天井，并标记落空回退供 3D 视图警示。
+        var cx = (minX + maxX) * 0.5
+        var cz = (minZ + maxZ) * 0.5
+        if obbUsable {
+            let obbCenter = toWorld(SIMD2<Float>(lCx, lCz))
+            cx = obbCenter.x
+            cz = obbCenter.y
+        }
+        let roomAreaRatio = usableArea / max(grossArea, 0.01)
+        var isCentroidIndirect = false
+        if roomAreaRatio < 0.75, let largest = rooms.max(by: { $0.areaSqMeters < $1.areaSqMeters }) {
+            cx = largest.centerX
+            cz = largest.centerZ
+            isCentroidIndirect = true
+        }
         let centroid = SIMD3<Float>(cx, 0.0, cz)
 
-        // 3. 全屋形煞体检核心逻辑
+        // 4. 全屋形煞体检核心逻辑
         var shaItems: [HouseSpatialShaItem] = []
         var score = 92
 
-        // A. 中宫受污检测 (卫生间/厨房占据房屋中心立极九宫中宫)
-        let centerBoxMinX = cx - spanX / 6.0
-        let centerBoxMaxX = cx + spanX / 6.0
-        let centerBoxMinZ = cz - spanZ / 6.0
-        let centerBoxMaxZ = cz + spanZ / 6.0
+        // A. 中宫受污检测 —— 在房屋局部坐标系划分九宫中宫盒 (OBB 九宫)，避免斜房切片
+        let centerBoxMinX = lCx - lSpanX / 6.0
+        let centerBoxMaxX = lCx + lSpanX / 6.0
+        let centerBoxMinZ = lCz - lSpanZ / 6.0
+        let centerBoxMaxZ = lCz + lSpanZ / 6.0
 
         for room in rooms {
-            let rMinX = room.centerX - room.sizeX * 0.5
-            let rMaxX = room.centerX + room.sizeX * 0.5
-            let rMinZ = room.centerZ - room.sizeZ * 0.5
-            let rMaxZ = room.centerZ + room.sizeZ * 0.5
+            // 房间 4 角点旋转到局部坐标后取 AABB，与局部中宫盒求重叠
+            var rLMinX: Float = .greatestFiniteMagnitude
+            var rLMaxX: Float = -.greatestFiniteMagnitude
+            var rLMinZ: Float = .greatestFiniteMagnitude
+            var rLMaxZ: Float = -.greatestFiniteMagnitude
+            for corner in roomCorners(room) {
+                let lc = toLocal(corner)
+                rLMinX = min(rLMinX, lc.x); rLMaxX = max(rLMaxX, lc.x)
+                rLMinZ = min(rLMinZ, lc.y); rLMaxZ = max(rLMaxZ, lc.y)
+            }
 
-            let overlapX = max(0, min(centerBoxMaxX, rMaxX) - max(centerBoxMinX, rMinX))
-            let overlapZ = max(0, min(centerBoxMaxZ, rMaxZ) - max(centerBoxMinZ, rMinZ))
+            let overlapX = max(0, min(centerBoxMaxX, rLMaxX) - max(centerBoxMinX, rLMinX))
+            let overlapZ = max(0, min(centerBoxMaxZ, rLMaxZ) - max(centerBoxMinZ, rLMinZ))
             let overlapArea = overlapX * overlapZ
 
             if overlapArea > 0.4 {
@@ -475,7 +557,10 @@ public enum HouseSpatialSurveyEngine {
 
             for win in exitOpenings {
                 let wPos = SIMD2<Float>(win.posX, win.posZ)
-                let delta = wPos - dPos
+                // 大门出发点：从门内侧（进门方向）偏移 0.3m 起射，规避端点粘连误判
+                let inward = simd_dot(dNorm, (wPos - dPos) / max(simd_length(wPos - dPos), 1e-5)) >= 0 ? dNorm : -dNorm
+                let startPos = dPos + inward * 0.3
+                let delta = wPos - startPos
                 let dist = simd_length(delta)
                 guard dist >= 2.0 && dist <= 14.0 else { continue }
 
@@ -484,13 +569,28 @@ public enum HouseSpatialSurveyEngine {
                 let lateralDist = dist * sqrt(max(0, 1.0 - alignment * alignment))
 
                 if alignment >= 0.86 && lateralDist <= 0.90 {
-                    // 检查两点之间是否有隔断墙阻隔
+                    // 检查两点之间是否有隔断墙阻隔；墙段交点落在任一开口（门/窗/垭口）
+                    // 宽度范围内视为畅通（Opening 豁免），避免过道垭口漏诊穿堂
                     let isBlockedByWall = walls.contains { wall in
-                        lineSegmentIntersection(
-                            p1: dPos, p2: wPos,
+                        guard let t = lineIntersectionParam(
+                            p1: startPos, p2: wPos,
                             p3: SIMD2<Float>(wall.startX, wall.startZ),
                             p4: SIMD2<Float>(wall.endX, wall.endZ)
-                        )
+                        ), t > 0.001, t < 0.999 else { return false }
+                        let hit = startPos + delta * t
+                        let isWithinOpening = openings.contains { op in
+                            let opPos = SIMD2<Float>(op.posX, op.posZ)
+                            let opN = SIMD2<Float>(op.normalX, op.normalZ)
+                            let nLen = simd_length(opN)
+                            guard nLen > 1e-4 else { return false }
+                            let on = opN / nLen
+                            let d = hit - opPos
+                            // 沿开口走向的横向距离 ≤ 开口半宽 + 容差；沿法线深度 ≤ 墙厚容差
+                            let lateral = abs(simd_dot(d, SIMD2<Float>(-on.y, on.x)))
+                            let depth = abs(simd_dot(d, on))
+                            return lateral <= op.width * 0.5 + 0.05 && depth <= 0.4
+                        }
+                        return !isWithinOpening
                     }
 
                     if !isBlockedByWall {
@@ -937,6 +1037,40 @@ public enum HouseSpatialSurveyEngine {
             }
         }
 
+        // O.1 玄空出卦 · 空亡破局煞 (理气最高危)：大门朝向落入大/小空亡线时自动警示并提示替卦
+        if let mainDoor = mainDoors.first {
+            var probe = CompassHeadingState(
+                heading: compassHeading,
+                facingAngle: compassHeading,
+                facingMountain: Mountain24Data.shared.mountain(for: compassHeading),
+                sittingMountain: Mountain24Data.shared.mountain(for: sittingAngle)
+            )
+            probe.heading = compassHeading
+            let kwLevel = probe.kongWangLevel
+            if kwLevel != .pure {
+                let isMajor = kwLevel == .largeVoid
+                let isSmall = kwLevel == .smallVoid
+                shaItems.append(HouseSpatialShaItem(
+                    title: "玄空出卦 · 空亡破局煞",
+                    severity: .critical,
+                    locationName: "入户大门 · \(kwLevel.localizedTitle)",
+                    detail: isMajor
+                        ? String(format: "大门朝向 %.1f° 正踏八卦大卦交界缝（大空亡绝线），五行错乱、阴阳差错，下卦排盘失效，必须以【替卦】重起九宫，属理气极凶出线。", compassHeading)
+                        : (isSmall
+                            ? String(format: "大门朝向 %.1f° 贴近同宫两山交界（小空亡出卦），气杂不纯、阴差阳错，须以【兼向替卦】排盘化解。", compassHeading)
+                            : String(format: "大门朝向 %.1f° 处于兼向（替卦）区间，气场微杂驳纯，建议按替卦挨星排盘校验旺衰。", compassHeading)),
+                    fengshuiLore: "堪舆古训：'出卦差错出孤寡，空亡线遇鬼神惊'。正针气场已乱，须以沈氏玄空替卦诀重排九宫飞星。",
+                    solution: isMajor
+                        ? "此线极凶，宜用实测罗盘复核坐向，优先整体挪门或以玄关斜向引气避开绝线；理气按【三元九运·替卦排盘】断验，忌择此线动土安门。"
+                        : (isSmall
+                            ? "玄关/门厅设斜向过渡区导气，理气按【三元九运·替卦排盘】校验旺衰，择吉时安门更佳。"
+                            : "玄关加设门帘缓气，理气按【三元九运·替卦排盘】校验旺衰即可。"),
+                    coordinate: mainDoor.position
+                ))
+                score -= (isMajor ? 18 : (isSmall ? 12 : 6))
+            }
+        }
+
                 return HouseSpatialSurvey(
             scanMethod: scanMethod,
             dimensions: dimensions,
@@ -948,7 +1082,8 @@ public enum HouseSpatialSurveyEngine {
             centroid: centroid,
             compassHeading: compassHeading,
             shaItems: shaItems,
-            fengshuiScore: score
+            fengshuiScore: score,
+            isCentroidIndirect: isCentroidIndirect
         )
     }
 
@@ -978,6 +1113,43 @@ public enum HouseSpatialSurveyEngine {
             return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
         }
         return ccw(p1, p3, p4) != ccw(p2, p3, p4) && ccw(p1, p2, p3) != ccw(p1, p2, p4)
+    }
+
+    /// 线段求交参数：返回 [p1→p2] 上的交点参数 t ∈ (0,1)，未相交/共线返回 nil。
+    /// 用于穿堂射线与墙体求交后进一步做开口（垭口）豁免判断。
+    private static func lineIntersectionParam(
+        p1: SIMD2<Float>, p2: SIMD2<Float>,
+        p3: SIMD2<Float>, p4: SIMD2<Float>
+    ) -> Float? {
+        let r = p2 - p1
+        let s = p4 - p3
+        let rxs = r.x * s.y - r.y * s.x
+        guard abs(rxs) > 1e-6, simd_length(r) > 1e-4, simd_length(s) > 1e-4 else { return nil }
+        let q = p3 - p1
+        let t = (q.x * s.y - q.y * s.x) / rxs
+        let u = (q.x * r.y - q.y * r.x) / rxs
+        if t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0 {
+            return t
+        }
+        return nil
+    }
+
+    /// 房屋主轴方向角（radian，归一化到 [0, π)）：以最长墙线段走向为基准。
+    /// 无有效墙时返回 0（退回世界轴对齐），保证 OBB 计算始终可退。
+    private static func primaryAxisAngle(walls: [SpatialWall3D]) -> Float {
+        var bestLen: Float = 0
+        var bestAngle: Float = 0
+        for w in walls {
+            let dx = w.endX - w.startX
+            let dz = w.endZ - w.startZ
+            let len = simd_length(SIMD2<Float>(dx, dz))
+            guard len > 0.3 else { continue }
+            var ang = atan2(dz, dx)
+            if ang < 0 { ang += .pi }
+            if ang >= .pi { ang -= .pi }
+            if len > bestLen { bestLen = len; bestAngle = ang }
+        }
+        return bestAngle
     }
 
     private static func distancePointToSegment(
@@ -1017,7 +1189,8 @@ extension HouseSpatialSurvey {
             ("WINDOWS", 3),          // 绿色
             ("BEAMS", 1),            // 红色
             ("ROOM_LABELS", 7),      // 白色
-            ("TAIJI_CENTER", 40)     // 金色
+            ("TAIJI_CENTER", 40),    // 金色
+            ("DIMENSIONS", 6)        // 品红：净距尺寸标注线
         ]
         
         for lyr in layers {
@@ -1071,6 +1244,35 @@ extension HouseSpatialSurvey {
             s += "10\n\(String(format: "%.3f", room.centerX - 0.4))\n20\n\(String(format: "%.3f", -room.centerZ))\n30\n0.0\n"
             s += "40\n0.30\n1\n\(room.name) \(String(format: "%.1f", room.areaSqMeters))m2\n"
         }
+
+        // 标注主要开间/进深净距尺寸线 (ALIGNED DIMENSION)
+        // 全屋外框 X/Z 净距 + 面积最大的前 3 个房间各自开间/进深净距，
+        // 供施工与设计人员直接量尺，无需手工重测。
+        func appendAlignedDim(_ x1: Float, _ y1: Float, _ x2: Float, _ y2: Float, _ label: String) {
+            let mx = (x1 + x2) * 0.5
+            let my = (y1 + y2) * 0.5
+            s += "0\nDIMENSION\n8\nDIMENSIONS\n2\n*D1\n"
+            s += "10\n\(String(format: "%.3f", x1))\n20\n\(String(format: "%.3f", y1))\n30\n0.0\n"
+            s += "11\n\(String(format: "%.3f", x2))\n21\n\(String(format: "%.3f", y2))\n31\n0.0\n"
+            s += "13\n\(String(format: "%.3f", mx))\n23\n\(String(format: "%.3f", my))\n33\n0.0\n"
+            s += "70\n32\n3\nDIMENSIONS\n1\n\(label)\n"
+        }
+        // 全屋净距（OBB 跨度值为真实开间/进深，绘图坐标仍取世界系）
+        appendAlignedDim(minX, -minZ, maxX, -minZ, "全屋开间 \(String(format: "%.2f", lSpanX))m")
+        appendAlignedDim(minX, -maxZ, maxX, -maxZ, "全屋开间 \(String(format: "%.2f", lSpanX))m")
+        appendAlignedDim(minX, -minZ, minX, -maxZ, "全屋进深 \(String(format: "%.2f", lSpanZ))m")
+        appendAlignedDim(maxX, -minZ, maxX, -maxZ, "全屋进深 \(String(format: "%.2f", lSpanZ))m")
+        // 主要房间净距
+        for r in rooms.sorted(by: { $0.areaSqMeters > $1.areaSqMeters }).prefix(3) {
+            let rMinX = r.centerX - r.sizeX * 0.5
+            let rMaxX = r.centerX + r.sizeX * 0.5
+            let rMinZ = r.centerZ - r.sizeZ * 0.5
+            let rMaxZ = r.centerZ + r.sizeZ * 0.5
+            appendAlignedDim(rMinX, -rMinZ, rMaxX, -rMinZ, "\(r.name)开间 \(String(format: "%.2f", r.sizeX))m")
+            appendAlignedDim(rMinX, -rMaxZ, rMaxX, -rMaxZ, "\(r.name)开间 \(String(format: "%.2f", r.sizeX))m")
+            appendAlignedDim(rMinX, -rMinZ, rMinX, -rMaxZ, "\(r.name)进深 \(String(format: "%.2f", r.sizeZ))m")
+            appendAlignedDim(rMaxX, -rMinZ, rMaxX, -rMaxZ, "\(r.name)进深 \(String(format: "%.2f", r.sizeZ))m")
+        }
         
         // 4. 结尾
         s += "0\nENDSEC\n0\nEOF\n"
@@ -1083,7 +1285,7 @@ extension HouseSpatialSurvey {
         let fileName = "TianJi-HouseSurvey-\(id.uuidString.prefix(8)).dxf"
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
         do {
-            try dxfString.write(to: tempURL, atomically: true, encoding: .ascii)
+            try dxfString.write(to: tempURL, atomically: true, encoding: .utf8)
             return tempURL
         } catch {
             return nil

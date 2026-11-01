@@ -11,10 +11,11 @@ public struct House3DSpaceViewer: View {
     @Environment(\.presentationMode) private var presentationMode
     
     @State private var viewMode: ViewAngleMode = .perspective
+    @State private var palaceGridMode: PalaceGridMode = .baZhai
     @State private var showDimensions: Bool = true
     @State private var showShaAlerts: Bool = true
-    @State private var showBaguaGrid: Bool = true
     @State private var selectedShaItem: HouseSpatialShaItem? = nil
+    @State private var inspectedElementDesc: String? = nil
     @State private var sceneCoordinator: HouseSceneCoordinator? = nil
     @State private var shareSheetItem: SurveyShareReportItem? = nil
 
@@ -22,6 +23,12 @@ public struct House3DSpaceViewer: View {
         case perspective = "3D透视"
         case topDown = "正顶俯视"
         case frontEntrance = "大门内视"
+    }
+
+    public enum PalaceGridMode: String, CaseIterable {
+        case baZhai = "八宅大游年"
+        case xuanKong = "玄空九运盘"
+        case off = "隐藏理气"
     }
 
     public init(survey: HouseSpatialSurvey) {
@@ -38,17 +45,28 @@ public struct House3DSpaceViewer: View {
                 viewMode: viewMode,
                 showDimensions: showDimensions,
                 showShaAlerts: showShaAlerts,
-                showBaguaGrid: showBaguaGrid,
+                palaceGridMode: palaceGridMode,
                 selectedShaItem: selectedShaItem,
+                onElementTapped: { desc in
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        self.inspectedElementDesc = desc
+                    }
+                },
                 coordinatorRef: { coord in
                     self.sceneCoordinator = coord
                 }
             )
             .ignoresSafeArea()
 
-            // 顶部测绘指标看板
+            // 顶部测绘指标看板与构件探查气泡
             VStack(spacing: 8) {
                 topMetricsHeader
+
+                if let desc = inspectedElementDesc {
+                    inspectedElementBanner(desc: desc)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 Spacer()
                 // 底部形煞卡片与视角控制条
                 bottomControlPanel
@@ -146,6 +164,34 @@ public struct House3DSpaceViewer: View {
         )
     }
 
+    private func inspectedElementBanner(desc: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "scope")
+                .font(.adaptive(size: 13, weight: .bold))
+                .foregroundColor(.yanGold)
+            Text(desc)
+                .font(.adaptive(size: 11, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(2)
+            Spacer()
+            Button(action: {
+                withAnimation { self.inspectedElementDesc = nil }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.adaptive(size: 13))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(red: 0.12, green: 0.14, blue: 0.20).opacity(0.95))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.yanCyan.opacity(0.6), lineWidth: 1)
+        )
+    }
+
     private func metricCell(title: String, value: String) -> some View {
         VStack(spacing: 2) {
             Text(title)
@@ -169,7 +215,6 @@ public struct House3DSpaceViewer: View {
     // MARK: - 底部控制条与形煞诊断浮层
     private var bottomControlPanel: some View {
         VStack(spacing: 10) {
-            // 形煞诊断卡片 (当有形煞项或用户选中项)
             if !survey.shaItems.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -202,7 +247,6 @@ public struct House3DSpaceViewer: View {
                     }
                 }
 
-                // 选中形煞的详细解析与化解方案
                 if let item = selectedShaItem ?? survey.shaItems.first {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -259,16 +303,26 @@ public struct House3DSpaceViewer: View {
 
                 Spacer()
 
-                // 八宅九宫地面投影开关
-                Button(action: { showBaguaGrid.toggle() }) {
-                    Image(systemName: showBaguaGrid ? "square.grid.3x3.fill" : "square.grid.3x3")
-                        .font(.adaptive(size: 12, weight: .bold))
-                        .foregroundColor(showBaguaGrid ? .yanGold : .white.opacity(0.6))
-                        .padding(7)
-                        .background(Color.white.opacity(0.12))
-                        .clipShape(Circle())
+                // 理气盘模式切换 (八宅 / 玄空 / 关)
+                Button(action: {
+                    switch palaceGridMode {
+                    case .baZhai: palaceGridMode = .xuanKong
+                    case .xuanKong: palaceGridMode = .off
+                    case .off: palaceGridMode = .baZhai
+                    }
+                }) {
+                    HStack(spacing: 2) {
+                        Image(systemName: "square.grid.3x3.fill")
+                        Text(palaceGridMode == .baZhai ? "八宅" : (palaceGridMode == .xuanKong ? "玄空" : "理气关"))
+                    }
+                    .font(.adaptive(size: 10, weight: .bold))
+                    .foregroundColor(palaceGridMode != .off ? .yanGold : .white.opacity(0.6))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.12))
+                    .cornerRadius(8)
                 }
-                .accessibilityLabel("切换八宅九宫地面阵")
+                .accessibilityLabel("切换八宅或玄空理气投影")
 
                 // 尺寸标注开关
                 Button(action: { showDimensions.toggle() }) {
@@ -333,12 +387,13 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
     public let viewMode: House3DSpaceViewer.ViewAngleMode
     public let showDimensions: Bool
     public let showShaAlerts: Bool
-    public let showBaguaGrid: Bool
+    public let palaceGridMode: House3DSpaceViewer.PalaceGridMode
     public let selectedShaItem: HouseSpatialShaItem?
+    public let onElementTapped: (String) -> Void
     public let coordinatorRef: (HouseSceneCoordinator) -> Void
 
     public func makeCoordinator() -> HouseSceneCoordinator {
-        HouseSceneCoordinator()
+        HouseSceneCoordinator(onElementTapped: onElementTapped)
     }
 
     public func makeUIView(context: Context) -> SCNView {
@@ -357,7 +412,7 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
             viewMode: viewMode,
             showDimensions: showDimensions,
             showShaAlerts: showShaAlerts,
-            showBaguaGrid: showBaguaGrid
+            palaceGridMode: palaceGridMode
         )
 
         coordinatorRef(context.coordinator)
@@ -370,7 +425,7 @@ public struct House3DSceneRepresentable: UIViewRepresentable {
             viewMode: viewMode,
             showDimensions: showDimensions,
             showShaAlerts: showShaAlerts,
-            showBaguaGrid: showBaguaGrid,
+            palaceGridMode: palaceGridMode,
             selectedShaItem: selectedShaItem
         )
     }
@@ -387,6 +442,12 @@ public final class HouseSceneCoordinator: NSObject {
     private var dimensionsNode = SCNNode()
     private var baguaGridNode = SCNNode()
     private var currentSurvey: HouseSpatialSurvey?
+    private let onElementTapped: (String) -> Void
+
+    public init(onElementTapped: @escaping (String) -> Void) {
+        self.onElementTapped = onElementTapped
+        super.init()
+    }
 
     public func captureSnapshot() -> UIImage? {
         return scnView?.snapshot()
@@ -399,7 +460,7 @@ public final class HouseSceneCoordinator: NSObject {
         viewMode: House3DSpaceViewer.ViewAngleMode,
         showDimensions: Bool,
         showShaAlerts: Bool,
-        showBaguaGrid: Bool
+        palaceGridMode: House3DSpaceViewer.PalaceGridMode
     ) {
         self.scene = scene
         self.scnView = view
@@ -435,8 +496,23 @@ public final class HouseSceneCoordinator: NSObject {
 
         buildHouseGeometry(survey: survey)
         buildDimensionsLines(survey: survey)
-        buildBaguaGridOverlay(survey: survey)
+        buildPalaceGridOverlay(survey: survey, mode: palaceGridMode)
         resetCamera(mode: viewMode)
+
+        // 添加轻触手势探查构件
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleSceneTap(_:)))
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func handleSceneTap(_ gesture: UITapGestureRecognizer) {
+        guard let view = scnView else { return }
+        let point = gesture.location(in: view)
+        let hits = view.hitTest(point, options: [:])
+        guard let firstHit = hits.first else { return }
+
+        if let nodeName = firstHit.node.name, !nodeName.isEmpty {
+            onElementTapped(nodeName)
+        }
     }
 
     public func update(
@@ -444,12 +520,14 @@ public final class HouseSceneCoordinator: NSObject {
         viewMode: House3DSpaceViewer.ViewAngleMode,
         showDimensions: Bool,
         showShaAlerts: Bool,
-        showBaguaGrid: Bool,
+        palaceGridMode: House3DSpaceViewer.PalaceGridMode,
         selectedShaItem: HouseSpatialShaItem?
     ) {
         dimensionsNode.isHidden = !showDimensions
         shaAlertsNode.isHidden = !showShaAlerts
-        baguaGridNode.isHidden = !showBaguaGrid
+        baguaGridNode.isHidden = (palaceGridMode == .off)
+
+        buildPalaceGridOverlay(survey: survey, mode: palaceGridMode)
 
         if let item = selectedShaItem, let coord = item.coordinate {
             SCNTransaction.begin()
@@ -516,6 +594,7 @@ public final class HouseSceneCoordinator: NSObject {
         pillarGeo.materials = [pillarMat]
         let pillarNode = SCNNode(geometry: pillarGeo)
         pillarNode.position = SCNVector3(cx, survey.dimensions.ceilingHeight * 0.75, cz)
+        pillarNode.name = "【全屋太极立极中心】三维坐标 (\(String(format: "%.1f, %.1f", cx, cz)))"
         rootHouseNode.addChildNode(pillarNode)
 
         let centerRingGeo = SCNTorus(ringRadius: 0.6, pipeRadius: 0.04)
@@ -527,7 +606,7 @@ public final class HouseSceneCoordinator: NSObject {
         rootHouseNode.addChildNode(ringNode)
 
         // 墙体
-        for wall in survey.walls {
+        for (idx, wall) in survey.walls.enumerated() {
             let start = wall.start
             let end = wall.end
             let len = wall.length
@@ -550,6 +629,7 @@ public final class HouseSceneCoordinator: NSObject {
 
             let angle = atan2(end.z - start.z, end.x - start.x)
             wallNode.eulerAngles.y = -angle
+            wallNode.name = "墙段 #\(idx + 1)：长 \(String(format: "%.2f", len))m · 高 \(String(format: "%.2f", wall.height))m"
             rootHouseNode.addChildNode(wallNode)
         }
 
@@ -576,11 +656,12 @@ public final class HouseSceneCoordinator: NSObject {
             opNode.position = SCNVector3(op.posX, Float(opH) * 0.5, op.posZ)
             let normAngle = atan2(op.normalZ, op.normalX)
             opNode.eulerAngles.y = -normAngle + Float.pi / 2
+            opNode.name = "\(op.type.rawValue)：宽 \(String(format: "%.2f", op.width))m × 高 \(String(format: "%.2f", op.height))m · 鲁班尺【\(op.yangGateName)】字门"
             rootHouseNode.addChildNode(opNode)
         }
 
         // 横梁
-        for beam in survey.beams {
+        for (idx, beam) in survey.beams.enumerated() {
             let len = simd_distance(SIMD2<Float>(beam.startX, beam.startZ), SIMD2<Float>(beam.endX, beam.endZ))
             guard len > 0.1 else { continue }
             let bGeo = SCNBox(width: CGFloat(len), height: CGFloat(beam.beamDepth), length: CGFloat(beam.beamWidth), chamferRadius: 0.01)
@@ -595,6 +676,7 @@ public final class HouseSceneCoordinator: NSObject {
             bNode.position = SCNVector3(midX, y, midZ)
             let bAngle = atan2(beam.endZ - beam.startZ, beam.endX - beam.startX)
             bNode.eulerAngles.y = -bAngle
+            bNode.name = "结构横梁 #\(idx + 1)：净高 \(String(format: "%.2f", beam.clearanceHeight))m · 跨度 \(String(format: "%.2f", len))m"
             rootHouseNode.addChildNode(bNode)
         }
 
@@ -620,6 +702,7 @@ public final class HouseSceneCoordinator: NSObject {
             let rNode = SCNNode(geometry: rGeo)
             rNode.eulerAngles.x = -Float.pi / 2
             rNode.position = SCNVector3(room.centerX, 0.01, room.centerZ)
+            rNode.name = "\(room.name)：实测面积 \(String(format: "%.1f", room.areaSqMeters))㎡ · 面宽 \(String(format: "%.2f", room.sizeX))m × 进深 \(String(format: "%.2f", room.sizeZ))m"
             rootHouseNode.addChildNode(rNode)
         }
 
@@ -638,31 +721,33 @@ public final class HouseSceneCoordinator: NSObject {
         let lineMat = SCNMaterial()
         lineMat.diffuse.contents = UIColor(red: 0.0, green: 0.85, blue: 0.95, alpha: 0.85)
 
-        // 开间宽度标尺 (沿 X 轴外移)
         let widthLineGeo = SCNBox(width: CGFloat(w), height: 0.015, length: 0.015, chamferRadius: 0)
         widthLineGeo.materials = [lineMat]
         let widthLineNode = SCNNode(geometry: widthLineGeo)
         widthLineNode.position = SCNVector3(cx, 0.05, cz + d * 0.5 + 0.45)
+        widthLineNode.name = "面宽开间尺寸：\(String(format: "%.2f", w)) 米"
         dimensionsNode.addChildNode(widthLineNode)
 
-        // 进深长度标尺 (沿 Z 轴外移)
         let depthLineGeo = SCNBox(width: 0.015, height: 0.015, length: CGFloat(d), chamferRadius: 0)
         depthLineGeo.materials = [lineMat]
         let depthLineNode = SCNNode(geometry: depthLineGeo)
         depthLineNode.position = SCNVector3(cx + w * 0.5 + 0.45, 0.05, cz)
+        depthLineNode.name = "进深长度尺寸：\(String(format: "%.2f", d)) 米"
         dimensionsNode.addChildNode(depthLineNode)
 
-        // 室内净高立柱标尺 (沿 Y 轴立起)
         let heightLineGeo = SCNBox(width: 0.015, height: CGFloat(h), length: 0.015, chamferRadius: 0)
         heightLineGeo.materials = [lineMat]
         let heightLineNode = SCNNode(geometry: heightLineGeo)
         heightLineNode.position = SCNVector3(cx - w * 0.5 - 0.45, h * 0.5, cz - d * 0.5 - 0.45)
+        heightLineNode.name = "室内净层高尺寸：\(String(format: "%.2f", h)) 米"
         dimensionsNode.addChildNode(heightLineNode)
     }
 
-    // MARK: - 八宅九宫阵地面贴地投影
-    private func buildBaguaGridOverlay(survey: HouseSpatialSurvey) {
+    // MARK: - 八宅大游年 / 玄空飞星 理气贴地投影
+    private func buildPalaceGridOverlay(survey: HouseSpatialSurvey, mode: House3DSpaceViewer.PalaceGridMode) {
         baguaGridNode.childNodes.forEach { $0.removeFromParentNode() }
+        guard mode != .off else { return }
+
         let cx = survey.centroidX
         let cz = survey.centroidZ
         let w = survey.dimensions.totalWidth
@@ -673,7 +758,11 @@ public final class HouseSceneCoordinator: NSObject {
         let facingGua = HouseSpatialSurveyEngine.guaForAngle(survey.compassHeading)
         let sittingAngle = (survey.compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
         let sittingGua = HouseSpatialSurveyEngine.guaForAngle(sittingAngle)
+
         let bazhai = BaZhaiEngine.shared.analyze(sittingPalace: sittingGua, facingPalace: facingGua)
+        let facingM = Mountain24Data.shared.mountain(for: survey.compassHeading)
+        let sittingM = Mountain24Data.shared.mountain(for: sittingAngle)
+        let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: sittingM, facing: facingM)
 
         for row in -1...1 {
             for col in -1...1 {
@@ -683,8 +772,10 @@ public final class HouseSceneCoordinator: NSObject {
                 let plane = SCNPlane(width: cellW * 0.95, height: cellD * 0.95)
                 let mat = SCNMaterial()
 
+                let nodeName: String
                 if row == 0 && col == 0 {
-                    mat.diffuse.contents = UIColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 0.18)
+                    mat.diffuse.contents = UIColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 0.20)
+                    nodeName = "【中宫太极】九运天心：运星 \(xkChart.period)"
                 } else {
                     let relX = Double(col)
                     let relZ = Double(row)
@@ -693,14 +784,33 @@ public final class HouseSceneCoordinator: NSObject {
                     let geoAngle = (angleDeg + survey.compassHeading).truncatingRemainder(dividingBy: 360.0)
                     let cellGua = HouseSpatialSurveyEngine.guaForAngle(geoAngle)
 
-                    if let item = bazhai.items.first(where: { $0.guaName == cellGua }) {
-                        if item.star.isAuspicious {
-                            mat.diffuse.contents = UIColor(red: 0.20, green: 0.85, blue: 0.45, alpha: 0.15)
+                    if mode == .baZhai {
+                        if let item = bazhai.items.first(where: { $0.guaName == cellGua }) {
+                            if item.star.isAuspicious {
+                                mat.diffuse.contents = UIColor(red: 0.20, green: 0.85, blue: 0.45, alpha: 0.16)
+                            } else {
+                                mat.diffuse.contents = UIColor(red: 0.85, green: 0.30, blue: 0.25, alpha: 0.15)
+                            }
+                            nodeName = "【八宅·\(cellGua)宫】\(item.direction)：【\(item.star.name)】(\(item.star.luckLevel.title))"
                         } else {
-                            mat.diffuse.contents = UIColor(red: 0.85, green: 0.30, blue: 0.25, alpha: 0.14)
+                            mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
+                            nodeName = "【\(cellGua)宫】"
                         }
                     } else {
-                        mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
+                        // 玄空飞星模式
+                        if let palace = xkChart.palaces.first(where: { $0.guaName == cellGua }) {
+                            if palace.facingStar == xkChart.period || palace.mountainStar == xkChart.period {
+                                mat.diffuse.contents = UIColor(red: 0.95, green: 0.80, blue: 0.25, alpha: 0.22) // 当旺向星/山星金色发光
+                            } else if palace.facingStar == 5 || palace.mountainStar == 5 {
+                                mat.diffuse.contents = UIColor(red: 0.88, green: 0.25, blue: 0.20, alpha: 0.20) // 五黄煞显红
+                            } else {
+                                mat.diffuse.contents = UIColor(red: 0.20, green: 0.65, blue: 0.90, alpha: 0.12)
+                            }
+                            nodeName = "【玄空九运·\(cellGua)宫】山星 \(palace.mountainStar) · 向星 \(palace.facingStar) · 运星 \(palace.periodStar)"
+                        } else {
+                            mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
+                            nodeName = "【玄空 \(cellGua)宫】"
+                        }
                     }
                 }
 
@@ -708,6 +818,7 @@ public final class HouseSceneCoordinator: NSObject {
                 let node = SCNNode(geometry: plane)
                 node.eulerAngles.x = -Float.pi / 2
                 node.position = SCNVector3(cellX, 0.012, cellZ)
+                node.name = nodeName
                 baguaGridNode.addChildNode(node)
             }
         }
@@ -725,6 +836,7 @@ public final class HouseSceneCoordinator: NSObject {
             sphereGeo.materials = [sphereMat]
             let sNode = SCNNode(geometry: sphereGeo)
             sNode.position = SCNVector3(pos.x, max(0.5, pos.y), pos.z)
+            sNode.name = "形煞【\(sha.title)】\(sha.locationName)：\(sha.detail)"
             shaAlertsNode.addChildNode(sNode)
 
             if let targetPos = sha.vectorEnd {
@@ -744,6 +856,7 @@ public final class HouseSceneCoordinator: NSObject {
                     let pitch = asin(-dir.y)
                     let yaw = atan2(dir.x, dir.z)
                     beamNode.eulerAngles = SCNVector3(pitch + Float.pi / 2, yaw, Float(0))
+                    beamNode.name = "冲煞对流轨迹：\(sha.title)"
                     shaAlertsNode.addChildNode(beamNode)
                 }
             }

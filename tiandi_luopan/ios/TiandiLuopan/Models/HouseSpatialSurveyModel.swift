@@ -840,6 +840,103 @@ public enum HouseSpatialSurveyEngine {
             }
         }
 
+        
+        // O. 三元九运玄空飞星理气体检 (形理兼备)
+        let facingMountainItem = Mountain24Data.shared.mountain(for: compassHeading)
+        let sittingMountainItem = Mountain24Data.shared.mountain(for: sittingAngle)
+        let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: sittingMountainItem, facing: facingMountainItem)
+        let curPeriod = xkChart.period
+
+        for palace in xkChart.palaces {
+            guard !palace.isCenter else { continue }
+            let pGua = palace.guaName
+
+            // 1. 五黄大煞 (5) 临门或临床
+            if palace.facingStar == 5 || palace.mountainStar == 5 {
+                for door in mainDoors {
+                    let dRelX = door.posX - cx
+                    let dRelZ = door.posZ - cz
+                    let dAngle = (atan2(Double(dRelX), Double(-dRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
+                    if guaForAngle(dAngle) == pGua {
+                        shaItems.append(HouseSpatialShaItem(
+                            title: "玄空理气煞 · 五黄到门",
+                            severity: .critical,
+                            locationName: "入户大门 · 逢【五黄大煞】",
+                            detail: String(format: "玄空飞星五黄廉贞大煞飞临大门%@宫 (山向 %d-%d)，门动则煞动，易招滞涩阻碍。", palace.palaceName, palace.mountainStar, palace.facingStar),
+                            fengshuiLore: "《玄空秘旨》云：'五黄为毒药，动则招灾'。五黄到门宜化不宜克。",
+                            solution: "玄关处悬挂纯铜六字真言风铃或安忍水，以六白金气泄化五黄土煞，忌铺红地毯。",
+                            coordinate: door.position
+                        ))
+                        score -= 15
+                        break
+                    }
+                }
+
+                for bed in beds {
+                    let bRelX = bed.posX - cx
+                    let bRelZ = bed.posZ - cz
+                    let bAngle = (atan2(Double(bRelX), Double(-bRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
+                    if guaForAngle(bAngle) == pGua {
+                        shaItems.append(HouseSpatialShaItem(
+                            title: "玄空理气煞 · 五黄加枕",
+                            severity: .critical,
+                            locationName: "卧床枕位 · 逢【五黄星】",
+                            detail: String(format: "卧床枕位位于玄空五黄大煞飞临之%@宫，久眠易感神疲力绌。", palace.palaceName),
+                            fengshuiLore: "《紫白诀》云：'五黄重叠，灾疾并临'。",
+                            solution: "床位微调避开五黄正对方位，床头柜放置天然纯铜葫芦化解土煞。",
+                            coordinate: bed.position
+                        ))
+                        score -= 12
+                        break
+                    }
+                }
+            }
+
+            // 2. 二黑病符星 (2) 临卧房
+            if palace.mountainStar == 2 || palace.facingStar == 2 {
+                for br in bedrooms {
+                    let brRelX = br.centerX - cx
+                    let brRelZ = br.centerZ - cz
+                    let brAngle = (atan2(Double(brRelX), Double(-brRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
+                    if guaForAngle(brAngle) == pGua {
+                        shaItems.append(HouseSpatialShaItem(
+                            title: "玄空理气煞 · 病符临卧",
+                            severity: .warning,
+                            locationName: "\(br.name) · 逢【二黑病符】",
+                            detail: String(format: "%@坐落于二黑巨门病符星飞临之%@宫 (山向 %d-%d)，久居易致脾胃失调。", br.name, palace.palaceName, palace.mountainStar, palace.facingStar),
+                            fengshuiLore: "《飞星赋》云：'二黑逢五，病生胸腹'。二黑主阴浊病符。",
+                            solution: "卧房悬挂天然开光晒干葫芦或六帝钱以金泄土，室内避免大红厚毯。",
+                            coordinate: br.center
+                        ))
+                        score -= 8
+                        break
+                    }
+                }
+            }
+
+            // 3. 当令旺星纳气 (9运向星飞临大门)
+            if palace.facingStar == curPeriod {
+                for door in mainDoors {
+                    let dRelX = door.posX - cx
+                    let dRelZ = door.posZ - cz
+                    let dAngle = (atan2(Double(dRelX), Double(-dRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
+                    if guaForAngle(dAngle) == pGua {
+                        shaItems.append(HouseSpatialShaItem(
+                            title: "玄空旺星纳气 (财路亨通)",
+                            severity: .auspicious,
+                            locationName: "入户大门 · 逢【当旺向星】",
+                            detail: String(format: "入户门迎当前%d运当旺向星飞临%@宫 (山向 %d-%d)，门迎旺气，大旺家业财帛。", curPeriod, palace.palaceName, palace.mountainStar, palace.facingStar),
+                            fengshuiLore: "《天玉经》云：'向首一星灾福柄，当旺乘时发万箱'。",
+                            solution: "门厅保持明堂整洁开阔，设暖白长明灯引气入宅，生旺气场。",
+                            coordinate: door.position
+                        ))
+                        score += 8
+                        break
+                    }
+                }
+            }
+        }
+
                 return HouseSpatialSurvey(
             scanMethod: scanMethod,
             dimensions: dimensions,

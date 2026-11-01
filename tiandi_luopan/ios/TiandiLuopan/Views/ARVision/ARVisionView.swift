@@ -445,6 +445,8 @@ public struct ARVisionView: View {
     @State private var showSpatialSurvey: Bool = false
     @State private var latestSnapshotImage: UIImage?
     @State private var showSnapshotShareSheet: Bool = false
+    @State private var shaRecords: [ExteriorShaRecord] = []
+    @State private var showPanoramaReport: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
     // check a frame captured just before leaving the tab could still be saved
@@ -471,6 +473,16 @@ public struct ARVisionView: View {
     
     private var targetMountain: Mountain24 {
         return Mountain24Data.shared.mountain(for: targetCalculatedHeading)
+    }
+
+    /// 目标仰角：相机光轴俯仰角 + 目标在画面中的纵向偏移角（俯为负、仰为正）。
+    /// 竖向 FOV 按横向 FOV 的 9/16 近似折算；手动拖框的垂直增量幅度小（约
+    /// ±1.5°），不并入，避免引入屏幕尺寸魔法常数。
+    private var targetElevationDegrees: Double {
+        let verticalFOVDeg = targetHorizontalFOV * 9.0 / 16.0
+        let yFraction = (Double(targetNormalizedPoint.y) - 0.5) * 2.0
+        let delta = atan(yFraction * tan(verticalFOVDeg * .pi / 360.0)) * 180.0 / .pi
+        return fusionModel.cameraElevationDegrees + delta
     }
 
     private var targetSanHeWater: SanHeWaterItem? {
@@ -669,6 +681,13 @@ public struct ARVisionView: View {
             if let snapshot = latestSnapshotImage {
                 ARProofShareSheet(items: [snapshot])
             }
+        }
+        .sheet(isPresented: $showPanoramaReport) {
+            ShaPanoramaReportSheet(
+                records: shaRecords,
+                heading: motion.headingState.facingAngle,
+                shaList: shaList
+            )
         }
         .fullScreenCover(isPresented: $showSpatialSurvey) {
             ARSpatialSurveyView()
@@ -1264,6 +1283,30 @@ public struct ARVisionView: View {
             .padding(8)
             .background(Color.black.opacity(0.75))
             .cornerRadius(8)
+
+            // 现场标注与全景报告入口
+            HStack(spacing: 8) {
+                Button(action: markCurrentSha) {
+                    Label("\(lang.t("ar_mark_sha")) (\(shaRecords.count))", systemImage: "mappin.and.ellipse")
+                        .font(.adaptive(size: 10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.yanCyan.opacity(0.25))
+                        .foregroundColor(Color.yanCyan)
+                        .cornerRadius(6)
+                }
+                Button(action: { showPanoramaReport = true }) {
+                    Label(lang.t("ar_panorama_report"), systemImage: "gauge")
+                        .font(.adaptive(size: 10, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundColor(.green)
+                        .cornerRadius(6)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 4)
         }
     }
 
@@ -1467,7 +1510,48 @@ public struct ARVisionView: View {
             }
             targetOffset = .zero
             manualTargetNormalizedOffset = 0.0
+            // AI 三帧共识即一次带置信度的方位标注，自动并入全景档案
+            let sample = CGPoint(
+                x: min(max(Double(targetNormalizedPoint.x), 0.02), 0.98),
+                y: min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
+            )
+            let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: sample) : nil
+            shaRecords.append(ExteriorShaRecord(
+                shaID: analysis.shaID,
+                bearingDegrees: targetCalculatedHeading,
+                elevationDegrees: targetElevationDegrees,
+                distanceMeters: dist,
+                confidence: analysis.confidence,
+                source: .ai,
+                note: "three-frame-temporal-consensus"
+            ))
         }
+    }
+
+    // MARK: - 外部形煞现场标注（结构化记录：类型/方位/仰角/距离，并入全景报告）
+
+    /// 当前锁定框在画面中的归一化采样点（并入 AI 目标点与手动水平拖动）
+    private var currentTargetSamplePoint: CGPoint {
+        let x = min(max(Double(targetNormalizedPoint.x) + manualTargetNormalizedOffset, 0.02), 0.98)
+        let y = min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
+        return CGPoint(x: x, y: y)
+    }
+
+    /// 把当前目标锁定框记入全景形煞档案（手动/AI 统一入口）
+    private func markCurrentSha() {
+        let sha = shaList[activeShaIndex]
+        let sample = currentTargetSamplePoint
+        let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: sample) : nil
+        let record = ExteriorShaRecord(
+            shaID: sha.id,
+            bearingDegrees: targetCalculatedHeading,
+            elevationDegrees: targetElevationDegrees,
+            distanceMeters: dist,
+            confidence: aiResult?.confidence,
+            source: aiResult == nil ? .manual : .ai,
+            note: aiResult == nil ? nil : "three-frame-temporal-consensus"
+        )
+        shaRecords.append(record)
     }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
@@ -2038,6 +2122,152 @@ public struct ShaRemedyDetailSheet: View {
                 .font(.adaptive(size: 11))
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(2)
+        }
+    }
+}
+
+// MARK: - 全景形煞分布报告 (八宫聚合 + 距离判级 + 仰角/距离明细)
+private struct ShaPanoramaReportSheet: View {
+    let records: [ExteriorShaRecord]
+    let heading: Double
+    let shaList: [ExteriorShaItem]
+    @ObservedObject var lang = LocalizationManager.shared
+    @Environment(\.dismiss) private var dismiss
+
+    private var grouped: [[ExteriorShaRecord]] {
+        ShaPanoramaReport(headingDegrees: heading, records: records).palacesByIndex
+    }
+
+    private func effectiveSeverity(for record: ExteriorShaRecord) -> ShaSeverity? {
+        guard let item = shaList.first(where: { $0.id == record.shaID }) else { return nil }
+        return ExteriorShaSeverityResolver.effectiveSeverity(
+            staticSeverity: item.severity,
+            distanceMeters: record.distanceMeters
+        )
+    }
+
+    private func shaName(for record: ExteriorShaRecord) -> String {
+        shaList.first(where: { $0.id == record.shaID })?.localizedName ?? record.shaID
+    }
+
+    private func palaceRange(_ index: Int) -> String {
+        String(format: "%d°–%d°", index * 45, (index + 1) * 45)
+    }
+
+    private func severityColor(for record: ExteriorShaRecord) -> Color {
+        guard let sev = effectiveSeverity(for: record) else { return .gray }
+        switch sev {
+        case .critical: return .red
+        case .warning: return .orange
+        case .minor: return .yellow
+        case .notice: return .green
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    // 顶部统计：标注数 / 覆盖宫位 / 极凶数
+                    HStack {
+                        VStack {
+                            Text("\(records.count)")
+                                .font(.system(size: 26, weight: .bold))
+                            Text(lang.t("ar_panorama_records"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        VStack {
+                            Text("\(grouped.filter { !$0.isEmpty }.count)/8")
+                                .font(.system(size: 26, weight: .bold))
+                            Text(lang.t("ar_panorama_palaces"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        VStack {
+                            Text("\(records.filter { effectiveSeverity(for: $0) == .critical }.count)")
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundColor(.red)
+                            Text(lang.t("ar_panorama_critical"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color.black.opacity(0.06))
+                    .cornerRadius(10)
+
+                    Text("\(lang.t("ar_panorama_heading")): \(String(format: "%.1f", heading))°")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+
+                    if records.isEmpty {
+                        Text(lang.t("ar_panorama_none"))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 24)
+                    } else {
+                        ForEach(0..<8, id: \.self) { idx in
+                            let palaceRecords = grouped[idx]
+                            if !palaceRecords.isEmpty {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Text(lang.t("ar_panorama_palace"))
+                                            .font(.caption.weight(.bold))
+                                        Text(palaceRange(idx))
+                                            .font(.caption.weight(.bold).monospaced())
+                                        Spacer()
+                                        Text("\(palaceRecords.count)")
+                                            .font(.caption.weight(.bold))
+                                    }
+                                    .foregroundColor(.brown)
+                                    ForEach(palaceRecords) { record in
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "mappin.circle.fill")
+                                                .foregroundColor(severityColor(for: record))
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(shaName(for: record))
+                                                    .font(.subheadline.weight(.semibold))
+                                                Text("\(String(format: "%.1f", record.bearingDegrees))° · \(lang.t("ar_panorama_elevation")) \(String(format: "%.0f", record.elevationDegrees))° · \(record.source == .ai ? lang.t("ar_panorama_ai") : lang.t("ar_panorama_manual"))")
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            Spacer()
+                                            if let d = record.distanceMeters {
+                                                Text(String(format: "%.1f m", d))
+                                                    .font(.caption.monospaced())
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            if let sev = effectiveSeverity(for: record) {
+                                                Text(sev.localizedTitle)
+                                                    .font(.caption2.weight(.bold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 3)
+                                                    .background(sev == .critical ? Color.red.opacity(0.15) : (sev == .warning ? Color.orange.opacity(0.15) : (sev == .minor ? Color.yellow.opacity(0.15) : Color.green.opacity(0.15))))
+                                                    .cornerRadius(6)
+                                            }
+                                        }
+                                        .padding(8)
+                                        .background(Color.black.opacity(0.04))
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle(lang.t("ar_panorama_title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(lang.t("ar_panorama_close")) { dismiss() }
+                }
+            }
         }
     }
 }

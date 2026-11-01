@@ -137,17 +137,19 @@ public struct FloorplanRoom: Identifiable, Codable {
     public var name: String
     public var type: FloorplanRoomType
     public var rect: CGRect // 相对比例 (0.0 .. 1.0)
+    public var polygonPoints: [CGPoint]? // 可选：识别出的真实房间轮廓（相对比例），nil 时退化为矩形
     public var palaceName: String // "西北乾宫", "东南巽宫", etc.
     public var inspectionTitle: String
     public var inspectionLevel: String // "吉", "平", "凶", "大凶"
     public var inspectionLore: String
     public var inspectionAdvice: String
     
-    public init(id: String = UUID().uuidString, name: String, type: FloorplanRoomType, rect: CGRect, palaceName: String = "", inspectionTitle: String = "", inspectionLevel: String = "平", inspectionLore: String = "", inspectionAdvice: String = "") {
+    public init(id: String = UUID().uuidString, name: String, type: FloorplanRoomType, rect: CGRect, polygonPoints: [CGPoint]? = nil, palaceName: String = "", inspectionTitle: String = "", inspectionLevel: String = "平", inspectionLore: String = "", inspectionAdvice: String = "") {
         self.id = id
         self.name = name
         self.type = type
         self.rect = rect
+        self.polygonPoints = polygonPoints
         self.palaceName = palaceName
         self.inspectionTitle = inspectionTitle
         self.inspectionLevel = inspectionLevel
@@ -342,6 +344,71 @@ public class FloorplanEngine {
         ]
     }
     
+    // MARK: - 多边形识别辅助（识别管线升级：真实轮廓优先，矩形退化）
+
+    /// 房间实际面积（优先多边形轮廓，退化回矩形）
+    public static func roomArea(_ room: FloorplanRoom) -> CGFloat {
+        if let pts = room.polygonPoints, pts.count >= 3 {
+            return GeometryUtils.polygonArea(pts)
+        }
+        return room.rect.width * room.rect.height
+    }
+
+    /// 房间几何质心（优先多边形质心，退化回矩形中心）
+    public static func roomCentroid(_ room: FloorplanRoom) -> CGPoint {
+        if let pts = room.polygonPoints, pts.count >= 3 {
+            let c = GeometryUtils.polygonCentroid(pts)
+            return CGPoint(x: max(0, min(1, c.x)), y: max(0, min(1, c.y)))
+        }
+        return CGPoint(x: room.rect.midX, y: room.rect.midY)
+    }
+
+    /// 全屋面积加权质心（立极中宫）：各房间真实面积 × 房间质心
+    public static func roomsCentroid(_ rooms: [FloorplanRoom]) -> CGPoint {
+        var totalArea: CGFloat = 0
+        var weightedX: CGFloat = 0
+        var weightedY: CGFloat = 0
+        for room in rooms where room.type != .missingCorner {
+            let area = roomArea(room)
+            guard area > 0 else { continue }
+            let c = roomCentroid(room)
+            totalArea += area
+            weightedX += c.x * area
+            weightedY += c.y * area
+        }
+        guard totalArea > 0 else { return CGPoint(x: 0.5, y: 0.5) }
+        return CGPoint(
+            x: max(0.05, min(0.95, weightedX / totalArea)),
+            y: max(0.05, min(0.95, weightedY / totalArea))
+        )
+    }
+
+    /// 规则式房间类型推断：依据相对面积与纵横比 + 已用类型，给出最可能类型
+    /// - Parameters:
+    ///   - areaRatio: 候选面积占画布面积比例 (0..1)
+    ///   - aspectRatio: 候选宽高比（>1 表示横向）
+    ///   - existing: 当前已确认房间（避免重复分配主卧/客厅等唯一类型）
+    public static func inferRoomType(areaRatio: CGFloat, aspectRatio: CGFloat, existing: [FloorplanRoom]) -> FloorplanRoomType? {
+        let used = Set(existing.map { $0.type })
+        // 细长区域（长走廊/阳台）优先判为阳台
+        if aspectRatio > 2.6 && !used.contains(.balcony) {
+            return .balcony
+        }
+        // 极小面积优先卫浴/书房
+        if areaRatio < 0.06 {
+            if !used.contains(.bathroom) { return .bathroom }
+            if !used.contains(.study) { return .study }
+        }
+        // 其余按常见户型主次分配第一个未占用类型
+        let candidateOrder: [FloorplanRoomType] = [
+            .livingRoom, .masterBedroom, .secondBedroom, .study, .kitchen, .bathroom, .balcony, .door
+        ]
+        for type in candidateOrder where !used.contains(type) {
+            return type
+        }
+        return nil
+    }
+
     // 根据户型重心立极点与罗盘朝向解算各房间八卦方位与全屋风水体检报告
     public func auditFloorplan(rooms: [FloorplanRoom], centroid: CGPoint, heading: Double) -> (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) {
         var updatedRooms: [FloorplanRoom] = []

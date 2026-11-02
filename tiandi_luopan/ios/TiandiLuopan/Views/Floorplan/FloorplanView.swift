@@ -16,10 +16,11 @@ private struct SavedFloorplanLayout: Codable {
     let compassRotation: Double
     let isSyncWithCompass: Bool
     let hasFloorplanAccess: Bool
-    /// A paid case grant is scoped to this saved layout. Older records did
-    /// not contain a grant ID; treating their boolean alone as access would
-    /// preserve the historical free RoomPlan/AR bypass.
+    /// A paid case grant is scoped to this saved layout. Older records may
+    /// contain only the pre-signature ID; those records are re-sealed once on
+    /// restore before they can continue to unlock the layout.
     let floorplanAccessGrantID: String?
+    let floorplanAccessGrantSignature: String?
 }
 
 /// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
@@ -55,6 +56,7 @@ public struct FloorplanView: View {
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
     @State private var floorplanAccessGrantID: String?
+    @State private var floorplanAccessGrantSignature: String?
     @State private var auditedRooms: [FloorplanRoom] = []
     @State private var auditReport: [FloorplanAuditItem] = []
     @State private var isDetectingRooms: Bool = false
@@ -227,7 +229,10 @@ public struct FloorplanView: View {
                 roomDetectionMessage = nil
                 roomDetectionGeneration &+= 1
                 isDetectingRooms = false
-                if !iap.hasUnlockedVIP {
+                // A paid case grant follows the active layout. Replacing the
+                // image therefore starts a new editable case without charging
+                // a second credit for the same active one-shot entitlement.
+                if !iap.hasUnlockedVIP && !didConsumeFloorplanCredit {
                     guard iap.consumeFloorplanCredit() else {
                         // UIImagePickerController updates the binding before
                         // this callback. Restore the previous plan when the
@@ -237,7 +242,9 @@ public struct FloorplanView: View {
                         return
                     }
                     didConsumeFloorplanCredit = true
-                    floorplanAccessGrantID = UUID().uuidString
+                    let grant = iap.issueFloorplanAccessGrant()
+                    floorplanAccessGrantID = grant.id
+                    floorplanAccessGrantSignature = grant.signature
                 }
                 if replacingExistingPlan {
                     // A new plan has a different coordinate system. Do not
@@ -368,17 +375,40 @@ public struct FloorplanView: View {
     ) {
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
         let resolvedHeading = compassHeading.map { normalizedHeading($0) } ?? CompassMotionManager.shared.headingState.facingAngle
+        let previousGrant: (Bool, String?, String?) = {
+            guard let data = UserDefaults.standard.data(forKey: savedLayoutKey),
+                  let previous = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data),
+                  previous.hasFloorplanAccess,
+                  let grantID = previous.floorplanAccessGrantID,
+                  !grantID.isEmpty else {
+                return (false, nil, nil)
+            }
+            if let grantSignature = previous.floorplanAccessGrantSignature {
+                let grant = FloorplanAccessGrant(id: grantID, signature: grantSignature)
+                guard StoreKitIAPManager.shared.validateFloorplanAccessGrant(grant) else {
+                    return (false, nil, nil)
+                }
+                return (true, grantID, grantSignature)
+            }
+            // One-time migration for layouts written before grants were
+            // signed. The old grant was already created only after a local
+            // credit debit; re-seal it immediately for subsequent writes.
+            let migrated = StoreKitIAPManager.shared.issueFloorplanAccessGrant()
+            return (true, migrated.id, migrated.signature)
+        }()
         let saved = SavedFloorplanLayout(
             rooms: sanitizedRooms,
             centroidX: Double(clampedUnit(Double(centroid.x), fallback: 0.5)),
             centroidY: Double(clampedUnit(Double(centroid.y), fallback: 0.5)),
             compassRotation: resolvedHeading,
             isSyncWithCompass: compassHeading == nil,
-            // RoomPlan/AR spatial capture is free measurement. Full floorplan
-            // diagnostics and export still require a VIP entitlement or a
-            // floorplan consumable, acquired by acquireFloorplanAccess().
-            hasFloorplanAccess: false,
-            floorplanAccessGrantID: nil
+            // RoomPlan/AR spatial capture is free measurement. If the user
+            // already paid for the active case, carry that one-case grant to
+            // the newly imported geometry instead of charging twice. A fresh
+            // install with no grant remains locked until acquireFloorplanAccess.
+            hasFloorplanAccess: previousGrant.0,
+            floorplanAccessGrantID: previousGrant.1,
+            floorplanAccessGrantSignature: previousGrant.2
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: savedLayoutKey)
@@ -435,13 +465,37 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
-        floorplanAccessGrantID = saved.floorplanAccessGrantID
-        didConsumeFloorplanCredit = saved.hasFloorplanAccess && saved.floorplanAccessGrantID != nil
+        if saved.hasFloorplanAccess, let grantID = saved.floorplanAccessGrantID {
+            if let grantSignature = saved.floorplanAccessGrantSignature,
+               iap.validateFloorplanAccessGrant(FloorplanAccessGrant(id: grantID, signature: grantSignature)) {
+                floorplanAccessGrantID = grantID
+                floorplanAccessGrantSignature = grantSignature
+                didConsumeFloorplanCredit = true
+            } else if saved.floorplanAccessGrantSignature == nil {
+                // Migrate one legacy unsigned grant and persist the signed
+                // replacement below. Invalid signed data remains locked.
+                let migrated = iap.issueFloorplanAccessGrant()
+                floorplanAccessGrantID = migrated.id
+                floorplanAccessGrantSignature = migrated.signature
+                didConsumeFloorplanCredit = true
+            } else {
+                floorplanAccessGrantID = nil
+                floorplanAccessGrantSignature = nil
+                didConsumeFloorplanCredit = false
+            }
+        } else {
+            floorplanAccessGrantID = nil
+            floorplanAccessGrantSignature = nil
+            didConsumeFloorplanCredit = false
+        }
 
         if let imageURL = Self.savedImageURL(),
            let image = UIImage(contentsOfFile: imageURL.path) {
             userFloorplanImage = image
         }
+        // Re-seal migrated grants and keep the restored layout in the current
+        // format for the next launch.
+        persistLayout()
     }
 
     /// Reads both archive slots and migrates the pre-split format where a VR
@@ -480,8 +534,11 @@ public struct FloorplanView: View {
             centroidY: Double(centroid.y),
             compassRotation: Self.normalizedHeading(compassRotation),
             isSyncWithCompass: isSyncWithCompass,
-            hasFloorplanAccess: didConsumeFloorplanCredit && floorplanAccessGrantID != nil,
-            floorplanAccessGrantID: floorplanAccessGrantID
+            hasFloorplanAccess: didConsumeFloorplanCredit
+                && floorplanAccessGrantID != nil
+                && floorplanAccessGrantSignature != nil,
+            floorplanAccessGrantID: floorplanAccessGrantID,
+            floorplanAccessGrantSignature: floorplanAccessGrantSignature
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: Self.savedLayoutKey)
@@ -593,7 +650,9 @@ public struct FloorplanView: View {
             return false
         }
         didConsumeFloorplanCredit = true
-        floorplanAccessGrantID = UUID().uuidString
+        let grant = iap.issueFloorplanAccessGrant()
+        floorplanAccessGrantID = grant.id
+        floorplanAccessGrantSignature = grant.signature
         persistLayout()
         return true
     }
@@ -632,7 +691,12 @@ public struct FloorplanView: View {
             
             // 导入真实户型图纸
             Button(action: {
-                if iap.hasUnlockedVIP || iap.floorplanCreditsCount > 0 {
+                // An already purchased case remains editable until the user
+                // starts a different case. Keep the picker available even
+                // after its single credit has been consumed so replacing the
+                // background does not incorrectly send the user back to the
+                // paywall.
+                if hasFloorplanAccess || iap.floorplanCreditsCount > 0 {
                     floorplanImageBeforePicker = userFloorplanImage
                     showImagePicker = true
                 } else {
@@ -1150,13 +1214,14 @@ public struct FloorplanView: View {
         selectedEditingRoomID = nil
         roomForTypeEditing = nil
         showEditingRoomDeleteConfirmation = false
-        didConsumeFloorplanCredit = false
-        floorplanAccessGrantID = nil
         persistedImageObjectID = nil
         if let imageURL = Self.savedImageURL(), FileManager.default.fileExists(atPath: imageURL.path) {
             try? FileManager.default.removeItem(at: imageURL)
         }
-        UserDefaults.standard.removeObject(forKey: Self.savedLayoutKey)
+        // Keep an already purchased one-case grant attached to the active
+        // layout. Resetting the editor must not silently consume the user's
+        // paid case; the next imported plan can reuse that active grant.
+        persistLayout()
         // A reset starts a new floorplan. Drop both measured and virtual
         // snapshots so the 3D buttons cannot reopen geometry from a previous
         // home after the visible canvas has been cleared.
@@ -2169,20 +2234,20 @@ public struct FloorplanView: View {
             let bodyWidth: CGFloat = 920
             func measuredRowHeight(_ item: FloorplanAuditItem) -> CGFloat {
                 let titleHeight = (item.title as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: [.font: titleFont],
                     context: nil
                 ).height
                 let loreHeight = (item.lore as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: [.font: bodyFont],
                     context: nil
                 ).height
                 let solution = "\(lang.t("floorplan_solution_prefix")) \(item.solution)"
                 let solutionHeight = (solution as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: .greatestFiniteMagnitude),
+                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: [.font: solutionFont],
                     context: nil

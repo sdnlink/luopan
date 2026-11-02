@@ -59,7 +59,7 @@ public struct VIPLockCardView: View {
                 Button(action: onUnlockTap) {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
-                        Text("\(LocalizationManager.shared.t("unlock_vip_now")) (\(iap.localizedPrice(for: targetProductId)))")
+                        Text("\(purchaseActionTitle) (\(iap.localizedPrice(for: targetProductId)))")
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
@@ -99,6 +99,15 @@ public struct VIPLockCardView: View {
         )
         .padding(.horizontal, 16)
     }
+
+    private var purchaseActionTitle: String {
+        switch targetProductId {
+        case .vipYearly, .proLifetime:
+            return LocalizationManager.shared.t("unlock_vip_now")
+        case .floorplanSingle, .tianjiSingle:
+            return LocalizationManager.shared.t("pay_securely")
+        }
+    }
 }
 
 // MARK: - 全功能专业版 VIP 收银台弹窗 (VIP Paywall Sheet)
@@ -128,28 +137,43 @@ public struct VIPPaywallSheet: View {
                     VStack(spacing: 16) {
                         // 1. 顶部尊贵皇冠 Banner
                         VStack(spacing: 6) {
-                            Image(systemName: "crown.fill")
+                            Image(systemName: selectedIsSingleProduct
+                                  ? (selectedIAPProduct == .floorplanSingle ? "house.fill" : "scroll.fill")
+                                  : "crown.fill")
                                 .font(.adaptive(size: 40))
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 .padding(.top, 12)
                             
-                            Text(LocalizationManager.shared.t("vip_sheet_title"))
+                            Text(selectedIsSingleProduct
+                                 ? selectedIAPProduct.title
+                                 : LocalizationManager.shared.t("vip_sheet_title"))
                                 .font(.adaptive(size: 18, weight: .bold))
                                 .foregroundColor(.white)
                             
-                            Text(LocalizationManager.shared.t("vip_sheet_subtitle"))
+                            Text(selectedIsSingleProduct
+                                 ? selectedIAPProduct.desc
+                                 : LocalizationManager.shared.t("vip_sheet_subtitle"))
                                 .font(.adaptive(size: 11))
                                 .foregroundColor(.white.opacity(0.65))
                         }
                         
-                        // 2. 核心特权清单
+                        // 2. 核心特权清单。单次商品只展示它实际解锁的
+                        // 一项服务，避免把一次导出误解成全量 VIP。
                         VStack(spacing: 8) {
-                            privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
-                            privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
-                            privilegeItem(icon: "drop.triangle.fill", title: LocalizationManager.shared.t("privilege_sanhe_title"), desc: LocalizationManager.shared.t("privilege_sanhe_desc"))
-                            privilegeItem(icon: "house.fill", title: LocalizationManager.shared.t("privilege_floorplan_title"), desc: LocalizationManager.shared.t("privilege_floorplan_desc"))
-                            privilegeItem(icon: "scroll.fill", title: LocalizationManager.shared.t("privilege_tianji_title"), desc: LocalizationManager.shared.t("privilege_tianji_desc"))
-                            privilegeItem(icon: "camera.viewfinder", title: LocalizationManager.shared.t("privilege_ar_title"), desc: LocalizationManager.shared.t("privilege_ar_desc"))
+                            if selectedIsSingleProduct {
+                                privilegeItem(
+                                    icon: selectedProductId == IAPProductID.floorplanSingle.rawValue ? "house.fill" : "scroll.fill",
+                                    title: selectedIAPProduct.title,
+                                    desc: selectedIAPProduct.desc
+                                )
+                            } else {
+                                privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
+                                privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
+                                privilegeItem(icon: "drop.triangle.fill", title: LocalizationManager.shared.t("privilege_sanhe_title"), desc: LocalizationManager.shared.t("privilege_sanhe_desc"))
+                                privilegeItem(icon: "house.fill", title: LocalizationManager.shared.t("privilege_floorplan_title"), desc: LocalizationManager.shared.t("privilege_floorplan_desc"))
+                                privilegeItem(icon: "scroll.fill", title: LocalizationManager.shared.t("privilege_tianji_title"), desc: LocalizationManager.shared.t("privilege_tianji_desc"))
+                                privilegeItem(icon: "camera.viewfinder", title: LocalizationManager.shared.t("privilege_ar_title"), desc: LocalizationManager.shared.t("privilege_ar_desc"))
+                            }
                         }
                         .padding(12)
                         .background(Color(red: 0.12, green: 0.12, blue: 0.15))
@@ -211,7 +235,7 @@ public struct VIPPaywallSheet: View {
                                             .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                             .padding(.trailing, 4)
                                     }
-                                    Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(LocalizationManager.shared.t("unlock_vip_now")) (\(getSelectedProductTitle()))")
+                                    Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(selectedIsSingleProduct ? LocalizationManager.shared.t("pay_securely") : LocalizationManager.shared.t("unlock_vip_now")) (\(getSelectedProductTitle()))")
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.7)
                                 }
@@ -338,6 +362,10 @@ public struct VIPPaywallSheet: View {
 
     private var selectedIAPProduct: IAPProductID {
         IAPProductID(rawValue: selectedProductId) ?? .vipYearly
+    }
+
+    private var selectedIsSingleProduct: Bool {
+        selectedIAPProduct == .floorplanSingle || selectedIAPProduct == .tianjiSingle
     }
     
     private func privilegeItem(icon: String, title: String, desc: String) -> some View {

@@ -1,7 +1,6 @@
 import SwiftUI
 import Photos
 import UIKit
-import Combine
 
 // MARK: - 福宅天机宣纸勘测长卷预览与导出视图 (TianJiShu View - PRD 第14章)
 
@@ -20,8 +19,6 @@ public struct TianJiShuView: View {
     @State private var showShareSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var isExporting: Bool = false
-    @State private var reservedTianjiCredit: String?
-    @State private var shareCompletionHandled = false
     // Invalidated whenever a new render starts or the view disappears, so a
     // late background result cannot overwrite current or dismissed state.
     @State private var renderGeneration: Int = 0
@@ -55,6 +52,18 @@ public struct TianJiShuView: View {
                                     .cornerRadius(8)
                                     .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 5)
                                 
+                                if !iap.canUseTianji {
+                                    VStack(spacing: 60) {
+                                        ForEach(0..<8, id: \.self) { _ in
+                                            Text(lang.t("tianji_vip_preview_watermark"))
+                                                .font(.adaptive(size: 22, weight: .bold, design: .serif))
+                                                .foregroundColor(Color.red.opacity(0.2))
+                                                .rotationEffect(.degrees(-25))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                    }
+                                    .allowsHitTesting(false)
+                                }
                             }
                             .padding(12)
                         }
@@ -78,31 +87,20 @@ public struct TianJiShuView: View {
                                         showPaywall = true
                                         return
                                     }
-                                    let reservation = iap.hasUnlockedVIP ? nil : iap.reserveTianjiCredit()
-                                    if !iap.hasUnlockedVIP && reservation == nil {
-                                        showPaywall = true
-                                        return
-                                    }
-                                    reservedTianjiCredit = reservation
                                     isExporting = true
                                     TianJiShuEngine.shared.saveToPhotoLibrary(image: img) { success, message in
-                                        DispatchQueue.main.async {
-                                            isExporting = false
-                                            if success {
-                                                // The credit was reserved before
-                                                // the asynchronous photo write.
-                                                commitReservedTianjiCredit()
-                                                withAnimation { showSavedToast = true }
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                                    withAnimation { showSavedToast = false }
-                                                }
-                                            } else {
-                                                releaseReservedTianjiCredit()
-                                                saveErrorMessage = message ?? lang.t("save_failed")
-                                                let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-                                                showPhotoSettings = status == .denied || status == .restricted
-                                                showSaveError = true
+                                        isExporting = false
+                                        if success {
+                                            _ = iap.consumeTianjiCredit()
+                                            withAnimation { showSavedToast = true }
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                                withAnimation { showSavedToast = false }
                                             }
+                                        } else {
+                                            saveErrorMessage = message ?? lang.t("save_failed")
+                                            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+                                            showPhotoSettings = status == .denied || status == .restricted
+                                            showSaveError = true
                                         }
                                     }
                                 }) {
@@ -136,13 +134,6 @@ public struct TianJiShuView: View {
                                         showPaywall = true
                                         return
                                     }
-                                    let reservation = iap.hasUnlockedVIP ? nil : iap.reserveTianjiCredit()
-                                    if !iap.hasUnlockedVIP && reservation == nil {
-                                        showPaywall = true
-                                        return
-                                    }
-                                    reservedTianjiCredit = reservation
-                                    shareCompletionHandled = false
                                     isExporting = true
                                     showShareSheet = true
                                 }) {
@@ -202,20 +193,10 @@ public struct TianJiShuView: View {
                 guard !isExporting else { return }
                 beginRendering()
             }
-            .onReceive(iap.$tianjiCreditsCount.dropFirst()) { _ in
-                guard !isExporting else { return }
-                beginRendering()
-            }
-            .onReceive(iap.$isVIPUser.dropFirst()) { _ in
-                guard !isExporting else { return }
-                beginRendering()
-            }
             .onDisappear {
                 // SwiftUI may dismiss the page while the worker is still
-                // rendering. Invalidate its completion. A pending credit
-                // reservation remains consumed if the process is interrupted;
-                // refunding it here could turn a successful background export
-                // into a free export.
+                // rendering. Invalidate its completion and release any
+                // export gate left by an interrupted presentation.
                 renderGeneration += 1
                 isExporting = false
             }
@@ -223,25 +204,12 @@ public struct TianJiShuView: View {
                 // completionWithItemsHandler is not guaranteed to run when a
                 // presentation is interrupted, so always clear the gate.
                 isExporting = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    if !shareCompletionHandled {
-                        releaseReservedTianjiCredit()
-                    }
-                    shareCompletionHandled = false
-                }
             }) {
                 if let img = scrollImage {
                     TianJiActivityViewController(activityItems: [img]) { completed in
-                        DispatchQueue.main.async {
-                            isExporting = false
-                            shareCompletionHandled = true
-                            if completed {
-                                // The credit was reserved before presenting
-                                // the share sheet and is already consumed.
-                                commitReservedTianjiCredit()
-                            } else {
-                                releaseReservedTianjiCredit()
-                            }
+                        isExporting = false
+                        if completed {
+                            _ = iap.consumeTianjiCredit()
                         }
                     }
                 }
@@ -277,18 +245,6 @@ public struct TianJiShuView: View {
         )
     }
 
-    private func releaseReservedTianjiCredit() {
-        guard let token = reservedTianjiCredit else { return }
-        reservedTianjiCredit = nil
-        iap.refundTianjiCreditReservation(token)
-    }
-
-    private func commitReservedTianjiCredit() {
-        guard let token = reservedTianjiCredit else { return }
-        reservedTianjiCredit = nil
-        iap.commitTianjiCreditReservation(token)
-    }
-
     private func beginRendering() {
                 renderGeneration += 1
                 let generation = renderGeneration
@@ -308,7 +264,6 @@ public struct TianJiShuView: View {
                 let panoramaArchive = ShaSurveyStore.shared.archive
                 let floorplanReport = FloorplanAuditStore.shared.latestReport
                 let reportDate = Date()
-                let hasExportEntitlement = iap.canUseTianji
                 isGenerating = true
                 DispatchQueue.global(qos: .userInitiated).async {
                     let img = TianJiShuEngine.shared.generateScrollImage(
@@ -316,7 +271,6 @@ public struct TianJiShuView: View {
                         coordsDesc: coordsDesc,
                         solarTimeDesc: solarTimeDesc,
                         language: language,
-                        isPro: hasExportEntitlement,
                         floorplanReport: floorplanReport,
                         panoramaArchive: panoramaArchive,
                         reportDate: reportDate

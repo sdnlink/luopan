@@ -271,7 +271,7 @@ def implement_iap():
             <!-- 核心商品选购网格 (StoreKit 四大商品) -->
             <div class="iap-products-grid">
                 <!-- 商品 1: 年度堪舆 VIP (推荐) -->
-                <div class="iap-prod-card selected" id="card-prod-yearly" onclick="selectIAPProduct('com.yanxiang.compass.vip.yearly')">
+                <div class="iap-prod-card selected" id="card-prod-yearly" onclick="selectIAPProduct('com.yanxiang.luopan.vip.yearly')">
                     <span class="iap-badge-corner">80% 首选</span>
                     <div>
                         <div class="iap-prod-name">👑 年度堪舆 VIP</div>
@@ -281,7 +281,7 @@ def implement_iap():
                 </div>
 
                 <!-- 商品 2: 大师终身专业版 -->
-                <div class="iap-prod-card" id="card-prod-lifetime" onclick="selectIAPProduct('com.yanxiang.compass.pro.lifetime')">
+                <div class="iap-prod-card" id="card-prod-lifetime" onclick="selectIAPProduct('com.yanxiang.luopan.pro.lifetime')">
                     <span class="iap-badge-corner gold">终身买断</span>
                     <div>
                         <div class="iap-prod-name">💎 大师终身版</div>
@@ -291,7 +291,7 @@ def implement_iap():
                 </div>
 
                 <!-- 商品 3: 户型空间立极单次测算 -->
-                <div class="iap-prod-card" id="card-prod-floorplan" onclick="selectIAPProduct('com.yanxiang.compass.floorplan.case')">
+                <div class="iap-prod-card" id="card-prod-floorplan" onclick="selectIAPProduct('com.yanxiang.luopan.floorplan.single')">
                     <div>
                         <div class="iap-prod-name">🏡 户型立极全案</div>
                         <div class="iap-prod-price">¥19.9 <small>/ 套</small></div>
@@ -300,7 +300,7 @@ def implement_iap():
                 </div>
 
                 <!-- 商品 4: 福宅天机宣纸长卷单次导出 -->
-                <div class="iap-prod-card" id="card-prod-tianji" onclick="selectIAPProduct('com.yanxiang.compass.tianji.single')">
+                <div class="iap-prod-card" id="card-prod-tianji" onclick="selectIAPProduct('com.yanxiang.luopan.tianji.single')">
                     <div>
                         <div class="iap-prod-name">📜 天机宣纸长卷</div>
                         <div class="iap-prod-price">¥9.9 <small>/ 次</small></div>
@@ -388,7 +388,7 @@ def implement_iap():
             floorplanCredits: 0,
             tianjiCredits: 0
         };
-        let selectedIAPProductId = 'com.yanxiang.compass.vip.yearly';
+        let selectedIAPProductId = 'com.yanxiang.luopan.vip.yearly';
         let pendingActionAfterPurchase = null;
 
         // 本地缓存加载
@@ -459,16 +459,16 @@ def implement_iap():
         function selectIAPProduct(pid) {
             selectedIAPProductId = pid;
             const cards = {
-                'com.yanxiang.compass.vip.yearly': 'card-prod-yearly',
-                'com.yanxiang.compass.pro.lifetime': 'card-prod-lifetime',
-                'com.yanxiang.compass.floorplan.case': 'card-prod-floorplan',
-                'com.yanxiang.compass.tianji.single': 'card-prod-tianji'
+                'com.yanxiang.luopan.vip.yearly': 'card-prod-yearly',
+                'com.yanxiang.luopan.pro.lifetime': 'card-prod-lifetime',
+                'com.yanxiang.luopan.floorplan.single': 'card-prod-floorplan',
+                'com.yanxiang.luopan.tianji.single': 'card-prod-tianji'
             };
             const prices = {
-                'com.yanxiang.compass.vip.yearly': '¥198',
-                'com.yanxiang.compass.pro.lifetime': '¥298',
-                'com.yanxiang.compass.floorplan.case': '¥19.9',
-                'com.yanxiang.compass.tianji.single': '¥9.9'
+                'com.yanxiang.luopan.vip.yearly': '¥198',
+                'com.yanxiang.luopan.pro.lifetime': '¥298',
+                'com.yanxiang.luopan.floorplan.single': '¥19.9',
+                'com.yanxiang.luopan.tianji.single': '¥9.9'
             };
             for (let k in cards) {
                 const el = document.getElementById(cards[k]);
@@ -526,14 +526,14 @@ def implement_iap():
 
         // Web 模拟购买成功 (开发调试便利)
         function simulateWebPurchaseSuccess(pid) {
-            if (pid === 'com.yanxiang.compass.pro.lifetime') {
+            if (pid === 'com.yanxiang.luopan.pro.lifetime') {
                 userIAPStatus.isLifetime = true;
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.vip.yearly') {
+            } else if (pid === 'com.yanxiang.luopan.vip.yearly') {
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.floorplan.case') {
+            } else if (pid === 'com.yanxiang.luopan.floorplan.single') {
                 userIAPStatus.floorplanCredits = (userIAPStatus.floorplanCredits || 0) + 1;
-            } else if (pid === 'com.yanxiang.compass.tianji.single') {
+            } else if (pid === 'com.yanxiang.luopan.tianji.single') {
                 userIAPStatus.tianjiCredits = (userIAPStatus.tianjiCredits || 0) + 1;
             }
             try {
@@ -572,14 +572,14 @@ def implement_iap():
                 btn.style.opacity = '1';
                 btn.innerHTML = '<span> 立即通过 Apple 安全支付</span> <span id="iap-btn-price">¥198</span>';
             }
-            if (pid === 'com.yanxiang.compass.pro.lifetime') {
+            if (pid === 'com.yanxiang.luopan.pro.lifetime') {
                 userIAPStatus.isLifetime = true;
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.vip.yearly') {
+            } else if (pid === 'com.yanxiang.luopan.vip.yearly') {
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.floorplan.case') {
+            } else if (pid === 'com.yanxiang.luopan.floorplan.single') {
                 userIAPStatus.floorplanCredits = (userIAPStatus.floorplanCredits || 0) + 1;
-            } else if (pid === 'com.yanxiang.compass.tianji.single') {
+            } else if (pid === 'com.yanxiang.luopan.tianji.single') {
                 userIAPStatus.tianjiCredits = (userIAPStatus.tianjiCredits || 0) + 1;
             }
             try {
@@ -652,7 +652,7 @@ def implement_iap():
             // 付费门槛检测：若非 VIP 且无单次导出额度，弹出 Apple 付费墙
             if (!userIAPStatus.isVIP && (!userIAPStatus.tianjiCredits || userIAPStatus.tianjiCredits <= 0)) {
                 pendingActionAfterPurchase = function() { generateTianJiShu(); };
-                openIAPModal('com.yanxiang.compass.tianji.single');
+                openIAPModal('com.yanxiang.luopan.tianji.single');
                 return;
             }
             // 若使用单次额度，扣减 1 点

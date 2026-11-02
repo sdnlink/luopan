@@ -39,7 +39,7 @@
 | 户型立极 | `FloorplanEngine.swift`、`FloorplanView.swift` | 图片/示例户型、房间编辑、面积质心、八宫分配、房间审计、缺角检查 | 房间与缺角有 lore/solution，正常房间也保留审计结果 | 缺角现查 3×3 外圈 8 区；审计主要使用矩形中心，真实多边形支持未贯穿 | 当前审计写入长卷；独立户型图按完整报告动态扩展 |
 | AR 形煞 | `ARVisionView.swift`、`OnDeviceShaAnalyzer.swift`、`ExteriorShaEngine.swift`、`ShaSurveyModels.swift` | Vision 矩形/轮廓几何候选、三帧共识、LiDAR 距离、手动/AI 标注、八宫聚合、化解页 | 八大静态形煞有通用 remedy；现场记录有距离/置信度/严重度并落盘 | 不是训练好的建筑语义模型；置信度是规则分数；八宫按报告基准朝向分组 | 当前现场记录进入长卷；无现场记录时才显示通用知识库 |
 | 空间测绘 | `ARSpatialSurveyView.swift`、`ARRoomPlanCaptureView.swift`、`HouseSpatialSurveyModel.swift`、`House3DSpaceViewer.swift`、`VRSpatialSurveyView.swift` | ARKit/LiDAR/RoomPlan/VR 仿真，墙门窗家具、测距、九宫、空间形煞、JSON/ARWorldMap/DXF/USDZ；户型页另有“当前户型3D”推演入口 | 每个 `shaItem` 有 detail/lore/solution，3D 查看器显示来源、实测构件和 VR 房间隔墙 | 规则和阈值是启发式；VR 依赖用户输入的比例尺寸，不能当现场实测；部分动态文案仍有中文硬编码 | 最近一次 `HouseSpatialSurvey`（AR/RoomPlan/VR，按 `scanMethod` 区分）的统计、评分和条目进入长卷 |
-| 长卷导出 | `TianJiShuEngine.swift`、`TianJiShuView.swift` | 宣纸长图、预览、相册保存、系统分享、成功后扣天机额度 | 当前接入模块输出完整数组并动态测量文本；渲染器按权益快照嵌入预览水印，导出开始时用令牌预留额度 | 仍为单张长图而非分页 PDF；本地额度在卸载/换机后不会由 Apple 恢复；真机内存/图像限制未实测 | 包含当前罗盘摘要、玄空/奇门/八宅/三合/紫白/择日、户型、AR 和室内测绘结果 |
+| 长卷导出 | `TianJiShuEngine.swift`、`TianJiShuView.swift` | 宣纸长图、预览、相册保存、系统分享、成功后扣天机额度 | 当前接入模块输出完整数组并动态测量文本 | 仍为单张长图而非分页 PDF；`isPro` 参数保留兼容但由视图门控；真机内存/图像限制未实测 | 包含当前罗盘摘要、玄空/奇门/八宅/三合/紫白/择日、户型、AR 和室内测绘结果 |
 | 权益与本地化 | `StoreKitIAPManager.swift`、`VIPPaywallSheet.swift`、`LocalizationManager.swift` | StoreKit 2 交易/权益、会员和消耗额度、本地化字典 | 付费入口有门控；8 种语言字典无重复/缺失 | 消耗型余额仍只在本地记账，生产环境需服务端交易账本 | 不属于长卷内容，但决定导出是否可用 |
 
 ## 按严重程度的问题
@@ -54,11 +54,6 @@
 - `ZeRiEngine` 已把坐山冲克放入 `sittingClashWarning`，但真正年/月/日三煞方和完整择日神煞仍未实现；`isAuspicious` 只能表示当前轻量检查器没有发现已编码警告。
 - WMM、节气边界、真太阳时和各传统流派参数需要固定样例、真机传感器和领域规则回归，当前容器不能替代这些验证。
 
-### P1：StoreKit 沙盒和服务端账本仍需发布验证
-
-- 原生管理器现在兼容 `com.yanxiang.luopan.*` 历史商品 ID，用户主动恢复先执行 `AppStore.sync()`；同一已验证交易的额度与交易 ID 在带 HMAC 的本地镜像中幂等记录，重复回调会完成交易。
-- 消费型额度仍不能依靠 Apple 恢复，且本地镜像不具备跨设备同步能力；正式发布应接入服务端交易 ID 账本，并在真机沙盒验证购买、退款、Ask to Buy、恢复和进程中断。
-
 ### P1：长卷是单张长图，仍有工程边界
 
 - 当前长卷接收一次性冻结的户型审计和 `ShaSurveyStore` 档案，输出玄空/奇门九宫、三合全量、紫白九宫、八宅八宫、择日宜忌、AR 外部记录和室内 `HouseSpatialSurvey` 条目。
@@ -68,8 +63,7 @@
 ### P2：本地化、数据账本和产品边界
 
 - `ARSpatialSurveyView`、`HouseSpatialSurveyModel` 和部分 AR 形煞页面仍有动态中文硬编码，非中文页面可能混入中文结果。
-- 消耗型余额仍只在本地镜像记账；`Transaction.currentEntitlements` 不会恢复已完成消耗型交易，卸载/换机可能丢失未用额度。当前客户端已将已验证交易 ID 与额度写入带 HMAC 的幂等镜像，但生产环境仍应增加服务端交易 ID 账本。
-- RoomPlan/AR 空间测绘是免费入口，导入结果不再自动写入户型全案授权；普通户型图或房间详勘仍需 VIP 或户型单次额度。旧布局只有布尔授权而没有付费授权标识时会按未授权迁移，防止历史免费导入继续绕过收费。
+- 消耗型余额仍只在本地镜像记账；`Transaction.currentEntitlements` 不会恢复已完成消耗型交易，生产环境应增加服务端交易 ID 幂等账本。
 - 传统堪舆结果属于文化/娱乐参考，不能作为医疗、法律、建筑安全或投资结论；导出免责声明仍需保留。
 - `check_localization_keys.py` 报告 8 种语言各 469 个 key，重复/缺失均为 0，13 个未使用 key 属于清理项。
 

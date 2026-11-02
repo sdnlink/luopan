@@ -31,9 +31,22 @@ public struct ReceiptValidationResult {
     }
 }
 
+/// A signed, device-bound grant for the currently active one-shot floorplan
+/// case. The grant is an integrity check for the local layout cache; production
+/// ownership and cross-device synchronization still belong to a server ledger.
+public struct FloorplanAccessGrant: Codable, Equatable {
+    public let id: String
+    public let signature: String
+
+    public init(id: String, signature: String) {
+        self.id = id
+        self.signature = signature
+    }
+}
+
 // MARK: - IAP 商品与权益定义
 
-public enum IAPProductID: String, CaseIterable {
+public enum IAPProductID: String, CaseIterable, Equatable {
     case vipYearly = "com.yanxiang.compass.vip.yearly"           // 演象·年度堪舆会员 198元/年
     case proLifetime = "com.yanxiang.compass.pro.lifetime"       // 演象·大师终身版 298元 一次性买断
     case floorplanSingle = "com.yanxiang.compass.floorplan.case"   // 户型空间立极·单套全案 19.9元
@@ -121,6 +134,12 @@ public class StoreKitIAPManager: ObservableObject {
 
     // MARK: - 权益镜像模型
 
+    private struct ConsumableGrant: Codable {
+        var productID: String
+        var consumed: Bool
+        var revoked: Bool
+    }
+
     /// 本地权益镜像：唯一被 UI 读取的本地数据，只由权威验证覆写。
     /// - 验证段（isLifetime / vipExpireDate / purchasedProductIDs）：由
     ///   `Transaction.currentEntitlements` 全量覆写，权威验证完成即覆盖，
@@ -137,6 +156,9 @@ public class StoreKitIAPManager: ObservableObject {
         var floorplanCredits: Int
         var tianjiCredits: Int
         var purchasedProductIDs: [String]
+        /// Maps each newly minted consumable credit to its transaction. This
+        /// lets a later Apple revocation remove an unused credit locally.
+        var consumableGrants: [String: ConsumableGrant]
         /// Durable idempotency ledger for verified transactions. Keeping this
         /// in the sealed mirror makes credit minting and transaction claiming
         /// one persisted state transition.
@@ -145,6 +167,7 @@ public class StoreKitIAPManager: ObservableObject {
         private enum CodingKeys: String, CodingKey {
             case verifiedAt, isAuthoritative, isLifetime, vipExpireDate
             case floorplanCredits, tianjiCredits, purchasedProductIDs
+            case consumableGrants
             case processedTransactionIDs
         }
 
@@ -155,6 +178,7 @@ public class StoreKitIAPManager: ObservableObject {
              floorplanCredits: Int,
              tianjiCredits: Int,
              purchasedProductIDs: [String],
+             consumableGrants: [String: ConsumableGrant] = [:],
              processedTransactionIDs: [String] = []) {
             self.verifiedAt = verifiedAt
             self.isAuthoritative = isAuthoritative
@@ -163,6 +187,7 @@ public class StoreKitIAPManager: ObservableObject {
             self.floorplanCredits = floorplanCredits
             self.tianjiCredits = tianjiCredits
             self.purchasedProductIDs = purchasedProductIDs
+            self.consumableGrants = consumableGrants
             self.processedTransactionIDs = processedTransactionIDs
         }
 
@@ -175,6 +200,7 @@ public class StoreKitIAPManager: ObservableObject {
             floorplanCredits = try container.decode(Int.self, forKey: .floorplanCredits)
             tianjiCredits = try container.decode(Int.self, forKey: .tianjiCredits)
             purchasedProductIDs = try container.decode([String].self, forKey: .purchasedProductIDs)
+            consumableGrants = try container.decodeIfPresent([String: ConsumableGrant].self, forKey: .consumableGrants) ?? [:]
             // Mirrors written before the idempotency ledger was introduced
             // decode as an empty ledger and are migrated from the legacy key
             // when the next verified transaction is handled.
@@ -190,6 +216,7 @@ public class StoreKitIAPManager: ObservableObject {
             try container.encode(floorplanCredits, forKey: .floorplanCredits)
             try container.encode(tianjiCredits, forKey: .tianjiCredits)
             try container.encode(purchasedProductIDs, forKey: .purchasedProductIDs)
+            try container.encode(consumableGrants, forKey: .consumableGrants)
             try container.encode(processedTransactionIDs, forKey: .processedTransactionIDs)
         }
     }
@@ -210,7 +237,13 @@ public class StoreKitIAPManager: ObservableObject {
     private var lastProductsFetchDate: Date?
     private let productsRetryInterval: TimeInterval = 30
     private let entitlementLock = NSLock()
-    private var activeTianjiReservations: Set<String> = []
+    /// In-flight exports reserve a slot in memory and only debit the durable
+    /// balance after the deliverable succeeds.  A process termination therefore
+    /// cannot permanently destroy a paid credit.  Stale reservations are
+    /// released after a short timeout so an interrupted share sheet cannot
+    /// block the next export forever.
+    private var activeTianjiReservations: [String: Date] = [:]
+    private let tianjiReservationTimeout: TimeInterval = 300
     private var transactionListener: Task<Void, Never>?
     private var verificationTask: Task<Void, Never>?
     /// 内存镜像（主线程读写），避免 SwiftUI 每帧 JSON 解码 + HMAC
@@ -272,6 +305,7 @@ public class StoreKitIAPManager: ObservableObject {
                           floorplanCredits: 0,
                           tianjiCredits: 0,
                           purchasedProductIDs: [],
+                          consumableGrants: [:],
                           processedTransactionIDs: [])
     }
 
@@ -298,11 +332,13 @@ public class StoreKitIAPManager: ObservableObject {
               let mirror = try? JSONDecoder().decode(EntitlementMirror.self, from: data) else {
             return nil
         }
-        // Mirrors written before the transaction ledger was added used the
-        // original v2 payload. Accept that seal once and re-seal on the next
+        // Mirrors written before per-transaction consumable grants were added
+        // used the v2 payload. Accept that seal once and re-seal on the next
         // entitlement/transaction write so upgrades do not discard a valid
         // local cache.
-        guard computeMirrorSeal(mirror) == seal || computeLegacyMirrorSeal(mirror) == seal else {
+        guard computeMirrorSeal(mirror) == seal
+                || computePreConsumableGrantSeal(mirror) == seal
+                || computeLegacyMirrorSeal(mirror) == seal else {
             return nil
         }
         return mirror
@@ -325,6 +361,17 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     private func computeMirrorSeal(_ mirror: EntitlementMirror) -> String {
+        let payload = "v3|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))|\(consumableGrantSealPayload(mirror.consumableGrants))"
+        let key = deviceSealSymmetricKey()
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Seal format used by the immediately preceding mirror version, which
+    /// already included processed transaction IDs but did not track grant
+    /// ownership. It remains readable so an upgrade does not discard a valid
+    /// local balance.
+    private func computePreConsumableGrantSeal(_ mirror: EntitlementMirror) -> String {
         let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))"
         let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
@@ -336,6 +383,13 @@ public class StoreKitIAPManager: ObservableObject {
         let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func consumableGrantSealPayload(_ grants: [String: ConsumableGrant]) -> String {
+        grants.keys.sorted().compactMap { transactionID in
+            guard let grant = grants[transactionID] else { return nil }
+            return "\(transactionID):\(grant.productID):\(grant.consumed ? 1 : 0):\(grant.revoked ? 1 : 0)"
+        }.joined(separator: ",")
     }
 
     /// 一次性迁移 v1 本地标志（仅当镜像不存在时执行）。
@@ -389,8 +443,16 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     public var canUseTianji: Bool {
-        guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
-        return hasUnlockedVIP || mirror.tianjiCredits > 0
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
+        pruneExpiredTianjiReservationsLocked()
+        if mirror.isLifetime || mirror.vipExpireDate > Date().timeIntervalSince1970 {
+            return true
+        }
+        // Credits are not debited while an export is in flight.  Exclude the
+        // reserved slots here so a second page cannot spend the same credit.
+        return mirror.tianjiCredits > activeTianjiReservations.count
     }
 
     public func isVIP() -> Bool {
@@ -428,7 +490,88 @@ public class StoreKitIAPManager: ObservableObject {
         return mirror.vipExpireDate > Date().timeIntervalSince1970
     }
 
+    /// Mark the oldest unused grant for a successful one-shot operation. The
+    /// aggregate balance remains the source used by the UI, while this small
+    /// per-transaction ledger makes later refund/revocation handling precise.
+    private func markConsumableGrantConsumedLocked(
+        kind: IAPProductKind,
+        mirror: inout EntitlementMirror
+    ) {
+        for transactionID in mirror.consumableGrants.keys.sorted() {
+            guard var grant = mirror.consumableGrants[transactionID],
+                  !grant.consumed,
+                  !grant.revoked,
+                  let grantKind = productKind(for: grant.productID) else { continue }
+            let matches: Bool
+            switch (kind, grantKind) {
+            case (.floorplanSingle, .floorplanSingle), (.tianjiSingle, .tianjiSingle):
+                matches = true
+            default:
+                matches = false
+            }
+            guard matches else { continue }
+            grant.consumed = true
+            mirror.consumableGrants[transactionID] = grant
+            return
+        }
+    }
+
+    /// Revoke an unused local consumable credit when StoreKit reports a
+    /// refund. A credit already spent cannot be reconstructed locally; the
+    /// server ledger remains required for cross-device and post-consumption
+    /// refund policy.
+    private func revokeConsumableGrant(productID: String, transactionID: String) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        // A revocation can be delivered immediately after the purchase and
+        // before the first entitlement snapshot marks the mirror
+        // authoritative.  The transaction itself is already StoreKit
+        // verified, so revoke a matching grant regardless of that snapshot
+        // flag; otherwise the credit could survive until a later sync.
+        guard var mirror = currentMirrorLocked(),
+              var grant = mirror.consumableGrants[transactionID],
+              !grant.revoked else { return }
+        grant.revoked = true
+        mirror.consumableGrants[transactionID] = grant
+        if !grant.consumed, let kind = productKind(for: productID) {
+            switch kind {
+            case .floorplanSingle:
+                mirror.floorplanCredits = max(0, mirror.floorplanCredits - 1)
+            case .tianjiSingle:
+                mirror.tianjiCredits = max(0, mirror.tianjiCredits - 1)
+            case .vipYearly, .proLifetime:
+                break
+            }
+        }
+        updateMirrorLocked(mirror)
+        let floorplan = mirror.floorplanCredits
+        let tianji = mirror.tianjiCredits
+        DispatchQueue.main.async { [weak self] in
+            self?.floorplanCreditsCount = floorplan
+            self?.tianjiCreditsCount = tianji
+        }
+    }
+
     // MARK: - 消费型商品记账（仅苹果已验证交易背书下增减）
+
+    /// Issue a device-bound grant after a verified floorplan credit is
+    /// consumed. Saved layouts store this grant instead of trusting a mutable
+    /// boolean in UserDefaults.
+    public func issueFloorplanAccessGrant() -> FloorplanAccessGrant {
+        let id = UUID().uuidString
+        return FloorplanAccessGrant(id: id, signature: floorplanGrantSignature(for: id))
+    }
+
+    public func validateFloorplanAccessGrant(_ grant: FloorplanAccessGrant) -> Bool {
+        guard !grant.id.isEmpty, !grant.signature.isEmpty else { return false }
+        return floorplanGrantSignature(for: grant.id) == grant.signature
+    }
+
+    private func floorplanGrantSignature(for id: String) -> String {
+        let payload = Data("floorplan-grant-v1|\(id)".utf8)
+        let mac = HMAC<SHA256>.authenticationCode(for: payload, using: deviceSealSymmetricKey())
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
 
     public func consumeFloorplanCredit() -> Bool {
         entitlementLock.lock()
@@ -438,6 +581,7 @@ public class StoreKitIAPManager: ObservableObject {
         guard mirror.floorplanCredits > 0 else { return false }
         var updated = mirror
         updated.floorplanCredits -= 1
+        markConsumableGrantConsumedLocked(kind: .floorplanSingle, mirror: &updated)
         updateMirrorLocked(updated)
         let remain = updated.floorplanCredits
         DispatchQueue.main.async { [weak self] in self?.floorplanCreditsCount = remain }
@@ -449,51 +593,67 @@ public class StoreKitIAPManager: ObservableObject {
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if isVIPUnlocked() { return true }
-        guard mirror.tianjiCredits > 0 else { return false }
+        pruneExpiredTianjiReservationsLocked()
+        guard mirror.tianjiCredits > activeTianjiReservations.count else { return false }
         var updated = mirror
         updated.tianjiCredits -= 1
+        markConsumableGrantConsumedLocked(kind: .tianjiSingle, mirror: &updated)
         updateMirrorLocked(updated)
         let remain = updated.tianjiCredits
         DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
         return true
     }
 
-    /// Reserve one export credit before an asynchronous save/share operation.
-    /// The token makes commit/refund idempotent across both completion and
-    /// sheet-dismiss callbacks.
+    /// Reserve one export slot before an asynchronous save/share operation.
+    /// The durable credit is debited only after the deliverable succeeds;
+    /// process termination therefore leaves the paid credit available. The
+    /// token makes commit/refund idempotent across completion callbacks.
     public func reserveTianjiCredit() -> String? {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard var mirror = currentMirrorLocked(), mirror.isAuthoritative else { return nil }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return nil }
         if isVIPUnlocked() { return nil }
-        guard mirror.tianjiCredits > 0 else { return nil }
-        mirror.tianjiCredits -= 1
+        pruneExpiredTianjiReservationsLocked()
+        guard mirror.tianjiCredits > activeTianjiReservations.count else { return nil }
         let token = UUID().uuidString
-        activeTianjiReservations.insert(token)
-        updateMirrorLocked(mirror)
-        let remain = mirror.tianjiCredits
-        DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
+        activeTianjiReservations[token] = Date()
         return token
     }
 
-    /// Commit a reservation after the deliverable was produced.
+    /// Commit a reservation after the deliverable was produced. This is the
+    /// only path that debits the durable balance for an export.
     public func commitTianjiCreditReservation(_ token: String) {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        activeTianjiReservations.remove(token)
-    }
-
-    /// Return a reservation when the export/share operation failed or was
-    /// cancelled. Repeated calls for the same token are harmless.
-    public func refundTianjiCreditReservation(_ token: String) {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        guard activeTianjiReservations.remove(token) != nil,
-              var mirror = currentMirrorLocked(), mirror.isAuthoritative else { return }
-        mirror.tianjiCredits += 1
+        pruneExpiredTianjiReservationsLocked()
+        // Consume the in-flight slot even when a concurrent refund or
+        // entitlement refresh removed the underlying credit.  Leaving the
+        // token in the reservation table would make every later export look
+        // busy until the five-minute timeout.
+        guard activeTianjiReservations.removeValue(forKey: token) != nil else { return }
+        guard var mirror = currentMirrorLocked(), mirror.isAuthoritative,
+              mirror.tianjiCredits > 0 else { return }
+        mirror.tianjiCredits -= 1
+        markConsumableGrantConsumedLocked(kind: .tianjiSingle, mirror: &mirror)
         updateMirrorLocked(mirror)
         let remain = mirror.tianjiCredits
         DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
+    }
+
+    /// Return a reservation when the export/share operation failed or was
+    /// cancelled. Since reservation does not debit the balance, this only
+    /// releases the in-flight slot. Repeated calls are harmless.
+    public func refundTianjiCreditReservation(_ token: String) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        activeTianjiReservations.removeValue(forKey: token)
+    }
+
+    /// Release interrupted export slots. The manager calls this while checking
+    /// availability, so an interrupted share sheet cannot block future use.
+    private func pruneExpiredTianjiReservationsLocked() {
+        let cutoff = Date().addingTimeInterval(-tianjiReservationTimeout)
+        activeTianjiReservations = activeTianjiReservations.filter { $0.value > cutoff }
     }
 
     /// Atomically claim a verified transaction and, for consumables, mint its
@@ -516,8 +676,18 @@ public class StoreKitIAPManager: ObservableObject {
         switch kind {
         case .floorplanSingle:
             mirror.floorplanCredits += 1
+            mirror.consumableGrants[transactionID] = ConsumableGrant(
+                productID: productID,
+                consumed: false,
+                revoked: false
+            )
         case .tianjiSingle:
             mirror.tianjiCredits += 1
+            mirror.consumableGrants[transactionID] = ConsumableGrant(
+                productID: productID,
+                consumed: false,
+                revoked: false
+            )
         case .vipYearly, .proLifetime:
             break
         }
@@ -530,6 +700,18 @@ public class StoreKitIAPManager: ObservableObject {
 
     private func isSupportedProductID(_ productID: String) -> Bool {
         productKind(for: productID) != nil
+    }
+
+    private func hasExpectedProductType(_ product: Product) -> Bool {
+        guard let kind = productKind(for: product.id) else { return false }
+        switch kind {
+        case .vipYearly:
+            return product.type == .autoRenewable
+        case .proLifetime:
+            return product.type == .nonConsumable
+        case .floorplanSingle, .tianjiSingle:
+            return product.type == .consumable
+        }
     }
 
     // MARK: - 商品信息请求 (StoreKit 2)
@@ -549,6 +731,10 @@ public class StoreKitIAPManager: ObservableObject {
                     self.isLoadingProducts = false
                     self.availableProducts.removeAll()
                     for product in storeProducts {
+                        guard self.hasExpectedProductType(product) else {
+                            print("StoreKit product type mismatch: \(product.id) (\(product.type))")
+                            continue
+                        }
                         self.availableProducts[product.id] = product
                     }
                     self.productsRevision &+= 1
@@ -779,6 +965,14 @@ public class StoreKitIAPManager: ObservableObject {
         // 退款/撤销：立即权威对账。currentEntitlements 已不含该交易，
         // 验证覆写镜像即收回权益（订阅失效同理由到期逻辑处理）。
         if transaction.revocationDate != nil {
+            if let kind = productKind(for: pid) {
+                switch kind {
+                case .floorplanSingle, .tianjiSingle:
+                    revokeConsumableGrant(productID: pid, transactionID: String(transaction.id))
+                case .vipYearly, .proLifetime:
+                    break
+                }
+            }
             await transaction.finish()
             await verifyEntitlementsAsync()
             return

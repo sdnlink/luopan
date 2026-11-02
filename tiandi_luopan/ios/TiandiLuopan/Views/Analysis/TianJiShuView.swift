@@ -21,7 +21,7 @@ public struct TianJiShuView: View {
     @State private var showPaywall: Bool = false
     @State private var isExporting: Bool = false
     @State private var reservedTianjiCredit: String?
-    @State private var shareCompletionHandled = false
+    @State private var exportImage: UIImage?
     // Invalidated whenever a new render starts or the view disappears, so a
     // late background result cannot overwrite current or dismissed state.
     @State private var renderGeneration: Int = 0
@@ -85,23 +85,32 @@ public struct TianJiShuView: View {
                                     }
                                     reservedTianjiCredit = reservation
                                     isExporting = true
-                                    TianJiShuEngine.shared.saveToPhotoLibrary(image: img) { success, message in
-                                        DispatchQueue.main.async {
+                                    prepareExportImage { exportImage in
+                                        guard let exportImage = exportImage else {
                                             isExporting = false
-                                            if success {
-                                                // The credit was reserved before
-                                                // the asynchronous photo write.
-                                                commitReservedTianjiCredit()
-                                                withAnimation { showSavedToast = true }
-                                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                                    withAnimation { showSavedToast = false }
+                                            releaseReservedTianjiCredit()
+                                            saveErrorMessage = lang.t("save_failed")
+                                            showSaveError = true
+                                            return
+                                        }
+                                        TianJiShuEngine.shared.saveToPhotoLibrary(image: exportImage) { success, message in
+                                            DispatchQueue.main.async {
+                                                isExporting = false
+                                                if success {
+                                                    // The credit is committed only
+                                                    // after the photo write succeeds.
+                                                    commitReservedTianjiCredit()
+                                                    withAnimation { showSavedToast = true }
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                                        withAnimation { showSavedToast = false }
+                                                    }
+                                                } else {
+                                                    releaseReservedTianjiCredit()
+                                                    saveErrorMessage = message ?? lang.t("save_failed")
+                                                    let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+                                                    showPhotoSettings = status == .denied || status == .restricted
+                                                    showSaveError = true
                                                 }
-                                            } else {
-                                                releaseReservedTianjiCredit()
-                                                saveErrorMessage = message ?? lang.t("save_failed")
-                                                let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-                                                showPhotoSettings = status == .denied || status == .restricted
-                                                showSaveError = true
                                             }
                                         }
                                     }
@@ -142,9 +151,21 @@ public struct TianJiShuView: View {
                                         return
                                     }
                                     reservedTianjiCredit = reservation
-                                    shareCompletionHandled = false
                                     isExporting = true
-                                    showShareSheet = true
+                                    prepareExportImage { exportImage in
+                                        guard let exportImage = exportImage else {
+                                            isExporting = false
+                                            releaseReservedTianjiCredit()
+                                            saveErrorMessage = lang.t("save_failed")
+                                            showSaveError = true
+                                            return
+                                        }
+                                        self.exportImage = exportImage
+                                        // Keep only one long image in memory while
+                                        // the share controller is presented.
+                                        self.scrollImage = nil
+                                        showShareSheet = true
+                                    }
                                 }) {
                                     HStack {
                                         Image(systemName: "square.and.arrow.up.fill")
@@ -212,32 +233,31 @@ public struct TianJiShuView: View {
             }
             .onDisappear {
                 // SwiftUI may dismiss the page while the worker is still
-                // rendering. Invalidate its completion. A pending credit
-                // reservation remains consumed if the process is interrupted;
-                // refunding it here could turn a successful background export
-                // into a free export.
+                // rendering. The manager keeps the in-flight slot bounded and
+                // the durable credit is only committed after success, so a
+                // terminated process cannot permanently lose the credit.
                 renderGeneration += 1
                 isExporting = false
             }
             .sheet(isPresented: $showShareSheet, onDismiss: {
-                // completionWithItemsHandler is not guaranteed to run when a
-                // presentation is interrupted, so always clear the gate.
+                // The activity controller completion callback is the source of
+                // truth for commit/refund. If iOS interrupts the sheet before
+                // invoking it, the manager's reservation timeout releases the
+                // in-flight slot without debiting the credit.
                 isExporting = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                    if !shareCompletionHandled {
-                        releaseReservedTianjiCredit()
-                    }
-                    shareCompletionHandled = false
+                exportImage = nil
+                if scrollImage == nil {
+                    beginRendering()
                 }
             }) {
-                if let img = scrollImage {
-                    TianJiActivityViewController(activityItems: [img]) { completed in
+                if let exportImage {
+                    TianJiActivityViewController(activityItems: [exportImage]) { completed in
                         DispatchQueue.main.async {
                             isExporting = false
-                            shareCompletionHandled = true
                             if completed {
-                                // The credit was reserved before presenting
-                                // the share sheet and is already consumed.
+                                // Commit exactly once after the share operation
+                                // reports success. The manager makes repeated
+                                // callbacks harmless.
                                 commitReservedTianjiCredit()
                             } else {
                                 releaseReservedTianjiCredit()
@@ -289,6 +309,34 @@ public struct TianJiShuView: View {
         iap.commitTianjiCreditReservation(token)
     }
 
+    /// Render a clean export image only after the user starts a real save/share
+    /// operation. The on-screen preview remains watermarked for single-credit
+    /// users, preventing screenshots from bypassing the one-export rule.
+    private func prepareExportImage(completion: @escaping (UIImage?) -> Void) {
+        let heading = motion.headingState.facingAngle
+        let coordsDesc = motion.coordsDesc
+        let solarTimeDesc = motion.solarTimeDesc
+        let language = lang.effectiveLanguage
+        let panoramaArchive = ShaSurveyStore.shared.archive
+        let floorplanReport = FloorplanAuditStore.shared.latestReport
+        let reportDate = Date()
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = TianJiShuEngine.shared.generateScrollImage(
+                heading: heading,
+                coordsDesc: coordsDesc,
+                solarTimeDesc: solarTimeDesc,
+                language: language,
+                isPro: true,
+                floorplanReport: floorplanReport,
+                panoramaArchive: panoramaArchive,
+                reportDate: reportDate
+            )
+            DispatchQueue.main.async {
+                completion(image)
+            }
+        }
+    }
+
     private func beginRendering() {
                 renderGeneration += 1
                 let generation = renderGeneration
@@ -308,7 +356,10 @@ public struct TianJiShuView: View {
                 let panoramaArchive = ShaSurveyStore.shared.archive
                 let floorplanReport = FloorplanAuditStore.shared.latestReport
                 let reportDate = Date()
-                let hasExportEntitlement = iap.canUseTianji
+                // A single credit authorizes one actual export. Keep the
+                // preview watermarked until that export is committed; VIP and
+                // lifetime users receive the clean preview immediately.
+                let hasExportEntitlement = iap.hasUnlockedVIP
                 isGenerating = true
                 DispatchQueue.global(qos: .userInitiated).async {
                     let img = TianJiShuEngine.shared.generateScrollImage(

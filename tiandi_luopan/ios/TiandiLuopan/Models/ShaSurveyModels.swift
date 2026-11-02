@@ -242,6 +242,17 @@ public final class ShaSurveyStore: ObservableObject {
         persist()
     }
 
+    public func removeRecord(id: UUID) {
+        records.removeAll(where: { $0.id == id })
+        persist()
+    }
+
+    public func removeLastRecord() {
+        guard !records.isEmpty else { return }
+        records.removeLast()
+        persist()
+    }
+
     /// 室内外统一档案（任一侧有数据即非空）
     public var archive: PanoramaFengShuiArchive? {
         guard !records.isEmpty || latestInterior != nil else { return nil }

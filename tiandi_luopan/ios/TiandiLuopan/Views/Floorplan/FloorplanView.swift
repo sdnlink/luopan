@@ -16,6 +16,10 @@ private struct SavedFloorplanLayout: Codable {
     let compassRotation: Double
     let isSyncWithCompass: Bool
     let hasFloorplanAccess: Bool
+    /// A paid case grant is scoped to this saved layout. Older records did
+    /// not contain a grant ID; treating their boolean alone as access would
+    /// preserve the historical free RoomPlan/AR bypass.
+    let floorplanAccessGrantID: String?
 }
 
 /// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
@@ -50,6 +54,7 @@ public struct FloorplanView: View {
     @State private var showEditingRoomDeleteConfirmation = false
     @State private var centroidDragStart: CGPoint? = nil
     @State private var didConsumeFloorplanCredit: Bool = false
+    @State private var floorplanAccessGrantID: String?
     @State private var auditedRooms: [FloorplanRoom] = []
     @State private var auditReport: [FloorplanAuditItem] = []
     @State private var isDetectingRooms: Bool = false
@@ -232,6 +237,7 @@ public struct FloorplanView: View {
                         return
                     }
                     didConsumeFloorplanCredit = true
+                    floorplanAccessGrantID = UUID().uuidString
                 }
                 if replacingExistingPlan {
                     // A new plan has a different coordinate system. Do not
@@ -368,7 +374,11 @@ public struct FloorplanView: View {
             centroidY: Double(clampedUnit(Double(centroid.y), fallback: 0.5)),
             compassRotation: resolvedHeading,
             isSyncWithCompass: compassHeading == nil,
-            hasFloorplanAccess: true
+            // RoomPlan/AR spatial capture is free measurement. Full floorplan
+            // diagnostics and export still require a VIP entitlement or a
+            // floorplan consumable, acquired by acquireFloorplanAccess().
+            hasFloorplanAccess: false,
+            floorplanAccessGrantID: nil
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: savedLayoutKey)
@@ -425,7 +435,8 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
-        didConsumeFloorplanCredit = saved.hasFloorplanAccess
+        floorplanAccessGrantID = saved.floorplanAccessGrantID
+        didConsumeFloorplanCredit = saved.hasFloorplanAccess && saved.floorplanAccessGrantID != nil
 
         if let imageURL = Self.savedImageURL(),
            let image = UIImage(contentsOfFile: imageURL.path) {
@@ -469,7 +480,8 @@ public struct FloorplanView: View {
             centroidY: Double(centroid.y),
             compassRotation: Self.normalizedHeading(compassRotation),
             isSyncWithCompass: isSyncWithCompass,
-            hasFloorplanAccess: didConsumeFloorplanCredit
+            hasFloorplanAccess: didConsumeFloorplanCredit && floorplanAccessGrantID != nil,
+            floorplanAccessGrantID: floorplanAccessGrantID
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: Self.savedLayoutKey)
@@ -581,6 +593,7 @@ public struct FloorplanView: View {
             return false
         }
         didConsumeFloorplanCredit = true
+        floorplanAccessGrantID = UUID().uuidString
         persistLayout()
         return true
     }
@@ -1138,6 +1151,7 @@ public struct FloorplanView: View {
         roomForTypeEditing = nil
         showEditingRoomDeleteConfirmation = false
         didConsumeFloorplanCredit = false
+        floorplanAccessGrantID = nil
         persistedImageObjectID = nil
         if let imageURL = Self.savedImageURL(), FileManager.default.fileExists(atPath: imageURL.path) {
             try? FileManager.default.removeItem(at: imageURL)

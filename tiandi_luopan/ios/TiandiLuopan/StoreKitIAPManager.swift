@@ -64,6 +64,16 @@ public enum IAPProductID: String, CaseIterable {
     }
 }
 
+/// Product identifiers used by released builds.  Product IDs are immutable in
+/// App Store Connect, so an app update must continue to recognize identifiers
+/// from older builds while presenting the current canonical IDs to StoreKit.
+private enum IAPProductKind {
+    case vipYearly
+    case proLifetime
+    case floorplanSingle
+    case tianjiSingle
+}
+
 // MARK: - IAP 代理协议
 
 public protocol StoreKitIAPManagerDelegate: AnyObject {
@@ -127,6 +137,61 @@ public class StoreKitIAPManager: ObservableObject {
         var floorplanCredits: Int
         var tianjiCredits: Int
         var purchasedProductIDs: [String]
+        /// Durable idempotency ledger for verified transactions. Keeping this
+        /// in the sealed mirror makes credit minting and transaction claiming
+        /// one persisted state transition.
+        var processedTransactionIDs: [String]
+
+        private enum CodingKeys: String, CodingKey {
+            case verifiedAt, isAuthoritative, isLifetime, vipExpireDate
+            case floorplanCredits, tianjiCredits, purchasedProductIDs
+            case processedTransactionIDs
+        }
+
+        init(verifiedAt: Date,
+             isAuthoritative: Bool,
+             isLifetime: Bool,
+             vipExpireDate: TimeInterval,
+             floorplanCredits: Int,
+             tianjiCredits: Int,
+             purchasedProductIDs: [String],
+             processedTransactionIDs: [String] = []) {
+            self.verifiedAt = verifiedAt
+            self.isAuthoritative = isAuthoritative
+            self.isLifetime = isLifetime
+            self.vipExpireDate = vipExpireDate
+            self.floorplanCredits = floorplanCredits
+            self.tianjiCredits = tianjiCredits
+            self.purchasedProductIDs = purchasedProductIDs
+            self.processedTransactionIDs = processedTransactionIDs
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            verifiedAt = try container.decode(Date.self, forKey: .verifiedAt)
+            isAuthoritative = try container.decode(Bool.self, forKey: .isAuthoritative)
+            isLifetime = try container.decode(Bool.self, forKey: .isLifetime)
+            vipExpireDate = try container.decode(TimeInterval.self, forKey: .vipExpireDate)
+            floorplanCredits = try container.decode(Int.self, forKey: .floorplanCredits)
+            tianjiCredits = try container.decode(Int.self, forKey: .tianjiCredits)
+            purchasedProductIDs = try container.decode([String].self, forKey: .purchasedProductIDs)
+            // Mirrors written before the idempotency ledger was introduced
+            // decode as an empty ledger and are migrated from the legacy key
+            // when the next verified transaction is handled.
+            processedTransactionIDs = try container.decodeIfPresent([String].self, forKey: .processedTransactionIDs) ?? []
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(verifiedAt, forKey: .verifiedAt)
+            try container.encode(isAuthoritative, forKey: .isAuthoritative)
+            try container.encode(isLifetime, forKey: .isLifetime)
+            try container.encode(vipExpireDate, forKey: .vipExpireDate)
+            try container.encode(floorplanCredits, forKey: .floorplanCredits)
+            try container.encode(tianjiCredits, forKey: .tianjiCredits)
+            try container.encode(purchasedProductIDs, forKey: .purchasedProductIDs)
+            try container.encode(processedTransactionIDs, forKey: .processedTransactionIDs)
+        }
     }
 
     private let kMirrorKey = "yx_iap_entitlement_mirror_v2"
@@ -145,23 +210,42 @@ public class StoreKitIAPManager: ObservableObject {
     private var lastProductsFetchDate: Date?
     private let productsRetryInterval: TimeInterval = 30
     private let entitlementLock = NSLock()
+    private var activeTianjiReservations: Set<String> = []
     private var transactionListener: Task<Void, Never>?
     private var verificationTask: Task<Void, Never>?
     /// 内存镜像（主线程读写），避免 SwiftUI 每帧 JSON 解码 + HMAC
     private var cachedMirror: EntitlementMirror?
     private var cachedMirrorLoadedFromStorage = false
 
+    private func productKind(for productID: String) -> IAPProductKind? {
+        switch productID {
+        case IAPProductID.vipYearly.rawValue, "com.yanxiang.luopan.vip.yearly":
+            return .vipYearly
+        case IAPProductID.proLifetime.rawValue, "com.yanxiang.luopan.pro.lifetime":
+            return .proLifetime
+        case IAPProductID.floorplanSingle.rawValue,
+             "com.yanxiang.compass.floorplan.single",
+             "com.yanxiang.luopan.floorplan.single":
+            return .floorplanSingle
+        case IAPProductID.tianjiSingle.rawValue, "com.yanxiang.luopan.tianji.single":
+            return .tianjiSingle
+        default:
+            return nil
+        }
+    }
+
     // MARK: - 初始化
 
     private init() {
         // 1. 一次性迁移旧版 v1 标志到镜像（带封印，权威验证会立即覆盖）
         migrateLegacyEntitlementsIfNeeded()
+        migrateLegacyTransactionLedgerIfNeeded()
         // 2. 同步读取镜像用于启动即时的 UI 反馈；无镜像（重装/首启）保持锁定
         let mirror = currentMirror()
-        self.isVIPUser = mirror.map { $0.isLifetime || $0.vipExpireDate > Date().timeIntervalSince1970 } ?? false
-        self.isLifetimeUser = mirror?.isLifetime ?? false
-        self.floorplanCreditsCount = mirror?.floorplanCredits ?? 0
-        self.tianjiCreditsCount = mirror?.tianjiCredits ?? 0
+        self.isVIPUser = mirror.map { $0.isAuthoritative && ($0.isLifetime || $0.vipExpireDate > Date().timeIntervalSince1970) } ?? false
+        self.isLifetimeUser = mirror?.isAuthoritative == true && (mirror?.isLifetime ?? false)
+        self.floorplanCreditsCount = mirror?.isAuthoritative == true ? (mirror?.floorplanCredits ?? 0) : 0
+        self.tianjiCreditsCount = mirror?.isAuthoritative == true ? (mirror?.tianjiCredits ?? 0) : 0
         // 3. 交易监听（续期/退款/跨设备恢复/Ask to Buy 结果）
         listenForTransactions()
         // 4. 权威对账（currentEntitlements 驱动，验证完成即覆写镜像）
@@ -187,7 +271,8 @@ public class StoreKitIAPManager: ObservableObject {
                           vipExpireDate: 0,
                           floorplanCredits: 0,
                           tianjiCredits: 0,
-                          purchasedProductIDs: [])
+                          purchasedProductIDs: [],
+                          processedTransactionIDs: [])
     }
 
     /// 读内存镜像（带锁）；首次访问从磁盘读取并校验 HMAC 封印（篡改视为无镜像）。
@@ -210,8 +295,14 @@ public class StoreKitIAPManager: ObservableObject {
     private func readMirrorFromStorage() -> EntitlementMirror? {
         guard let data = UserDefaults.standard.data(forKey: kMirrorKey),
               let seal = UserDefaults.standard.string(forKey: kMirrorSealKey),
-              let mirror = try? JSONDecoder().decode(EntitlementMirror.self, from: data),
-              computeMirrorSeal(mirror) == seal else {
+              let mirror = try? JSONDecoder().decode(EntitlementMirror.self, from: data) else {
+            return nil
+        }
+        // Mirrors written before the transaction ledger was added used the
+        // original v2 payload. Accept that seal once and re-seal on the next
+        // entitlement/transaction write so upgrades do not discard a valid
+        // local cache.
+        guard computeMirrorSeal(mirror) == seal || computeLegacyMirrorSeal(mirror) == seal else {
             return nil
         }
         return mirror
@@ -234,6 +325,13 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     private func computeMirrorSeal(_ mirror: EntitlementMirror) -> String {
+        let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))"
+        let key = deviceSealSymmetricKey()
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func computeLegacyMirrorSeal(_ mirror: EntitlementMirror) -> String {
         let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))"
         let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
@@ -241,8 +339,8 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     /// 一次性迁移 v1 本地标志（仅当镜像不存在时执行）。
-    /// 迁移数据 isAuthoritative=false：立即显示（老用户不闪锁），
-    /// 启动后的首次权威验证会将其完全覆盖（包括正确收回已退款的权益）。
+    /// 迁移数据 isAuthoritative=false：仅作为待校验缓存保存；在首次
+    /// 权威验证完成前不参与收费门控，避免退款权益或篡改状态被短暂使用。
     private func migrateLegacyEntitlementsIfNeeded() {
         guard currentMirror() == nil else { return }
         let defaults = UserDefaults.standard
@@ -260,29 +358,45 @@ public class StoreKitIAPManager: ObservableObject {
         updateMirror(mirror)
     }
 
+    /// Move the old unsealed processed-transaction list into the HMAC-sealed
+    /// mirror before any new transaction callback can mint a credit.
+    private func migrateLegacyTransactionLedgerIfNeeded() {
+        let legacyIDs = Set(UserDefaults.standard.stringArray(forKey: kProcessedTransactionIDs) ?? [])
+        guard !legacyIDs.isEmpty else { return }
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard var mirror = currentMirrorLocked() else { return }
+        let merged = Set(mirror.processedTransactionIDs).union(legacyIDs)
+        mirror.processedTransactionIDs = merged.sorted()
+        updateMirrorLocked(mirror)
+        UserDefaults.standard.removeObject(forKey: kProcessedTransactionIDs)
+    }
+
     // MARK: - 权益查询（只读镜像；无验证背书不显示权益）
 
     public var hasUnlockedVIP: Bool {
         // 镜像缺失（重装/首启）→ 返回 false 保持锁定；权威验证由
         // init / refreshEntitlements / 购买完成 / updates 事件持续驱动。
-        guard let mirror = currentMirror() else { return false }
+        guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
         if mirror.vipExpireDate > Date().timeIntervalSince1970 { return true }
         return false
     }
 
     public var canUseFloorplan: Bool {
-        return hasUnlockedVIP || (currentMirror()?.floorplanCredits ?? 0) > 0
+        guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
+        return hasUnlockedVIP || mirror.floorplanCredits > 0
     }
 
     public var canUseTianji: Bool {
-        return hasUnlockedVIP || (currentMirror()?.tianjiCredits ?? 0) > 0
+        guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
+        return hasUnlockedVIP || mirror.tianjiCredits > 0
     }
 
     public func isVIP() -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard let mirror = currentMirrorLocked() else { return false }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
         return mirror.vipExpireDate > Date().timeIntervalSince1970
     }
@@ -290,23 +404,26 @@ public class StoreKitIAPManager: ObservableObject {
     public func isLifetime() -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        return currentMirrorLocked()?.isLifetime ?? false
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
+        return mirror.isLifetime
     }
 
     public func floorplanCredits() -> Int {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        return currentMirrorLocked()?.floorplanCredits ?? 0
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return 0 }
+        return mirror.floorplanCredits
     }
 
     public func tianjiCredits() -> Int {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        return currentMirrorLocked()?.tianjiCredits ?? 0
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return 0 }
+        return mirror.tianjiCredits
     }
 
     private func isVIPUnlocked() -> Bool {
-        guard let mirror = currentMirrorLocked() else { return false }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
         return mirror.vipExpireDate > Date().timeIntervalSince1970
     }
@@ -316,7 +433,7 @@ public class StoreKitIAPManager: ObservableObject {
     public func consumeFloorplanCredit() -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard let mirror = currentMirrorLocked() else { return false }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if isVIPUnlocked() { return true }
         guard mirror.floorplanCredits > 0 else { return false }
         var updated = mirror
@@ -330,7 +447,7 @@ public class StoreKitIAPManager: ObservableObject {
     public func consumeTianjiCredit() -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard let mirror = currentMirrorLocked() else { return false }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if isVIPUnlocked() { return true }
         guard mirror.tianjiCredits > 0 else { return false }
         var updated = mirror
@@ -341,27 +458,78 @@ public class StoreKitIAPManager: ObservableObject {
         return true
     }
 
-    /// 购买成功（已验证交易）后为消费型商品记账 +1。
-    /// 订阅/非消耗品**不在这里直接写入**，统一由权威验证覆写镜像。
-    private func applyConsumableCreditIfNeeded(productID: String) {
+    /// Reserve one export credit before an asynchronous save/share operation.
+    /// The token makes commit/refund idempotent across both completion and
+    /// sheet-dismiss callbacks.
+    public func reserveTianjiCredit() -> String? {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        let isFloorplan = productID == IAPProductID.floorplanSingle.rawValue
-            || productID == "com.yanxiang.compass.floorplan.single"
-            || productID == "com.yanxiang.luopan.floorplan.single"
-        let isTianji = productID == IAPProductID.tianjiSingle.rawValue
-        guard isFloorplan || isTianji else { return }
-        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
-        if isFloorplan { mirror.floorplanCredits += 1 } else { mirror.tianjiCredits += 1 }
+        guard var mirror = currentMirrorLocked(), mirror.isAuthoritative else { return nil }
+        if isVIPUnlocked() { return nil }
+        guard mirror.tianjiCredits > 0 else { return nil }
+        mirror.tianjiCredits -= 1
+        let token = UUID().uuidString
+        activeTianjiReservations.insert(token)
         updateMirrorLocked(mirror)
+        let remain = mirror.tianjiCredits
+        DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
+        return token
+    }
+
+    /// Commit a reservation after the deliverable was produced.
+    public func commitTianjiCreditReservation(_ token: String) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        activeTianjiReservations.remove(token)
+    }
+
+    /// Return a reservation when the export/share operation failed or was
+    /// cancelled. Repeated calls for the same token are harmless.
+    public func refundTianjiCreditReservation(_ token: String) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard activeTianjiReservations.remove(token) != nil,
+              var mirror = currentMirrorLocked(), mirror.isAuthoritative else { return }
+        mirror.tianjiCredits += 1
+        updateMirrorLocked(mirror)
+        let remain = mirror.tianjiCredits
+        DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
+    }
+
+    /// Atomically claim a verified transaction and, for consumables, mint its
+    /// credit in the same sealed mirror write. Replayed transactions return
+    /// false but are still finished by the caller, so a crash cannot either
+    /// lose a credit or leave a transaction permanently pending.
+    private func applyVerifiedTransactionIfNeeded(productID: String, transactionID: String) -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let kind = productKind(for: productID) else { return false }
+        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+        // Migrate the legacy unsealed ledger into the sealed mirror before
+        // checking the transaction. This prevents an old build's processed ID
+        // from minting a second credit after upgrade.
+        let legacyIDs = Set(UserDefaults.standard.stringArray(forKey: kProcessedTransactionIDs) ?? [])
+        var processedIDs = Set(mirror.processedTransactionIDs).union(legacyIDs)
+        guard !processedIDs.contains(transactionID) else { return false }
+        processedIDs.insert(transactionID)
+        mirror.processedTransactionIDs = processedIDs.sorted()
+        switch kind {
+        case .floorplanSingle:
+            mirror.floorplanCredits += 1
+        case .tianjiSingle:
+            mirror.tianjiCredits += 1
+        case .vipYearly, .proLifetime:
+            break
+        }
+        updateMirrorLocked(mirror)
+        if !legacyIDs.isEmpty {
+            UserDefaults.standard.removeObject(forKey: kProcessedTransactionIDs)
+        }
+        return true
     }
 
     private func isSupportedProductID(_ productID: String) -> Bool {
-        if IAPProductID(rawValue: productID) != nil { return true }
-        // These IDs were shipped by earlier builds and are still valid
-        // transaction identifiers for consumable credit migration.
-        return productID == "com.yanxiang.compass.floorplan.single"
-            || productID == "com.yanxiang.luopan.floorplan.single"
+        productKind(for: productID) != nil
     }
 
     // MARK: - 商品信息请求 (StoreKit 2)
@@ -518,9 +686,9 @@ public class StoreKitIAPManager: ObservableObject {
 
     // MARK: - 恢复购买 (StoreKit 2)
 
-    /// StoreKit 2 无 restore API：非消耗品与订阅权益通过
-    /// `Transaction.currentEntitlements` 自动恢复（换机/重装/退款同步）。
-    /// 此方法重跑权威对账并按结果回调，保留“恢复购买”入口供 App Store 审核。
+    /// StoreKit 2 没有独立的 restore transaction API：用户主动恢复时先
+    /// 调用 `AppStore.sync()`，再以 `Transaction.currentEntitlements` 对账。
+    /// 消费型额度仍是本地账本，不由 Apple 的恢复流程重新发放。
     public func restorePurchases() {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
@@ -533,29 +701,40 @@ public class StoreKitIAPManager: ObservableObject {
         guard !isProcessingPurchase else { return }
         isProcessingPurchase = true
         Task {
-            await verifyEntitlementsAsync()
-            var unlockedList: [String] = []
-            if isVIP() { unlockedList.append(IAPProductID.vipYearly.rawValue) }
-            if isLifetime() { unlockedList.append(IAPProductID.proLifetime.rawValue) }
-            let unlocked = unlockedList
-            await MainActor.run {
-                if unlocked.isEmpty {
-                    // Consumable credits are intentionally not restorable by
-                    // StoreKit; only report the absence of restorable
-                    // subscriptions/non-consumables.
-                    self.lastStatusMessage = LocalizationManager.shared.t("iap_restore_none")
-                } else {
-                    self.lastStatusMessage = nil
+            do {
+                // currentEntitlements is normally synchronized automatically,
+                // but an explicit user restore must ask the App Store to sync
+                // first (especially after an account/device change).
+                try await AppStore.sync()
+                await self.verifyEntitlementsAsync()
+                var unlockedList: [String] = []
+                if self.isVIP() { unlockedList.append(IAPProductID.vipYearly.rawValue) }
+                if self.isLifetime() { unlockedList.append(IAPProductID.proLifetime.rawValue) }
+                let unlocked = unlockedList
+                await MainActor.run {
+                    if unlocked.isEmpty {
+                        // Consumable credits are intentionally not restorable by
+                        // StoreKit; only report the absence of restorable
+                        // subscriptions/non-consumables.
+                        self.lastStatusMessage = LocalizationManager.shared.t("iap_restore_none")
+                    } else {
+                        self.lastStatusMessage = nil
+                    }
+                    self.isProcessingPurchase = false
+                    self.delegate?.iapManagerDidRestorePurchases(unlockedProductIds: unlocked)
                 }
-                self.isProcessingPurchase = false
-                self.delegate?.iapManagerDidRestorePurchases(unlockedProductIds: unlocked)
+            } catch {
+                await MainActor.run {
+                    self.isProcessingPurchase = false
+                    self.lastErrorMessage = error.localizedDescription
+                }
             }
         }
     }
 
     /// Clear one-shot UI feedback when a payment screen is presented again.
-    /// Entitlements and processed transaction IDs are persisted separately and
-    /// are intentionally left untouched.
+    /// Entitlements and the sealed transaction ledger are persisted separately
+    /// from these one-shot UI messages and are intentionally left untouched.
     public func clearTransientMessages() {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
@@ -589,22 +768,29 @@ public class StoreKitIAPManager: ObservableObject {
 
     private func handleTransactionUpdate(_ transaction: Transaction) async {
         let pid = transaction.productID
-        guard isSupportedProductID(pid) else { return }
+        guard isSupportedProductID(pid) else {
+            // Do not grant unknown products, but finish them so a future
+            // product identifier cannot keep the update stream replaying
+            // forever after an app update.
+            await transaction.finish()
+            return
+        }
 
         // 退款/撤销：立即权威对账。currentEntitlements 已不含该交易，
         // 验证覆写镜像即收回权益（订阅失效同理由到期逻辑处理）。
         if transaction.revocationDate != nil {
+            await transaction.finish()
             await verifyEntitlementsAsync()
             return
         }
 
         let txId = String(transaction.id)
-        // 与购买路径共用 claimTransaction 幂等去重，避免同一笔交易重复记账
-        guard claimTransaction(txId) else { return }
-
-        // 消费型商品：仅在本交易已验证背书下记账
-        applyConsumableCreditIfNeeded(productID: pid)
+        let didProcess = applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        // Always finish a replay as well. A previous crash may have committed
+        // the ledger but not reached finish(), and returning early would leave
+        // StoreKit delivering the same transaction forever.
         await transaction.finish()
+        guard didProcess else { return }
 
         // 订阅/非消耗品：不直接写本地，由权威验证覆写（续期刷新到期日）
         await verifyEntitlementsAsync()
@@ -620,14 +806,12 @@ public class StoreKitIAPManager: ObservableObject {
     private func handleVerified(_ transaction: Transaction) async {
         let pid = transaction.productID
         let txId = String(transaction.id)
-        guard claimTransaction(txId) else {
+        let didProcess = applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        await transaction.finish()
+        guard didProcess else {
             await MainActor.run { self.isProcessingPurchase = false }
             return
         }
-
-        // 消费型商品记账（已验证背书）
-        applyConsumableCreditIfNeeded(productID: pid)
-        await transaction.finish()
 
         // 订阅/非消耗品权益：交由权威验证从 currentEntitlements 覆写，
         // 绝不因“购买成功”直接点亮本地会员标志。
@@ -640,18 +824,6 @@ public class StoreKitIAPManager: ObservableObject {
         }
     }
 
-    private func claimTransaction(_ transactionID: String) -> Bool {
-        entitlementLock.lock()
-        defer { entitlementLock.unlock() }
-        var ids = UserDefaults.standard.stringArray(forKey: kProcessedTransactionIDs) ?? []
-        guard !ids.contains(transactionID) else { return false }
-        ids.append(transactionID)
-        // Transaction identifiers are the local idempotency key. Keep the
-        // complete set: trimming old IDs allows StoreKit to replay an older
-        // transaction and mint a consumable credit a second time.
-        UserDefaults.standard.set(ids, forKey: kProcessedTransactionIDs)
-        return true
-    }
 
     // MARK: - 商品价格与状态
 
@@ -752,6 +924,25 @@ public class StoreKitIAPManager: ObservableObject {
         }
     }
 
+    /// Persist a complete StoreKit entitlement snapshot from a synchronous
+    /// context. Keeping the lock operations here avoids Swift 6's
+    /// “lock/unlock unavailable from asynchronous contexts” diagnostic in the
+    /// async transaction scanner.
+    private func persistEntitlementSnapshot(isLifetime: Bool,
+                                            vipExpire: TimeInterval,
+                                            purchasedProductIDs: [String]) -> (floorplan: Int, tianji: Int) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+        mirror.verifiedAt = Date()
+        mirror.isAuthoritative = true
+        mirror.isLifetime = isLifetime
+        mirror.vipExpireDate = vipExpire
+        mirror.purchasedProductIDs = purchasedProductIDs.sorted()
+        updateMirrorLocked(mirror)
+        return (mirror.floorplanCredits, mirror.tianjiCredits)
+    }
+
     /// Re-evaluate time-based entitlements when the app returns to foreground.
     /// 权威对账：以 Transaction.currentEntitlements 覆写镜像验证段。
     public func refreshEntitlements() {
@@ -776,7 +967,7 @@ public class StoreKitIAPManager: ObservableObject {
 
         for await entitlement in Transaction.currentEntitlements {
             guard case .verified(let tx) = entitlement else { continue }
-            guard let product = IAPProductID(rawValue: tx.productID) else { continue }
+            guard let product = productKind(for: tx.productID) else { continue }
             purchasedProductIDs.append(tx.productID)
             switch product {
             case .proLifetime:
@@ -788,22 +979,19 @@ public class StoreKitIAPManager: ObservableObject {
                 if let exp = tx.expirationDate {
                     vipExpire = max(vipExpire, exp.timeIntervalSince1970)
                 }
-            default:
+            case .floorplanSingle, .tianjiSingle:
                 break
             }
         }
 
         // 覆写镜像验证段（保留账本段；消费型商品不因验证清零/恢复）
-        let (floorplanCredits, tianjiCredits) = entitlementLock.withLock {
-            var mirror = currentMirrorLocked() ?? freshEmptyMirror()
-            mirror.verifiedAt = Date()
-            mirror.isAuthoritative = true
-            mirror.isLifetime = isLifetime
-            mirror.vipExpireDate = vipExpire
-            mirror.purchasedProductIDs = purchasedProductIDs.sorted()
-            updateMirrorLocked(mirror)
-            return (mirror.floorplanCredits, mirror.tianjiCredits)
-        }
+        let snapshot = persistEntitlementSnapshot(
+            isLifetime: isLifetime,
+            vipExpire: vipExpire,
+            purchasedProductIDs: purchasedProductIDs
+        )
+        let floorplanCredits = snapshot.floorplan
+        let tianjiCredits = snapshot.tianji
 
         let finalLifetime = isLifetime
         let finalVipExpire = vipExpire

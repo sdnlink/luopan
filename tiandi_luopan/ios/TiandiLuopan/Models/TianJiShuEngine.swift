@@ -632,36 +632,6 @@ public class TianJiShuEngine {
             
             // 11. 卷尾合规免责声明 (Compliance & disclaimer)
             drawDisclaimer(ctx: cg, curY: curY, renderLanguage: renderLanguage)
-
-            // Keep the access policy inside the renderer as well as in the
-            // SwiftUI controls. A caller that receives the generated image
-            // must never get an unmarked full report before an export credit
-            // or VIP entitlement has been granted.
-            if !isPro {
-                let watermark = tr8(
-                    "预览 · 解锁后导出无水印长卷",
-                    "預覽 · 解鎖後匯出無水印長卷",
-                    "PREVIEW · UNLOCK TO EXPORT WITHOUT WATERMARK",
-                    "プレビュー・解放すると透かしなしで出力",
-                    "미리보기 · 잠금 해제 후 워터마크 없이 내보내기",
-                    "XEM TRƯỚC · MỞ KHÓA ĐỂ XUẤT KHÔNG DẤU",
-                    "ตัวอย่าง · ปลดล็อกเพื่อส่งออกแบบไม่มีลายน้ำ",
-                    "PRATINJAU · BUKA KUNCI UNTUK EKSPOR TANPA TANDA AIR"
-                )
-                cg.saveGState()
-                cg.setAlpha(0.16)
-                cg.translateBy(x: size.width * 0.5, y: size.height * 0.5)
-                cg.rotate(by: -.pi / 8)
-                let watermarkAttributes: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.boldSystemFont(ofSize: 34),
-                    .foregroundColor: vermilion
-                ]
-                let watermarkWidth = size.width * 1.25
-                for y in stride(from: -size.height, through: size.height, by: 180) {
-                    watermark.draw(in: CGRect(x: -watermarkWidth * 0.5, y: y, width: watermarkWidth, height: 60), withAttributes: watermarkAttributes)
-                }
-                cg.restoreGState()
-            }
         }
     }
     

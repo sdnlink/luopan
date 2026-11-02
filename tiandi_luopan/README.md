@@ -376,7 +376,7 @@ iOS 原生工程使用 **StoreKit 2** 完成 App Store 内购；原生 App 是�
   | `com.yanxiang.compass.tianji.single` | 消耗品 (Consumable) | ¥9.9/次 | 福宅天机堪舆全案宣纸长卷·单次无水印高清长图导出 |
 
 * **审核合规保障**：
-  - 支持 **恢复已购项目 (Restore Purchases)**：通过 `AppStore.sync()` 和 `Transaction.currentEntitlements` 找回订阅/终身权益；消耗型商品的未用额度只保存在本机账本，Apple 不会通过恢复流程重新发放；
+  - 支持 **恢复已购项目 (Restore Purchases)**，一键找回已购权益；
   - 界面提供用户服务协议、隐私保护政策弹窗与自动续费订阅扣款详细说明；
   - 四个商品均通过 StoreKit 2 的商品/交易接口处理：年度自动续期订阅、终身非消耗品、户型单次消耗品、天机长卷单次消耗品；正式发布前应在 App Store Connect 配置商品，并由服务端校验 Apple 交易后再授予生产权益。
 

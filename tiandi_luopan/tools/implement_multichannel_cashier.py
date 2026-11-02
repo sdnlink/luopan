@@ -635,10 +635,10 @@ def implement():
             const currencyHint = document.getElementById('iap-currency-hint');
 
             const prices = {
-                'com.yanxiang.compass.vip.yearly': { cny: '¥198', usd: '约 $27.50 USD' },
-                'com.yanxiang.compass.pro.lifetime': { cny: '¥298', usd: '约 $41.50 USD' },
-                'com.yanxiang.compass.floorplan.case': { cny: '¥19.9', usd: '约 $2.80 USD' },
-                'com.yanxiang.compass.tianji.single': { cny: '¥9.9', usd: '约 $1.40 USD' }
+                'com.yanxiang.luopan.vip.yearly': { cny: '¥198', usd: '约 $27.50 USD' },
+                'com.yanxiang.luopan.pro.lifetime': { cny: '¥298', usd: '约 $41.50 USD' },
+                'com.yanxiang.luopan.floorplan.single': { cny: '¥19.9', usd: '约 $2.80 USD' },
+                'com.yanxiang.luopan.tianji.single': { cny: '¥9.9', usd: '约 $1.40 USD' }
             };
             const currentPrice = prices[selectedIAPProductId] || { cny: '¥198', usd: '约 $27.50 USD' };
 
@@ -728,10 +728,10 @@ def implement():
             const pid = selectedIAPProductId;
             const channel = selectedPayChannel;
             const prices = {
-                'com.yanxiang.compass.vip.yearly': '198.00',
-                'com.yanxiang.compass.pro.lifetime': '298.00',
-                'com.yanxiang.compass.floorplan.case': '19.90',
-                'com.yanxiang.compass.tianji.single': '9.90'
+                'com.yanxiang.luopan.vip.yearly': '198.00',
+                'com.yanxiang.luopan.pro.lifetime': '298.00',
+                'com.yanxiang.luopan.floorplan.single': '19.90',
+                'com.yanxiang.luopan.tianji.single': '9.90'
             };
             const amount = prices[pid] || '198.00';
             const orderId = 'ORD_' + Date.now();
@@ -912,14 +912,14 @@ def implement():
         // 多渠道统一发放权益与提示
         function simulateMultiPaymentSuccess(channel, txId, channelName) {
             const pid = selectedIAPProductId;
-            if (pid === 'com.yanxiang.compass.pro.lifetime') {
+            if (pid === 'com.yanxiang.luopan.pro.lifetime') {
                 userIAPStatus.isLifetime = true;
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.vip.yearly') {
+            } else if (pid === 'com.yanxiang.luopan.vip.yearly') {
                 userIAPStatus.isVIP = true;
-            } else if (pid === 'com.yanxiang.compass.floorplan.case') {
+            } else if (pid === 'com.yanxiang.luopan.floorplan.single') {
                 userIAPStatus.floorplanCredits = (userIAPStatus.floorplanCredits || 0) + 1;
-            } else if (pid === 'com.yanxiang.compass.tianji.single') {
+            } else if (pid === 'com.yanxiang.luopan.tianji.single') {
                 userIAPStatus.tianjiCredits = (userIAPStatus.tianjiCredits || 0) + 1;
             }
 

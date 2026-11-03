@@ -2453,6 +2453,15 @@
                         <div class="pay-channel-sub">绑定银联/Visa/万事达</div>
                     </div>
                 </div>
+
+                <!-- 渠道 6: Google Play (安卓设备官方通道) -->
+                <div class="pay-channel-item" id="pay-ch-googleplay" onclick="selectPayChannel('googleplay')">
+                    <div class="pay-channel-icon" style="background:rgba(66,133,244,0.18); color:#4285f4; font-weight:bold;">▶</div>
+                    <div class="pay-channel-info">
+                        <div class="pay-channel-name">Google Play <span class="channel-badge-hot" style="background:#4285f4;">官方</span></div>
+                        <div class="pay-channel-sub">Google 官方安全结算通道</div>
+                    </div>
+                </div>
             </div>
 
             <!-- 国际信用卡 (Visa / Mastercard / 运通) 拟真表单卡片 -->
@@ -3995,7 +4004,13 @@
             const modal = document.getElementById('iap-modal');
             if (modal) {
                 modal.style.display = 'flex';
-                // 尝试向 iOS 原生端查询最新商品和状态
+                if (window.AndroidBridge && window.AndroidBridge.syncIapStatus) {
+                    window.AndroidBridge.syncIapStatus();
+                    selectPayChannel('googleplay');
+                } else if (window.AndroidCompass && window.AndroidCompass.syncIapStatus) {
+                    window.AndroidCompass.syncIapStatus();
+                    selectPayChannel('googleplay');
+                } else // 尝试向 iOS 原生端查询最新商品和状态
                 if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
                     window.webkit.messageHandlers.iOSCompass.postMessage({action: "iap_getStatus"});
                     window.webkit.messageHandlers.iOSCompass.postMessage({action: "iap_getProducts"});
@@ -4049,7 +4064,12 @@
                 btn.innerHTML = '<span> 正在呼起 Apple 安全支付…</span>';
             }
 
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
+            if (window.AndroidBridge && window.AndroidBridge.launchGooglePlayPurchase) {
+                // 原生 Android Google Play 环境
+                window.AndroidBridge.launchGooglePlayPurchase(pid);
+            } else if (window.AndroidCompass && window.AndroidCompass.launchGooglePlayPurchase) {
+                window.AndroidCompass.launchGooglePlayPurchase(pid);
+            } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
                 // 原生 iOS 环境
                 window.webkit.messageHandlers.iOSCompass.postMessage({
                     action: "iap_purchase",
@@ -4071,14 +4091,42 @@
 
         // 发起恢复购买
         function executeAppleRestore() {
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
+            if (window.AndroidBridge && window.AndroidBridge.restorePurchases) {
+                window.AndroidBridge.restorePurchases();
+            } else if (window.AndroidCompass && window.AndroidCompass.restorePurchases) {
+                window.AndroidCompass.restorePurchases();
+            } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iOSCompass) {
                 window.webkit.messageHandlers.iOSCompass.postMessage({ action: "iap_restore" });
             } else {
                 localizedAlert('请在原生 App 中恢复 App Store 购买记录。当前 Web 环境无法验证购买状态。','請在原生 App 中恢復 App Store 購買記錄。目前 Web 環境無法驗證購買狀態。','Restore App Store purchases in the native app. The Web version cannot verify purchase status.');
             }
         }
 
-        // MARK: - Native iOS 核心回调
+        // MARK: - Google Play 动态商品定价加载
+        window.onGooglePlayProductsLoaded = function(products) {
+            if (typeof products === 'string') {
+                try { products = JSON.parse(products); } catch(e) {}
+            }
+            if (Array.isArray(products)) {
+                products.forEach(function(p) {
+                    if (p.productId === 'com.yanxiang.compass.vip.yearly' && p.price) {
+                        var el = document.querySelector('#card-prod-yearly .iap-prod-price');
+                        if (el) el.innerHTML = p.price + ' <small>/ 年</small>';
+                    } else if (p.productId === 'com.yanxiang.compass.pro.lifetime' && p.price) {
+                        var el = document.querySelector('#card-prod-lifetime .iap-prod-price');
+                        if (el) el.innerHTML = p.price + ' <small>/ 终身买断</small>';
+                    } else if (p.productId === 'com.yanxiang.compass.floorplan.case' && p.price) {
+                        var el = document.querySelector('#card-prod-floorplan .iap-prod-price');
+                        if (el) el.innerHTML = p.price + ' <small>/ 套</small>';
+                    } else if (p.productId === 'com.yanxiang.compass.tianji.single' && p.price) {
+                        var el = document.querySelector('#card-prod-tianji .iap-prod-price');
+                        if (el) el.innerHTML = p.price + ' <small>/ 次</small>';
+                    }
+                });
+            }
+        };
+
+        // MARK: - Native 核心回调
         window.onNativeIAPStatusUpdate = function(status) {
             if (typeof status === 'string') {
                 try { status = JSON.parse(status); } catch(e) {}
@@ -4159,7 +4207,7 @@
         // 选择支付渠道
         function selectPayChannel(channel) {
             selectedPayChannel = channel;
-            const channels = ['wechat', 'alipay', 'card', 'unionpay', 'applepay'];
+            const channels = ['wechat', 'alipay', 'card', 'unionpay', 'applepay', 'googleplay'];
             channels.forEach(ch => {
                 const el = document.getElementById('pay-ch-' + ch);
                 if (el) {
@@ -4220,6 +4268,11 @@
                     if (btnIcon) btnIcon.innerText = '';
                     if (btnLabel) btnLabel.innerText = '立即通过 Apple Pay 安全支付';
                     if (currencyHint) currencyHint.innerText = 'Apple ID 极速免密扣款';
+                    break;
+                case 'googleplay':
+                    if (btnIcon) btnIcon.innerText = '▶';
+                    if (btnLabel) btnLabel.innerText = '立即通过 Google Play 安全支付';
+                    if (currencyHint) currencyHint.innerText = 'Google Play 官方安全结算通道';
                     break;
             }
         }
@@ -4318,7 +4371,7 @@
             }
 
             // 2. Apple Pay 原生渠道
-            if (channel === 'applepay') {
+            if (channel === 'applepay' || channel === 'googleplay') {
                 executeApplePurchase();
                 return;
             }

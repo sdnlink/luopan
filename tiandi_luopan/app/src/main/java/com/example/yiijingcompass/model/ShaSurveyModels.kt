@@ -125,6 +125,18 @@ data class ShaPanoramaReport(
         get() = palacesByIndex.count { it.isNotEmpty() }
 }
 
+data class PanoramaFengShuiArchive(
+    val id: String = UUID.randomUUID().toString(),
+    val createdAt: Date = Date(),
+    val compassHeading: Double,
+    val interior: HouseSpatialSurvey?,
+    val exterior: List<ExteriorShaRecord>
+) {
+    val interiorShaCount: Int get() = interior?.shaItems?.size ?: 0
+    val exteriorShaCount: Int get() = exterior.size
+    val totalShaCount: Int get() = interiorShaCount + exteriorShaCount
+}
+
 class ShaSurveyStore private constructor() {
     companion object {
         val instance: ShaSurveyStore by lazy { ShaSurveyStore() }
@@ -134,6 +146,17 @@ class ShaSurveyStore private constructor() {
 
     private var prefs: SharedPreferences? = null
     val records: MutableList<ExteriorShaRecord> = mutableListOf()
+    var latestInterior: HouseSpatialSurvey? = null
+
+    val archive: PanoramaFengShuiArchive?
+        get() {
+            if (records.isEmpty() && latestInterior == null) return null
+            return PanoramaFengShuiArchive(
+                compassHeading = 0.0,
+                interior = latestInterior,
+                exterior = ArrayList(records)
+            )
+        }
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -169,6 +192,10 @@ class ShaSurveyStore private constructor() {
     fun addRecord(record: ExteriorShaRecord) {
         records.add(record)
         persist()
+    }
+
+    fun updateInterior(survey: HouseSpatialSurvey?) {
+        latestInterior = survey
     }
 
     fun clearRecords() {

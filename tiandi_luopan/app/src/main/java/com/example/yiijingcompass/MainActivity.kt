@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         ShaSurveyStore.instance.init(this)
         CompassLayerManager.instance.init(this)
         UserEntitlementsManager.instance.init(this)
+        com.example.yiijingcompass.billing.GooglePlayBillingManager.instance.init(this)
 
         webView = findViewById(R.id.webview)
         webView.setBackgroundColor(android.graphics.Color.parseColor("#121216"))

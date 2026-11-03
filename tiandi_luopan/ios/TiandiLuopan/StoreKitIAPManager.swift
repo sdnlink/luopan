@@ -1278,8 +1278,11 @@ public class StoreKitIAPManager: ObservableObject {
               let subscription = product.subscription else {
             return .unknown
         }
-        let states = subscription.status.map { $0.state }
-        if states.contains(where: { $0 == .subscribed || $0 == .inGracePeriod || $0 == .billingRetry }) {
+        guard let statuses = try? await subscription.status else {
+            return .unknown
+        }
+        let states = statuses.map { $0.state }
+        if states.contains(where: { $0 == .subscribed || $0 == .inGracePeriod }) {
             return .active
         }
         if states.contains(where: { $0 == .expired || $0 == .revoked }) {

@@ -1,0 +1,17 @@
+country_or_region_code,country_or_region,available,storefront_language,notes
+CN,中国大陆,true,zh-Hans,简体中文界面与支持
+HK,香港,true,zh-Hant,繁体中文界面与支持
+MO,澳门,true,zh-Hant,繁体中文界面与支持
+TW,中国台湾,true,zh-Hant,繁体中文界面与支持
+SG,新加坡,true,zh-Hans;en,中文与英文界面
+MY,马来西亚,true,zh-Hans;en,中文与英文界面
+JP,日本,true,ja,日文界面与支持
+KR,韩国,true,ko,韩文界面与支持
+VN,越南,true,vi,越南文界面与支持
+TH,泰国,true,th,泰文界面与支持
+ID,印度尼西亚,true,id,印尼文界面与支持
+US,美国,true,en,英文界面与支持
+CA,加拿大,true,en,英文界面与支持
+AU,澳大利亚,true,en,英文界面与支持
+NZ,新西兰,true,en,英文界面与支持
+GB,英国,true,en,英文界面与支持

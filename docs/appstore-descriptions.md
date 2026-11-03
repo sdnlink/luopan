@@ -2,7 +2,7 @@
 
 以下内容用于 App Store Connect 的 **App 描述（Description）** 字段。每个本地化版本都保留完整的用户服务协议（Terms of Use / EULA）链接，避免自动审核因订阅商品缺少 EULA 链接而阻止提交。
 
-自定义 EULA：<https://sdnlink.cn/subscription-terms.html>
+自定义 EULA：<https://yulintao.github.io/tiandiluopan-support/>
 
 ## 简体中文（zh-Hans）
 
@@ -18,7 +18,7 @@
 
 AR、LiDAR、RoomPlan、相机识别和传统文化分析结果可能存在误差，仅供信息、学习研究和娱乐使用，不能替代医疗、建筑、测绘、结构、消防、法律、财务、投资或导航专业服务。涉及重大事项请现场复核并咨询具备资质的专业人士。
 
-条款与用户服务协议（EULA）：https://sdnlink.cn/subscription-terms.html
+条款与用户服务协议（EULA）：https://yulintao.github.io/tiandiluopan-support/
 
 ## 繁体中文（zh-Hant）
 
@@ -28,7 +28,7 @@ AR、LiDAR、RoomPlan、相机识别和传统文化分析结果可能存在误�
 
 AR、LiDAR、RoomPlan、相機識別和傳統文化分析結果可能存在誤差，僅供資訊、學習研究和娛樂使用，不能替代醫療、建築、測繪、結構、消防、法律、財務、投資或導航專業服務。重大事項請現場複核並諮詢具備資質的專業人士。
 
-條款與用戶服務協議（EULA）：https://sdnlink.cn/subscription-terms.html
+條款與用戶服務協議（EULA）：https://yulintao.github.io/tiandiluopan-support/
 
 ## English（en）
 
@@ -38,7 +38,7 @@ Features include compass and 24-mountain readings, solar terms and true solar ti
 
 AR, LiDAR, RoomPlan, camera recognition and traditional-culture results may be inaccurate. They are for information, learning and entertainment only and are not medical, architectural, surveying, structural, fire-safety, legal, financial, investment or navigation services. Verify important matters on site and consult qualified professionals.
 
-Terms of Use (EULA): https://sdnlink.cn/subscription-terms.html
+Terms of Use (EULA): https://yulintao.github.io/tiandiluopan-support/
 
 ## 日本語（ja）
 
@@ -48,7 +48,7 @@ Terms of Use (EULA): https://sdnlink.cn/subscription-terms.html
 
 AR、LiDAR、RoomPlan、カメラ認識および伝統文化の結果には誤差が生じる場合があります。情報、学習研究、娯楽のみを目的とし、医療、建築、測量、構造、消防、法律、金融、投資、ナビゲーションの専門サービスに代わるものではありません。重要な事項は現地で確認し、有資格者にご相談ください。
 
-利用規約（EULA）：https://sdnlink.cn/subscription-terms.html
+利用規約（EULA）：https://yulintao.github.io/tiandiluopan-support/
 
 ## 한국어（ko）
 
@@ -58,7 +58,7 @@ AR、LiDAR、RoomPlan、カメラ認識および伝統文化の結果には誤�
 
 AR, LiDAR, RoomPlan, 카메라 인식 및 전통 문화 분석 결과에는 오차가 있을 수 있습니다. 정보·학습·오락용이며 의료, 건축, 측량, 구조, 소방, 법률, 재무, 투자 또는 내비게이션 전문 서비스를 대체하지 않습니다. 중요한 사항은 현장에서 확인하고 자격 있는 전문가에게 문의하세요.
 
-이용약관（EULA）：https://sdnlink.cn/subscription-terms.html
+이용약관（EULA）：https://yulintao.github.io/tiandiluopan-support/
 
 ## Tiếng Việt（vi）
 
@@ -68,7 +68,7 @@ Thiên Cơ Diễn Tượng là công cụ đo đạc không gian, phân tích m�
 
 Kết quả AR, LiDAR, RoomPlan, nhận dạng camera và phân tích văn hóa truyền thống có thể sai lệch. Nội dung chỉ dành cho thông tin, học tập và giải trí, không thay thế dịch vụ y tế, kiến trúc, trắc địa, kết cấu, phòng cháy, pháp lý, tài chính, đầu tư hoặc dẫn đường. Hãy kiểm tra thực tế và hỏi chuyên gia có đủ năng lực đối với vấn đề quan trọng.
 
-Điều khoản sử dụng (EULA): https://sdnlink.cn/subscription-terms.html
+Điều khoản sử dụng (EULA): https://yulintao.github.io/tiandiluopan-support/
 
 ## ภาษาไทย（th）
 
@@ -78,7 +78,7 @@ Kết quả AR, LiDAR, RoomPlan, nhận dạng camera và phân tích văn hóa 
 
 ผลลัพธ์จาก AR, LiDAR, RoomPlan การรู้จำกล้อง และการวิเคราะห์วัฒนธรรมดั้งเดิมอาจคลาดเคลื่อน ใช้เพื่อข้อมูล การเรียนรู้ และความบันเทิงเท่านั้น ไม่ใช่บริการทางการแพทย์ สถาปัตยกรรม สำรวจ โครงสร้าง ป้องกันอัคคีภัย กฎหมาย การเงิน การลงทุน หรือการนำทาง โปรดตรวจสอบหน้างานและปรึกษาผู้เชี่ยวชาญสำหรับเรื่องสำคัญ
 
-ข้อกำหนดการใช้งาน (EULA): https://sdnlink.cn/subscription-terms.html
+ข้อกำหนดการใช้งาน (EULA): https://yulintao.github.io/tiandiluopan-support/
 
 ## Bahasa Indonesia（id）
 
@@ -88,4 +88,4 @@ Fitur mencakup kompas dan 24 gunung, Fenjin, istilah matahari dan waktu matahari
 
 Hasil AR, LiDAR, RoomPlan, pengenalan kamera, dan analisis budaya tradisional dapat tidak akurat. Konten hanya untuk informasi, pembelajaran, dan hiburan, bukan pengganti layanan medis, arsitektur, survei, struktur, keselamatan kebakaran, hukum, keuangan, investasi, atau navigasi. Verifikasi hal penting di lokasi dan konsultasikan dengan profesional yang memenuhi syarat.
 
-Ketentuan Penggunaan (EULA): https://sdnlink.cn/subscription-terms.html
+Ketentuan Penggunaan (EULA): https://yulintao.github.io/tiandiluopan-support/

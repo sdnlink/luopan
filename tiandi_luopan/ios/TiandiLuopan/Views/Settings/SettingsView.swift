@@ -2,13 +2,14 @@ import SwiftUI
 import Foundation
 
 /// Public HTTPS pages used by the purchase flow and App Store metadata.
-/// Keep these URLs stable: changing a legal URL after review can make the
-/// links shown in the paywall point at an outdated policy.
+/// Keep these URLs stable so the links shown in Settings and the paywall
+/// always point at the currently published legal pages.
 public enum LegalLinks {
     // Escape the slashes so the repository's lightweight Swift checker does
     // not mistake the URL for a source comment.
-    public static let privacyPolicy = URL(string: "https:\u{2F}\u{2F}sdnlink.cn/privacy.html")!
-    public static let termsOfUse = URL(string: "https:\u{2F}\u{2F}sdnlink.cn/subscription-terms.html")!
+    public static let termsOfUse = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-support/")!
+    public static let privacyPolicy = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-privacy/")!
+    public static let subscriptionInfo = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-subscription/")!
 }
 
 private enum LegalDocument: String, Identifiable {
@@ -277,27 +278,25 @@ public struct SettingsView: View {
                             .lineSpacing(3)
                     }
                     HStack(spacing: 16) {
-                        Button(lang.t("legal_terms_button")) {
-                            legalDocument = .terms
+                        Link(destination: LegalLinks.termsOfUse) {
+                            Label(lang.t("legal_terms_button"), systemImage: "safari")
                         }
                         .font(.adaptive(size: 12, weight: .semibold))
-                        .foregroundColor(Color.yanCyan)
-                        Link(destination: LegalLinks.termsOfUse) {
-                            Image(systemName: "safari")
-                                .accessibilityLabel(lang.t("legal_terms_button"))
-                        }
                         .foregroundColor(Color.yanCyan)
                         Spacer()
-                        Button(lang.t("legal_privacy_button")) {
-                            legalDocument = .privacy
+                        Link(destination: LegalLinks.privacyPolicy) {
+                            Label(lang.t("legal_privacy_button"), systemImage: "safari")
                         }
                         .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
-                        Link(destination: LegalLinks.privacyPolicy) {
-                            Image(systemName: "safari")
-                                .accessibilityLabel(lang.t("legal_privacy_button"))
+                    }
+                    HStack {
+                        Link(destination: LegalLinks.subscriptionInfo) {
+                            Label(lang.t("subscription_info_button"), systemImage: "safari")
                         }
+                        .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
+                        Spacer()
                     }
                     Button {
                         legalDocument = .compliance

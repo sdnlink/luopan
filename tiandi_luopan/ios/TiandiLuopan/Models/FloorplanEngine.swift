@@ -477,7 +477,8 @@ public class FloorplanEngine {
                 let content = missingCornerContent(gua: palace.gua)
                 r.inspectionTitle = content.title
                 r.inspectionLevel = "预警"
-                r.inspectionLore = content.lore
+                let lore = missingCornerLoreWithSource(gua: palace.gua, lore: content.lore)
+                r.inspectionLore = lore
                 r.inspectionAdvice = content.solution
                 updatedRooms.append(r)
                 auditReport.append(FloorplanAuditItem(
@@ -485,7 +486,7 @@ public class FloorplanEngine {
                     title: "\(r.name) · \(content.title)",
                     palace: r.palaceName,
                     severity: "预警",
-                    lore: content.lore,
+                    lore: lore,
                     solution: content.solution
                 ))
                 continue
@@ -691,12 +692,13 @@ public class FloorplanEngine {
             guard !emittedGua.contains(palace.gua) else { continue }
             emittedGua.insert(palace.gua)
             let content = missingCornerContent(gua: palace.gua)
+            let lore = missingCornerLoreWithSource(gua: palace.gua, lore: content.lore)
             results.append(FloorplanAuditItem(
                 id: "missing-corner-\(palace.gua)",
                 title: content.title,
                 palace: palace.dir,
                 severity: "预警",
-                lore: content.lore,
+                lore: lore,
                 solution: content.solution
             ))
         }
@@ -778,6 +780,42 @@ public class FloorplanEngine {
         }
     }
 
+    /// Adds the classical source and plain-language context to the two
+    /// missing-corner sectors whose traditional interpretation includes
+    /// wealth or water-flow language. The Chinese strings already contain
+    /// their citations; this keeps the other localized reports equally
+    /// explicit without replacing the original judgment.
+    private func missingCornerLoreWithSource(gua: String, lore: String) -> String {
+        let isXun = ["巽", "Xun", "손", "Tốn", "ซวิ่น"].contains(gua)
+        let isKan = ["坎", "Kan", "감", "Khảm", "ข่าน"].contains(gua)
+        guard isXun || isKan else { return lore }
+        let language = LocalizationManager.shared.effectiveLanguage
+        let source: String
+        if isXun {
+            switch language {
+            case .en: source = "Classical source: the Book of Changes, Discussion of the Trigrams, says ‘Xun is Wood, Wind, the eldest daughter and entering.’ Later yang-house traditions extend this to wealth and networks."
+            case .ja: source = "出典：『易経・説卦伝』「巽は木、風、長女、入」。後世の陽宅論では財・人脈・資源の流れに引き継ぎます。"
+            case .ko: source = "출처: 《주역·설괘전》 ‘손은 나무·바람·장녀·들어감’이라 하며, 후대 양택론은 이를 재물·인맥·자원 흐름으로 풀이합니다."
+            case .vi: source = "Nguồn: 《Kinh Dịch·Thuyết Quái》 ghi ‘Tốn là Mộc, là Gió, con gái trưởng và sự đi vào’; dương trạch hậu thế diễn giải thêm về tài lộc, quan hệ và dòng nguồn lực."
+            case .th: source = "แหล่งที่มา: 《อี้จิง·ซัวกว้า》กล่าวว่า ‘ซวิ่นคือไม้ ลม บุตรสาวคนโต และการเข้า’; ตำราหยางไจ๋ภายหลังขยายความเป็นทรัพย์ เครือข่าย และการไหลของทรัพยากร"
+            case .id: source = "Sumber klasik: 《I Ching·Shuo Gua》 menyebut ‘Xun adalah Kayu, Angin, putri sulung dan memasuki’; tradisi yang zhai kemudian mengaitkannya dengan rezeki, jaringan dan arus sumber daya."
+            case .zhHant, .zhHans, .auto: source = ""
+            }
+        } else {
+            switch language {
+            case .en: source = "Classical source: the Book of Changes, Discussion of the Trigrams, says ‘Kan is Water, channels and concealment.’ Later yang-house traditions extend this to wealth flow and drainage."
+            case .ja: source = "出典：『易経・説卦伝』「坎は水、溝瀆、隠伏」。後世の陽宅論では財の流れと水回りに引き継ぎます。"
+            case .ko: source = "출처: 《주역·설괘전》 ‘감은 물·도랑·숨음’이라 하며, 후대 양택론은 이를 재물 흐름과 배수로 풀이합니다."
+            case .vi: source = "Nguồn: 《Kinh Dịch·Thuyết Quái》 ghi ‘Khảm là Nước, mương rãnh và ẩn phục’; dương trạch hậu thế diễn giải thêm về dòng tài lộc và thoát nước."
+            case .th: source = "แหล่งที่มา: 《อี้จิง·ซัวกว้า》กล่าวว่า ‘ข่านคือน้ำ คูคลอง และการซ่อนเร้น’; ตำราหยางไจ๋ภายหลังขยายความเป็นกระแสทรัพย์และทางระบายน้ำ"
+            case .id: source = "Sumber klasik: 《I Ching·Shuo Gua》 menyebut ‘Kan adalah Air, saluran dan tersembunyi’; tradisi yang zhai kemudian mengaitkannya dengan arus rezeki dan drainase."
+            case .zhHant, .zhHans, .auto: source = ""
+            }
+        }
+        guard !source.isEmpty else { return lore }
+        return "\(lore) \(source)"
+    }
+
     private func missingCornerContent(gua: String) -> (title: String, lore: String, solution: String) {
         switch gua {
         case "乾", "Qian", "건", "Càn", "เฉียน":
@@ -844,9 +882,9 @@ public class FloorplanEngine {
                     "มุมเว้าแหว่ง · ทิศตะวันออกเฉียงใต้ซวิ่น", "Sudut Hilang · Tenggara Xun"
                 ),
                 tr8(
-                    "东南巽位缺角属于传统文化中的空间布局提示，可关注动线、沟通、通风和采光；当前判断基于房间框，需先核对真实外墙。",
-                    "東南巽位缺角屬於傳統文化中的空間布局提示，可關注動線、溝通、通風和採光；當前判斷基於房間框，需先核對真實外牆。",
-                    "A southeast Xun gap is a traditional-culture space-layout reference; review circulation, communication, ventilation and daylight, and verify the actual exterior wall.",
+                    "东南巽位缺角常被用于提示财务规划、资源流动、沟通关系和通风采光方面需要关注；出处：《易经·说卦传》：“巽为木，为风，为长女，为入。”传统阳宅缺角论将巽位引申为财帛、人脉与资源流动。解释：以上是古籍方位象征，当前判断基于房间框，需先核对真实外墙，财务事项请独立核实。",
+                    "東南巽位缺角常被用於提示財務規劃、資源流動、溝通關係和通風採光方面需要關注；出處：《易經·說卦傳》：「巽為木，為風，為長女，為入。」傳統陽宅缺角論將巽位引申為財帛、人脈與資源流動。解釋：以上是古籍方位象徵，當前判斷基於房間框，需先核對真實外牆，財務事項請獨立核實。",
+                    "A southeast Xun gap is traditionally associated with financial planning, resource flow, relationships, ventilation and daylight. The Book of Changes, Discussion of the Trigrams, says: ‘Xun is Wood, Wind, the eldest daughter and entering.’ Later yang-house traditions extend this to wealth and networks. Verify the actual exterior wall; check financial decisions independently.",
                     "南東の巽位の欠けは財政計画、人脈関係、風通しや日当たりに留意が必要とされます。",
                     "동남 손위 결손은 재정 계획, 자원 순환, 대인관계 및 채광·통풍에 주의가 필요함을 나타냅니다.",
                     "Khuyết góc Đông Nam Tốn vị liên quan đến tài chính, lưu thông của cải, giao tiếp xã hội và độ thông thoáng.",
@@ -900,9 +938,9 @@ public class FloorplanEngine {
                     "มุมเว้าแหว่ง · ทิศเหนือข่าน", "Sudut Hilang · Utara Kan"
                 ),
                 tr8(
-                    "正北坎位缺角属于传统文化中的空间布局提示，可关注作息、动线、管线和排水；当前判断基于房间框，需先核对真实外墙。",
-                    "正北坎位缺角屬於傳統文化中的空間布局提示，可關注作息、動線、管線和排水；當前判斷基於房間框，需先核對真實外牆。",
-                    "A north Kan gap is a traditional-culture space-layout reference; review rest, circulation, pipes and drainage, and verify the actual exterior wall.",
+                    "正北坎位缺角常被用于提示作息安全、情绪压力、财务流动和与水有关的使用空间；出处：《易经·说卦传》：“坎为水，为沟渎，为隐伏。”传统阳宅缺角论将坎位引申为财源、流动与水路。解释：以上是古籍方位象征，当前判断基于房间框，需先核对真实外墙、管线和排水，财务事项请独立核实。",
+                    "正北坎位缺角常被用於提示作息安全、情緒壓力、財務流動和與水有關的使用空間；出處：《易經·說卦傳》：「坎為水，為溝瀆，為隱伏。」傳統陽宅缺角論將坎位引申為財源、流動與水路。解釋：以上是古籍方位象徵，當前判斷基於房間框，需先核對真實外牆、管線和排水，財務事項請獨立核實。",
+                    "A north Kan gap is traditionally associated with rest, emotional pressure, financial flow and water-related utilities. The Book of Changes, Discussion of the Trigrams, says: ‘Kan is Water, channels and concealment.’ Later yang-house traditions extend this to wealth flow and drainage. Verify the exterior wall, pipes and drainage; check financial decisions independently.",
                     "北の坎位の欠けは休息の質、精神的ストレス、財の循環や配管・水回りの安全に留意が必要とされます。",
                     "정북 감위 결손은 휴식의 질, 감정적 스트레스, 재정 유동성 및 배수 상태와 연관됩니다.",
                     "Khuyết góc Chính Bắc Khảm vị nhắc nhở lưu ý đến giấc ngủ, áp lực tinh thần, dòng chảy tài chính và hệ thống cấp thoát nước.",

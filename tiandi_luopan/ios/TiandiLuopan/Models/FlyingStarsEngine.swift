@@ -288,17 +288,46 @@ public struct XuanKongChart {
     
     /// 基于九宫飞星排盘动态推导的【催财旺气建议】
     public var wealthAdvice: String {
+        baseWealthAdvice + "\n\n" + wealthSourceNote
+    }
+
+    private var baseWealthAdvice: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        let candidate = palaces.first(where: { $0.facingStar == period && !$0.hasEarthSha })?.localizedPalaceName ?? ""
+        // Never recommend activation in a 5-Yellow/2-Black palace. The
+        // current-period star does not override an earth-sha warning.
+        let wangPalace = palaces.first(where: { $0.facingStar == period && !$0.hasEarthSha })
+        let nextStar = (period % 9) + 1
+        let shengQiPalace = palaces.first(where: { !$0.isCenter && $0.facingStar == nextStar && !$0.hasEarthSha })
+            ?? palaces.first(where: { $0.facingStar == nextStar && !$0.hasEarthSha })
+        let wenchangPalace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 1 && $0.facingStar == 4) || ($0.mountainStar == 4 && $0.facingStar == 1) || ($0.mountainStar == 1 && $0.facingStar == 6) || ($0.mountainStar == 6 && $0.facingStar == 1)) })
+
+        let wangName = wangPalace?.localizedPalaceName ?? ""
+        let wangCombo = wangPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(period)"
+        let sqName = shengQiPalace?.localizedPalaceName ?? ""
+        let sqCombo = shengQiPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(nextStar)"
+        let wcName = wenchangPalace?.localizedPalaceName
+
         switch lang {
-        case .en: return "• Space-use reference: keep [\(candidate)] clear, bright and easy to circulate; verify glare, noise, ventilation and drainage on site."
-        case .zhHant: return "• 空間使用參考：保持【\(candidate)】通暢、明亮，並現場核對眩光、噪音、通風和排水。"
-        case .ja: return "• 空間利用の参考：【\(candidate)】を明るく通りやすく保ち、眩しさ、騒音、換気、排水を現地で確認します。"
-        case .ko: return "• 공간 사용 참고: 【\(candidate)】을 밝고 통행하기 쉽게 유지하고 눈부심·소음·환기·배수를 현장에서 확인하세요."
-        case .vi: return "• Tham khảo sử dụng không gian: giữ 【\(candidate)】 thông thoáng, sáng và dễ đi lại; kiểm tra chói sáng, tiếng ồn, thông gió và thoát nước tại chỗ."
-        case .th: return "• อ้างอิงการใช้พื้นที่: รักษา【\(candidate)】ให้โล่ง สว่าง และเดินได้สะดวก ตรวจสอบแสงจ้า เสียง การระบายอากาศ และการระบายน้ำหน้างาน"
-        case .id: return "• Referensi penggunaan ruang: jaga [\(candidate)] tetap terang, lega, dan mudah dilalui; periksa silau, kebisingan, ventilasi, dan drainase di lokasi."
-        case .auto, .zhHans: return "• 空间使用参考：保持【\(candidate)】通畅、明亮，并现场核对眩光、噪音、通风和排水。"
+        case .en:
+            let wcNote = wcName.map { " Wenchang/Harmony star gathers at [\($0)]." } ?? ""
+            return "• Wealth & Prosperity: Current Period-\(period) facing star lands at [\(wangName)] (Star \(wangCombo)), and future Sheng-Qi Star \(nextStar) reaches [\(sqName)] (Star \(sqCombo)). Keep these sectors bright, open, or place moving water to activate wealth.\(wcNote)"
+        case .zhHant:
+            let wcNote = wcName.map { "另【\($0)】逢文昌吉星會聚，利書房策劃。" } ?? ""
+            return "• 催財旺位：當令\(period)運向星飛臨【\(wangName)】（山向\(wangCombo)），生氣\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂開闊、安設動水或長明燈催旺財源。\(wcNote)"
+        case .ja:
+            let wcNote = wcName.map { "また【\($0)】は文昌吉星が会聚し書斎に吉。" } ?? ""
+            return "• 催財旺位：当令\(period)運の向星が【\(wangName)】（山向\(wangCombo)）に飛臨し、生気\(nextStar)星が【\(sqName)】（山向\(sqCombo)）に到ります。採光や動水を設けて財気を催旺してください。\(wcNote)"
+        case .ko:
+            return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오."
+        case .vi:
+            return "• Cung kích tài: Hướng tinh đương vận \(period) bay tới 【\(wangName)】 (Sơn Hướng \(wangCombo)), sinh khí tinh \(nextStar) đáo 【\(sqName)】 (Sơn Hướng \(sqCombo)), nên mở thoáng, tăng ánh sáng hoặc đặt thủy động kích hoạt tài lộc."
+        case .th:
+            return "• ตำแหน่งเรียกทรัพย์: ดาวหันประจำยุค \(period) สถิตที่ 【\(wangName)】 (ดาว \(wangCombo)) และดาวพลัง生气 \(nextStar) อยู่ที่ 【\(sqName)】 (ดาว \(sqCombo)) ควรเปิดโล่งรับแสงหรือตั้งน้ำพุกระตุ้นโชคลาภ"
+        case .id:
+            return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki."
+        case .auto, .zhHans:
+            let wcNote = wcName.map { "另【\($0)】逢文昌吉星会聚，利书房策划。" } ?? ""
+            return "• 催财旺位：当令\(period)运向星飞临【\(wangName)】（山向\(wangCombo)），生气\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂开阔、安设动水或长明灯催旺财源。\(wcNote)"
         }
     }
 
@@ -437,21 +466,42 @@ public struct XuanKongChart {
     private var traditionalSourceNote: String {
         switch LocalizationManager.shared.effectiveLanguage {
         case .en:
-            return "Classical source: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The wealth, people and health wording above is a traditional symbolic reading, not a medical or financial prediction."
+            return "Classical sources: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The traditional Xuan-Kong mountain/facing-star formula preserves the wording ‘Wang Shan Wang Xiang prospers people and wealth; Double Stars at Facing prospers wealth but not people; Double Stars at Sitting prospers people but not wealth; Shang Shan Xia Shui brings loss of wealth and people’ (transmitted versions differ). These wealth, people and health statements are traditional symbolic readings, not medical or financial predictions."
         case .zhHant:
-            return "古籍出处：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」上文財丁與健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
+            return "古籍出處：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」玄空山向星訣（傳本有異文）保留「到山到向，旺丁旺財；雙星到向，旺財不旺丁；雙星到坐，旺丁不旺財；上山下水，敗財損丁」等原文。上文財丁、健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
         case .ja:
-            return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
+            return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。玄空山向星訣（伝本に異文）は「到山到向は財と人が栄え、双星到向は財、双星到坐は人、上山下水は財と人を損なう」と伝えます。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
         case .ko:
-            return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
+            return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 전통 현공 산향성결은 ‘도산도향 왕정왕재, 쌍성도향 왕재불왕정, 쌍성도좌 왕정불왕재, 동산하수 손재손정’으로 전합니다(전본 이문). 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
         case .vi:
-            return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Các câu về tài, đinh và sức khỏe là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
+            return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài bất vượng đinh; song tinh đáo tọa vượng đinh bất vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Đây là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
         case .th:
-            return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
+            return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์แต่ไม่คน; ดาวคู่สู่หลังรุ่งเรืองคนแต่ไม่ทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
         case .id:
-            return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
+            return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Rumus bintang gunung/hadap Xuan-Kong mempertahankan ungkapan ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta, bintang ganda di duduk memakmurkan orang, Shang Shan Xia Shui merusak harta dan orang’ (versi tradisi berbeda). Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
         case .auto, .zhHans:
-            return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”上文财丁与健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
+            return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”玄空山向星诀（传本有异文）保留“到山到向，旺丁旺财；双星到向，旺财不旺丁；双星到坐，旺丁不旺财；上山下水，败财损丁”等原文。上文财丁、健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
+        }
+    }
+
+    private var wealthSourceNote: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Classical source: the transmitted Xuan-Kong mountain/facing-star formula (wording varies by edition) uses ‘Wang Shan Wang Xiang prospers people and wealth’, ‘Double Stars at Facing prospers wealth’, and ‘Shang Shan Xia Shui loses wealth and people’. Explanation: wealth, income and prosperity are traditional metaphysical symbols; verify real budgets and decisions independently."
+        case .zhHant:
+            return "古籍出處：玄空山向星訣（傳本有異文）有「到山到向，旺丁旺財；雙星到向，旺財不旺丁；上山下水，敗財損丁」等原文。解釋：財源、收入與旺財是傳統術數象徵，實際預算及決策請獨立核對。"
+        case .ja:
+            return "出典：玄空山向星訣（伝本に異文）には「到山到向は財と人が栄え、双星到向は財、上山下水は財と人を損なう」とあります。解釈：財・収入・繁栄は伝統術数の象徴であり、実際の予算と判断は独立に確認してください。"
+        case .ko:
+            return "출처: 전통 현공 산향성결(전본 이문)은 ‘도산도향 왕정왕재, 쌍성도향 왕재, 동산하수 손재손정’이라 전합니다. 설명: 재물·수입·번영은 전통 술수의 상징이며 실제 예산과 결정은 별도로 확인하세요."
+        case .vi:
+            return "Nguồn: Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Giải thích: tài lộc, thu nhập và thịnh vượng là biểu tượng thuật số; hãy tự kiểm tra ngân sách và quyết định thực tế."
+        case .th:
+            return "แหล่งที่มา: ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) คำอธิบาย: ทรัพย์ รายได้ และความรุ่งเรืองเป็นสัญลักษณ์ทางโหราศาสตร์ ควรตรวจสอบงบประมาณและการตัดสินใจจริงแยกต่างหาก"
+        case .id:
+            return "Sumber: rumus bintang gunung/hadap Xuan-Kong (versi tradisi berbeda) memuat ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta; Shang Shan Xia Shui merusak harta dan orang’. Penjelasan: rezeki, pendapatan, dan kemakmuran adalah simbol metafisika tradisional; periksa anggaran dan keputusan nyata secara mandiri."
+        case .auto, .zhHans:
+            return "古籍出处：玄空山向星诀（传本有异文）有“到山到向，旺丁旺财；双星到向，旺财不旺丁；上山下水，败财损丁”等原文。解释：财源、收入与旺财是传统术数象征，实际预算及决策请独立核对。"
         }
     }
 

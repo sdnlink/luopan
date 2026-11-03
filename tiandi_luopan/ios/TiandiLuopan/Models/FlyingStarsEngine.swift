@@ -2,6 +2,30 @@ import Foundation
 
 // MARK: - 玄空九宫飞星排盘引擎 (XuanKong Flying Stars Engine)
 
+/// Classical source notes shared by palace-level evaluations and chart summaries.
+/// Keeping this at file scope prevents localized evaluations from depending on
+/// the `XuanKongChart` instance that owns the chart-level advice.
+private func flyingStarsTraditionalSourceNote(for language: AppLanguage) -> String {
+    switch language {
+    case .en:
+        return "Classical sources: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The traditional Xuan-Kong mountain/facing-star formula preserves the wording ‘Wang Shan Wang Xiang prospers people and wealth; Double Stars at Facing prospers wealth but not people; Double Stars at Sitting prospers people but not wealth; Shang Shan Xia Shui brings loss of wealth and people’ (transmitted versions differ). These wealth, people and health statements are traditional symbolic readings, not medical or financial predictions."
+    case .zhHant:
+        return "古籍出處：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」玄空山向星訣（傳本有異文）保留「到山到向，旺丁旺財；雙星到向，旺財不旺丁；雙星到坐，旺丁不旺財；上山下水，敗財損丁」等原文。上文財丁、健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
+    case .ja:
+        return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。玄空山向星訣（伝本に異文）は「到山到向は財と人が栄え、双星到向は財、双星到坐は人、上山下水は財と人を損なう」と伝えます。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
+    case .ko:
+        return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 전통 현공 산향성결은 ‘도산도향 왕정왕재, 쌍성도향 왕재불왕정, 쌍성도좌 왕정불왕재, 동산하수 손재손정’으로 전합니다(전본 이문). 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
+    case .vi:
+        return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài bất vượng đinh; song tinh đáo tọa vượng đinh bất vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Đây là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
+    case .th:
+        return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์แต่ไม่คน; ดาวคู่สู่หลังรุ่งเรืองคนแต่ไม่ทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
+    case .id:
+        return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Rumus bintang gunung/hadap Xuan-Kong mempertahankan ungkapan ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta, bintang ganda di duduk memakmurkan orang, Shang Shan Xia Shui merusak harta dan orang’ (versi tradisi berbeda). Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
+    case .auto, .zhHans:
+        return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”玄空山向星诀（传本有异文）保留“到山到向，旺丁旺财；双星到向，旺财不旺丁；双星到坐，旺丁不旺财；上山下水，败财损丁”等原文。上文财丁、健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
+    }
+}
+
 public struct PalaceCell: Identifiable {
     public let id: Int // 0..8 (九宫对应: 0:坎, 1:坤, 2:震, 3:巽, 4:中, 5:乾, 6:兑, 7:艮, 8:离)
     public let palaceName: String
@@ -102,7 +126,9 @@ public struct PalaceCell: Identifiable {
     }
 
     public var localizedEvaluation: String {
-        baseLocalizedEvaluation + "\n\n" + traditionalSourceNote
+        baseLocalizedEvaluation + "\n\n" + flyingStarsTraditionalSourceNote(
+            for: LocalizationManager.shared.effectiveLanguage
+        )
     }
 
     private var baseLocalizedEvaluation: String {
@@ -238,7 +264,9 @@ public struct PalaceCell: Identifiable {
     }
     
     public var evaluation: String {
-        baseEvaluation + "\n\n" + traditionalSourceNote
+        baseEvaluation + "\n\n" + flyingStarsTraditionalSourceNote(
+            for: LocalizationManager.shared.effectiveLanguage
+        )
     }
 
     private var baseEvaluation: String {
@@ -464,24 +492,9 @@ public struct XuanKongChart {
     }
 
     private var traditionalSourceNote: String {
-        switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
-            return "Classical sources: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The traditional Xuan-Kong mountain/facing-star formula preserves the wording ‘Wang Shan Wang Xiang prospers people and wealth; Double Stars at Facing prospers wealth but not people; Double Stars at Sitting prospers people but not wealth; Shang Shan Xia Shui brings loss of wealth and people’ (transmitted versions differ). These wealth, people and health statements are traditional symbolic readings, not medical or financial predictions."
-        case .zhHant:
-            return "古籍出處：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」玄空山向星訣（傳本有異文）保留「到山到向，旺丁旺財；雙星到向，旺財不旺丁；雙星到坐，旺丁不旺財；上山下水，敗財損丁」等原文。上文財丁、健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
-        case .ja:
-            return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。玄空山向星訣（伝本に異文）は「到山到向は財と人が栄え、双星到向は財、双星到坐は人、上山下水は財と人を損なう」と伝えます。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
-        case .ko:
-            return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 전통 현공 산향성결은 ‘도산도향 왕정왕재, 쌍성도향 왕재불왕정, 쌍성도좌 왕정불왕재, 동산하수 손재손정’으로 전합니다(전본 이문). 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
-        case .vi:
-            return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài bất vượng đinh; song tinh đáo tọa vượng đinh bất vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Đây là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
-        case .th:
-            return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์แต่ไม่คน; ดาวคู่สู่หลังรุ่งเรืองคนแต่ไม่ทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
-        case .id:
-            return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Rumus bintang gunung/hadap Xuan-Kong mempertahankan ungkapan ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta, bintang ganda di duduk memakmurkan orang, Shang Shan Xia Shui merusak harta dan orang’ (versi tradisi berbeda). Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
-        case .auto, .zhHans:
-            return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”玄空山向星诀（传本有异文）保留“到山到向，旺丁旺财；双星到向，旺财不旺丁；双星到坐，旺丁不旺财；上山下水，败财损丁”等原文。上文财丁、健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
-        }
+        flyingStarsTraditionalSourceNote(
+            for: LocalizationManager.shared.effectiveLanguage
+        )
     }
 
     private var wealthSourceNote: String {
@@ -813,23 +826,24 @@ public final class FlyingStarsEngine {
         let summary: String
         let sittingName = sitting.localizedName
         let facingName = facing.localizedName
+        let sourceNote = flyingStarsTraditionalSourceNote(for: lang)
         switch lang {
         case .en:
-            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony.\n\n\(traditionalSourceNote)"
+            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony.\n\n\(sourceNote)"
         case .zhHant:
-            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。\n\n\(sourceNote)"
         case .ja:
-            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。\n\n\(sourceNote)"
         case .ko:
-            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다.\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다.\n\n\(sourceNote)"
         case .vi:
-            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh.\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh.\n\n\(sourceNote)"
         case .th:
-            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล\n\n\(sourceNote)"
         case .id:
-            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)—\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga.\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)—\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga.\n\n\(sourceNote)"
         case .auto, .zhHans:
-            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。\n\n\(traditionalSourceNote)"
+            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。\n\n\(sourceNote)"
         }
         
         let modeTitle = useTiGua

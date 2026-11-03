@@ -2,32 +2,230 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>天机演象 · 用户服务协议与订阅条款</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>天机演象 · 用户服务协议与自动续费订阅条款</title>
   <style>
-    :root { color-scheme: light dark; --bg: #111216; --card: #1b1d24; --text: #f4f4f6; --muted: #b5b7c0; --gold: #e0bd5a; --line: #343641; }
-    * { box-sizing: border-box; }
-    body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--text); font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    main { max-width: 860px; margin: 0 auto; padding: 28px clamp(20px, 5vw, 56px); background: var(--card); border: 1px solid var(--line); border-radius: 18px; }
-    h1 { margin: 0 0 8px; color: var(--gold); font-size: clamp(24px, 4vw, 34px); line-height: 1.3; }
-    h2 { margin: 34px 0 8px; color: var(--gold); font-size: 21px; line-height: 1.4; }
-    h3 { margin: 22px 0 6px; font-size: 17px; }
-    p, li { color: var(--muted); }
+    :root {
+      color-scheme: dark;
+      --bg: #0a0b0e;
+      --card: #14161f;
+      --text: #f5f6fa;
+      --muted: #9aa1b2;
+      --gold: #d4af37;
+      --gold-light: #f5e6b3;
+      --line: #262938;
+      --border-gold: rgba(212, 175, 55, 0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 24px 16px calc(48px + env(safe-area-inset-bottom));
+    }
+    .nav-header {
+      max-width: 860px;
+      margin: 0 auto 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 0 4px;
+    }
+    .nav-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gold-light);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .nav-links {
+      display: inline-flex;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .nav-links a:hover {
+      color: var(--gold-light);
+    }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: clamp(20px, 5vw, 44px);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    }
+    h1 {
+      margin: 0 0 10px;
+      color: var(--gold-light);
+      font-size: clamp(22px, 5vw, 30px);
+      line-height: 1.35;
+    }
+    h2 {
+      margin: 34px 0 12px;
+      color: var(--gold);
+      font-size: clamp(17px, 4vw, 20px);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+      line-height: 1.4;
+    }
+    h3 {
+      margin: 22px 0 6px;
+      font-size: 16px;
+      color: #fff;
+    }
+    p, li {
+      color: var(--muted);
+      margin-bottom: 12px;
+      word-break: break-word;
+    }
+    ul {
+      padding-left: 20px;
+      margin-bottom: 12px;
+    }
     strong { color: var(--text); }
-    a { color: var(--gold); }
-    .meta { color: var(--muted); font-size: 14px; }
-    .notice { margin: 22px 0; padding: 14px 16px; border-left: 4px solid var(--gold); background: rgba(224, 189, 90, .1); }
-    .products { width: 100%; border-collapse: collapse; margin: 12px 0 20px; }
-    .products th, .products td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; color: var(--muted); }
-    .products th { color: var(--text); }
-    code { color: var(--text); }
-    footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; }
+    a {
+      color: var(--gold);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    a:hover {
+      color: var(--gold-light);
+      text-decoration: underline;
+    }
+    .meta {
+      color: #7e8696;
+      font-size: 13px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .notice {
+      margin: 22px 0;
+      padding: 14px 18px;
+      border-left: 4px solid var(--gold);
+      background: rgba(212, 175, 55, 0.08);
+      border-radius: 6px;
+      color: #e5e9f2;
+      font-size: 14px;
+    }
+    /* 表格响应式容器 */
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 16px 0 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .products {
+      width: 100%;
+      min-width: 520px;
+      border-collapse: collapse;
+    }
+    .products th, .products td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      color: var(--muted);
+      font-size: 13.5px;
+    }
+    .products tr:last-child td {
+      border-bottom: none;
+    }
+    .products th {
+      color: var(--gold-light);
+      background: rgba(255, 255, 255, 0.03);
+      font-weight: 700;
+    }
+    code {
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      word-break: break-all;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 44px 0;
+    }
+    footer {
+      margin-top: 36px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+      color: #7a8292;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+    }
+    .icp-link {
+      color: #9aa1b2;
+      text-decoration: none;
+    }
+    .icp-link:hover {
+      color: var(--gold);
+      text-decoration: underline;
+    }
+
+    /* 手机端响应式适配 */
+    @media (max-width: 600px) {
+      body {
+        padding: 14px 10px calc(36px + env(safe-area-inset-bottom));
+      }
+      .nav-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      main {
+        padding: 20px 14px;
+        border-radius: 12px;
+      }
+      p, li {
+        font-size: 13.5px;
+        line-height: 1.68;
+      }
+      .notice {
+        padding: 12px 14px;
+        margin: 16px 0;
+      }
+      hr {
+        margin: 32px 0;
+      }
+    }
   </style>
 </head>
 <body>
+<div class="nav-header">
+  <a href="index.html" class="nav-brand">
+    <span>🧭</span> 北京长线科技 · 天机演象
+  </a>
+  <div class="nav-links">
+    <a href="index.html">官网首页</a>
+    <a href="privacy.html">隐私政策</a>
+    <a href="appstore-marketing.html">产品介绍</a>
+  </div>
+</div>
+
 <main>
   <h1>天机演象 · 用户服务协议与订阅条款</h1>
-  <p class="meta">生效日期：2026 年 11 月 3 日　开发者：北京长线科技有限公司　支持邮箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <p class="meta">生效日期：2026 年 11 月 3 日 · 开发者：北京长线科技有限公司 · 支持邮箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
 
   <div class="notice"><strong>重要提示：</strong>本应用提供罗盘读数、AR/LiDAR/RoomPlan 空间数据展示、户型几何工具和传统民俗文化参考内容。所有测量、识别、评分和建议都可能存在误差，仅供信息、学习和娱乐使用，不能替代医疗、建筑、测绘、结构、消防、法律、财务、投资或导航服务。</div>
 
@@ -36,15 +234,17 @@
   <p>请勿将应用用于紧急处置、车辆或航空导航、房屋安全鉴定、土地测量、施工放样、承重结构判断、工程验收、医疗决定或其他人身安全决定。</p>
 
   <h2>二、应用内购买商品</h2>
-  <table class="products">
-    <thead><tr><th>商品</th><th>类型</th><th>权益</th></tr></thead>
-    <tbody>
-      <tr><td><code>com.yanxiang.compass.vip.yearly</code></td><td>自动续期订阅</td><td>在当前订阅期内使用会员功能。具体周期和价格以 Apple 购买页显示为准。</td></tr>
-      <tr><td><code>com.yanxiang.compass.pro.lifetime</code></td><td>非消耗型一次性购买</td><td>永久使用当前版本提供的专业功能；未来功能是否包含以更新说明为准。</td></tr>
-      <tr><td><code>com.yanxiang.compass.floorplan.case</code></td><td>消耗型商品</td><td>消耗一次额度，用于一套户型参考报告。成功提交后该额度不能重复使用。</td></tr>
-      <tr><td><code>com.yanxiang.compass.tianji.single</code></td><td>消耗型商品</td><td>消耗一次额度，用于保存或分享一份无水印文化参考长卷。</td></tr>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="products">
+      <thead><tr><th>商品 Product ID</th><th>项目类型</th><th>服务权益</th></tr></thead>
+      <tbody>
+        <tr><td><code>com.yanxiang.compass.vip.yearly</code></td><td>自动续期订阅</td><td>在当前订阅期内使用会员功能。具体周期和价格以 Apple 购买页显示为准。</td></tr>
+        <tr><td><code>com.yanxiang.compass.pro.lifetime</code></td><td>非消耗型一次性购买</td><td>永久使用当前版本提供的专业功能；未来功能是否包含以更新说明为准。</td></tr>
+        <tr><td><code>com.yanxiang.compass.floorplan.case</code></td><td>消耗型商品</td><td>消耗一次额度，用于一套户型参考报告。成功提交后该额度不能重复使用。</td></tr>
+        <tr><td><code>com.yanxiang.compass.tianji.single</code></td><td>消耗型商品</td><td>消耗一次额度，用于保存或分享一份无水印文化参考长卷。</td></tr>
+      </tbody>
+    </table>
+  </div>
   <p>商品可用性、价格、税费和本地货币由 App Store 根据用户所在地区显示。商品类型和权益以 App Store Connect 配置以及购买页的最终信息为准。</p>
 
   <h2>三、自动续期订阅</h2>
@@ -56,18 +256,13 @@
 
   <h2>五、隐私与用户提供的内容</h2>
   <p>相机、位置、运动传感器和照片权限只在相应功能使用时请求。当前版本主要在设备端处理扫描和分析，不提供自有服务器上传接口。用户主动保存或分享的图片、空间文件可能包含位置、方向、房屋结构或其他敏感信息，请在分享前自行检查并确认拥有相关内容的使用权。</p>
-  <p>详细隐私说明请阅读 <a href="https://yulintao.github.io/tiandiluopan-privacy/">隐私政策</a>。隐私政策和本协议可能随功能、法律或服务变化而更新。</p>
+  <p>详细隐私说明请阅读 <a href="privacy.html">《隐私政策》</a>。隐私政策和本协议可能随功能、法律或服务变化而更新。</p>
 
   <h2>六、责任范围</h2>
   <p>用户应根据真实环境独立判断，不应仅依据应用结果作出装修、施工、搬迁、投资、医疗或其他重大决定。在法律允许的范围内，因设备故障、环境干扰、权限状态、算法误差、系统服务中断或误用产生的损失由用户自行承担。</p>
 
   <h2>七、联系我们</h2>
   <p>订阅、隐私或服务问题请发送邮件至 <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>。Apple 账户扣款、退款和订阅状态仍应通过 Apple 官方支持渠道处理。</p>
-
-  <footer>
-    <p>北京长线科技有限公司 · 天机演象</p>
-    <p><a href="https://yulintao.github.io/tiandiluopan-support/">用户服务协议</a> · <a href="https://yulintao.github.io/tiandiluopan-privacy/">隐私政策</a> · <a href="https://yulintao.github.io/tiandiluopan-subscription/">订阅说明</a></p>
-  </footer>
 
   <hr>
   <h1 lang="en">TianJi YanXiang · Terms and Subscription</h1>
@@ -81,7 +276,12 @@
     <li><code>com.yanxiang.compass.tianji.single</code>: consumable credit for one watermark-free reference scroll export.</li>
   </ul>
   <p lang="en">Subscriptions renew for the period and price shown at purchase unless auto-renewal is turned off at least 24 hours before the current period ends. Manage or cancel them in Apple ID subscription settings. Deleting the app does not cancel a subscription. Apple handles billing, refunds and payment disputes. StoreKit restores subscriptions and non-consumables; consumable credits are not restored by Apple.</p>
-  <p lang="en">See our <a href="https://yulintao.github.io/tiandiluopan-privacy/">Privacy Policy</a>. Contact <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a> for app questions.</p>
+  <p lang="en">See our <a href="privacy.html">Privacy Policy</a>. Contact <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a> for app questions.</p>
+
+  <footer>
+    <p>© 2024–2026 北京长线科技有限公司 版权所有 · All Rights Reserved.</p>
+    <p>网站备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="icp-link">京ICP备2024080356号</a></p>
+  </footer>
 </main>
 </body>
 </html>

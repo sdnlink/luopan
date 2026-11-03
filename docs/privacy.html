@@ -2,49 +2,199 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>天机演象 · 隐私政策 | YanXiang Compass Privacy Policy</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>天机演象 · 隐私保护政策 | YanXiang Compass Privacy Policy</title>
     <style>
         :root {
             --gold-primary: #d4af37;
-            --gold-light: #f3e5ab;
-            --bg-dark: #121216;
-            --card-bg: #1c1d24;
-            --border-color: #2e303d;
-            --text-main: #f0f0f5;
-            --text-muted: #9aa0a6;
+            --gold-light: #f5e6b3;
+            --bg-dark: #0a0b0e;
+            --card-bg: #14161f;
+            --border-color: #262938;
+            --text-main: #f5f6fa;
+            --text-muted: #9aa1b2;
+            --cyan-accent: #00e5ff;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
         }
         body {
             background-color: var(--bg-dark);
             color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.7;
-            padding: 40px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.75;
+            padding: 24px 16px calc(48px + env(safe-area-inset-bottom));
+        }
+        .nav-header {
+            max-width: 860px;
+            margin: 0 auto 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding: 0 4px;
+        }
+        .nav-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--gold-light);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .nav-links {
+            display: inline-flex;
+            gap: 16px;
+            font-size: 13px;
+        }
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        .nav-links a:hover {
+            color: var(--gold-light);
         }
         .container {
-            max-width: 820px;
+            max-width: 860px;
             margin: 0 auto;
             background: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 40px;
+            border-radius: 18px;
+            padding: clamp(20px, 5vw, 44px);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
         }
-        h1 { color: var(--gold-light); font-size: 26px; margin-bottom: 8px; }
-        h2 { color: var(--gold-primary); font-size: 20px; margin-top: 32px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
-        h3 { font-size: 16px; margin-top: 18px; margin-bottom: 6px; }
-        p, li { color: var(--text-muted); font-size: 14px; margin-bottom: 10px; }
-        ul { padding-left: 20px; }
-        .meta { font-size: 13px; color: #777; margin-bottom: 24px; }
-        .highlight { background: rgba(212, 175, 55, 0.1); border-left: 4px solid var(--gold-primary); padding: 12px 16px; margin: 20px 0; border-radius: 4px; }
-        a { color: var(--gold-primary); text-decoration: none; }
-        hr { border: 0; border-top: 1px solid var(--border-color); margin: 40px 0; }
+        h1 {
+            color: var(--gold-light);
+            font-size: clamp(22px, 5vw, 28px);
+            margin-bottom: 10px;
+            line-height: 1.35;
+        }
+        h2 {
+            color: var(--gold-primary);
+            font-size: clamp(17px, 4vw, 20px);
+            margin-top: 34px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            line-height: 1.4;
+        }
+        h3 {
+            font-size: 15px;
+            margin-top: 20px;
+            margin-bottom: 6px;
+            color: #fff;
+        }
+        p, li {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 12px;
+            word-break: break-word;
+        }
+        ul {
+            padding-left: 20px;
+            margin-bottom: 12px;
+        }
+        .meta {
+            font-size: 13px;
+            color: #7e8696;
+            margin-bottom: 18px;
+            line-height: 1.6;
+        }
+        .highlight {
+            background: rgba(212, 175, 55, 0.08);
+            border-left: 4px solid var(--gold-primary);
+            padding: 14px 18px;
+            margin: 22px 0;
+            border-radius: 6px;
+            color: #e5e9f2;
+            font-size: 14px;
+        }
+        a {
+            color: var(--gold-primary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        a:hover {
+            color: var(--gold-light);
+            text-decoration: underline;
+        }
+        hr {
+            border: 0;
+            border-top: 1px solid var(--border-color);
+            margin: 44px 0;
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 36px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+            font-size: 13px;
+            color: #7a8292;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: center;
+        }
+        .icp-link {
+            color: #9aa1b2;
+            text-decoration: none;
+        }
+        .icp-link:hover {
+            color: var(--gold-primary);
+            text-decoration: underline;
+        }
+
+        /* 移动端与平板响应式适配 */
+        @media (max-width: 600px) {
+            body {
+                padding: 14px 10px calc(36px + env(safe-area-inset-bottom));
+            }
+            .nav-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                margin-bottom: 14px;
+            }
+            .container {
+                padding: 20px 14px;
+                border-radius: 12px;
+            }
+            p, li {
+                font-size: 13.5px;
+                line-height: 1.68;
+            }
+            .highlight {
+                padding: 12px 14px;
+                margin: 16px 0;
+            }
+            hr {
+                margin: 32px 0;
+            }
+        }
     </style>
 </head>
 <body>
+    <div class="nav-header">
+        <a href="index.html" class="nav-brand">
+            <span>🧭</span> 北京长线科技 · 天机演象
+        </a>
+        <div class="nav-links">
+            <a href="index.html">官网首页</a>
+            <a href="subscription-terms.html">服务与订阅条款</a>
+            <a href="appstore-marketing.html">产品介绍</a>
+        </div>
+    </div>
+
     <div class="container">
         <h1>天机演象 · 隐私保护政策 (Privacy Policy)</h1>
-        <div class="meta">生效日期 / Effective Date: 2026年10月31日 · 开发者：北京长线科技有限公司 · 邮箱：support@sdnlink.cn</div>
-        <p><a href="https://yulintao.github.io/tiandiluopan-support/">用户服务协议</a> · <a href="https://yulintao.github.io/tiandiluopan-subscription/">订阅说明</a></p>
+        <div class="meta">生效日期 / Effective Date: 2026年10月31日 · 开发者：北京长线科技有限公司 · 邮箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></div>
+        <p><a href="subscription-terms.html">👉 查看《用户服务协议与自动续费订阅条款》</a></p>
 
         <div class="highlight">
             <strong>核心承诺：</strong>本应用采用“本地优先 (Local-First)”设计原则。不设立任何外部中心化服务器，您的传感器数据、相机画面、地理位置及房型蓝图绝不上云，不进行任何跨应用广告追踪。
@@ -75,30 +225,29 @@
         <hr>
 
         <h1>YanXiang Compass Privacy Policy (English)</h1>
-        <div class="meta">Effective Date: October 31, 2026 · Developer: Beijing Changxian Technology Co., Ltd. · Email: support@sdnlink.cn</div>
+        <div class="meta">Effective Date: October 31, 2026 · Developer: Beijing Changxian Technology Co., Ltd. · Email: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></div>
 
         <div class="highlight">
             <strong>Privacy Commitment:</strong> YanXiang Compass operates strictly local-first. We do not operate external cloud servers. Your sensor streams, camera feeds, location, and floorplan drawings are never transmitted off your device.
         </div>
 
-        <h2>1. Data Collection & Permissions</h2>
-        <p>• <b>Motion & Sensors:</b> Drives 360° compass heading and dual-axis spirit bubble in real-time memory.</p>
+        <h2>1. Data Collection &amp; Permissions</h2>
+        <p>• <b>Motion &amp; Sensors:</b> Drives 360° compass heading and dual-axis spirit bubble in real-time memory.</p>
         <p>• <b>Location Services:</b> Computes local magnetic declination (True North vs. Magnetic North) offline using the World Magnetic Model (WMM).</p>
         <p>• <b>Camera:</b> Displays real-time optical viewfinders for AR spatial surveys. No video is recorded or streamed externally.</p>
         <p>• <b>Photo Library:</b> Imports blueprints for centroid diagnosis and exports high-definition survey scrolls to Photos.</p>
         <p>• <b>StoreKit In-App Purchase:</b> All financial processing is securely handled by Apple Inc.</p>
 
-        <h2>2. Third-Party Analytics & Tracking</h2>
+        <h2>2. Third-Party Analytics &amp; Tracking</h2>
         <p>We do not integrate third-party ad SDKs, do not collect IDFA, and do not sell data to brokers.</p>
 
         <h2>3. Contact Information</h2>
         <p>Inquiries: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
 
-        <div style="text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #222; font-size: 13px; color: #777;">
-            <p style="margin-bottom: 6px;">北京长线科技有限公司 · Beijing Changxian Technology Co., Ltd.</p>
-            <p>备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" style="color: #c5a059; text-decoration: none;">京ICP备2024080356号</a></p>
+        <div class="footer-note">
+            <p>北京长线科技有限公司 · Beijing Changxian Technology Co., Ltd.</p>
+            <p>网站备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="icp-link">京ICP备2024080356号</a></p>
         </div>
     </div>
 </body>
 </html>
-

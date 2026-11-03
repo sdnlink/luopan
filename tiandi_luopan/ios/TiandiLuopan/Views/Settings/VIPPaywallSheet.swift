@@ -113,6 +113,7 @@ public struct VIPLockCardView: View {
 // MARK: - 全功能专业版 VIP 收银台弹窗 (VIP Paywall Sheet)
 
 public struct VIPPaywallSheet: View {
+    @Environment(\.openURL) private var openURL
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
@@ -277,15 +278,24 @@ public struct VIPPaywallSheet: View {
                                 .multilineTextAlignment(.center)
 
                             HStack(spacing: 18) {
-                                Link(destination: LegalLinks.termsOfUse) {
+                                Button {
+                                    _ = openURL(LegalLinks.termsOfUse)
+                                } label: {
                                     Label(LocalizationManager.shared.t("legal_terms_button"), systemImage: "safari")
                                 }
-                                Link(destination: LegalLinks.privacyPolicy) {
+                                .buttonStyle(.plain)
+                                Button {
+                                    _ = openURL(LegalLinks.privacyPolicy)
+                                } label: {
                                     Label(LocalizationManager.shared.t("legal_privacy_button"), systemImage: "safari")
                                 }
-                                Link(destination: LegalLinks.subscriptionInfo) {
+                                .buttonStyle(.plain)
+                                Button {
+                                    _ = openURL(LegalLinks.subscriptionInfo)
+                                } label: {
                                     Label(LocalizationManager.shared.t("subscription_info_button"), systemImage: "safari")
                                 }
+                                .buttonStyle(.plain)
                             }
                             .font(.adaptive(size: 10, weight: .semibold))
                             .foregroundColor(.yanCyan)

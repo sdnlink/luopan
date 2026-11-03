@@ -40,6 +40,7 @@ private enum LegalDocument: String, Identifiable {
 
 public struct SettingsView: View {
     public var isActive: Bool = true
+    @Environment(\.openURL) private var openURL
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -278,22 +279,31 @@ public struct SettingsView: View {
                             .lineSpacing(3)
                     }
                     HStack(spacing: 16) {
-                        Link(destination: LegalLinks.termsOfUse) {
+                        Button {
+                            _ = openURL(LegalLinks.termsOfUse)
+                        } label: {
                             Label(lang.t("legal_terms_button"), systemImage: "safari")
                         }
+                        .buttonStyle(.plain)
                         .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                         Spacer()
-                        Link(destination: LegalLinks.privacyPolicy) {
+                        Button {
+                            _ = openURL(LegalLinks.privacyPolicy)
+                        } label: {
                             Label(lang.t("legal_privacy_button"), systemImage: "safari")
                         }
+                        .buttonStyle(.plain)
                         .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                     }
                     HStack {
-                        Link(destination: LegalLinks.subscriptionInfo) {
+                        Button {
+                            _ = openURL(LegalLinks.subscriptionInfo)
+                        } label: {
                             Label(lang.t("subscription_info_button"), systemImage: "safari")
                         }
+                        .buttonStyle(.plain)
                         .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
                         Spacer()

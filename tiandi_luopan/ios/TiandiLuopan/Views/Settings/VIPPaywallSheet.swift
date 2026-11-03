@@ -283,6 +283,9 @@ public struct VIPPaywallSheet: View {
                                 Link(destination: LegalLinks.privacyPolicy) {
                                     Label(LocalizationManager.shared.t("legal_privacy_button"), systemImage: "safari")
                                 }
+                                Link(destination: LegalLinks.subscriptionInfo) {
+                                    Label(LocalizationManager.shared.t("subscription_info_button"), systemImage: "safari")
+                                }
                             }
                             .font(.adaptive(size: 10, weight: .semibold))
                             .foregroundColor(.yanCyan)

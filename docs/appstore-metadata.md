@@ -20,14 +20,14 @@ GeoJSON 地址：`https://sdnlink.cn/appstore-coverage.geojson`
 | --- | --- |
 | 营销网址（Marketing URL） | https://sdnlink.cn/appstore-marketing.html |
 | 支持网址（Support URL） | https://sdnlink.cn/appstore-marketing.html#support |
-| 隐私政策网址（Privacy Policy URL） | https://sdnlink.cn/privacy.html |
-| 订阅条款 | https://sdnlink.cn/subscription-terms.html |
+| 隐私政策网址（Privacy Policy URL） | https://yulintao.github.io/tiandiluopan-privacy/ |
+| 订阅条款 | https://yulintao.github.io/tiandiluopan-subscription/ |
 
 营销页已包含产品功能、设备要求、隐私处理、支持邮箱、服务协议和订阅条款入口。部署到 Web 服务器后，请确认上述 HTTPS 地址可从公网访问，并让服务器返回 UTF-8 的 HTML/CSV 内容。
 
 ## 审核修复步骤
 
 1. 打开 App Store Connect 的 **App 信息 → 描述**，按 `appstore-descriptions.md` 分别更新 zh-Hans、zh-Hant、en、ja、ko、vi、th、id 八个本地化描述。
-2. 确认每个描述末尾都保留完整的 `https://sdnlink.cn/subscription-terms.html` 链接。不要只填写应用内协议入口或相对路径。
-3. 如果使用自定义 EULA，在 App Store Connect 的 **App 信息 → 许可协议（License Agreement）** 中提交同一个 `subscription-terms.html` 页面；如果选择 Apple 标准 EULA，也仍建议在每个描述中保留该链接。
+2. 确认每个描述末尾都保留完整的 `https://yulintao.github.io/tiandiluopan-support/` 链接。不要只填写应用内协议入口或相对路径。
+3. 如果使用自定义 EULA，在 App Store Connect 的 **App 信息 → 许可协议（License Agreement）** 中提交同一个用户服务协议页面；如果选择 Apple 标准 EULA，也仍建议在每个描述中保留该链接。
 4. 在提交审核前，用 Safari 的无痕窗口和 iPhone 网络分别打开该 HTTPS 地址，确认页面无需登录、不会 404、不会被 robots 或地区跳转拦截。

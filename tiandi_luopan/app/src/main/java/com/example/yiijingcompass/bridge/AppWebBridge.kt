@@ -1,0 +1,487 @@
+package com.example.yiijingcompass.bridge
+
+import android.app.Activity
+import android.content.Context
+import android.graphics.PointF
+import android.graphics.RectF
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.widget.Toast
+import com.example.yiijingcompass.model.*
+import com.example.yiijingcompass.sensor.CompassMotionListener
+import com.example.yiijingcompass.sensor.CompassMotionManager
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Date
+import java.util.Locale
+
+class AppWebBridge(
+    private val activity: Activity,
+    private val webView: WebView
+) : CompassMotionListener {
+
+    private val motion = CompassMotionManager.instance
+
+    init {
+        motion.addListener(this)
+    }
+
+    fun destroy() {
+        motion.removeListener(this)
+    }
+
+    // --- CompassMotionListener updates pushing to WebView ---
+    override fun onHeadingUpdate(heading: Double, trueHeading: Double, magneticHeading: Double, headingState: CompassHeadingState) {
+        activity.runOnUiThread {
+            val formatted = String.format(Locale.US, "%.1f", heading)
+            webView.evaluateJavascript("if(window.onNativeHeadingUpdate){window.onNativeHeadingUpdate($formatted);}", null)
+        }
+    }
+
+    override fun onTiltUpdate(pitch: Float, roll: Float, isLevel: Boolean) {
+        activity.runOnUiThread {
+            val pitchStr = String.format(Locale.US, "%.1f", pitch)
+            val rollStr = String.format(Locale.US, "%.1f", roll)
+            webView.evaluateJavascript("if(window.onNativeTiltUpdate){window.onNativeTiltUpdate($pitchStr, $rollStr);}", null)
+        }
+    }
+
+    override fun onLocationUpdate(lat: Double, lon: Double, alt: Double, speedKmH: Float, coordsDesc: String) {
+        activity.runOnUiThread {
+            val declFormatted = String.format(Locale.US, "%.1f", motion.currentDeclination)
+            val speedFormatted = String.format(Locale.US, "%.1f", speedKmH)
+            val escapedCoords = coordsDesc.replace("'", "\\'")
+            val escapedDesc = "磁偏角补偿 ${declFormatted}°"
+
+            webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declFormatted, true, '$escapedDesc');}", null)
+            webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($lat, $lon, $alt, true, '$escapedCoords');}", null)
+            webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
+        }
+    }
+
+    override fun onSolarTimeUpdate(solarTimeStr: String, solarTerm: String) {
+        activity.runOnUiThread {
+            webView.evaluateJavascript("if(window.onNativeSolarTimeUpdate){window.onNativeSolarTimeUpdate('$solarTimeStr', '$solarTerm');}", null)
+        }
+    }
+
+    override fun onMagneticFieldUpdate(isDistorted: Boolean, strengthUT: Float) {
+        activity.runOnUiThread {
+            val strengthFormatted = String.format(Locale.US, "%.1f", strengthUT)
+            webView.evaluateJavascript("if(window.onNativeMagneticFieldUpdate){window.onNativeMagneticFieldUpdate($isDistorted, $strengthFormatted);}", null)
+        }
+    }
+
+    override fun onAccuracyChange(accuracy: Int) {
+        activity.runOnUiThread {
+            webView.evaluateJavascript("if(window.onNativeCompassAccuracy){window.onNativeCompassAccuracy($accuracy);}", null)
+        }
+    }
+
+    // --- JavascriptInterface endpoints ---
+
+    @JavascriptInterface
+    fun isCompassAvailable(): Boolean {
+        return motion.hasSensors(activity)
+    }
+
+    @JavascriptInterface
+    fun startCompass() {
+        activity.runOnUiThread {
+            motion.start(activity)
+        }
+    }
+
+    @JavascriptInterface
+    fun stopCompass() {
+        activity.runOnUiThread {
+            motion.stop()
+        }
+    }
+
+    @JavascriptInterface
+    fun resetCalibration() {
+        activity.runOnUiThread {
+            motion.stop()
+            motion.start(activity)
+            webView.evaluateJavascript("if(window.onNativeCompassAccuracy){window.onNativeCompassAccuracy(1);}", null)
+        }
+    }
+
+    @JavascriptInterface
+    fun getDeclination(): Float = motion.currentDeclination
+
+    @JavascriptInterface
+    fun hasDeclination(): Boolean = motion.hasDeclination
+
+    @JavascriptInterface
+    fun getCoordsDesc(): String = motion.coordsDesc
+
+    @JavascriptInterface
+    fun getLatitude(): Double = motion.latitude
+
+    @JavascriptInterface
+    fun getLongitude(): Double = motion.longitude
+
+    @JavascriptInterface
+    fun getSpeed(): Float = motion.speedKmH
+
+    @JavascriptInterface
+    fun getPitch(): Float = motion.pitch
+
+    @JavascriptInterface
+    fun getRoll(): Float = motion.roll
+
+    @JavascriptInterface
+    fun getSystemLanguage(): String {
+        return LocalizationManager.instance.effectiveLanguage.rawValue
+    }
+
+    // 1. 罗盘全息元数据与空亡分金接口
+    @JavascriptInterface
+    fun getCompassHeadingStateJson(): String {
+        val state = motion.headingState
+        val obj = JSONObject().apply {
+            put("heading", motion.heading)
+            put("sittingMountain", state.sittingMountain.name)
+            put("facingMountain", state.facingMountain.name)
+            put("facingFenjin", JSONObject().apply {
+                put("jiaziName", state.facingFenjin.jiaziName)
+                put("grade", state.facingFenjin.grade)
+                put("centerAngle", state.facingFenjin.centerAngle)
+                put("isAuspicious", state.facingFenjin.isAuspicious)
+                put("lore", state.facingFenjin.lore)
+            })
+            put("kongWangLevel", state.kongWangLevel.name)
+            put("kongWangDesc", state.kongWangLevel.description)
+            val hex = Hexagram64Data.instance.hexagram(motion.heading)
+            put("hexagram", JSONObject().apply {
+                put("name", hex.name)
+                put("luckDegree", hex.luckDegree)
+                put("fenJinDetail", hex.fenJinDetail)
+                put("elementNumber", hex.elementNumber)
+            })
+        }
+        return obj.toString()
+    }
+
+    // 2. 玄空九宫飞星排盘计算
+    @JavascriptInterface
+    fun calculateXuanKongJson(period: Int, sittingName: String, facingName: String, useTiGua: Boolean): String {
+        val mList = Mountain24Data.instance.mountains
+        val sitting = mList.firstOrNull { it.name == sittingName } ?: mList[0]
+        val facing = mList.firstOrNull { it.name == facingName } ?: mList[12]
+        val chart = FlyingStarsEngine.instance.calculateChart(
+            period = if (period in 1..9) period else null,
+            sitting = sitting,
+            facing = facing,
+            useTiGua = useTiGua
+        )
+        val obj = JSONObject().apply {
+            put("period", chart.period)
+            put("sittingMountain", chart.sittingMountain)
+            put("facingMountain", chart.facingMountain)
+            put("patternType", chart.patternType)
+            put("isSanBanGua", chart.isSanBanGua)
+            put("isQiXingDaJie", chart.isQiXingDaJie)
+            put("isTiGua", chart.isTiGua)
+            put("summaryAnalysis", chart.summaryAnalysis)
+            val palacesArr = JSONArray()
+            for (p in chart.palaces) {
+                palacesArr.put(JSONObject().apply {
+                    put("id", p.id)
+                    put("palaceName", p.palaceName)
+                    put("direction", p.direction)
+                    put("periodStar", p.periodStar)
+                    put("mountainStar", p.mountainStar)
+                    put("facingStar", p.facingStar)
+                    put("isWangMountain", p.isWangMountain)
+                    put("isWangFacing", p.isWangFacing)
+                    put("isShaWuHuang", p.isShaWuHuang)
+                    put("isShaErHei", p.isShaErHei)
+                    put("evaluation", p.baseEvaluation)
+                })
+            }
+            put("palaces", palacesArr)
+        }
+        return obj.toString()
+    }
+
+    // 3. 八宅风水计算
+    @JavascriptInterface
+    fun calculateBaZhaiJson(sittingGua: String, facingGua: String): String {
+        val result = BaZhaiEngine.instance.analyze(sittingGua, facingGua)
+        val obj = JSONObject().apply {
+            put("houseGua", result.houseGua)
+            put("houseType", result.houseType)
+            put("gateDirection", result.gateDirection)
+            put("gateStar", result.gateStar.rawValue)
+            val itemsArr = JSONArray()
+            for (it in result.items) {
+                itemsArr.put(JSONObject().apply {
+                    put("direction", it.direction)
+                    put("guaName", it.guaName)
+                    put("star", it.star.rawValue)
+                    put("isAuspicious", it.star.isAuspicious)
+                })
+            }
+            put("items", itemsArr)
+        }
+        return obj.toString()
+    }
+
+    // 4. 紫白九星客星飞布
+    @JavascriptInterface
+    fun calculatePurpleWhiteJson(): String {
+        val chart = PurpleWhiteEngine.instance.calculateChart(heading = motion.heading)
+        val obj = JSONObject().apply {
+            put("year", chart.year)
+            put("month", chart.month)
+            put("yearCentralStar", chart.yearCentralStar)
+            put("monthCentralStar", chart.monthCentralStar)
+            put("taiSui", chart.taiSuiDescription)
+            put("suiPo", chart.suiPoDescription)
+            put("sanSha", chart.sanShaDescription)
+            val itemsArr = JSONArray()
+            for (p in chart.palaceItems) {
+                itemsArr.put(JSONObject().apply {
+                    put("palaceId", p.palaceId)
+                    put("palaceName", p.palaceName)
+                    put("direction", p.direction)
+                    put("yearGuestStar", p.yearGuestStar)
+                    put("monthGuestStar", p.monthGuestStar)
+                    put("starName", p.starName)
+                    put("isDanger25", p.isDanger25)
+                    put("isTaiSui", p.isTaiSui)
+                    put("isSuiPo", p.isSuiPo)
+                    put("isSanSha", p.isSanSha)
+                    put("advice", p.advice)
+                })
+            }
+            put("palaceItems", itemsArr)
+        }
+        return obj.toString()
+    }
+
+    // 5. 时家奇门遁甲计算
+    @JavascriptInterface
+    fun calculateQimenJson(): String {
+        val chart = QimenEngine.instance.calculateChart(heading = motion.heading)
+        val obj = JSONObject().apply {
+            put("title", chart.title)
+            put("dunType", chart.dunType)
+            put("juNumber", chart.juNumber)
+            put("shichen", chart.shichen)
+            put("bestDirection", chart.bestDirection)
+            put("bestReason", chart.bestReason)
+            put("worstDirection", chart.worstDirection)
+            put("worstReason", chart.worstReason)
+            val cellsArr = JSONArray()
+            for (c in chart.cells) {
+                cellsArr.put(JSONObject().apply {
+                    put("id", c.id)
+                    put("palaceName", c.palaceName)
+                    put("direction", c.direction)
+                    put("doorName", c.doorName)
+                    put("starName", c.starName)
+                    put("godName", c.godName)
+                    put("tianPanGan", c.tianPanGan)
+                    put("diPanGan", c.diPanGan)
+                    put("isAuspicious", c.isAuspicious)
+                    put("luckType", c.luckType)
+                    put("isCenter", c.isCenter)
+                })
+            }
+            put("cells", cellsArr)
+        }
+        return obj.toString()
+    }
+
+    // 6. 外环境形煞 48 种数据库与标注记录管理
+    @JavascriptInterface
+    fun getExteriorShaDatabase(): String {
+        val list = ExteriorShaEngine.instance.database
+        val arr = JSONArray()
+        for (item in list) {
+            arr.put(JSONObject().apply {
+                put("id", item.id)
+                put("name", item.name)
+                put("aliases", item.aliases)
+                put("visualFeature", item.visualFeature)
+                put("metaphysicsHarm", item.metaphysicsHarm)
+                put("severity", item.severity.name)
+                put("classicalText", item.classicalText)
+                put("remedySolution", item.remedySolution)
+            })
+        }
+        return arr.toString()
+    }
+
+    @JavascriptInterface
+    fun addShaRecord(shaID: String, bearing: Double, distance: Float, note: String): String {
+        val record = ExteriorShaRecord(
+            shaID = shaID,
+            bearingDegrees = bearing,
+            capturedHeadingDegrees = motion.heading,
+            distanceMeters = if (distance > 0f) distance else null,
+            note = note.ifEmpty { null }
+        )
+        ShaSurveyStore.instance.addRecord(record)
+        return record.id
+    }
+
+    @JavascriptInterface
+    fun removeShaRecord(id: String): Boolean {
+        ShaSurveyStore.instance.removeRecord(id)
+        return true
+    }
+
+    @JavascriptInterface
+    fun removeLastShaRecord(): Boolean {
+        ShaSurveyStore.instance.removeLastRecord()
+        return true
+    }
+
+    @JavascriptInterface
+    fun clearShaRecords(): Boolean {
+        ShaSurveyStore.instance.clearRecords()
+        return true
+    }
+
+    @JavascriptInterface
+    fun getShaRecordsJson(): String {
+        val store = ShaSurveyStore.instance
+        val arr = JSONArray()
+        for (r in store.records) {
+            arr.put(r.toJsonObject())
+        }
+        return arr.toString()
+    }
+
+    // 7. 户型立极与 DXF 导出
+    @JavascriptInterface
+    fun auditFloorplanJson(roomsJson: String): String {
+        return try {
+            val array = JSONArray(roomsJson)
+            val rooms = mutableListOf<FloorplanRoom>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val id = obj.optString("id", "r$i")
+                val name = obj.optString("name", "房间")
+                val typeStr = obj.optString("type", "UNKNOWN")
+                val type = try { FloorplanRoomType.valueOf(typeStr) } catch (_: Exception) { FloorplanRoomType.UNKNOWN }
+                val l = obj.optDouble("left", 0.0).toFloat()
+                val t = obj.optDouble("top", 0.0).toFloat()
+                val r = obj.optDouble("right", 100.0).toFloat()
+                val b = obj.optDouble("bottom", 100.0).toFloat()
+                rooms.add(FloorplanRoom(id, name, type, RectF(l, t, r, b)))
+            }
+            val centroid = FloorplanEngine.instance.computeCentroid(rooms)
+            val audited = FloorplanEngine.instance.auditFloorplan(rooms, centroid, motion.heading)
+            val reportArr = JSONArray()
+            for (item in audited.second) {
+                reportArr.put(JSONObject().apply {
+                    put("id", item.id)
+                    put("title", item.title)
+                    put("palace", item.palace)
+                    put("severity", item.severity)
+                    put("lore", item.lore)
+                    put("solution", item.solution)
+                })
+            }
+            reportArr.toString()
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
+
+    @JavascriptInterface
+    fun exportCAD_DXF(roomsJson: String): String {
+        val rooms = if (roomsJson.isNotEmpty() && roomsJson != "[]") {
+            try {
+                val array = JSONArray(roomsJson)
+                val list = mutableListOf<FloorplanRoom>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    val id = obj.optString("id", "r$i")
+                    val name = obj.optString("name", "房间")
+                    val typeStr = obj.optString("type", "UNKNOWN")
+                    val type = try { FloorplanRoomType.valueOf(typeStr) } catch (_: Exception) { FloorplanRoomType.UNKNOWN }
+                    val l = obj.optDouble("left", 0.0).toFloat()
+                    val t = obj.optDouble("top", 0.0).toFloat()
+                    val r = obj.optDouble("right", 100.0).toFloat()
+                    val b = obj.optDouble("bottom", 100.0).toFloat()
+                    list.add(FloorplanRoom(id, name, type, RectF(l, t, r, b)))
+                }
+                list
+            } catch (_: Exception) {
+                FloorplanEngine.instance.generateSampleRooms()
+            }
+        } else {
+            FloorplanEngine.instance.generateSampleRooms()
+        }
+        val centroid = FloorplanEngine.instance.computeCentroid(rooms)
+        return FloorplanEngine.instance.exportDXF(rooms, centroid)
+    }
+
+    // 8. 宣纸长卷超高清生成与相册保存
+    @JavascriptInterface
+    fun generateAndSaveTianJiScroll(): Boolean {
+        return try {
+            val shaRep = ShaSurveyStore.instance.createReport(motion.heading)
+            val sampleRooms = FloorplanEngine.instance.generateSampleRooms()
+            val centroid = FloorplanEngine.instance.computeCentroid(sampleRooms)
+            val audited = FloorplanEngine.instance.auditFloorplan(sampleRooms, centroid, motion.heading)
+
+            val bmp = TianJiShuEngine.instance.generateScrollImage(
+                context = activity,
+                heading = motion.heading,
+                coordsDesc = motion.coordsDesc,
+                solarTimeDesc = "${SolarTimeCalculator.instance.calculate(Date(), motion.longitude).trueSolarTimeString} (${SolarTimeCalculator.instance.solarTermName()})",
+                floorplanReport = audited.second,
+                shaReport = shaRep
+            )
+            val saved = TianJiShuEngine.instance.saveToGallery(activity, bmp)
+            activity.runOnUiThread {
+                Toast.makeText(activity, if (saved) "福宅长卷已成功保存至系统相册！" else "保存失败，请检查相册存储权限", Toast.LENGTH_LONG).show()
+            }
+            saved
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    // 9. 会员与特权
+    @JavascriptInterface
+    fun isUserVip(): Boolean = UserEntitlementsManager.instance.isVip
+
+    @JavascriptInterface
+    fun upgradeVipLevel(level: String): Boolean {
+        return try {
+            val lvl = EntitlementLevel.valueOf(level)
+            UserEntitlementsManager.instance.upgradeTo(lvl)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    // 10. 国际化与语言
+    @JavascriptInterface
+    fun setAppLanguage(lang: String): Boolean {
+        return try {
+            val l = AppLanguage.values().firstOrNull { it.rawValue == lang } ?: AppLanguage.AUTO
+            LocalizationManager.instance.setLanguage(activity, l)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun t(key: String): String {
+        return LocalizationManager.instance.t(key)
+    }
+}
+

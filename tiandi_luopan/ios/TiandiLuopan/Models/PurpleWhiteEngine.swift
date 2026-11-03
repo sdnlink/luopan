@@ -528,24 +528,29 @@ public class PurpleWhiteEngine {
                 }
             }
 
-            if isDanger25 || hasFiveYellow || hasIllnessStar {
+            // Preserve the classical wealth wording for Eight-White/wealth
+            // and Nine-Purple/celebration stars as well as the health stars.
+            // Every such reading carries its source and a plain-language
+            // explanation, so the original judgment is not silently reduced
+            // to a generic space-use hint.
+            if isDanger25 || hasFiveYellow || hasIllnessStar || yStar == 8 || yStar == 9 {
                 switch lang {
                 case .en:
-                    advice += " Source: Zi Bai Jue, “When Five Yellow overlaps, calamity and illness arrive.” This preserves the classical health symbolism as a cultural quotation; it is not a medical diagnosis."
+                    advice += " Source: the transmitted Purple-White Nine-Star formula (wording varies by edition) calls this ‘Eight-White Wealth Star’ and ‘Nine-Purple Auspicious Star’; the Five-Yellow line is ‘When Five Yellow overlaps, calamity and illness arrive.’ Explanation: wealth, property, savings and loss are traditional symbolic readings, not medical or financial predictions."
                 case .zhHant:
-                    advice += " 出處：《紫白訣》：「五黃重疊，災疾並臨。」此處保留古籍健康象徵作文化引文，不是醫療診斷。"
+                    advice += " 出處：傳統紫白九星訣（傳本有異文）稱「八白財星、九紫喜慶」；《紫白訣》又云「五黃重疊，災疾並臨」。解釋：正財、田宅、儲蓄、破財與喜慶是古法象徵，不是醫療診斷或財務預測。"
                 case .ja:
-                    advice += " 出典：『紫白訣』「五黄重なれば災疾並び臨む」。古典の健康象徴を文化的な引用として示すもので、医学的診断ではありません。"
+                    advice += " 出典：伝統紫白九星訣（伝本に異文）は「八白財星・九紫喜慶」とし、『紫白訣』は「五黄重なれば災疾並び臨む」と伝えます。解釈：正財・不動産・蓄財・散財と慶事は古法の象徴であり、医学的・金融的予測ではありません。"
                 case .ko:
-                    advice += " 출처: 《자백결》 ‘오황이 겹치면 재질이 임한다’. 고전의 건강 상징을 문화 인용으로 제시한 것이며 의학적 진단이 아닙니다."
+                    advice += " 출처: 전통 자백구성결(전본 이문)은 ‘팔백 재성·구자 희경’이라 하고 《자백결》은 ‘오황이 겹치면 재질이 임한다’고 전합니다. 설명: 정재·부동산·저축·손재와 경사는 고법의 상징이며 의학적·재무 예측이 아닙니다."
                 case .vi:
-                    advice += " Nguồn: 《Tử Bạch Quyết》, “Ngũ Hoàng chồng lên thì tai bệnh đến.” Đây là trích dẫn biểu tượng sức khỏe trong cổ thư, không phải chẩn đoán y khoa."
+                    advice += " Nguồn: Quyết Tử Bạch truyền thống (bản truyền có dị văn) gọi đây là ‘Bát Bạch Tài Tinh, Cửu Tử Hỷ Khánh’; 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến’. Giải thích: tài sản, thu nhập, hao tài và hỷ sự là biểu tượng cổ pháp, không phải dự đoán y khoa hay tài chính."
                 case .th:
-                    advice += " แหล่งที่มา: 《จื่อไป๋เจวี๋ย》 “ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน” เป็นการอ้างอิงสัญลักษณ์สุขภาพในคัมภีร์ ไม่ใช่การวินิจฉัยทางการแพทย์"
+                    advice += " แหล่งที่มา: ตำราจื่อไป๋เก้าดาวแบบดั้งเดิม (ตำราต่างกัน) เรียก ‘ดาวแปดขาวทรัพย์·ดาวเก้าม่วงมงคล’; 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน’ คำอธิบาย: ทรัพย์ รายได้ การเสียทรัพย์ และความยินดีเป็นสัญลักษณ์โบราณ ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
                 case .id:
-                    advice += " Sumber: 《Zi Bai Jue》, “Saat Lima Kuning bertumpuk, penyakit dan bencana datang.” Ini kutipan simbol kesehatan dari teks klasik, bukan diagnosis medis."
+                    advice += " Sumber: rumus sembilan bintang Zi Bai tradisional (versi berbeda) menyebut ‘Bintang Rezeki 8-Putih dan Keberuntungan 9-Ungu’; 《Zi Bai Jue》 menyebut ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang.’ Penjelasan: harta, pendapatan, kerugian dan sukacita adalah simbol klasik, bukan prediksi medis atau keuangan."
                 case .auto, .zhHans:
-                    advice += " 出处：《紫白诀》：“五黄重叠，灾疾并临。”此处保留古籍健康象征作文化引文，不是医疗诊断。"
+                    advice += " 出处：传统紫白九星诀（传本有异文）称“八白财星、九紫喜庆”；《紫白诀》又云“五黄重叠，灾疾并临”。解释：正财、田宅、储蓄、破财与喜庆是古法象征，不是医疗诊断或财务预测。"
                 }
             }
 

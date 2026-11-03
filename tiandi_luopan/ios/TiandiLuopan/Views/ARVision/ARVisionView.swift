@@ -695,15 +695,16 @@ public struct ARVisionView: View {
                 shaList: shaList
             )
         }
-        .alert(isPresented: $showClearShaAlert) {
-            Alert(
-                title: Text(lang.t("ar_panorama_clear_confirm_title")),
-                message: Text(lang.t("ar_panorama_clear_confirm_msg")),
-                primaryButton: .destructive(Text(lang.t("ar_panorama_clear_confirm_btn"))) {
-                    shaStore.clearRecords()
-                },
-                secondaryButton: .cancel(Text(lang.t("cancel")))
-            )
+        .alert(
+            Text(lang.t("ar_panorama_clear_confirm_title")),
+            isPresented: $showClearShaAlert
+        ) {
+            Button(lang.t("ar_panorama_clear_confirm_btn"), role: .destructive) {
+                shaStore.clearRecords()
+            }
+            Button(lang.t("cancel"), role: .cancel) { }
+        } message: {
+            Text(lang.t("ar_panorama_clear_confirm_msg"))
         }
         .confirmationDialog(
             Text(lang.t("ar_panorama_title")),
@@ -714,9 +715,12 @@ public struct ARVisionView: View {
                 shaStore.removeLastRecord()
             }
             Button(lang.t("ar_panorama_clear"), role: .destructive) {
-                // Let the action sheet finish dismissing before presenting
-                // the destructive confirmation alert.
-                DispatchQueue.main.async {
+                // Explicitly dismiss the action dialog first. Presenting an
+                // alert in the same transaction leaves the alert above a
+                // still-present confirmation dialog on some iOS 16 devices;
+                // that invisible presenter then intercepts the alert button.
+                showShaActions = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     showClearShaAlert = true
                 }
             }

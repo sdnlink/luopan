@@ -447,6 +447,7 @@ public struct ARVisionView: View {
     @State private var showSnapshotShareSheet: Bool = false
     @ObservedObject private var shaStore = ShaSurveyStore.shared
     @State private var showPanoramaReport: Bool = false
+    @State private var showClearShaAlert: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
     // check a frame captured just before leaving the tab could still be saved
@@ -687,6 +688,16 @@ public struct ARVisionView: View {
                 records: shaStore.records,
                 heading: shaStore.archive?.compassHeading ?? motion.headingState.facingAngle,
                 shaList: shaList
+            )
+        }
+        .alert(isPresented: $showClearShaAlert) {
+            Alert(
+                title: Text(lang.t("ar_panorama_clear_confirm_title")),
+                message: Text(lang.t("ar_panorama_clear_confirm_msg")),
+                primaryButton: .destructive(Text(lang.t("ar_panorama_clear_confirm_btn"))) {
+                    shaStore.clearRecords()
+                },
+                secondaryButton: .cancel(Text(lang.t("cancel")))
             )
         }
         .fullScreenCover(isPresented: $showSpatialSurvey) {
@@ -1303,6 +1314,28 @@ public struct ARVisionView: View {
                         .background(Color.green.opacity(0.2))
                         .foregroundColor(.green)
                         .cornerRadius(6)
+                }
+                if !shaStore.records.isEmpty {
+                    Menu {
+                        Button(action: {
+                            shaStore.removeLastRecord()
+                        }) {
+                            Label(lang.t("ar_panorama_undo"), systemImage: "arrow.uturn.backward")
+                        }
+                        Button(role: .destructive, action: {
+                            showClearShaAlert = true
+                        }) {
+                            Label(lang.t("ar_panorama_clear"), systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.adaptive(size: 11, weight: .bold))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.18))
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
                 }
                 Spacer()
             }
@@ -2130,11 +2163,22 @@ public struct ShaRemedyDetailSheet: View {
 
 // MARK: - 全景形煞分布报告 (八宫聚合 + 距离判级 + 仰角/距离明细)
 private struct ShaPanoramaReportSheet: View {
-    let records: [ExteriorShaRecord]
+    @ObservedObject private var shaStore = ShaSurveyStore.shared
     let heading: Double
     let shaList: [ExteriorShaItem]
     @ObservedObject var lang = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
+
+    @State private var showClearConfirmAlert = false
+
+    init(records: [ExteriorShaRecord]? = nil, heading: Double, shaList: [ExteriorShaItem]) {
+        self.heading = heading
+        self.shaList = shaList
+    }
+
+    private var records: [ExteriorShaRecord] {
+        shaStore.records
+    }
 
     private var grouped: [[ExteriorShaRecord]] {
         ShaPanoramaReport(headingDegrees: heading, records: records).palacesByIndex
@@ -2266,6 +2310,16 @@ private struct ShaPanoramaReportSheet: View {
                                                     .background(sev == .critical ? Color.red.opacity(0.15) : (sev == .warning ? Color.orange.opacity(0.15) : (sev == .minor ? Color.yellow.opacity(0.15) : Color.green.opacity(0.15))))
                                                     .cornerRadius(6)
                                             }
+                                            Button(action: {
+                                                shaStore.removeRecord(id: record.id)
+                                            }) {
+                                                Image(systemName: "trash")
+                                                    .font(.system(size: 12))
+                                                    .foregroundColor(.red.opacity(0.75))
+                                                    .padding(6)
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(BorderlessButtonStyle())
                                         }
                                         .padding(8)
                                         .background(Color.black.opacity(0.04))
@@ -2281,9 +2335,33 @@ private struct ShaPanoramaReportSheet: View {
             .navigationTitle(lang.t("ar_panorama_title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !records.isEmpty {
+                        Button(role: .destructive, action: {
+                            showClearConfirmAlert = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash")
+                                Text(lang.t("ar_panorama_clear"))
+                            }
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.red)
+                        }
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(lang.t("ar_panorama_close")) { dismiss() }
                 }
+            }
+            .alert(isPresented: $showClearConfirmAlert) {
+                Alert(
+                    title: Text(lang.t("ar_panorama_clear_confirm_title")),
+                    message: Text(lang.t("ar_panorama_clear_confirm_msg")),
+                    primaryButton: .destructive(Text(lang.t("ar_panorama_clear_confirm_btn"))) {
+                        shaStore.clearRecords()
+                    },
+                    secondaryButton: .cancel(Text(lang.t("cancel")))
+                )
             }
         }
     }

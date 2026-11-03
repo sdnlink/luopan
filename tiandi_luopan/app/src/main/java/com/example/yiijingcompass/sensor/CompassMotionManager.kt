@@ -8,9 +8,13 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import com.example.yiijingcompass.model.CompassHeadingState
 import com.example.yiijingcompass.model.Mountain24Data
 import com.example.yiijingcompass.model.SolarTimeCalculator
@@ -22,6 +26,17 @@ import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+
+enum class CompassNorthReference(val rawValue: String) {
+    TRUE_NORTH("true_north"),
+    MAGNETIC_NORTH("magnetic_north");
+
+    companion object {
+        fun from(value: String): CompassNorthReference {
+            return values().firstOrNull { it.rawValue == value } ?: TRUE_NORTH
+        }
+    }
+}
 
 interface CompassMotionListener {
     fun onHeadingUpdate(heading: Double, trueHeading: Double, magneticHeading: Double, headingState: CompassHeadingState)
@@ -86,7 +101,33 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         private set
 
     var isLocked: Boolean = false
+        set(value) {
+            field = value
+            if (isHapticEnabled) {
+                triggerClick()
+            }
+        }
     var manualOffset: Double = 0.0
+
+    var northReference: CompassNorthReference = CompassNorthReference.TRUE_NORTH
+        set(value) {
+            field = value
+            hasSmoothHeading = false
+            appContext?.getSharedPreferences("compass_prefs", Context.MODE_PRIVATE)
+                ?.edit()?.putString("compass_north_reference", value.rawValue)?.apply()
+        }
+
+    var isHapticEnabled: Boolean = true
+        set(value) {
+            field = value
+            appContext?.getSharedPreferences("compass_prefs", Context.MODE_PRIVATE)
+                ?.edit()?.putBoolean("compass_haptic_enabled", value)?.apply()
+        }
+
+    private var vibrator: Vibrator? = null
+    private var appContext: Context? = null
+    private var lastMountainIndex: Int = -1
+    private var wasLevel: Boolean = false
 
     var headingState: CompassHeadingState = Mountain24Data.instance.resolveHeadingState(0.0)
         private set
@@ -124,7 +165,47 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
                 (sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null && sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null)
     }
 
+    fun triggerTick() {
+        if (!isHapticEnabled) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createOneShot(12, 50))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(12)
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun triggerClick() {
+        if (!isHapticEnabled) return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(VibrationEffect.createOneShot(25, 120))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(25)
+            }
+        } catch (_: Exception) {}
+    }
+
     fun start(context: Context) {
+        appContext = context.applicationContext
+        val prefs = context.getSharedPreferences("compass_prefs", Context.MODE_PRIVATE)
+        northReference = CompassNorthReference.from(prefs.getString("compass_north_reference", "true_north") ?: "true_north")
+        isHapticEnabled = prefs.getBoolean("compass_haptic_enabled", true)
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibratorManager?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+
         sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
 
@@ -222,7 +303,12 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
 
         pitch = pitchDeg
         roll = rollDeg
-        isLevel = abs(pitchDeg) < 1.5f && abs(rollDeg) < 1.5f
+        val currentLevel = abs(pitchDeg) < 1.5f && abs(rollDeg) < 1.5f
+        if (currentLevel && !wasLevel && isHapticEnabled) {
+            triggerClick()
+        }
+        wasLevel = currentLevel
+        isLevel = currentLevel
 
         for (l in listeners) l.onTiltUpdate(pitch, roll, isLevel)
 
@@ -233,7 +319,11 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         val trueH = (magneticHeading + decl + 360.0) % 360.0
         trueHeading = trueH
 
-        val targetAngle = if (hasDeclination) trueHeading else magneticHeading
+        val targetAngle = if (northReference == CompassNorthReference.TRUE_NORTH && hasDeclination) {
+            trueHeading
+        } else {
+            magneticHeading
+        }
 
         // Circular Low-pass filter
         val rad = Math.toRadians(targetAngle)
@@ -257,6 +347,12 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         if (now - lastHeadingTime >= 30) {
             lastHeadingTime = now
             headingState = Mountain24Data.instance.resolveHeadingState(heading)
+            if (headingState.facingMountain.id != lastMountainIndex) {
+                if (lastMountainIndex != -1 && isHapticEnabled) {
+                    triggerTick()
+                }
+                lastMountainIndex = headingState.facingMountain.id
+            }
             for (l in listeners) l.onHeadingUpdate(heading, trueHeading, magneticHeading, headingState)
         }
 

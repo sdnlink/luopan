@@ -177,6 +177,63 @@ class AppWebBridge(
         return LocalizationManager.instance.effectiveLanguage.rawValue
     }
 
+    @JavascriptInterface
+    fun getFenjin120Database(): String {
+        return try {
+            val list = Fenjin120Data.instance.allFenjin
+            val arr = JSONArray()
+            for (f in list) {
+                arr.put(JSONObject().apply {
+                    put("mountainName", f.mountainName)
+                    put("index", f.index)
+                    put("jiaziName", f.jiaziName)
+                    put("startAngle", f.startAngle)
+                    put("endAngle", f.endAngle)
+                    put("centerAngle", f.centerAngle)
+                    put("grade", f.grade)
+                    put("localizedGrade", f.localizedGrade)
+                    put("isAuspicious", f.isAuspicious)
+                    put("lore", f.lore)
+                    put("localizedLore", f.localizedLore)
+                })
+            }
+            arr.toString()
+        } catch (e: Exception) {
+            "[]"
+        }
+    }
+
+    @JavascriptInterface
+    fun getNorthReference(): String {
+        return motion.northReference.rawValue
+    }
+
+    @JavascriptInterface
+    fun setNorthReference(ref: String): Boolean {
+        motion.northReference = com.example.yiijingcompass.sensor.CompassNorthReference.from(ref)
+        return true
+    }
+
+    @JavascriptInterface
+    fun isHapticEnabled(): Boolean {
+        return motion.isHapticEnabled
+    }
+
+    @JavascriptInterface
+    fun setHapticEnabled(enabled: Boolean): Boolean {
+        motion.isHapticEnabled = enabled
+        return true
+    }
+
+    @JavascriptInterface
+    fun triggerHaptic(type: String) {
+        when (type) {
+            "tick" -> motion.triggerTick()
+            "click" -> motion.triggerClick()
+            else -> motion.triggerClick()
+        }
+    }
+
     // 1. 罗盘全息元数据与空亡分金接口
     @JavascriptInterface
     fun getCompassHeadingStateJson(): String {
@@ -474,7 +531,16 @@ class AppWebBridge(
                 val t = obj.optDouble("top", 0.0).toFloat()
                 val r = obj.optDouble("right", 100.0).toFloat()
                 val b = obj.optDouble("bottom", 100.0).toFloat()
-                rooms.add(FloorplanRoom(id, name, type, RectF(l, t, r, b)))
+                val ptsArray = obj.optJSONArray("polygonPoints")
+                val pts = if (ptsArray != null && ptsArray.length() >= 3) {
+                    val pList = mutableListOf<PointF>()
+                    for (j in 0 until ptsArray.length()) {
+                        val p = ptsArray.getJSONObject(j)
+                        pList.add(PointF(p.optDouble("x", 0.0).toFloat(), p.optDouble("y", 0.0).toFloat()))
+                    }
+                    pList
+                } else null
+                rooms.add(FloorplanRoom(id, name, type, RectF(l, t, r, b), polygonPoints = pts))
             }
             val centroid = FloorplanEngine.instance.computeCentroid(rooms)
             val audited = FloorplanEngine.instance.auditFloorplan(rooms, centroid, motion.heading)

@@ -275,6 +275,18 @@ public struct VIPPaywallSheet: View {
                                 .font(.adaptive(size: 10))
                                 .foregroundColor(.orange.opacity(0.75))
                                 .multilineTextAlignment(.center)
+
+                            HStack(spacing: 18) {
+                                Link(destination: LegalLinks.termsOfUse) {
+                                    Label(LocalizationManager.shared.t("legal_terms_button"), systemImage: "safari")
+                                }
+                                Link(destination: LegalLinks.privacyPolicy) {
+                                    Label(LocalizationManager.shared.t("legal_privacy_button"), systemImage: "safari")
+                                }
+                            }
+                            .font(.adaptive(size: 10, weight: .semibold))
+                            .foregroundColor(.yanCyan)
+                            .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)

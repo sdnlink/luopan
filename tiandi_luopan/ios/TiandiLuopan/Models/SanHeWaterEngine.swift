@@ -135,79 +135,88 @@ public enum ChangShengPhase: String, CaseIterable {
     
     public var localizedWaterRule: String {
         let lang = LocalizationManager.shared.effectiveLanguage
+        let core: String
         switch lang {
         case .en:
             switch self {
-            case .changSheng, .diWang: return "Inflow brings great wealth; outflow causes losses."
-            case .linGuan, .guanDai:   return "Noble benefactor inflow; outflow is unfavorable."
-            case .shuai:               return "Jumen water, flexible for inflow/outflow as storage."
-            case .mu, .jue:            return "Outflow auspicious; inflow is strictly taboo."
-            case .muYu:                return "Peach blossom water; both inflow/outflow cause turbulence."
-            case .bing, .si, .tai, .yang: return "Neutral peaceful position; keep calm and gentle."
+            case .changSheng, .diWang: core = "Inflow brings great wealth; outflow causes losses."
+            case .linGuan, .guanDai: core = "Noble benefactor inflow; outflow is unfavorable."
+            case .shuai: core = "Jumen water, flexible for inflow/outflow as storage."
+            case .mu, .jue: core = "Outflow auspicious; inflow is strictly taboo."
+            case .muYu: core = "Peach blossom water; both inflow/outflow cause turbulence."
+            case .bing, .si, .tai, .yang: core = "Neutral peaceful position; keep calm and gentle."
             }
+            return core + " Source: traditional San-He twelve-phase water method. Interpretation: the wealth, people and health wording is a classical symbol, not a medical or financial prediction; inspect drainage and safety on site."
         case .zhHant:
             switch self {
-            case .changSheng, .diWang: return "來水吉，大發富貴；去水凶，損丁破財"
-            case .linGuan, .guanDai:   return "貴人來水，催官發甲；出水不利"
-            case .shuai:               return "巨門水，來去均宜，借庫消水"
-            case .mu, .jue:            return "去水吉，化煞為權；來水大凶，黃泉破局"
-            case .muYu:                return "桃花水，來去皆忌，主風流蕩產"
-            case .bing, .si, .tai, .yang: return "平和之位，宜緩流靜蓄"
+            case .changSheng, .diWang: core = "來水吉，大發富貴；去水凶，損丁破財"
+            case .linGuan, .guanDai: core = "貴人來水，催官發甲；出水不利"
+            case .shuai: core = "巨門水，來去均宜，借庫消水"
+            case .mu, .jue: core = "去水吉，化煞為權；來水大凶，黃泉破局"
+            case .muYu: core = "桃花水，來去皆忌，主風流蕩產"
+            case .bing, .si, .tai, .yang: core = "平和之位，宜緩流靜蓄"
             }
+            return core + "。出處：傳統三合十二長生水法（傳本有異文）。解釋：其中富貴、損丁與病死等語句是古法象徵，不是醫療或財務預測；請現場檢查排水與安全。"
         case .ja:
             switch self {
-            case .changSheng, .diWang: return "来水は大吉で富貴を招き、去水は凶で散財損丁"
-            case .linGuan, .guanDai:   return "貴人の来水で出世栄達、去水は不利"
-            case .shuai:               return "巨門水、出水入水ともに可、借庫消水に適す"
-            case .mu, .jue:            return "去水は吉で煞を権に変え、来水は大凶で黄泉破局"
-            case .muYu:                return "桃花水、出水入水ともに凶、放蕩や破財を招く"
-            case .bing, .si, .tai, .yang: return "穏やかな気位、静水緩流が吉"
+            case .changSheng, .diWang: core = "来水は大吉で富貴を招き、去水は凶で散財損丁"
+            case .linGuan, .guanDai: core = "貴人の来水で出世栄達、去水は不利"
+            case .shuai: core = "巨門水、出水入水ともに可、借庫消水に適す"
+            case .mu, .jue: core = "去水は吉で煞を権に変え、来水は大凶で黄泉破局"
+            case .muYu: core = "桃花水、出水入水ともに凶、放蕩や破財を招く"
+            case .bing, .si, .tai, .yang: core = "穏やかな気位、静水緩流が吉"
             }
+            return core + "。出典：伝統三合十二長生水法（伝本に異文）。健康・財産の表現は古典の象徴であり、現場の排水と安全を確認してください。"
         case .ko:
             switch self {
-            case .changSheng, .diWang: return "물이 들어오면 대길하여 부귀를 부르고, 나가면 흉하여 손실 초래"
-            case .linGuan, .guanDai:   return "귀인의 수로 승진 발달, 물이 나가면 불리"
-            case .shuai:               return "거문수로 들어오고 나감이 모두 무방하며 수구로 차용"
-            case .mu, .jue:            return "물이 나가면 길하여 살을 권세로 화하고, 들어오면 황천 대흉"
-            case .muYu:                return "도화수로 들고남이 모두 꺼려지며 주색패가"
-            case .bing, .si, .tai, .yang: return "평화로운 자리로 고요하고 완만한 흐름이 적합"
+            case .changSheng, .diWang: core = "물이 들어오면 대길하여 부귀를 부르고, 나가면 흉하여 손실 초래"
+            case .linGuan, .guanDai: core = "귀인의 수로 승진 발달, 물이 나가면 불리"
+            case .shuai: core = "거문수로 들어오고 나감이 모두 무방하며 수구로 차용"
+            case .mu, .jue: core = "물이 나가면 길하여 살을 권세로 화하고, 들어오면 황천 대흉"
+            case .muYu: core = "도화수로 들고남이 모두 꺼려지며 주색패가"
+            case .bing, .si, .tai, .yang: core = "평화로운 자리로 고요하고 완만한 흐름이 적합"
             }
+            return core + " 출처: 전통 삼합 십이장생 수법. 건강·재정 표현은 고전 상징이며 의료·재정 예측이 아닙니다."
         case .vi:
             switch self {
-            case .changSheng, .diWang: return "Nước lại cát lợi đại phát phú quý; nước đi hung tổn đinh hao tài"
-            case .linGuan, .guanDai:   return "Nước quý nhân trợ quan phát đạt; nước chảy đi thì bất lợi"
-            case .shuai:               return "Nước Cự Môn, đến hay đi đều được, mượn khố tiêu thủy"
-            case .mu, .jue:            return "Nước đi cát, hóa sát thành quyền; nước đến đại hung phạm Hoàng Tuyền"
-            case .muYu:                return "Nước Đào Hoa, đến hay đi đều kỵ, chủ phong lưu phá sản"
-            case .bing, .si, .tai, .yang: return "Vị trí bình hòa, nên để dòng nước chảy chậm êm ả"
+            case .changSheng, .diWang: core = "Nước lại cát lợi đại phát phú quý; nước đi hung tổn đinh hao tài"
+            case .linGuan, .guanDai: core = "Nước quý nhân trợ quan phát đạt; nước chảy đi thì bất lợi"
+            case .shuai: core = "Nước Cự Môn, đến hay đi đều được, mượn khố tiêu thủy"
+            case .mu, .jue: core = "Nước đi cát, hóa sát thành quyền; nước đến đại hung phạm Hoàng Tuyền"
+            case .muYu: core = "Nước Đào Hoa, đến hay đi đều kỵ, chủ phong lưu phá sản"
+            case .bing, .si, .tai, .yang: core = "Vị trí bình hòa, nên để dòng nước chảy chậm êm ả"
             }
+            return core + ". Nguồn: thủy pháp Tam Hợp Thập Nhị Trường Sinh truyền thống; các câu về sức khỏe và tài lộc là biểu tượng cổ, không phải dự đoán y khoa hay tài chính."
         case .th:
             switch self {
-            case .changSheng, .diWang: return "น้ำไหลเข้ามงคลยิ่ง ร่ำรวยมหาศาล; น้ำไหลออกอัปมงคล สูญเสียทรัพย์สิน"
-            case .linGuan, .guanDai:   return "น้ำไหลเข้าส่งเสริมยศศักดิ์บารมี; น้ำไหลออกไม่เป็นผลดี"
-            case .shuai:               return "น้ำจวี้เหมิน ไหลเข้าออกพอสมควร ใช้ทดน้ำระบายได้"
-            case .mu, .jue:            return "น้ำไหลออกมงคล เปลี่ยนร้ายกลายเป็นดี; น้ำไหลเข้าอัปมงคลยิ่ง"
-            case .muYu:                return "น้ำดอกท้อ หลีกเลี่ยงทั้งไหลเข้าและออก ระวังเรื่องชู้สาวเสียทรัพย์"
-            case .bing, .si, .tai, .yang: return "ตำแหน่งสงบสมดุล ควรให้น้ำไหลเอื่อยช้าๆ"
+            case .changSheng, .diWang: core = "น้ำไหลเข้ามงคลยิ่ง ร่ำรวยมหาศาล; น้ำไหลออกอัปมงคล สูญเสียทรัพย์สิน"
+            case .linGuan, .guanDai: core = "น้ำไหลเข้าส่งเสริมยศศักดิ์บารมี; น้ำไหลออกไม่เป็นผลดี"
+            case .shuai: core = "น้ำจวี้เหมิน ไหลเข้าออกพอสมควร ใช้ทดน้ำระบายได้"
+            case .mu, .jue: core = "น้ำไหลออกมงคล เปลี่ยนร้ายกลายเป็นดี; น้ำไหลเข้าอัปมงคลยิ่ง"
+            case .muYu: core = "น้ำดอกท้อ หลีกเลี่ยงทั้งไหลเข้าและออก ระวังเรื่องชู้สาวเสียทรัพย์"
+            case .bing, .si, .tai, .yang: core = "ตำแหน่งสงบสมดุล ควรให้น้ำไหลเอื่อยช้าๆ"
             }
+            return core + " แหล่งที่มา: วิธีน้ำสามประสานสิบสองระยะดั้งเดิม; ถ้อยคำเรื่องสุขภาพและทรัพย์เป็นสัญลักษณ์ ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
         case .id:
             switch self {
-            case .changSheng, .diWang: return "Air masuk sangat baik mendatangkan rezeki; air keluar membawa kerugian"
-            case .linGuan, .guanDai:   return "Air masuk membawa promosi bangsawan; air keluar tidak menguntungkan"
-            case .shuai:               return "Air Jumen, baik masuk maupun keluar cukup seimbang sebagai penampung"
-            case .mu, .jue:            return "Air keluar membawa berkah; air masuk sangat tabu menimbulkan petaka"
-            case .muYu:                return "Air asmara/bunga persik; masuk maupun keluar harus dihindari"
-            case .bing, .si, .tai, .yang: return "Posisi netral dan tenang; pertahankan aliran air yang lambat dan damai"
+            case .changSheng, .diWang: core = "Air masuk sangat baik mendatangkan rezeki; air keluar membawa kerugian"
+            case .linGuan, .guanDai: core = "Air masuk membawa promosi bangsawan; air keluar tidak menguntungkan"
+            case .shuai: core = "Air Jumen, baik masuk maupun keluar cukup seimbang sebagai penampung"
+            case .mu, .jue: core = "Air keluar membawa berkah; air masuk sangat tabu menimbulkan petaka"
+            case .muYu: core = "Air asmara/bunga persik; masuk maupun keluar harus dihindari"
+            case .bing, .si, .tai, .yang: core = "Posisi netral dan tenang; pertahankan aliran air yang lambat dan damai"
             }
+            return core + ". Sumber: metode air San-He dua belas fase tradisional; ungkapan kesehatan dan rezeki bersifat simbolis, bukan prediksi medis atau keuangan."
         case .auto, .zhHans:
             switch self {
-            case .changSheng, .diWang: return "来水吉，大发富贵；去水凶，损丁破财"
-            case .linGuan, .guanDai:   return "贵人来水，催官发甲；出水不利"
-            case .shuai:               return "巨门水，来去均宜，借库消水"
-            case .mu, .jue:            return "去水吉，化煞为权；来水大凶，黄泉破局"
-            case .muYu:                return "桃花水，来去皆忌，主风流荡产"
-            case .bing, .si, .tai, .yang: return "平和之位，宜缓流静蓄"
+            case .changSheng, .diWang: core = "来水吉，大发富贵；去水凶，损丁破财"
+            case .linGuan, .guanDai: core = "贵人来水，催官发甲；出水不利"
+            case .shuai: core = "巨门水，来去均宜，借库消水"
+            case .mu, .jue: core = "去水吉，化煞为权；来水大凶，黄泉破局"
+            case .muYu: core = "桃花水，来去皆忌，主风流荡产"
+            case .bing, .si, .tai, .yang: core = "平和之位，宜缓流静蓄"
             }
+            return core + "。出处：传统三合十二长生水法（传本有异文）。解释：其中富贵、损丁与病死等语句是古法象征，不是医疗或财务预测；请现场检查排水与安全。"
         }
     }
 }
@@ -281,17 +290,17 @@ public struct BaShaResult {
 
     public var localizedXiaoShaRule: String {
         switch LocalizationManager.shared.effectiveLanguage {
-        case .en: return "Generating me is Sheng Sha (noble aid); same as me is Wang Sha (people and wealth); overcoming me is Sha (major harm); I overcome is Slave Sha (wealth); I generate is Draining Sha (waste)."
-        case .zhHant: return "生我為生砂（催貴），同我為旺砂（旺丁財），克我為煞砂（大凶血光），我克為奴砂（得財帛），我生為洩砂（虛耗脫白）。"
-        case .ja: return "生我は生砂（貴人を促す）、同我は旺砂（人財を盛んにす）、克我は煞砂（大凶血光）、我克は奴砂（財帛を得る）、我生は洩砂（散財衰耗）。"
-        case .ko: return "생하는 것은 생사(귀인 조력), 같은 것은 왕사(인재 재물 번창), 극하는 것은 살사(대흉 혈광), 내가 극하는 것은 노사(재물 획득), 내가 생하는 것은 설사(소모 쇠퇴)."
-        case .vi: return "Sinh ngã vi Sinh Sa (trợ quý), đồng ngã vi Vượng Sa (vượng nhân đinh tài lộc), khắc ngã vi Sát Sa (đại hung huyết quang), ngã khắc vi Nô Sa (đắc tài bạch), ngã sinh vi Tiết Sa (tiêu hao hư thoát)."
-        case .th: return "ธาตุเกื้อหนุนคือเซิงซา (เสริมบารมี); ธาตุเดียวกันคือวั่งซา (บริบูรณ์ทรัพย์และคน); ธาตุข่มคือชาซา (เคราะห์ใหญ่เลือดตก); เราข่มคือหนูซา (ได้ลาภทรัพย์); เราก่อกำเนิดคือเซี่ยซา (รั่วไหลสูญเปล่า)"
-        case .id: return "Menghidupkan adalah Sheng Sha (penolong bangsawan); seunsur adalah Wang Sha (keluarga & kekayaan); menaklukkan saya adalah Sifat Sha (bahaya besar); saya taklukkan adalah Budak Sha (kekayaan); saya hidupkan adalah Boros Sha (pemborosan)."
-        case .auto, .zhHans: return xiaoShaRule
+        case .en: return "Generating me is Sheng Sha (noble aid); same as me is Wang Sha (people and wealth); overcoming me is Sha (major harm); I overcome is Slave Sha (wealth); I generate is Draining Sha (waste). Source: traditional Xiao-Sha five-element rule; health, blood-harm and wealth wording is symbolic, not a diagnosis or prediction."
+        case .zhHant: return "生我為生砂（催貴），同我為旺砂（旺丁財），克我為煞砂（大凶血光），我克為奴砂（得財帛），我生為洩砂（虛耗脫白）。出處：傳統消砂五行口訣。解釋：旺丁、血光與財帛語句是古法象徵，請現場核對安全，不是醫療或財務預測。"
+        case .ja: return "生我は生砂（貴人を促す）、同我は旺砂（人財を盛んにす）、克我は煞砂（大凶血光）、我克は奴砂（財帛を得る）、我生は洩砂（散財衰耗）。出典：伝統消砂五行訣。健康・事故・財産の表現は象徴であり、診断や予測ではありません。"
+        case .ko: return "생하는 것은 생사(귀인 조력), 같은 것은 왕사(인재 재물 번창), 극하는 것은 살사(대흉 혈광), 내가 극하는 것은 노사(재물 획득), 내가 생하는 것은 설사(소모 쇠퇴). 출처: 전통 소사 오행결. 건강·사고·재정 표현은 상징이며 진단이나 예측이 아닙니다."
+        case .vi: return "Sinh ngã vi Sinh Sa (trợ quý), đồng ngã vi Vượng Sa (vượng nhân đinh tài lộc), khắc ngã vi Sát Sa (đại hung huyết quang), ngã khắc vi Nô Sa (đắc tài bạch), ngã sinh vi Tiết Sa (tiêu hao hư thoát). Nguồn: khẩu quyết Ngũ hành Tiêu Sa truyền thống; các câu về sức khỏe và tài lộc là biểu tượng, không phải chẩn đoán hay dự đoán."
+        case .th: return "ธาตุเกื้อหนุนคือเซิงซา (เสริมบารมี); ธาตุเดียวกันคือวั่งซา (บริบูรณ์ทรัพย์และคน); ธาตุข่มคือชาซา (เคราะห์ใหญ่เลือดตก); เราข่มคือหนูซา (ได้ลาภทรัพย์); เราก่อกำเนิดคือเซี่ยซา (รั่วไหลสูญเปล่า) แหล่งที่มา: กฎห้าธาตุเซียวซาแบบดั้งเดิม ถ้อยคำเรื่องสุขภาพและทรัพย์เป็นสัญลักษณ์ ไม่ใช่การวินิจฉัยหรือพยากรณ์"
+        case .id: return "Menghidupkan adalah Sheng Sha (penolong bangsawan); seunsur adalah Wang Sha (keluarga & kekayaan); menaklukkan saya adalah Sifat Sha (bahaya besar); saya taklukkan adalah Budak Sha (kekayaan); saya hidupkan adalah Boros Sha (pemborosan). Sumber: aturan lima elemen Xiao-Sha tradisional; ungkapan kesehatan dan rezeki bersifat simbolis."
+        case .auto, .zhHans: return "生我为生砂（催贵），同我为旺砂（旺丁财），克我为煞砂（大凶血光），我克为奴砂（得财帛），我生为泄砂（虚耗脱白）。出处：传统消砂五行口诀。解释：旺丁、血光与财帛语句是古法象征，请现场核对安全，不是医疗或财务预测。"
         }
     }
-    
+
     public var localizedShaDir: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
@@ -339,17 +348,60 @@ public struct BaShaResult {
 
 public final class SanHeWaterEngine {
     public static let shared = SanHeWaterEngine()
-    
-    // 八煞克煞曜位映射表：“坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”
+
+    private func localizedHuangQuanSourceNote(for lang: AppLanguage) -> String {
+        switch lang {
+        case .zhHant:
+            return "出處：楊公八路黃泉水法口訣。解釋：上述疾厄、損丁與財運語句為古法象徵，不是醫療或財務預測；請現場核對排水與安全。"
+        case .ja:
+            return "出典：楊公八路黄泉水法の口訣。健康・家族・財産の表現は古法の象徴であり、医療・金融の予測ではありません。排水と安全を現地で確認してください。"
+        case .ko:
+            return "출처: 양공 팔로황천 수법 구결. 건강·가족·재정 표현은 고법의 상징이며 의료·재정 예측이 아닙니다. 배수와 안전을 현장에서 확인하세요."
+        case .vi:
+            return "Nguồn: khẩu quyết thủy pháp Hoàng Tuyền Bát Lộ của Dương Công. Các câu về sức khỏe, gia đình và tài lộc là biểu tượng cổ, không phải dự đoán y khoa hay tài chính; hãy kiểm tra thoát nước và an toàn tại chỗ."
+        case .th:
+            return "แหล่งที่มา: คาถาวิธีน้ำหวงเฉวียนแปดทางของหยางกง ถ้อยคำเรื่องสุขภาพ ครอบครัว และทรัพย์เป็นสัญลักษณ์โบราณ ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน โปรดตรวจสอบการระบายน้ำและความปลอดภัยหน้างาน"
+        case .id:
+            return "Sumber: mantra tata air Huangquan delapan jalur tradisi Yang Gong. Ungkapan kesehatan, keluarga, dan rezeki bersifat simbolis, bukan prediksi medis atau keuangan; periksa drainase dan keselamatan di lokasi."
+        case .en:
+            return "Source: Yang Gong Eight-Road Huangquan water-method formula. Health, family and wealth wording is a classical symbol, not a medical or financial prediction; verify drainage and safety on site."
+        case .auto, .zhHans:
+            return "出处：杨公八路黄泉水法口诀。解释：上述疾厄、损丁与财运语句为古法象征，不是医疗或财务预测；请现场核对排水与安全。"
+        }
+    }
+
+    private func localizedBaShaSourceNote(for lang: AppLanguage) -> String {
+        switch lang {
+        case .zhHant:
+            return "出處：傳統八煞曜位歌訣「坎龍坤兔震山猴，巽雞乾馬兌蛇頭，艮虎離豬為煞曜」。解釋：腎疾、脾胃、眼疾、傷損等語句是古籍象徵，不是醫療診斷；請先處理現場結構、噪音、排水和通行安全。"
+        case .ja:
+            return "出典：伝統八煞曜位の歌訣。腎臓・胃腸・眼・けがの表現は古典の象徴で、医学的診断ではありません。構造、騒音、排水、安全を現地で確認してください。"
+        case .ko:
+            return "출처: 전통 팔살요위 구결. 신장·소화·눈·부상 표현은 고전 상징이며 의료 진단이 아닙니다. 구조·소음·배수·통행 안전을 현장에서 확인하세요."
+        case .vi:
+            return "Nguồn: khẩu quyết Bát Sát Diệu vị truyền thống. Các câu về thận, tỳ vị, mắt và thương tổn là biểu tượng cổ, không phải chẩn đoán y khoa; hãy kiểm tra cấu trúc, tiếng ồn, thoát nước và an toàn."
+        case .th:
+            return "แหล่งที่มา: คาถาดาวพิฆาตแปดทิศดั้งเดิม ถ้อยคำเรื่องไต ระบบย่อยอาหาร ดวงตา และการบาดเจ็บเป็นสัญลักษณ์โบราณ ไม่ใช่การวินิจฉัยทางการแพทย์ โปรดตรวจโครงสร้าง เสียง การระบายน้ำ และความปลอดภัย"
+        case .id:
+            return "Sumber: mantra delapan bintang Sha tradisional. Ungkapan ginjal, pencernaan, mata, dan cedera bersifat simbolis, bukan diagnosis medis; periksa struktur, kebisingan, drainase, dan keselamatan."
+        case .en:
+            return "Source: traditional Eight-Sha star formula. Kidney, digestion, eye and injury wording is classical symbolism, not a medical diagnosis; inspect structure, noise, drainage and access safety on site."
+        case .auto, .zhHans:
+            return "出处：传统八煞曜位歌诀“坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”。解释：肾疾、脾胃、眼疾、伤损等语句是古籍象征，不是医疗诊断；请先处理现场结构、噪音、排水和通行安全。"
+        }
+    }
+
+    // 八煞克煞曜位传统映射（口诀：“坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”）。
+    // 保留古籍健康、伤灾与家人象征语句，并在展示处注明其文化语境。
     private let baShaMap: [String: (zhi: String, dir: String, lore: String)] = [
-        "坎": ("辰", "东南", "坎卦三山(壬/子/癸)煞在辰位。辰方最忌见高压电塔、尖角怪石或破败死水，犯之主肾疾、下元损丁。"),
-        "坤": ("卯", "正东", "坤卦三山(未/坤/申)煞在卯位。忌正东见冲射，主脾胃败坏、老母伤损。"),
-        "震": ("申", "西南", "震卦三山(甲/卯/乙)煞在申位。忌西南申方突兀尖峰，主长房伤残、足疾官非。"),
-        "巽": ("酉", "正西", "巽卦三山(辰/巽/巳)煞在酉位。忌正西酉金直冲，主妇女产厄、风声是非。"),
-        "乾": ("午", "正南", "乾卦三山(戌/乾/亥)煞在午位。忌正南离火烈焰反克天门，主心脑血光、损老翁。"),
-        "兑": ("巳", "东南", "兑卦三山(庚/酉/辛)煞在巳位。忌东南巳火伤金，主少女不利、肺疾吐血。"),
-        "艮": ("寅", "东北", "艮卦三山(丑/艮/寅)煞在寅位。忌东北见破山绝涧，损幼子少男。"),
-        "离": ("亥", "西北", "离卦三山(丙/午/丁)煞在亥位。忌西北亥水冲射，主眼疾暗昧、中房受制。")
+        "坎": ("辰", "东南", "坎卦三山（壬／子／癸）煞在辰位。辰方最忌见高压电塔、尖角怪石或破败死水，犯之主肾疾、下元损丁。"),
+        "坤": ("卯", "正东", "坤卦三山（未／坤／申）煞在卯位。忌正东见冲射，主脾胃败坏、老母伤损。"),
+        "震": ("申", "西南", "震卦三山（甲／卯／乙）煞在申位。忌西南申方突兀尖峰，主长房伤残、足疾官非。"),
+        "巽": ("酉", "正西", "巽卦三山（辰／巽／巳）煞在酉位。忌正西酉金直冲，主妇女产厄、风声是非。"),
+        "乾": ("午", "正南", "乾卦三山（戌／乾／亥）煞在午位。忌正南离火烈焰反克天门，主心脑血光、损老翁。"),
+        "兑": ("巳", "东南", "兑卦三山（庚／酉／辛）煞在巳位。忌东南巳火伤金，主少女不利、肺疾吐血。"),
+        "艮": ("寅", "东北", "艮卦三山（丑／艮／寅）煞在寅位。忌东北见破山绝涧，损幼子少男。"),
+        "离": ("亥", "西北", "离卦三山（丙／午／丁）煞在亥位。忌西北亥水冲射，主眼疾暗昧、中房受制。")
     ]
     
     // 1. 八路黄泉水法判定
@@ -670,6 +722,8 @@ public final class SanHeWaterEngine {
             }
         }
         
+        desc += "\n\n" + localizedHuangQuanSourceNote(for: lang)
+
         return HuangQuanWaterResult(
             facingMountain: name,
             waterDesc: desc,
@@ -729,7 +783,7 @@ public final class SanHeWaterEngine {
             sittingPalace: palace,
             shaZhi: info.zhi,
             shaDir: info.dir,
-            lore: lore,
+            lore: lore + "\n\n" + localizedBaShaSourceNote(for: lang),
             remedy: remedy
         )
     }

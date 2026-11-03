@@ -58,7 +58,13 @@ public struct QimenDoor {
         }
     }
 
+    /// Keep the traditional door symbolism intact and attach its classical
+    /// source and interpretation after the displayed wording.
     public var localizedLore: String {
+        baseLocalizedLore + "\n\n" + classicalSourceNote
+    }
+
+    private var baseLocalizedLore: String {
         switch LocalizationManager.shared.effectiveLanguage {
         case .en:
             return [
@@ -116,6 +122,27 @@ public struct QimenDoor {
                 "景门": "文书考试宴请吉，火炎防急", "死门": "吊丧刑戮宜，出行造葬大凶",
                 "惊门": "官非惊恐口舌，捕盗宜", "开门": "经商开业动身，百事通亨"
             ][name] ?? lore
+        }
+    }
+
+    private var classicalSourceNote: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Classical source: the traditional Eight-Gates mnemonic in Qimen Dunjia texts, ‘Rest, Life and Open are the three auspicious gates; Death, Shock and Harm are the three inauspicious gates; Block and View are intermediate.’ Interpretation: the gate language above is a historical symbolic reading. It does not determine travel safety, health, construction, legal or financial outcomes; verify real-world conditions and consult qualified professionals."
+        case .zhHant:
+            return "古籍出处：奇門遁甲八門傳統訣：「休、生、開三吉；死、驚、傷三凶；杜、景二門中。」解釋：上文門象為古籍術數的象徵解讀，不決定出行安全、健康、施工、法律或財務結果；請以現場條件及專業意見為準。"
+        case .ja:
+            return "出典：奇門遁甲の八門訣「休・生・開は三吉、死・驚・傷は三凶、杜・景は中門」。解釈：門の吉凶は古典術数の象徴的な読みであり、旅行の安全、健康、工事、法律・金融の結果を決めるものではありません。"
+        case .ko:
+            return "출처: 기문둔갑 팔문 전통결 ‘휴·생·개는 삼길, 사·경·상은 삼흉, 두·경은 중문’. 해석: 위 문상은 고전 술수의 상징적 해석이며 여행 안전·건강·공사·법률·재무 결과를 결정하지 않습니다."
+        case .vi:
+            return "Nguồn cổ: khẩu quyết Bát Môn trong Kỳ Môn Độn Giáp: ‘Hưu, Sinh, Khai là ba cửa cát; Tử, Kinh, Thương là ba cửa hung; Đỗ, Cảnh là cửa trung.’ Giải thích: ngôn ngữ cửa là biểu tượng thuật số cổ, không quyết định an toàn đi lại, sức khỏe, xây dựng, pháp lý hay tài chính."
+        case .th:
+            return "ที่มาโบราณ: สูตรแปดประตูในฉีเหมินตุ้นเจี่ย ‘ประตูพัก เกิด เปิด เป็นสามประตูมงคล; ตาย ตกใจ บาดเจ็บ เป็นสามประตูอัปมงคล; ซ่อนและทัศน์เป็นประตูกลาง’ คำอธิบาย: ถ้อยคำเรื่องประตูเป็นสัญลักษณ์ของศาสตร์โบราณ ไม่ได้กำหนดความปลอดภัย สุขภาพ งานก่อสร้าง กฎหมาย หรือการเงิน"
+        case .id:
+            return "Sumber klasik: mnemonik Delapan Gerbang Qimen Dunjia, ‘Istirahat, Kehidupan, dan Pembuka adalah tiga gerbang baik; Kematian, Kejutan, dan Luka adalah tiga gerbang buruk; Blokir dan Pandang adalah gerbang menengah.’ Penjelasan: simbol gerbang ini adalah tafsir sejarah, bukan penentu keselamatan perjalanan, kesehatan, konstruksi, hukum, atau keuangan."
+        case .auto, .zhHans:
+            return "古籍出处：奇门遁甲八门传统诀：“休、生、开三吉；死、惊、伤三凶；杜、景二门中。”解释：上文门象为古籍术数的象征解读，不决定出行安全、健康、施工、法律或财务结果；请以现场条件及专业意见为准。"
         }
     }
 }

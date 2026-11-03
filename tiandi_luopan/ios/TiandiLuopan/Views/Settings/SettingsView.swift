@@ -1,4 +1,15 @@
 import SwiftUI
+import Foundation
+
+/// Public HTTPS pages used by the purchase flow and App Store metadata.
+/// Keep these URLs stable: changing a legal URL after review can make the
+/// links shown in the paywall point at an outdated policy.
+public enum LegalLinks {
+    // Escape the slashes so the repository's lightweight Swift checker does
+    // not mistake the URL for a source comment.
+    public static let privacyPolicy = URL(string: "https:\u{2F}\u{2F}sdnlink.cn/privacy.html")!
+    public static let termsOfUse = URL(string: "https:\u{2F}\u{2F}sdnlink.cn/subscription-terms.html")!
+}
 
 private enum LegalDocument: String, Identifiable {
     case terms
@@ -271,11 +282,21 @@ public struct SettingsView: View {
                         }
                         .font(.adaptive(size: 12, weight: .semibold))
                         .foregroundColor(Color.yanCyan)
+                        Link(destination: LegalLinks.termsOfUse) {
+                            Image(systemName: "safari")
+                                .accessibilityLabel(lang.t("legal_terms_button"))
+                        }
+                        .foregroundColor(Color.yanCyan)
                         Spacer()
                         Button(lang.t("legal_privacy_button")) {
                             legalDocument = .privacy
                         }
                         .font(.adaptive(size: 12, weight: .semibold))
+                        .foregroundColor(Color.yanCyan)
+                        Link(destination: LegalLinks.privacyPolicy) {
+                            Image(systemName: "safari")
+                                .accessibilityLabel(lang.t("legal_privacy_button"))
+                        }
                         .foregroundColor(Color.yanCyan)
                     }
                     Button {

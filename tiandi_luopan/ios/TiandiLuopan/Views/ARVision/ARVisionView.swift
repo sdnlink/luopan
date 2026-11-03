@@ -1278,7 +1278,7 @@ public struct ARVisionView: View {
                 Text(sha.localizedMetaphysicsHarm)
                     .font(.adaptive(size: 11))
                     .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(2)
+                    .lineSpacing(2)
             }
             .padding(8)
             .background(Color.black.opacity(0.75))
@@ -2026,7 +2026,7 @@ public struct ShaRemedyDetailSheet: View {
             VStack(alignment: .leading, spacing: 8) {
                 timingPointRow(
                     tag: "玄空避忌",
-                    content: "冲煞方若逢二黑病符或五黄廉贞位，忌动土、忌红色暖光；可挂铜葫芦或六帝钱泄土气。"
+                    content: "冲煞方若逢二黑病符或五黄廉贞位，忌动土、忌红色暖光；可挂铜葫芦或六帝钱泄土气。出处：《紫白诀》有‘五黄重叠，灾疾并临；二五交加，罹疾病’。解释：这是古籍中的健康象征与调理建议，供传统文化参考，不是医疗诊断；现场应以通风、采光、结构安全和专业意见为准。"
                 )
                 timingPointRow(
                     tag: "择日建议",

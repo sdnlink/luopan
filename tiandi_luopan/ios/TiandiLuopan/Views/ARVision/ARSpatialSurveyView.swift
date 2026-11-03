@@ -83,25 +83,34 @@ public struct LubanRulerEvaluation: Equatable {
     }
 
     public func localizedSummary(for language: AppLanguage) -> String {
+        let sourceNote: String
+        switch language {
+        case .en:
+            sourceNote = "Classical source: the Lu Ban ruler formula, ‘Wealth, Righteousness, Official and Origin are auspicious; Illness, Separation, Robbery and Harm are inauspicious.’ ‘Illness’, ‘loss’ and ‘wealth’ are symbolic ruler labels, not medical, safety or financial conclusions."
+        case .zhHant:
+            sourceNote = "出处：《鲁班经》尺法诀：「财、义、官、本为吉，病、离、劫、害为凶。」兼参《丁兰尺》传统尺法；‘病、失、财、旺’是文化象征标签，不是医疗、安全或财务判断。"
+        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
+            sourceNote = "出处：《鲁班经》尺法诀：“财、义、官、本为吉，病、离、劫、害为凶。”兼参《丁兰尺》传统尺法；‘病、失、财、旺’是文化象征标签，不是医疗、安全或财务判断。"
+        }
         switch language {
         case .en:
             let yName = Self.yangNamesEn[yangGateIndex]
             let yLuck = yangIsAuspicious ? "Auspicious" : "Inauspicious"
             let nName = Self.yinNamesEn[yinIndex]
             let nLuck = yinIsAuspicious ? "Auspicious" : "Inauspicious"
-            return String(format: "%.1f cm · LuBan: %@ (%@) · DingLan: %@ (%@)", centimeters, yName, yLuck, nName, nLuck)
+            return String(format: "%.1f cm · LuBan: %@ (%@) · DingLan: %@ (%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
         case .zhHant:
             let yName = Self.yangNamesHant[yangGateIndex]
             let yLuck = yangIsAuspicious ? "吉" : "凶"
             let nName = Self.yinNamesHant[yinIndex]
             let nLuck = yinIsAuspicious ? "吉" : "凶"
-            return String(format: "%.1f cm · 魯班門光尺：【%@】字門(%@) · 丁蘭尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck)
+            return String(format: "%.1f cm · 魯班門光尺：【%@】字門(%@) · 丁蘭尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
         case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
             let yName = Self.yangNamesHans[yangGateIndex]
             let yLuck = yangIsAuspicious ? "吉" : "凶"
             let nName = Self.yinNamesHans[yinIndex]
             let nLuck = yinIsAuspicious ? "吉" : "凶"
-            return String(format: "%.1f cm · 鲁班门光尺：【%@】字门(%@) · 丁兰尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck)
+            return String(format: "%.1f cm · 鲁班门光尺：【%@】字门(%@) · 丁兰尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
         }
     }
 }
@@ -487,7 +496,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             "东南巽宫 · 八白左辅（次财位·吉）",
             "正南离宫 · 四绿文昌（功名位·吉）",
             "西南坤宫 · 六白武曲（偏财权印·吉）",
-            "正西兑宫 · 二黑巨门（病符位）",
+            "正西兑宫 · 二黑巨门（病符象征·《紫白诀》）",
             "西北乾宫 · 一白贪狼（未来生气·大吉）"
         ]
         let labelsHant = [
@@ -497,7 +506,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             "東南巽宮 · 八白左輔（次財位·吉）",
             "正南離宮 · 四綠文昌（功名位·吉）",
             "西南坤宮 · 六白武曲（偏財權印·吉）",
-            "正西兌宮 · 二黑巨門（病符位）",
+            "正西兌宮 · 二黑巨門（病符象徵·《紫白訣》）",
             "西北乾宮 · 一白貪狼（未來生氣·大吉）"
         ]
         let labelsEn = [
@@ -507,7 +516,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             "Southeast (Xun) · 8 White (Wealth)",
             "South (Li) · 4 Green (Academic)",
             "Southwest (Kun) · 6 White (Career)",
-            "West (Dui) · 2 Black (Illness)",
+            "West (Dui) · 2 Black (classical illness symbol · Zi Bai Jue)",
             "Northwest (Qian) · 1 White (Noble)"
         ]
         let safeIdx = min(7, max(0, index))
@@ -567,7 +576,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                     ("艮 · 三碧", "东北禄存", UIColor(red: 0.95, green: 0.75, blue: 0.35, alpha: 0.95))
                 ],
                 [
-                    ("兑 · 二黑", "正西病符", UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)),
+                    ("兑 · 二黑", "正西病符（《紫白诀》象征）", UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)),
                     ("中宫 · 九紫", "天心太极", UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1.0)),
                     ("震 · 七赤", "正东破军", UIColor(red: 0.85, green: 0.85, blue: 0.92, alpha: 0.95))
                 ],

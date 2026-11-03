@@ -52,6 +52,7 @@
 		1061 /* FengshuiPalaceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2061 /* FengshuiPalaceDetailSheet.swift */; };
 		1062 /* CompassLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2062 /* CompassLayerManager.swift */; };
 		1063 /* SolarTermsData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2063 /* SolarTermsData.swift */; };
+		1014 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2087 /* PrivacyInfo.xcprivacy */; };
 		1064 /* LayerSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2064 /* LayerSettingsSheet.swift */; };
 		1065 /* FloorplanImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2065 /* FloorplanImagePicker.swift */; };
 		1066 /* ZeRiEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2066 /* ZeRiEngine.swift */; };
@@ -140,6 +141,10 @@
 		2084 /* id Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = id; path = id.lproj/Localizable.strings; sourceTree = "<group>"; };
 		2085 /* ja Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		2086 /* ko Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
+		2087 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		2088 /* en Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		2089 /* zh-Hans Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		2091 /* zh-Hant Localizable.strings */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		2072 /* ARSpatialSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/ARSpatialSurveyView.swift"; sourceTree = "<group>"; };
 		2073 /* ARRoomPlanCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/ARRoomPlanCaptureView.swift"; sourceTree = "<group>"; };
 		2074 /* HouseSpatialSurveyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/HouseSpatialSurveyModel.swift"; sourceTree = "<group>"; };
@@ -233,6 +238,7 @@
 				2073 /* ARRoomPlanCaptureView.swift */,
 				2075 /* House3DSpaceViewer.swift */,
 				2078 /* VRSpatialSurveyView.swift */,
+				2087 /* PrivacyInfo.xcprivacy */,
 				2013 /* InfoPlist.strings */,
 				2090 /* Localizable.strings */,
 
@@ -245,6 +251,9 @@
 		2090 /* Localizable.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
+				2088 /* en Localizable.strings */,
+				2089 /* zh-Hans Localizable.strings */,
+				2091 /* zh-Hant Localizable.strings */,
 				2082 /* th Localizable.strings */,
 				2083 /* vi Localizable.strings */,
 				2084 /* id Localizable.strings */,
@@ -362,6 +371,7 @@
 				1006 /* www in Resources */,
 				1012 /* InfoPlist.strings in Resources */,
 				1013 /* Localizable.strings in Resources */,
+				1014 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -2,6 +2,8 @@
 
 本地化 App 描述（含每种语言的 EULA 链接）：[`appstore-descriptions.md`](appstore-descriptions.md)
 
+加密合规填写说明：[`appstore-encryption-compliance.md`](appstore-encryption-compliance.md)
+
 ## App 覆盖地区文件
 
 `appstore-coverage.geojson` 是提交给 App Store Connect 的覆盖区域文件，文件顶层只有一个 `MultiPolygon` 几何对象；每个外环使用 `[经度, 纬度]` 坐标并闭合。当前 16 个多边形按 `appstore-availability.csv` 的顺序对应 16 个计划 storefront。`appstore-availability.csv` 仍作为地区代码和语言映射的核对清单。

@@ -152,6 +152,11 @@ public class StoreKitIAPManager: ObservableObject {
         var verifiedAt: Date
         var isAuthoritative: Bool
         var isLifetime: Bool
+        /// Apple 当前仍授予年度订阅（交易未撤销地存在于 currentEntitlements，
+        /// 或 SubscriptionInfo.status 显示 subscribed/inGracePeriod/billingRetry）。
+        /// 宽限期内 expirationDate 已过但权益有效，此时 vipExpireDate 不可靠，
+        /// 必须靠本标志保持可用，避免把有效会员锁成 0。
+        var vipActive: Bool
         var vipExpireDate: TimeInterval
         var floorplanCredits: Int
         var tianjiCredits: Int
@@ -165,7 +170,7 @@ public class StoreKitIAPManager: ObservableObject {
         var processedTransactionIDs: [String]
 
         private enum CodingKeys: String, CodingKey {
-            case verifiedAt, isAuthoritative, isLifetime, vipExpireDate
+            case verifiedAt, isAuthoritative, isLifetime, vipActive, vipExpireDate
             case floorplanCredits, tianjiCredits, purchasedProductIDs
             case consumableGrants
             case processedTransactionIDs
@@ -174,6 +179,7 @@ public class StoreKitIAPManager: ObservableObject {
         init(verifiedAt: Date,
              isAuthoritative: Bool,
              isLifetime: Bool,
+             vipActive: Bool,
              vipExpireDate: TimeInterval,
              floorplanCredits: Int,
              tianjiCredits: Int,
@@ -183,6 +189,7 @@ public class StoreKitIAPManager: ObservableObject {
             self.verifiedAt = verifiedAt
             self.isAuthoritative = isAuthoritative
             self.isLifetime = isLifetime
+            self.vipActive = vipActive
             self.vipExpireDate = vipExpireDate
             self.floorplanCredits = floorplanCredits
             self.tianjiCredits = tianjiCredits
@@ -196,6 +203,9 @@ public class StoreKitIAPManager: ObservableObject {
             verifiedAt = try container.decode(Date.self, forKey: .verifiedAt)
             isAuthoritative = try container.decode(Bool.self, forKey: .isAuthoritative)
             isLifetime = try container.decode(Bool.self, forKey: .isLifetime)
+            // Mirrors written before the Apple-grant flag existed keep a false
+            // value and are refreshed by the next authoritative verification.
+            vipActive = try container.decodeIfPresent(Bool.self, forKey: .vipActive) ?? false
             vipExpireDate = try container.decode(TimeInterval.self, forKey: .vipExpireDate)
             floorplanCredits = try container.decode(Int.self, forKey: .floorplanCredits)
             tianjiCredits = try container.decode(Int.self, forKey: .tianjiCredits)
@@ -212,6 +222,7 @@ public class StoreKitIAPManager: ObservableObject {
             try container.encode(verifiedAt, forKey: .verifiedAt)
             try container.encode(isAuthoritative, forKey: .isAuthoritative)
             try container.encode(isLifetime, forKey: .isLifetime)
+            try container.encode(vipActive, forKey: .vipActive)
             try container.encode(vipExpireDate, forKey: .vipExpireDate)
             try container.encode(floorplanCredits, forKey: .floorplanCredits)
             try container.encode(tianjiCredits, forKey: .tianjiCredits)
@@ -275,7 +286,7 @@ public class StoreKitIAPManager: ObservableObject {
         migrateLegacyTransactionLedgerIfNeeded()
         // 2. 同步读取镜像用于启动即时的 UI 反馈；无镜像（重装/首启）保持锁定
         let mirror = currentMirror()
-        self.isVIPUser = mirror.map { $0.isAuthoritative && ($0.isLifetime || $0.vipExpireDate > Date().timeIntervalSince1970) } ?? false
+        self.isVIPUser = mirror.map { $0.isAuthoritative && ($0.isLifetime || $0.vipActive || $0.vipExpireDate > Date().timeIntervalSince1970) } ?? false
         self.isLifetimeUser = mirror?.isAuthoritative == true && (mirror?.isLifetime ?? false)
         self.floorplanCreditsCount = mirror?.isAuthoritative == true ? (mirror?.floorplanCredits ?? 0) : 0
         self.tianjiCreditsCount = mirror?.isAuthoritative == true ? (mirror?.tianjiCredits ?? 0) : 0
@@ -301,6 +312,7 @@ public class StoreKitIAPManager: ObservableObject {
         EntitlementMirror(verifiedAt: Date(),
                           isAuthoritative: false,
                           isLifetime: false,
+                          vipActive: false,
                           vipExpireDate: 0,
                           floorplanCredits: 0,
                           tianjiCredits: 0,
@@ -337,6 +349,7 @@ public class StoreKitIAPManager: ObservableObject {
         // entitlement/transaction write so upgrades do not discard a valid
         // local cache.
         guard computeMirrorSeal(mirror) == seal
+                || computeV3MirrorSeal(mirror) == seal
                 || computePreConsumableGrantSeal(mirror) == seal
                 || computeLegacyMirrorSeal(mirror) == seal else {
             return nil
@@ -361,6 +374,17 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     private func computeMirrorSeal(_ mirror: EntitlementMirror) -> String {
+        let payload = "v4|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(mirror.vipActive ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))|\(consumableGrantSealPayload(mirror.consumableGrants))"
+        let key = deviceSealSymmetricKey()
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Seal format used by the immediately preceding mirror version (v3),
+    /// which predates the vipActive Apple-grant flag. It remains readable so
+    /// an upgrade does not discard a valid local cache; the next authoritative
+    /// verification re-seals with the v4 payload.
+    private func computeV3MirrorSeal(_ mirror: EntitlementMirror) -> String {
         let payload = "v3|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))|\(consumableGrantSealPayload(mirror.consumableGrants))"
         let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
@@ -433,6 +457,8 @@ public class StoreKitIAPManager: ObservableObject {
         // init / refreshEntitlements / 购买完成 / updates 事件持续驱动。
         guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
+        // 苹果当前授予中（含宽限期/账单重试）不因本地到期日已过而锁
+        if mirror.vipActive { return true }
         if mirror.vipExpireDate > Date().timeIntervalSince1970 { return true }
         return false
     }
@@ -447,7 +473,7 @@ public class StoreKitIAPManager: ObservableObject {
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         pruneExpiredTianjiReservationsLocked()
-        if mirror.isLifetime || mirror.vipExpireDate > Date().timeIntervalSince1970 {
+        if mirror.isLifetime || mirror.vipActive || mirror.vipExpireDate > Date().timeIntervalSince1970 {
             return true
         }
         // Credits are not debited while an export is in flight.  Exclude the
@@ -460,6 +486,7 @@ public class StoreKitIAPManager: ObservableObject {
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
+        if mirror.vipActive { return true }
         return mirror.vipExpireDate > Date().timeIntervalSince1970
     }
 
@@ -487,6 +514,7 @@ public class StoreKitIAPManager: ObservableObject {
     private func isVIPUnlocked() -> Bool {
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if mirror.isLifetime { return true }
+        if mirror.vipActive { return true }
         return mirror.vipExpireDate > Date().timeIntervalSince1970
     }
 
@@ -984,10 +1012,14 @@ public class StoreKitIAPManager: ObservableObject {
         // the ledger but not reached finish(), and returning early would leave
         // StoreKit delivering the same transaction forever.
         await transaction.finish()
-        guard didProcess else { return }
 
-        // 订阅/非消耗品：不直接写本地，由权威验证覆写（续期刷新到期日）
-        await verifyEntitlementsAsync()
+        // 订阅/非消耗品：即使交易 ID 已入账（重放/跨设备恢复），也要重新
+        // 权威对账刷新到期日；幂等只继续挡消费型额度，避免重复加次数。
+        let kind = productKind(for: pid)
+        if didProcess || kind == .vipYearly || kind == .proLifetime {
+            await verifyEntitlementsAsync()
+        }
+        guard didProcess else { return }
 
         await MainActor.run {
             self.isProcessingPurchase = false
@@ -1002,14 +1034,16 @@ public class StoreKitIAPManager: ObservableObject {
         let txId = String(transaction.id)
         let didProcess = applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
         await transaction.finish()
+
+        // 订阅/非消耗品：即使交易 ID 已入账，也重新权威对账刷新到期日。
+        let kind = productKind(for: pid)
+        if didProcess || kind == .vipYearly || kind == .proLifetime {
+            await verifyEntitlementsAsync()
+        }
         guard didProcess else {
             await MainActor.run { self.isProcessingPurchase = false }
             return
         }
-
-        // 订阅/非消耗品权益：交由权威验证从 currentEntitlements 覆写，
-        // 绝不因“购买成功”直接点亮本地会员标志。
-        await verifyEntitlementsAsync()
 
         await MainActor.run {
             self.isProcessingPurchase = false
@@ -1123,6 +1157,7 @@ public class StoreKitIAPManager: ObservableObject {
     /// “lock/unlock unavailable from asynchronous contexts” diagnostic in the
     /// async transaction scanner.
     private func persistEntitlementSnapshot(isLifetime: Bool,
+                                            vipActive: Bool,
                                             vipExpire: TimeInterval,
                                             purchasedProductIDs: [String]) -> (floorplan: Int, tianji: Int) {
         entitlementLock.lock()
@@ -1131,6 +1166,7 @@ public class StoreKitIAPManager: ObservableObject {
         mirror.verifiedAt = Date()
         mirror.isAuthoritative = true
         mirror.isLifetime = isLifetime
+        mirror.vipActive = vipActive
         mirror.vipExpireDate = vipExpire
         mirror.purchasedProductIDs = purchasedProductIDs.sorted()
         updateMirrorLocked(mirror)
@@ -1154,8 +1190,19 @@ public class StoreKitIAPManager: ObservableObject {
     ///    （订阅含权威 expirationDate；退款交易已自动移除）；
     /// 2. 全量覆写镜像验证段：有效则点亮/刷新到期日，失效/退款则收回；
     /// 3. 账本段（消费型 credits）不在此覆写，由已验证交易记账维护。
+    ///
+    /// 订阅有效性以「苹果当前是否仍授予」为准，而不是只看本地镜像里抄来
+    /// 的到期日：
+    /// - currentEntitlements 中未撤销的年度订阅即视为授予中（该序列只含
+    ///   subscribed / inGracePeriod），宽限期与账单重试期保持可用；
+    /// - 本地缓存为空（对账瞬间 currentEntitlements 尚未同步）而镜像此前
+    ///   有效时，先查 Product.SubscriptionInfo.status 二次确认：状态为
+    ///   subscribed/inGracePeriod/billingRetry 保持可用；明确 expired/revoked
+    ///   才锁定；信息不足（商品未加载）则保留旧镜像、跳过本次覆写，等待
+    ///   下一次对账，绝不用一次空缓存把昨天还有效的会员清成 0。
     private func verifyEntitlementsAsync() async {
         var isLifetime = false
+        var vipActive = false
         var vipExpire: TimeInterval = 0
         var purchasedProductIDs: [String] = []
 
@@ -1168,8 +1215,9 @@ public class StoreKitIAPManager: ObservableObject {
                 // 非消耗品：未撤销则永久有效（退款后自动移出 currentEntitlements）
                 isLifetime = true
             case .vipYearly:
-                // 自动续订订阅：以苹果权威到期日为准；续费成功即刷新，
-                // 取消续订/扣款失败则到期后自动失效
+                // 出现在 currentEntitlements 中 = 苹果当前授予（订阅中或宽限中），
+                // 不因 expirationDate 已过而锁；expirationDate 仅作展示与兜底。
+                vipActive = true
                 if let exp = tx.expirationDate {
                     vipExpire = max(vipExpire, exp.timeIntervalSince1970)
                 }
@@ -1178,9 +1226,32 @@ public class StoreKitIAPManager: ObservableObject {
             }
         }
 
+        // 空缓存保护：本次没有读到任何订阅/终身交易，但镜像此前有效。
+        // 不能直接覆写清 0 —— 可能是 currentEntitlements 尚未同步到设备。
+        if !isLifetime && !vipActive {
+            let prev = currentMirror()
+            let prevActive = prev?.isAuthoritative == true
+                && (prev?.isLifetime == true || prev?.vipActive == true
+                    || (prev?.vipExpireDate ?? 0) > Date().timeIntervalSince1970)
+            if prevActive {
+                switch await currentSubscriptionRenewalState() {
+                case .active:
+                    // 苹果仍授予（subscribed/inGracePeriod/billingRetry）→ 保持可用
+                    vipActive = true
+                case .inactive:
+                    // 明确 expired/revoked → 允许覆写收回
+                    break
+                case .unknown:
+                    // 商品未加载或状态不可得：保留旧镜像验证段，等待下一次对账
+                    return
+                }
+            }
+        }
+
         // 覆写镜像验证段（保留账本段；消费型商品不因验证清零/恢复）
         let snapshot = persistEntitlementSnapshot(
             isLifetime: isLifetime,
+            vipActive: vipActive,
             vipExpire: vipExpire,
             purchasedProductIDs: purchasedProductIDs
         )
@@ -1188,15 +1259,39 @@ public class StoreKitIAPManager: ObservableObject {
         let tianjiCredits = snapshot.tianji
 
         let finalLifetime = isLifetime
+        let finalVipActive = vipActive
         let finalVipExpire = vipExpire
 
         // 发布 UI（主线程）
         await MainActor.run {
-            self.isVIPUser = finalLifetime || (finalVipExpire > Date().timeIntervalSince1970)
+            self.isVIPUser = finalLifetime || finalVipActive || (finalVipExpire > Date().timeIntervalSince1970)
             self.isLifetimeUser = finalLifetime
             self.floorplanCreditsCount = floorplanCredits
             self.tianjiCreditsCount = tianjiCredits
         }
+    }
+
+    /// 用 Product.SubscriptionInfo.status 确认苹果侧订阅续期状态。
+    /// 纯读属性，不触发任何登录弹窗；商品尚未加载时返回 unknown。
+    private func currentSubscriptionRenewalState() async -> SubscriptionRenewalStateSummary {
+        guard let product = availableProducts[IAPProductID.vipYearly.rawValue],
+              let subscription = product.subscription else {
+            return .unknown
+        }
+        let states = subscription.status.map { $0.state }
+        if states.contains(where: { $0 == .subscribed || $0 == .inGracePeriod || $0 == .billingRetry }) {
+            return .active
+        }
+        if states.contains(where: { $0 == .expired || $0 == .revoked }) {
+            return .inactive
+        }
+        return .unknown
+    }
+
+    private enum SubscriptionRenewalStateSummary {
+        case active
+        case inactive
+        case unknown
     }
 
     // MARK: - Keychain HMAC 防篡改保护（镜像封印）

@@ -185,33 +185,17 @@ object Mountain24Data {
     }
 
     fun resolveFenjin(degree: Double): FenjinItem {
-        val norm = (degree % 360.0 + 360.0) % 360.0
-        val m = find(norm)
-        val s = (m.angleCenter - 7.5 + 360.0) % 360.0
-        var diff = norm - s
-        if (diff < 0) diff += 360.0
-        val subIndex = Math.min(4, Math.max(0, (diff / 3.0).toInt()))
-        val stems = listOf("甲", "丙", "戊", "庚", "壬")
-        val stem = stems[subIndex]
-        val (grade, isAuspicious, lore) = when (subIndex) {
-            1 -> Triple("旺相大吉", true, "正针阳火得令，招财进宝，富贵长久。")
-            3 -> Triple("旺相大吉", true, "阳金生旺，武贵显达，威权四海。")
-            2 -> Triple("龟甲空亡", false, "戊己土煞龟甲空亡，冷退损丁，横祸官非。")
-            else -> Triple("孤虚差错", false, "孤虚煞气，财源破散，气场杂驳。")
-        }
-        val fenjinStart = (s + subIndex * 3.0) % 360.0
-        val fenjinEnd = (fenjinStart + 3.0) % 360.0
-        val fenjinCenter = (fenjinStart + 1.5) % 360.0
+        val f120 = Fenjin120Data.instance.resolveFenjin(degree)
         return FenjinItem(
-            mountainName = m.localizedName,
-            index = subIndex + 1,
-            jiaziName = "${stem}${m.name}",
-            startAngle = fenjinStart,
-            endAngle = fenjinEnd,
-            centerAngle = fenjinCenter,
-            grade = grade,
-            isAuspicious = isAuspicious,
-            lore = lore
+            mountainName = f120.localizedMountainName,
+            index = f120.index,
+            jiaziName = f120.jiaziName,
+            startAngle = f120.startAngle,
+            endAngle = f120.endAngle,
+            centerAngle = f120.centerAngle,
+            grade = f120.grade,
+            isAuspicious = f120.isAuspicious,
+            lore = f120.lore
         )
     }
 

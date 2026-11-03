@@ -447,6 +447,11 @@ public struct ARVisionView: View {
     @State private var showSnapshotShareSheet: Bool = false
     @ObservedObject private var shaStore = ShaSurveyStore.shared
     @State private var showPanoramaReport: Bool = false
+    // Menu items rendered inside the camera overlay could open but lose their
+    // hit target after the AR view recomposed. Present the actions as a
+    // system confirmation dialog instead so every action has a reliable,
+    // full-width hit target above the capture layer.
+    @State private var showShaActions: Bool = false
     @State private var showClearShaAlert: Bool = false
     // Invalidated when the AR page disappears or a newer proof capture starts.
     // Rendering a 1080x1920 proof image is asynchronous; without a generation
@@ -699,6 +704,23 @@ public struct ARVisionView: View {
                 },
                 secondaryButton: .cancel(Text(lang.t("cancel")))
             )
+        }
+        .confirmationDialog(
+            Text(lang.t("ar_panorama_title")),
+            isPresented: $showShaActions,
+            titleVisibility: .visible
+        ) {
+            Button(lang.t("ar_panorama_undo")) {
+                shaStore.removeLastRecord()
+            }
+            Button(lang.t("ar_panorama_clear"), role: .destructive) {
+                // Let the action sheet finish dismissing before presenting
+                // the destructive confirmation alert.
+                DispatchQueue.main.async {
+                    showClearShaAlert = true
+                }
+            }
+            Button(lang.t("cancel"), role: .cancel) { }
         }
         .fullScreenCover(isPresented: $showSpatialSurvey) {
             ARSpatialSurveyView()
@@ -1316,18 +1338,9 @@ public struct ARVisionView: View {
                         .cornerRadius(6)
                 }
                 if !shaStore.records.isEmpty {
-                    Menu {
-                        Button(action: {
-                            shaStore.removeLastRecord()
-                        }) {
-                            Label(lang.t("ar_panorama_undo"), systemImage: "arrow.uturn.backward")
-                        }
-                        Button(role: .destructive, action: {
-                            showClearShaAlert = true
-                        }) {
-                            Label(lang.t("ar_panorama_clear"), systemImage: "trash")
-                        }
-                    } label: {
+                    Button(action: {
+                        showShaActions = true
+                    }) {
                         Image(systemName: "ellipsis.circle")
                             .font(.adaptive(size: 11, weight: .bold))
                             .padding(.horizontal, 7)
@@ -1336,6 +1349,9 @@ public struct ARVisionView: View {
                             .foregroundColor(.white)
                             .cornerRadius(6)
                     }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(lang.t("ar_panorama_title"))
                 }
                 Spacer()
             }

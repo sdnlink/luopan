@@ -2,7 +2,11 @@
 
 ## App 覆盖地区文件
 
-`appstore-availability.csv` 是当前版本的地区覆盖清单，按 Apple 的 ISO 3166-1 alpha-2 地区代码记录已计划开放的 storefront。最终是否开放某个地区，应在 App Store Connect 的 **App 可用性** 页面结合当地法律、税务、支付和内容政策确认；CSV 是提交前的核对文件，不替代 App Store Connect 的地区选择。
+`appstore-coverage.geojson` 是提交给 App Store Connect 的覆盖区域文件，文件顶层只有一个 `MultiPolygon` 几何对象；每个外环使用 `[经度, 纬度]` 坐标并闭合。当前 16 个多边形按 `appstore-availability.csv` 的顺序对应 16 个计划 storefront。`appstore-availability.csv` 仍作为地区代码和语言映射的核对清单。
+
+GeoJSON 地址：`https://sdnlink.cn/appstore-coverage.geojson`
+
+最终是否开放某个地区，应在 App Store Connect 的 **App 可用性** 页面结合当地法律、税务、支付和内容政策确认。若 Apple 审核要求服务边界的测绘级精度，应将这些覆盖包络替换为实际业务边界后再上传。
 
 当前清单覆盖简体中文、繁体中文、英语、日语、韩语、越南语、泰语和印尼语对应的主要地区。
 

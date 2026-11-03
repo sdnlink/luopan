@@ -6,13 +6,13 @@
 
 ## App 覆盖地区文件
 
-`appstore-coverage.geojson` 是提交给 App Store Connect 的覆盖区域文件，文件顶层只有一个 `MultiPolygon` 几何对象；每个外环使用 `[经度, 纬度]` 坐标并闭合。当前 16 个多边形按 `appstore-availability.csv` 的顺序对应 16 个计划 storefront。`appstore-availability.csv` 仍作为地区代码和语言映射的核对清单。
+`appstore-coverage.geojson` 是提交给 App Store Connect 的覆盖区域文件，文件顶层只有一个 `MultiPolygon` 几何对象；外环使用 `[经度, 纬度]` 坐标并闭合。当前文件使用覆盖全球经纬度范围的单个外环（经度 -180° 至 180°、纬度 -90° 至 90°），表示 App 的覆盖范围为全球。`appstore-availability.csv` 仅作为地区代码和语言映射的内部核对清单，不再与 GeoJSON 中的多边形数量一一对应。
 
 GeoJSON 地址：`https://sdnlink.cn/appstore-coverage.geojson`
 
 最终是否开放某个地区，应在 App Store Connect 的 **App 可用性** 页面结合当地法律、税务、支付和内容政策确认。若 Apple 审核要求服务边界的测绘级精度，应将这些覆盖包络替换为实际业务边界后再上传。
 
-当前清单覆盖简体中文、繁体中文、英语、日语、韩语、越南语、泰语和印尼语对应的主要地区。
+当前 App Store 覆盖边界按全球范围提交；实际开放的 storefront、语言、法律和支付条件仍以 App Store Connect 的 App 可用性设置为准。
 
 ## 可填写的网址
 

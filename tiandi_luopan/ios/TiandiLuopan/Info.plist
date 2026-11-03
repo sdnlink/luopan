@@ -48,15 +48,17 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>天机演象需要使用您的位置信息以计算当地精确经纬度、海拔高程与地磁偏角。</string>
+	<string>天机演象仅在罗盘或真太阳时功能使用时读取位置，用于本机方位、海拔和地磁偏角参考计算。</string>
 	<key>NSMotionUsageDescription</key>
-	<string>天机演象需要使用高精度运动传感器以驱动双轴太极水准仪与指南针。</string>
+	<string>天机演象仅在罗盘和姿态显示功能使用时读取运动传感器，用于本机方向与姿态显示。</string>
 	<key>NSCameraUsageDescription</key>
 	<string>天机演象需要使用相机以提供AR实景天心透视、形煞测量与实地立向功能。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>天机演象需要将实景勘测长图与水印存证快照保存至您的相册。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>天机演象需要访问相册以导入户型图，并保存实景勘测长图与水印存证相片。</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

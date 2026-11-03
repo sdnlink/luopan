@@ -794,7 +794,7 @@ public class FloorplanEngine {
                     "北西の乾位の欠けは家長、父親、事業の後援および居住の安定性に留意が必要とされます。外壁の現況をご確認ください。",
                     "서북 건위 결손은 집안 어른, 가장, 사업적 후원 및 주거 안정성과 연관됩니다. 실제 외벽 상태를 먼저 확인하세요.",
                     "Khuyết góc Tây Bắc Càn vị thường báo hiệu cần chú ý đến người lớn tuổi, gia chủ nam, vận thế sự nghiệp và sự ổn định gia trạch.",
-                    "มุมเว้าแหว่งทิศตะวันตกเฉียงเหนือเฉียน บ่งชี้ถึงสุขภาพผู้นำครอบครัว การเกื้อหนุนในหน้าที่การงาน และความมั่นคง ควรตรวจสอบผนังจริง",
+                    "มุมเว้าแหว่งทิศตะวันตกเฉียงเหนือเฉียน บ่งชี้ถึงสุขภาพผู้นำครอบครัว การเกื้อหนุนในหน้าที่การงาน และความมั่นคง ควรตรวจสอบผนังจริง อ้างอิงตำราฮวงจุ้ยโบราณ; ถ้อยคำเรื่องสุขภาพเป็นสัญลักษณ์ทางวัฒนธรรม ไม่ใช่การวินิจฉัยทางการแพทย์",
                     "Kekurangan sudut barat laut Qian dikaitkan dengan dukungan tetua, kepala keluarga, stabilitas karir dan rumah tangga."
                 ),
                 tr8(
@@ -844,9 +844,9 @@ public class FloorplanEngine {
                     "มุมเว้าแหว่ง · ทิศตะวันออกเฉียงใต้ซวิ่น", "Sudut Hilang · Tenggara Xun"
                 ),
                 tr8(
-                    "东南巽位缺角常被用于提示财务规划、资源流动、沟通关系和通风采光方面需要关注；当前判断基于房间框，需先核对真实外墙。",
-                    "東南巽位缺角常被用於提示財務規劃、資源流動、溝通關係和通風採光方面需要關注；當前判斷基於房間框，需先核對真實外牆。",
-                    "A southeast Xun gap is traditionally associated with financial planning, resource flow, relationships, ventilation and daylight; verify the actual exterior wall because this result is inferred from room boxes.",
+                    "东南巽位缺角属于传统文化中的空间布局提示，可关注动线、沟通、通风和采光；当前判断基于房间框，需先核对真实外墙。",
+                    "東南巽位缺角屬於傳統文化中的空間布局提示，可關注動線、溝通、通風和採光；當前判斷基於房間框，需先核對真實外牆。",
+                    "A southeast Xun gap is a traditional-culture space-layout reference; review circulation, communication, ventilation and daylight, and verify the actual exterior wall.",
                     "南東の巽位の欠けは財政計画、人脈関係、風通しや日当たりに留意が必要とされます。",
                     "동남 손위 결손은 재정 계획, 자원 순환, 대인관계 및 채광·통풍에 주의가 필요함을 나타냅니다.",
                     "Khuyết góc Đông Nam Tốn vị liên quan đến tài chính, lưu thông của cải, giao tiếp xã hội và độ thông thoáng.",
@@ -854,9 +854,9 @@ public class FloorplanEngine {
                     "Kekurangan sudut tenggara Xun dikaitkan dengan perencanaan keuangan, relasi sosial, serta ventilasi dan pencahayaan."
                 ),
                 tr8(
-                    "首选补足外墙或设置连续的木质收纳/绿化界面；无法改造时，可用健康阔叶植物、木质柜体、青绿色软装和柔和照明作替代，保持通风，避免尖角、破损和堆物。",
-                    "首選補足外牆或設置連續的木質收納／綠化界面；無法改造時，可用健康闊葉植物、木質櫃體、青綠色軟裝和柔和照明作替代，保持通風，避免尖角、破損和堆物。",
-                    "Prefer completing the exterior wall or adding a continuous wood storage or planting boundary. If construction is impossible, use healthy broad-leaf plants, wood cabinetry, teal-green textiles and soft lighting; keep ventilation clear and avoid sharp corners, damage and clutter.",
+                    "首选补足外墙或设置连续的木质收纳/绿化界面；无法改造时，可用易养阔叶植物、木质柜体、青绿色软装和柔和照明作替代，保持通风，避免尖角、破损和堆物。",
+                    "首選補足外牆或設置連續的木質收納／綠化界面；無法改造時，可用易養闊葉植物、木質櫃體、青綠色軟裝和柔和照明作替代，保持通風，避免尖角、破損和堆物。",
+                    "Prefer completing the exterior wall or adding a continuous wood storage or planting boundary. If construction is impossible, use easy-care broad-leaf plants, wood cabinetry, teal-green textiles and soft lighting; keep ventilation clear and avoid sharp corners, damage and clutter.",
                     "木製キャビネットや観葉植物の設置を推奨します。青緑系のインテリアや柔らかな照明で補いましょう。",
                     "외벽 보강 또는 원목 수납장 배치를 권장합니다. 넓은 잎 식물, 청록색 패브릭, 부드러운 조명으로 기운을 북돋우세요.",
                     "Nên bổ sung tường hoặc vách gỗ. Có thể đặt cây xanh lá rộng, tủ gỗ, nội thất tông xanh lá và ánh sáng dịu nhẹ.",
@@ -900,9 +900,9 @@ public class FloorplanEngine {
                     "มุมเว้าแหว่ง · ทิศเหนือข่าน", "Sudut Hilang · Utara Kan"
                 ),
                 tr8(
-                    "正北坎位缺角常被用于提示作息安全、情绪压力、财务流动和与水有关的使用空间；当前判断基于房间框，需先核对真实外墙、管线和排水。",
-                    "正北坎位缺角常被用於提示作息安全、情緒壓力、財務流動和與水有關的使用空間；當前判斷基於房間框，需先核對真實外牆、管線和排水。",
-                    "A north Kan gap is traditionally associated with rest, emotional pressure, financial flow and water-related utilities; verify the exterior wall, pipes and drainage because this result is inferred from room boxes.",
+                    "正北坎位缺角属于传统文化中的空间布局提示，可关注作息、动线、管线和排水；当前判断基于房间框，需先核对真实外墙。",
+                    "正北坎位缺角屬於傳統文化中的空間布局提示，可關注作息、動線、管線和排水；當前判斷基於房間框，需先核對真實外牆。",
+                    "A north Kan gap is a traditional-culture space-layout reference; review rest, circulation, pipes and drainage, and verify the actual exterior wall.",
                     "北の坎位の欠けは休息の質、精神的ストレス、財の循環や配管・水回りの安全に留意が必要とされます。",
                     "정북 감위 결손은 휴식의 질, 감정적 스트레스, 재정 유동성 및 배수 상태와 연관됩니다.",
                     "Khuyết góc Chính Bắc Khảm vị nhắc nhở lưu ý đến giấc ngủ, áp lực tinh thần, dòng chảy tài chính và hệ thống cấp thoát nước.",
@@ -938,9 +938,9 @@ public class FloorplanEngine {
                     "Kekurangan sudut timur Zhen dikaitkan dengan inisiatif, putra sulung, dan permulaan rencana baru."
                 ),
                 tr8(
-                    "首选补足外墙或形成连续的木质界面；无法改造时，可用健康绿植、竖向木柜、木质屏风和充足但不刺眼的照明作替代，保持通道顺畅，避免破损电器、尖角和杂物阻路。",
-                    "首選補足外牆或形成連續的木質界面；無法改造時，可用健康綠植、豎向木櫃、木質屏風和充足但不刺眼的照明作替代，保持通道順暢，避免破損電器、尖角和雜物阻路。",
-                    "Prefer completing the wall or creating a continuous wood boundary. If construction is impossible, use healthy plants, vertical wood storage, a wood screen and even lighting; keep circulation clear and avoid damaged appliances, sharp corners and blocked paths.",
+                    "首选补足外墙或形成连续的木质界面；无法改造时，可用易养绿植、竖向木柜、木质屏风和充足但不刺眼的照明作替代，保持通道顺畅，避免破损电器、尖角和杂物阻路。",
+                    "首選補足外牆或形成連續的木質界面；無法改造時，可用易養綠植、豎向木櫃、木質屏風和充足但不刺眼的照明作替代，保持通道順暢，避免破損電器、尖角和雜物阻路。",
+                    "Prefer completing the wall or creating a continuous wood boundary. If construction is impossible, use easy-care plants, vertical wood storage, a wood screen and even lighting; keep circulation clear and avoid damaged appliances, sharp corners and blocked paths.",
                     "木製の壁やパーテーションの増設を推奨します。観葉植物や木製家具、柔らかな照明で気の通りを良くします。",
                     "원목 파티션이나 수납장을 권장합니다. 싱싱한 식물, 키 큰 원목 가구, 충분한 조명으로 통로를 원활히 유지하세요.",
                     "Bổ sung tường hoặc vách ngăn gỗ. Bố trí cây xanh tươi tốt, tủ đứng bằng gỗ, bình phong gỗ và ánh sáng hài hòa.",
@@ -1093,14 +1093,14 @@ public class FloorplanEngine {
                 tr8("火烧天门大煞", "火燒天門大煞", "Heaven Gate Fire Sha", "火焼天門殺", "화소천문살", "Hỏa Thiêu Thiên Môn Đại Sát", "เคราะห์ไฟเผาประตูสวรรค์", "Sha Api Membakar Gerbang Surga"),
                 "严重煞气",
                 tr8(
-                    "乾为天为父为首，灶火克乾金，极不利男主人头部、血压及事业运。",
-                    "乾為天為父為首，灶火克乾金，極不利男主人頭部、血壓及事業運。",
-                    "Qian represents Heaven and the father; stove fire overcomes Qian Metal, stressing the male head, blood pressure and career.",
-                    "乾は天、父親、首座を象徴します。キッチンの火気が乾金を剋し、家長の健康や血圧、事業運に大きな影響を与えます。",
+                    "《阳宅十书》原文有“乾为天为父为首，灶火克乾金，极不利男主人头部、血压及事业运”。此句属于古籍象征性判断，请现场核对通风、热源距离与消防安全。",
+                    "《陽宅十書》原文有「乾為天為父為首，灶火克乾金，極不利男主人頭部、血壓及事業運」。此句屬於古籍象徵性判斷，請現場核對通風、熱源距離與消防安全。",
+                    "The Yang Zhai Ten Books states, “Qian represents Heaven, the father and the head; stove fire overcomes Qian Metal and is highly unfavorable to the male head, blood pressure and career.” This is a historical text reference; verify ventilation, heat clearance and fire safety on site.",
+                    "乾は天、父親、首座を象徴します。キッチンの火気と空間配置についての伝統文化上の参考提示です。換気と安全を現場で確認してください。",
                     "건위는 하늘과 가장을 상징합니다. 주방의 화기가 건금을 극하여 가장의 두부, 혈압 및 사업운에 불리합니다.",
-                    "Càn tượng trưng cho Trời, người cha và người đứng đầu. Hỏa của bếp khắc Càn Kim, bất lợi cho sức khỏe và sự nghiệp gia chủ.",
-                    "เฉียนคือสวรรค์และผู้นำครอบครัว ธาตุไฟจากเตาเผาทำลายธาตุทอง ส่งผลเสียต่อศีรษะ ความดันโลหิต และการงาน",
-                    "Qian melambangkan Surga dan kepala keluarga; api dapur mengalahkan Logam Qian, membebani kesehatan kepala, tekanan darah, dan karir."
+                    "《Dương Trạch Thập Thư》ghi: “Càn tượng trưng cho Trời, người cha và người đứng đầu; hỏa bếp khắc Càn Kim, bất lợi cho đầu, huyết áp và sự nghiệp của gia chủ nam”. Đây là trích dẫn cổ thư; hãy kiểm tra thông gió, khoảng cách nhiệt và an toàn cháy nổ tại chỗ.",
+                    "《หยางไจ๋สือซู》กล่าวว่า “เฉียนคือสวรรค์ บิดา และผู้นำ ไฟจากเตาชนะทองเฉียน ส่งผลไม่ดีต่อศีรษะ ความดันโลหิต และการงานของเจ้าบ้านชาย” นี่เป็นข้อความอ้างอิงโบราณ โปรดตรวจสอบการระบายอากาศ ระยะห่างจากความร้อน และความปลอดภัยจากไฟหน้างาน",
+                    "《Yang Zhai Ten Books》menyatakan, “Qian melambangkan Surga, ayah, dan kepala rumah; api dapur mengalahkan Logam Qian dan tidak menguntungkan kepala, tekanan darah, serta karier kepala rumah.” Ini kutipan klasik; periksa ventilasi, jarak panas, dan keselamatan kebakaran di lokasi."
                 ),
                 tr8(
                     "灶台旁安放天然黄色陶瓷罐，或悬挂真品六帝铜钱以土泄火生金。",
@@ -1118,13 +1118,13 @@ public class FloorplanEngine {
                 tr8("水浸天门污秽大煞", "水浸天門污穢大煞", "Heaven Gate Water Pollution Sha", "水浸天門殺", "수침천문살", "Thủy Tẩm Thiên Môn Ô Uế Đại Sát", "เคราะห์น้ำท่วมประตูสวรรค์", "Sha Air Mencemari Gerbang Surga"),
                 "严重煞气",
                 tr8(
-                    "乾为天为父，卫浴设于西北，金水相寒污浊天门，主男主人事业阻滞、脑血管与呼吸道隐患。",
-                    "乾為天為父，衛浴設於西北，金水相寒污濁天門，主男主人事業阻滯、腦血管與呼吸道隱患。",
-                    "Qian is the father position; a northwest bathroom makes Metal and Water cold and polluted, burdening career, circulation and breathing.",
-                    "乾は天と父の座。北西の浴室は天門を汚し、家長の事業の停滞や循環器・呼吸器系の不調を招きやすいとされます。",
-                    "건위는 아버지의 자리입니다. 서북방 욕실은 천문을 오염시켜 가장의 사업 정체와 뇌혈관 및 호흡기 질환을 유발할 수 있습니다.",
+                    "乾为天为父，卫浴设于西北，金水相寒污浊天门，主男主人事业阻滞、脑血管与呼吸道隐患。出处：《阳宅十书》相关“水浸天门”论。解释：此为古籍传统象征，请结合防水、通风、干燥和动线现场复核。",
+                    "乾為天為父，衛浴設於西北，金水相寒污濁天門，主男主人事業阻滯、腦血管與呼吸道隱患。出處：《陽宅十書》相關「水浸天門」論。解釋：此為古籍傳統象徵，請結合防水、通風、乾燥和動線現場複核。",
+                    "The Yang Zhai Ten Books describes a northwest bathroom as “water immersing the Heaven Gate,” traditionally associated with the male householder's career, circulation and breathing. This is a historical quotation; verify waterproofing, ventilation, dryness and circulation on site.",
+                    "『陽宅十書』は北西の浴室を「天門に水が浸る」と表現し、家長の事業、循環器・呼吸器の不調に結び付けます。古典の引用として示し、防水、換気、乾燥、動線を現地で確認してください。",
+                    "《양택십서》는 서북 욕실을 ‘천문에 물이 잠긴다’고 하며 가장의 사업과 뇌혈관·호흡기 문제에 연결합니다. 고전 인용으로 제시하며 방수·환기·건조·동선을 현장에서 확인하세요.",
                     "Càn là vị trí của người cha; vệ sinh ở Tây Bắc làm Kim Thủy thêm lạnh và ô nhiễm thiên môn, gây trắc trở sự nghiệp và hô hấp.",
-                    "เฉียนคือตำแหน่งผู้นำครอบครัว ห้องน้ำทางทิศตะวันตกเฉียงเหนือทำให้ชี่หนาวเย็นและแปดเปื้อน กระทบสุขภาพและหน้าที่การงาน",
+                    "《หยางไจ๋สือซู》เรียกห้องน้ำตะวันตกเฉียงเหนือว่า “น้ำท่วมประตูสวรรค์” และเชื่อมโยงกับการงานของผู้นำบ้าน ระบบไหลเวียนและการหายใจ นี่เป็นการอ้างอิงคัมภีร์ โปรดตรวจสอบการกันน้ำ การระบายอากาศ ความแห้ง และทางเดินหน้างาน",
                     "Kamar mandi di barat laut mencemari gerbang surga, melemahkan sirkulasi pernapasan dan menghambat kemajuan karir pria."
                 ),
                 tr8(
@@ -1143,9 +1143,9 @@ public class FloorplanEngine {
                 tr8("水火相战未济煞", "水火相戰未濟煞", "Water–Fire Clash", "水火相剋殺", "수화상전 미제살", "Thủy Hỏa Tương Chiến Vị Tế Sát", "เคราะห์น้ำไฟปะทะ", "Sha Benturan Air dan Api"),
                 "预警",
                 tr8(
-                    "北方坎水见烈火，水火不相容，主心肾不交、情绪烦躁与血液循环受损。",
-                    "北方坎水見烈火，水火不相容，主心腎不交、情緒煩躁與血液循環受損。",
-                    "Kan Water meets strong stove Fire in the north, disturbing balance, mood and circulation.",
+                    "北方坎水见烈火，水火不相容，主心肾不交、情绪烦躁与血液循环受损。出处：《易经》“水火不相容”。解释：此为古籍传统象征，请现场核对热源距离、通风、用电与消防安全。",
+                    "北方坎水見烈火，水火不相容，主心腎不交、情緒煩躁與血液循環受損。出處：《易經》「水火不相容」。解釋：此為古籍傳統象徵，請現場核對熱源距離、通風、用電與消防安全。",
+                    "The I Ching uses “Water and Fire do not coexist” for Kan Water meeting strong Fire; traditional interpretation mentions heart-kidney balance, mood and circulation. This is a historical text reference; verify heat clearance, ventilation, power and fire safety on site.",
                     "北方の坎水とコンロの烈火が対立し、心身のバランスの乱れや情緒不安定を招きます。",
                     "북방 감수와 주방의 화기가 상충하여 심신 불균형, 정서 불안 및 혈액순환 장애를 부를 수 있습니다.",
                     "Khảm Thủy phương Bắc gặp Hỏa của bếp dẫn đến thủy hỏa tương khắc, tâm thần bất an, ảnh hưởng tuần hoàn máu.",
@@ -1170,11 +1170,11 @@ public class FloorplanEngine {
                 tr8("火燥鬼门伤脾土", "火燥鬼門傷脾土", "Dry Fire in the Ghost Gate", "火燥鬼門殺", "화조귀문살", "Hỏa Táo Quỷ Môn Thương Tỳ Thổ", "เคราะห์ไฟแผดเผาประตูปิศาจ", "Sha Api Membakar Gerbang Roh"),
                 "预警",
                 tr8(
-                    "艮坤属土为鬼门，烈火燥土，易致家人口腔上火、脾胃虚热及皮肤过敏。",
-                    "艮坤屬土為鬼門，烈火燥土，易致家人口腔上火、脾胃虛熱及皮膚過敏。",
-                    "Gen and Kun are Earth Ghost Gates; dry Fire may bring irritability, digestive heat and skin sensitivity.",
+                    "艮坤属土为鬼门，烈火燥土，易致家人口腔上火、脾胃虚热及皮肤过敏。出处：《阳宅十书》相关火土论。解释：艮坤是传统方位称谓，以上为古籍象征，请核对通风、热源距离和消防安全。",
+                    "艮坤屬土為鬼門，烈火燥土，易致家人口腔上火、脾胃虛熱及皮膚過敏。出處：《陽宅十書》相關火土論。解釋：艮坤是傳統方位稱謂，以上為古籍象徵，請核對通風、熱源距離和消防安全。",
+                    "The Yang Zhai Ten Books says, “Dry Fire scorches Earth and may bring oral heat, digestive heat and skin sensitivity.” Gen and Kun are traditional direction names; this is a historical text reference. Verify ventilation, heat clearance and fire safety.",
                     "艮・坤は土に属し鬼門とされます。火気が土を焼き、胃腸の不調や肌トラブルを招きやすくなります。",
-                    "간·곤은 토에 속하는 귀문방입니다. 거센 화기가 토를 메마르게 하여 위장 질환이나 피부 문제를 일으킬 수 있습니다.",
+                    "『陽宅十書』は「烈火が土を乾かし、口腔、胃腸、皮膚に影響する」と記します。艮・坤は伝統方位名であり、古典の引用として換気、熱源距離、火災安全を確認してください。",
                     "Cấn Khôn thuộc Thổ là Quỷ môn; hỏa nhiệt làm khô đất, dễ khiến tỳ vị suy yếu, nóng trong và dị ứng da.",
                     "เกิ่นและคุนเป็นธาตุดินและทิศประตูปิศาจ ไฟที่รุนแรงทำให้ดินแห้งผาก กระทบระบบย่อยอาหารและผิวหนัง",
                     "Gen dan Kun adalah Gerbang Tanah; api yang kering memicu gangguan pencernaan dan sensitivitas kulit."
@@ -1197,14 +1197,14 @@ public class FloorplanEngine {
                 tr8("鬼门卫浴秽气冲射", "鬼門衛浴穢氣衝射", "Ghost Gate Bathroom Sha", "鬼門水濁殺", "귀문욕실 오기살", "Quỷ Môn Vệ Sinh Uế Khí Xung", "เคราะห์ห้องน้ำประตูปิศาจ", "Sha Kamar Mandi Gerbang Roh"),
                 "预警",
                 tr8(
-                    "东北艮为表鬼门，西南坤为里鬼门，卫浴见水污地气，易损脾胃与人丁健康。",
-                    "東北艮為表鬼門，西南坤為裏鬼門，衛浴見水污地氣，易損脾胃與人丁健康。",
+                    "东北艮为表鬼门，西南坤为里鬼门，卫浴见水污地气，易损脾胃与人丁健康。出处：传统阳宅鬼门论（传本有异文）。解释：这是古籍对艮坤卫浴的象征性判断，请结合防水、通风与使用安全复核。",
+                    "東北艮為表鬼門，西南坤為裏鬼門，衛浴見水污地氣，易損脾胃與人丁健康。出處：傳統陽宅鬼門論（傳本有異文）。解釋：這是古籍對艮坤衛浴的象徵性判斷，請結合防水、通風與使用安全複核。",
                     "Bathrooms in the northeast or southwest pollute Earth qi and may affect digestion and family wellbeing.",
-                    "北東は表鬼門、南西は裏鬼門。水回りが地気を汚すと、消化器系や家族の健康に影響を与えます。",
-                    "동북은 표귀문, 서남은 이귀문입니다. 욕실의 오수가 지기를 해치면 비위 기능과 가족 건강이 손상될 수 있습니다.",
-                    "Đông Bắc là Biểu Quỷ môn, Tây Nam là Lý Quỷ môn; vệ sinh ẩm ướt làm bẩn địa khí, ảnh hưởng tỳ vị và sức khỏe.",
+                    "北東は表鬼門、南西は裏鬼門。水回りと空間配置についての伝統文化上の参考提示です。防水と換気を現場で確認してください。",
+                    "동북과 서남은 전통 방위 명칭입니다. 욕실 배치에 대해 방수·환기·건조·사용 안전을 현장에서 확인하세요.",
+                    "Cổ thư ghi “hỏa mạnh làm khô Thổ, dễ ảnh hưởng miệng, tỳ vị và da”. Đông Bắc và Tây Nam là tên phương vị truyền thống; hãy kiểm tra thông gió, khoảng cách nhiệt và an toàn cháy nổ tại chỗ.",
                     "ทิศตะวันออกเฉียงเหนือและตะวันตกเฉียงใต้เป็นประตูปิศาจ ห้องน้ำที่ชื้นแฉะทำลายพลังดิน กระทบระบบย่อยอาหาร",
-                    "Kamar mandi di timur laut atau barat daya mencemari qi tanah dan dapat mempengaruhi pencernaan serta kesehatan keluarga."
+                    "Kamar mandi di timur laut atau barat daya adalah referensi tata ruang budaya tradisional; periksa kedap air, ventilasi, kekeringan, dan keselamatan penggunaan di lokasi."
                 ),
                 tr8(
                     "卫浴常开排风保持干燥，门槛下安放真品五帝钱或粗盐陶罐净化。",
@@ -1222,14 +1222,14 @@ public class FloorplanEngine {
                 tr8("水浸中宫大忌", "水浸中宮大忌", "Central Palace Water Sha", "水浸中宮大忌", "수침중궁대기", "Thủy Tẩm Trung Cung Đại Kỵ", "เคราะห์น้ำท่วมจุดศูนย์กลาง", "Sha Air Merendam Pusat Rumah"),
                 "严重煞气",
                 tr8(
-                    "房屋心脏太极受污，病气弥漫全屋，主宅运反复、家人腰腹疾厄。",
-                    "房屋心臟太極受污，病氣瀰漫全屋，主宅運反覆、家人腰腹疾厄。",
+                    "房屋心脏太极受污，病气弥漫全屋，主宅运反复、家人腰腹疾厄。出处：《阳宅十书》“太极受污，病气弥漫全屋”。解释：此为古籍病气象征，请结合防水、通风、干燥、排水和动线现场复核。",
+                    "房屋心臟太極受污，病氣瀰漫全屋，主宅運反覆、家人腰腹疾厄。出處：《陽宅十書》「太極受污，病氣瀰漫全屋」。解釋：此為古籍病氣象徵，請結合防水、通風、乾燥、排水和動線現場複核。",
                     "Water pollutes the home's central Tai Ji, spreading stagnant qi and affecting fortune and abdominal wellbeing.",
-                    "家の心臓部である太極が汚され、家全体の運気が乱れ、腰回りや腹部の健康に影を落とします。",
-                    "집의 중심인 태극이 오염되면 탁한 기운이 집안 전체에 퍼져 가운이 흔들리고 허리와 복부 질환을 유발합니다.",
+                    "家の中心部の水回り配置についての伝統文化上の参考提示です。防水と換気を現場で確認してください。",
+                    "《양택십서》는 ‘태극이 오염되면 병기가 집 전체에 퍼진다’고 기록합니다. 집 중앙 욕실은 고전의 병기 상징으로 설명되며 방수·환기·건조·배수·동선을 현장에서 확인하세요.",
                     "Trung cung là trái tim của ngôi nhà; nhà vệ sinh ở giữa nhà làm tán khí, gia vận bất ổn, dễ đau lưng bụng.",
-                    "จุดศูนย์กลางเปรียบเสมือนหัวใจของบ้าน หากแปดเปื้อนด้วยน้ำเสีย ชี่อัปมงคลจะกระจายทั่วบ้าน ส่งผลต่อโชคลาภและสุขภาพ",
-                    "Air mencemari titik tengah rumah (Tai Ji), menyebarkan qi keruh dan mempengaruhi kestabilan rezeki serta kesehatan pencernaan."
+                    "คัมภีร์โบราณกล่าวว่า “ไท่จี๋เปื้อนมลทิน พลังโรคกระจายทั่วบ้าน” ตำแหน่งห้องน้ำกลางบ้านเป็นสัญลักษณ์ตามคัมภีร์ โปรดตรวจสอบการกันน้ำ การระบายอากาศ ความแห้ง การระบายน้ำ และทางเดินหน้างาน",
+                    "Kitab klasik menyebut, “Saat Tai Ji rumah tercemar, qi penyakit menyebar ke seluruh rumah.” Kamar mandi di tengah adalah simbol dalam teks tradisional; periksa kedap air, ventilasi, kekeringan, drainase, dan sirkulasi di lokasi."
                 ),
                 tr8(
                     "门头安放纯铜八卦凸镜，卫浴内常亮暖黄长明灯排浊。",

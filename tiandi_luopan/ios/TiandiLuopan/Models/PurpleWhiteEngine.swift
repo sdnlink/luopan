@@ -32,15 +32,15 @@ public struct PurpleWhiteChart {
 
 public class PurpleWhiteEngine {
     public static let shared = PurpleWhiteEngine()
-    
+
     // 洛书标准轨迹: [坎1, 坤2, 震3, 巽4, 中5, 乾6, 兑7, 艮8, 离9]
     private let luoshuOrder = [5, 6, 7, 8, 9, 1, 2, 3, 4]
-    
+
     // 九宫网格展示次序 (东南4, 正南9, 西南2; 正东3, 中宫5, 正西7; 东北8, 正北1, 西北6)
     public let displayPalaceOrder = [4, 9, 2, 3, 5, 7, 8, 1, 6]
-    
+
     private init() {}
-    
+
     public func starName(for star: Int) -> String {
         guard star >= 1 && star <= 9 else { return "" }
         let lang = LocalizationManager.shared.effectiveLanguage
@@ -95,7 +95,7 @@ public class PurpleWhiteEngine {
             return names[star]
         }
     }
-    
+
     public func palaceDirection(palaceId: Int) -> String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
@@ -125,7 +125,7 @@ public class PurpleWhiteEngine {
             return dirs[palaceId] ?? "中宫"
         }
     }
-    
+
     public func palaceFullName(palaceId: Int) -> String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
@@ -155,13 +155,13 @@ public class PurpleWhiteEngine {
             return full[palaceId] ?? "中央 太极"
         }
     }
-    
+
     public func calcYearStar(year: Int) -> Int {
         var num = (11 - (year % 9)) % 9
         if num <= 0 { num += 9 }
         return num
     }
-    
+
     public func calcMonthStar(year: Int, month: Int) -> Int {
         // 年支五虎遁确定月飞星入中
         // Gregorian year % 12 is not the earthly-branch index (for example,
@@ -179,7 +179,7 @@ public class PurpleWhiteEngine {
         if mStar <= 0 { mStar += 9 }
         return mStar
     }
-    
+
     public func flyStars(centralStar: Int) -> [Int: Int] {
         var result: [Int: Int] = [:]
         for (step, targetPalace) in luoshuOrder.enumerated() {
@@ -189,17 +189,17 @@ public class PurpleWhiteEngine {
         }
         return result
     }
-    
+
     public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> PurpleWhiteChart {
         let calendar = Calendar.current
         let rawYear = calendar.component(.year, from: date)
         let rawMonth = calendar.component(.month, from: date)
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
-        
+
         // 立春交岁按太阳黄经判断，避免固定 2 月 4 日在不同年份错位。
         let isBeforeLichun = SolarTimeCalculator.shared.isBeforeLiChun(for: date)
         let effectiveYear = isBeforeLichun ? (rawYear - 1) : rawYear
-        
+
         // 流月按节气月界计算。界面保留公历一月的 1 月显示习惯，避免
         // 冬至桶把整个月标题显示成 12 月；客星计算则使用传统节气月，
         // 以寅月为正月（1），小寒、大寒归丑月（12）。
@@ -214,25 +214,25 @@ public class PurpleWhiteEngine {
         let solarMonthForStar = solarTermIndex < 2
             ? 12
             : min(11, 1 + (solarTermIndex - 2) / 2)
-        
+
         let yCenter = calcYearStar(year: effectiveYear)
         let mCenter = calcMonthStar(year: effectiveYear, month: solarMonthForStar)
-        
+
         let yearStarsMap = flyStars(centralStar: yCenter)
         let monthStarsMap = flyStars(centralStar: mCenter)
-        
+
         // 地支年对应太岁/岁破/三煞 (基于立春后真实年支)
         let zhiIndex = ((effectiveYear - 4) % 12 + 12) % 12
         let lang = LocalizationManager.shared.effectiveLanguage
-        
+
         var taiSuiPalace = 9
         var suiPoPalace = 1
         var sanShaPalaces = [1]
-        
+
         var taiSuiDesc = ""
         var suiPoDesc = ""
         var sanShaDesc = ""
-        
+
         let baseConfigs: [Int: (tsP: Int, spP: Int, ssP: [Int])] = [
             0: (1, 9, [9]), 1: (8, 2, [3]), 2: (8, 2, [1]), 3: (3, 7, [7]),
             4: (4, 6, [9]), 5: (4, 6, [3]), 6: (9, 1, [1]), 7: (2, 8, [7]),
@@ -242,7 +242,7 @@ public class PurpleWhiteEngine {
         taiSuiPalace = baseConf.tsP
         suiPoPalace = baseConf.spP
         sanShaPalaces = baseConf.ssP
-        
+
         switch lang {
         case .en:
             let enConfig: [Int: (ts: String, sp: String, ss: String)] = [
@@ -381,7 +381,7 @@ public class PurpleWhiteEngine {
             let c = hansConfig[zhiIndex] ?? ("正南方", "正北方", "正北方")
             taiSuiDesc = c.ts; suiPoDesc = c.sp; sanShaDesc = c.ss
         }
-        
+
         var palaceItems: [PurpleWhitePalaceItem] = []
         for pId in displayPalaceOrder {
             let yStar = yearStarsMap[pId] ?? 1
@@ -389,13 +389,13 @@ public class PurpleWhiteEngine {
             let isTaiSui = (pId == taiSuiPalace)
             let isSuiPo = (pId == suiPoPalace)
             let isSanSha = sanShaPalaces.contains(pId)
-            
+
             // 二五交加必须由同一宫的流年、流月客星实际形成 2/5 组合。
             // 仅凭宫位编号为 2 或 5 会把正常星位误报为重煞。
             let isDanger25 = (yStar == 5 && mStar == 2) || (yStar == 2 && mStar == 5)
             let hasFiveYellow = yStar == 5 || mStar == 5
             let hasIllnessStar = yStar == 2 || mStar == 2
-            
+
             var advice = ""
             switch lang {
             case .en:
@@ -527,7 +527,28 @@ public class PurpleWhiteEngine {
                     advice = "气场平稳。做法：保持整洁通风即可。→ 影响：家人运势平稳，无需特别调理。"
                 }
             }
-            
+
+            if isDanger25 || hasFiveYellow || hasIllnessStar {
+                switch lang {
+                case .en:
+                    advice += " Source: Zi Bai Jue, “When Five Yellow overlaps, calamity and illness arrive.” This preserves the classical health symbolism as a cultural quotation; it is not a medical diagnosis."
+                case .zhHant:
+                    advice += " 出處：《紫白訣》：「五黃重疊，災疾並臨。」此處保留古籍健康象徵作文化引文，不是醫療診斷。"
+                case .ja:
+                    advice += " 出典：『紫白訣』「五黄重なれば災疾並び臨む」。古典の健康象徴を文化的な引用として示すもので、医学的診断ではありません。"
+                case .ko:
+                    advice += " 출처: 《자백결》 ‘오황이 겹치면 재질이 임한다’. 고전의 건강 상징을 문화 인용으로 제시한 것이며 의학적 진단이 아닙니다."
+                case .vi:
+                    advice += " Nguồn: 《Tử Bạch Quyết》, “Ngũ Hoàng chồng lên thì tai bệnh đến.” Đây là trích dẫn biểu tượng sức khỏe trong cổ thư, không phải chẩn đoán y khoa."
+                case .th:
+                    advice += " แหล่งที่มา: 《จื่อไป๋เจวี๋ย》 “ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน” เป็นการอ้างอิงสัญลักษณ์สุขภาพในคัมภีร์ ไม่ใช่การวินิจฉัยทางการแพทย์"
+                case .id:
+                    advice += " Sumber: 《Zi Bai Jue》, “Saat Lima Kuning bertumpuk, penyakit dan bencana datang.” Ini kutipan simbol kesehatan dari teks klasik, bukan diagnosis medis."
+                case .auto, .zhHans:
+                    advice += " 出处：《紫白诀》：“五黄重叠，灾疾并临。”此处保留古籍健康象征作文化引文，不是医疗诊断。"
+                }
+            }
+
             palaceItems.append(PurpleWhitePalaceItem(
                 palaceId: pId,
                 palaceName: palaceFullName(palaceId: pId),
@@ -543,7 +564,7 @@ public class PurpleWhiteEngine {
                 advice: advice
             ))
         }
-        
+
         return PurpleWhiteChart(
             year: effectiveYear,
             month: effectiveMonth,

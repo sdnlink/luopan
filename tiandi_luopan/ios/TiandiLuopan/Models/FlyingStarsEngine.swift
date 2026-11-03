@@ -102,6 +102,10 @@ public struct PalaceCell: Identifiable {
     }
 
     public var localizedEvaluation: String {
+        baseLocalizedEvaluation + "\n\n" + traditionalSourceNote
+    }
+
+    private var baseLocalizedEvaluation: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         if hasEarthSha { return localizedEarthShaEvaluation(lang) }
         switch lang {
@@ -155,7 +159,7 @@ public struct PalaceCell: Identifiable {
             if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Harmoni Satu–Enam · Mendukung prestasi akademis" }
             return "Campuran peruntungan · Posisi seimbang"
         case .auto, .zhHans:
-            return evaluation
+            return baseEvaluation
         }
     }
 
@@ -234,6 +238,10 @@ public struct PalaceCell: Identifiable {
     }
     
     public var evaluation: String {
+        baseEvaluation + "\n\n" + traditionalSourceNote
+    }
+
+    private var baseEvaluation: String {
         if hasEarthSha {
             return "五黄／二黑土煞 · 宜静安金属化解"
         } else if mountainStar == activePeriod && facingStar == activePeriod {
@@ -281,46 +289,25 @@ public struct XuanKongChart {
     /// 基于九宫飞星排盘动态推导的【催财旺气建议】
     public var wealthAdvice: String {
         let lang = LocalizationManager.shared.effectiveLanguage
-        // Never recommend activation in a 5-Yellow/2-Black palace. The
-        // current-period star does not override an earth-sha warning.
-        let wangPalace = palaces.first(where: { $0.facingStar == period && !$0.hasEarthSha })
-        let nextStar = (period % 9) + 1
-        let shengQiPalace = palaces.first(where: { !$0.isCenter && $0.facingStar == nextStar && !$0.hasEarthSha })
-            ?? palaces.first(where: { $0.facingStar == nextStar && !$0.hasEarthSha })
-        let wenchangPalace = palaces.first(where: { !$0.isCenter && (($0.mountainStar == 1 && $0.facingStar == 4) || ($0.mountainStar == 4 && $0.facingStar == 1) || ($0.mountainStar == 1 && $0.facingStar == 6) || ($0.mountainStar == 6 && $0.facingStar == 1)) })
-        
-        let wangName = wangPalace?.localizedPalaceName ?? ""
-        let wangCombo = wangPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(period)"
-        let sqName = shengQiPalace?.localizedPalaceName ?? ""
-        let sqCombo = shengQiPalace.map { "\($0.mountainStar)-\($0.facingStar)" } ?? "\(nextStar)"
-        let wcName = wenchangPalace?.localizedPalaceName
-        
+        let candidate = palaces.first(where: { $0.facingStar == period && !$0.hasEarthSha })?.localizedPalaceName ?? ""
         switch lang {
-        case .en:
-            let wcNote = wcName.map { " Wenchang/Harmony star gathers at [\($0)]." } ?? ""
-            return "• Wealth & Prosperity: Current Period-\(period) facing star lands at [\(wangName)] (Star \(wangCombo)), and future Sheng-Qi Star \(nextStar) reaches [\(sqName)] (Star \(sqCombo)). Keep these sectors bright, open, or place moving water to activate wealth.\(wcNote)"
-        case .zhHant:
-            let wcNote = wcName.map { "另【\($0)】逢文昌吉星會聚，利書房策劃。" } ?? ""
-            return "• 催財旺位：當令\(period)運向星飛臨【\(wangName)】（山向\(wangCombo)），生氣\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂開闊、安設動水或長明燈催旺財源。\(wcNote)"
-        case .ja:
-            let wcNote = wcName.map { "また【\($0)】は文昌吉星が会聚し書斎に吉。" } ?? ""
-            return "• 催財旺位：当令\(period)運の向星が【\(wangName)】（山向\(wangCombo)）に飛臨し、生気\(nextStar)星が【\(sqName)】（山向\(sqCombo)）に到ります。採光や動水を設けて財気を催旺してください。\(wcNote)"
-        case .ko:
-            return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오."
-        case .vi:
-            return "• Cung kích tài: Hướng tinh đương vận \(period) bay tới 【\(wangName)】 (Sơn Hướng \(wangCombo)), sinh khí tinh \(nextStar) đáo 【\(sqName)】 (Sơn Hướng \(sqCombo)), nên mở thoáng, tăng ánh sáng hoặc đặt thủy động kích hoạt tài lộc."
-        case .th:
-            return "• ตำแหน่งเรียกทรัพย์: ดาวหันประจำยุค \(period) สถิตที่ 【\(wangName)】 (ดาว \(wangCombo)) และดาวพลัง生气 \(nextStar) อยู่ที่ 【\(sqName)】 (ดาว \(sqCombo)) ควรเปิดโล่งรับแสงหรือตั้งน้ำพุกระตุ้นโชคลาภ"
-        case .id:
-            return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki."
-        case .auto, .zhHans:
-            let wcNote = wcName.map { "另【\($0)】逢文昌吉星会聚，利书房策划。" } ?? ""
-            return "• 催财旺位：当令\(period)运向星飞临【\(wangName)】（山向\(wangCombo)），生气\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂开阔、安设动水或长明灯催旺财源。\(wcNote)"
+        case .en: return "• Space-use reference: keep [\(candidate)] clear, bright and easy to circulate; verify glare, noise, ventilation and drainage on site."
+        case .zhHant: return "• 空間使用參考：保持【\(candidate)】通暢、明亮，並現場核對眩光、噪音、通風和排水。"
+        case .ja: return "• 空間利用の参考：【\(candidate)】を明るく通りやすく保ち、眩しさ、騒音、換気、排水を現地で確認します。"
+        case .ko: return "• 공간 사용 참고: 【\(candidate)】을 밝고 통행하기 쉽게 유지하고 눈부심·소음·환기·배수를 현장에서 확인하세요."
+        case .vi: return "• Tham khảo sử dụng không gian: giữ 【\(candidate)】 thông thoáng, sáng và dễ đi lại; kiểm tra chói sáng, tiếng ồn, thông gió và thoát nước tại chỗ."
+        case .th: return "• อ้างอิงการใช้พื้นที่: รักษา【\(candidate)】ให้โล่ง สว่าง และเดินได้สะดวก ตรวจสอบแสงจ้า เสียง การระบายอากาศ และการระบายน้ำหน้างาน"
+        case .id: return "• Referensi penggunaan ruang: jaga [\(candidate)] tetap terang, lega, dan mudah dilalui; periksa silau, kebisingan, ventilasi, dan drainase di lokasi."
+        case .auto, .zhHans: return "• 空间使用参考：保持【\(candidate)】通畅、明亮，并现场核对眩光、噪音、通风和排水。"
         }
     }
-    
-    /// 基于九宫飞星排盘动态推导的【五黄二黑病符防煞建议】
+
+    /// 基于九宫飞星排盘动态推导的空间环境复核建议。
     public var healthAdvice: String {
+        baseHealthAdvice + "\n\n" + healthSourceNote
+    }
+
+    private var baseHealthAdvice: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let clash25Palace = palaces.first(where: { ($0.mountainStar == 2 && $0.facingStar == 5) || ($0.mountainStar == 5 && $0.facingStar == 2) || ($0.mountainStar == 5 && $0.facingStar == 5) })
         let wuHuangPalace = palaces.first(where: { $0.facingStar == 5 }) ?? palaces.first(where: { $0.mountainStar == 5 })
@@ -363,8 +350,12 @@ public struct XuanKongChart {
         }
     }
     
-    /// 基于九宫飞星排盘动态推导的【山向调候与五行通关建议】
+    /// 基于九宫飞星排盘动态推导的空间布局复核建议。
     public var remedyAdvice: String {
+        baseRemedyAdvice + "\n\n" + healthSourceNote
+    }
+
+    private var baseRemedyAdvice: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let dingPalace = palaces.first(where: { $0.mountainStar == period })
         let caiPalace = palaces.first(where: { $0.facingStar == period })
@@ -442,6 +433,32 @@ public struct XuanKongChart {
             return "白话：当运财星在【\(caiName)】，此方位宜敞亮见水（鱼缸、水景或镜面）聚财；当运丁星在【\(dingName)】，宜放高柜或山石稳住健康人丁。→ 影响：财位管家中正财与事业进账（男主人与经营家人）、丁位管家人健康与人丁（小孩体质、长辈康健），分别覆盖【\(caiName)】【\(dingName)】区域。\(extra)"
         }
     }
+
+    private var traditionalSourceNote: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Classical source: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The wealth, people and health wording above is a traditional symbolic reading, not a medical or financial prediction."
+        case .zhHant:
+            return "古籍出处：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」上文財丁與健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
+        case .ja:
+            return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
+        case .ko:
+            return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
+        case .vi:
+            return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Các câu về tài, đinh và sức khỏe là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
+        case .th:
+            return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
+        case .id:
+            return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
+        case .auto, .zhHans:
+            return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”上文财丁与健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
+        }
+    }
+
+    private var healthSourceNote: String {
+        traditionalSourceNote + "\n解释：请结合通风、采光、噪音、排水和结构安全现场复核；涉及健康或财务事项应咨询相应专业人士。"
+    }
+
 }
 
 public final class FlyingStarsEngine {
@@ -684,104 +701,36 @@ public final class FlyingStarsEngine {
         let mountainStarAtFacing = mountainStars[sittingFacingIdx]
         let facingStarAtMount = facingStars[sittingMountIdx]
         
+        let patternKind: Int
+        if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
+            patternKind = 0
+        } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
+            patternKind = 1
+        } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
+            patternKind = 2
+        } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
+            patternKind = 3
+        } else {
+            patternKind = 4
+        }
         let pattern: String
         switch lang {
         case .en:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Wang Shan Wang Xiang (Supreme Wealth & Health)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Double Stars at Facing (Auspicious Wealth)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Double Stars at Sitting (Auspicious Health)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Shang Shan Xia Shui (Reverse Chart)"
-            } else {
-                pattern = "Balanced Harmony Chart"
-            }
+            pattern = ["Wang Shan Wang Xiang (Supreme Wealth & Health)", "Double Stars at Facing (Auspicious Wealth)", "Double Stars at Sitting (Auspicious Health)", "Shang Shan Xia Shui (Reverse Chart)", "Balanced Harmony Chart"][patternKind]
         case .zhHant:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "到山到向 (旺丁旺財最吉)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "雙星到向 (旺財不旺丁 · 宜向前有水後有山)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "雙星到坐 (旺丁不旺財 · 宜向後有水水後有山)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "上山下水 (敗財損丁凶局 · 需借勢顛倒用法)"
-            } else {
-                pattern = "吉凶平和局"
-            }
+            pattern = ["到山到向 (旺丁旺財最吉)", "雙星到向 (旺財不旺丁 · 宜向前有水後有山)", "雙星到坐 (旺丁不旺財 · 宜向後有水水後有山)", "上山下水 (敗財損丁凶局 · 需借勢顛倒用法)", "吉凶平和局"][patternKind]
         case .ja:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "到山到向 (旺丁旺財の大吉)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "双星到向 (旺財不旺丁 · 前方に水、後方に山が吉)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "双星到坐 (旺丁不旺財 · 後方に水、その奥に山が吉)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "上山下水 (敗財損丁の凶局 · 顛倒勢の借用が必要)"
-            } else {
-                pattern = "吉凶相半の平和局"
-            }
+            pattern = ["到山到向 (旺丁旺財の大吉)", "双星到向 (旺財不旺丁 · 前方に水、後方に山が吉)", "双星到坐 (旺丁不旺財 · 後方に水、その奥に山が吉)", "上山下水 (敗財損丁の凶局 · 顛倒勢の借用が必要)", "吉凶相半の平和局"][patternKind]
         case .ko:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "도산도향 (왕정왕재 대길)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "쌍성도향 (재물 번창 · 앞에 물 뒤에 산이 길함)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "쌍성도좌 (자손 번창 · 뒤에 물과 산이 길함)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "동산하수 (손재패가 흉국 · 전도법 응용 필요)"
-            } else {
-                pattern = "길흉 평화국"
-            }
+            pattern = ["도산도향 (왕정왕재 대길)", "쌍성도향 (재물 번창 · 앞에 물 뒤에 산이 길함)", "쌍성도좌 (자손 번창 · 뒤에 물과 산이 길함)", "동산하수 (손재패가 흉국 · 전도법 응용 필요)", "길흉 평화국"][patternKind]
         case .vi:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Đáo Sơn Đáo Hướng (Vượng đinh vượng tài đại cát)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Song Tinh Đáo Hướng (Vượng tài · Trước có nước sau có núi)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Song Tinh Đáo Tọa (Vượng đinh · Sau có nước sau nước có núi)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Thượng Sơn Hạ Thủy (Bại tài tổn đinh hung cục · Cần phép điên đảo)"
-            } else {
-                pattern = "Cát hung bình hòa cục"
-            }
+            pattern = ["Đáo Sơn Đáo Hướng (Vượng đinh vượng tài đại cát)", "Song Tinh Đáo Hướng (Vượng tài · Trước có nước sau có núi)", "Song Tinh Đáo Tọa (Vượng đinh · Sau có nước sau nước có núi)", "Thượng Sơn Hạ Thủy (Bại tài tổn đinh hung cục · Cần phép điên đảo)", "Cát hung bình hòa cục"][patternKind]
         case .th:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "ถึงเขาถึงทิศ (เจริญทั้งคนและทรัพย์ มงคลยิ่ง)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "สองดาวสู่ทิศหน้า (รุ่งเรืองทรัพย์สิน · หน้าควรมีน้ำหลังมีเขา)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "สองดาวสู่หลังพิง (ลูกหลานรุ่งเรือง · หลังควรมีน้ำและมีเขา)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "ขึ้นเขาลงน้ำ (สูญเสียทรัพย์และคน เคราะห์ร้าย · ต้องกลับทิศแก้เคล็ด)"
-            } else {
-                pattern = "สมดุลปานกลาง"
-            }
+            pattern = ["ถึงเขาถึงทิศ (เจริญทั้งคนและทรัพย์ มงคลยิ่ง)", "สองดาวสู่ทิศหน้า (รุ่งเรืองทรัพย์สิน · หน้าควรมีน้ำหลังมีเขา)", "สองดาวสู่หลังพิง (ลูกหลานรุ่งเรือง · หลังควรมีน้ำและมีเขา)", "ขึ้นเขาลงน้ำ (สูญเสียทรัพย์และคน เคราะห์ร้าย · ต้องกลับทิศแก้เคล็ด)", "สมดุลปานกลาง"][patternKind]
         case .id:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Wang Shan Wang Xiang (Makmur Keluarga & Harta)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Bintang Kembar di Hadap (Kaya Harta · Air di Depan, Gunung di Belakang)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "Bintang Kembar di Duduk (Banyak Keturunan · Air & Gunung di Belakang)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "Shang Shan Xia Shui (Peta Terbalik · Rawan Kerugian Harta & Fisik)"
-            } else {
-                pattern = "Peta Harmonis Seimbang"
-            }
+            pattern = ["Wang Shan Wang Xiang (Makmur Keluarga & Harta)", "Bintang Kembar di Hadap (Kaya Harta · Air di Depan, Gunung di Belakang)", "Bintang Kembar di Duduk (Banyak Keturunan · Air & Gunung di Belakang)", "Shang Shan Xia Shui (Peta Terbalik · Rawan Kerugian Harta & Fisik)", "Peta Harmonis Seimbang"][patternKind]
         case .auto, .zhHans:
-            if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "到山到向 (旺丁旺财最吉)"
-            } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "双星到向 (旺财不旺丁 · 宜向前有水后有山)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-                pattern = "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)"
-            } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-                pattern = "上山下水 (败财损丁凶局 · 需借势颠倒用法)"
-            } else {
-                pattern = "吉凶平和局"
-            }
+            pattern = ["到山到向 (旺丁旺财最吉)", "双星到向 (旺财不旺丁 · 宜向前有水后有山)", "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)", "上山下水 (败财损丁凶局 · 需借势颠倒用法)", "吉凶平和局"][patternKind]
         }
         
         // 5. 组合九宫格模型
@@ -810,27 +759,27 @@ public final class FlyingStarsEngine {
             cells.append(cell)
         }
         
-        // 6. 综合格局断语
+        // 6. 综合格局说明。仅描述计算出的盘面，不对现实结果作承诺。
         let summary: String
         let sittingName = sitting.localizedName
         let facingName = facing.localizedName
         switch lang {
         case .en:
-            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
+            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony.\n\n\(traditionalSourceNote)"
         case .zhHant:
-            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。\n\n\(traditionalSourceNote)"
         case .ja:
-            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。"
+            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。\n\n\(traditionalSourceNote)"
         case .ko:
-            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다."
+            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다.\n\n\(traditionalSourceNote)"
         case .vi:
-            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh."
+            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh.\n\n\(traditionalSourceNote)"
         case .th:
-            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล"
+            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล\n\n\(traditionalSourceNote)"
         case .id:
-            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)–\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga."
+            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)—\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga.\n\n\(traditionalSourceNote)"
         case .auto, .zhHans:
-            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
+            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。\n\n\(traditionalSourceNote)"
         }
         
         let modeTitle = useTiGua

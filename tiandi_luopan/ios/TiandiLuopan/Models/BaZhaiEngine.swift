@@ -121,7 +121,14 @@ public enum StarLuckType: String, Codable {
         localizedSuggestion
     }
     
+    /// Traditional wording is kept verbatim in `baseLocalizedSuggestion`.
+    /// The source note below makes the health/wealth symbolism explicit without
+    /// presenting it as a clinical or financial conclusion.
     public var localizedSuggestion: String {
+        baseLocalizedSuggestion + "\n\n" + classicalSourceNote
+    }
+
+    private var baseLocalizedSuggestion: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
         case .en:
@@ -212,6 +219,28 @@ public enum StarLuckType: String, Codable {
             case .liuSha:  return "酒色桃花、心绪不宁。做法：此方位设杂物柜/储物架，保持整洁少坐人；不宜作主卧或书房。→ 影响：主家中成员是非口舌与感情纠纷（女眷、年轻成员及夫妻关系感受最明显），桃花困扰；覆盖该方位。"
             case .huoHai:  return "官非小人、财帛破耗。做法：宜静不宜动，放陶瓷/土性摆件稳定气场，忌开凿大动。→ 影响：主家中成员官非小人、破财与脾胃不适（主事者与体弱者更明显），覆盖该方位。"
             }
+        }
+    }
+
+    private var classicalSourceNote: String {
+        let source = "《八宅明镜》八宅九星诀：“生气贪狼木，延年武曲金，天医巨门土，伏位辅弼木；绝命破军金，五鬼廉贞火，六煞文曲水，祸害禄存土。”"
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Classical source: Eight-House Nine-Star formula in Ba Zhai Ming Jing: ‘Sheng Qi is Tan Lang Wood; Yan Nian is Wu Qu Metal; Tian Yi is Ju Men Earth; Fu Wei is Fu Bi Wood; Jue Ming is Po Jun Metal; Wu Gui is Lian Zhen Fire; Liu Sha is Wen Qu Water; Huo Hai is Lu Cun Earth.’ Interpretation: the health, vitality and wealth language above is a symbolic traditional-culture reading of these star names, not a medical diagnosis, treatment, financial advice or guaranteed outcome."
+        case .zhHant:
+            return "古籍出处： 《八宅明鏡》八宅九星訣：「生氣貪狼木，延年武曲金，天醫巨門土，伏位輔弼木；絕命破軍金，五鬼廉貞火，六煞文曲水，禍害祿存土。」解釋：上文涉及健康、元氣與財帛的語句，屬九星名義的傳統文化象徵解讀，不是醫療診斷、治療或財務建議，也不保證實際結果。"
+        case .ja:
+            return "出典：『八宅明鏡』八宅九星訣「生気は貪狼木、延年は武曲金、天医は巨門土、伏位は輔弼木、絶命は破軍金、五鬼は廉貞火、六殺は文曲水、禍害は禄存土」。解釈：健康・活力・財に関する表現は星名に基づく伝統文化上の象徴的な読みであり、医学的診断・治療・金融助言や結果の保証ではありません。"
+        case .ko:
+            return "출처: 《팔택명경》 팔택구성결 ‘생기는 탐랑목, 연년은 무곡금, 천의는 거문토, 복위는 보필목, 절명은 파군금, 오귀는 염정화, 육살은 문곡수, 화해는 녹존토’입니다. 해석: 위 건강·활력·재물 표현은 전통문화의 상징적 해석이며 의학적 진단·치료·재무 조언이나 결과 보장이 아닙니다."
+        case .vi:
+            return "Nguồn cổ: Quyết Cửu Tinh Bát Trạch trong Bát Trạch Minh Kính: ‘Sinh Khí thuộc Tham Lang Mộc; Diên Niên thuộc Vũ Khúc Kim; Thiên Y thuộc Cự Môn Thổ; Phục Vị thuộc Phụ Bật Mộc; Tuyệt Mệnh thuộc Phá Quân Kim; Ngũ Quỷ thuộc Liêm Trinh Hỏa; Lục Sát thuộc Văn Khúc Thủy; Họa Hại thuộc Lộc Tồn Thổ.’ Giải thích: các câu về sức khỏe, sinh lực và tài lộc là biểu tượng văn hóa truyền thống, không phải chẩn đoán y khoa, điều trị, tư vấn tài chính hay bảo đảm kết quả."
+        case .th:
+            return "ที่มาโบราณ: สูตรดาวเก้าดวงแปดบ้านในคัมภีร์ปาจ้ายหมิงจิ่งกล่าวว่า ‘เซิงชี่ดาวทานหลางธาตุไม้ เหยียนเหนียนดาวอู่ชวีธาตุทอง เทียนอีดาวจวี้เหมินธาตุดิน ฝูเว่ยดาวฝู่ปี้ธาตุไม้ เจวี๋ยหมิงดาวผัวจวินธาตุทอง อู่กุ่ยดาวเหลียนเจินธาตุไฟ ลิ่วซาดาวเหวินชวีธาตุน้ำ ฮั่วไห่ดาวลู่ชุนธาตุดิน’ คำอธิบาย: ถ้อยคำด้านสุขภาพ พลังชีวิต และทรัพย์สินเป็นสัญลักษณ์ทางวัฒนธรรมดั้งเดิม ไม่ใช่การวินิจฉัยหรือรักษาโรค คำแนะนำทางการเงิน หรือการรับประกันผลลัพธ์"
+        case .id:
+            return "Sumber klasik: Rumus Sembilan Bintang Ba Zhai dalam Ba Zhai Ming Jing: ‘Sheng Qi Tan Lang Kayu; Yan Nian Wu Qu Logam; Tian Yi Ju Men Tanah; Fu Wei Fu Bi Kayu; Jue Ming Po Jun Logam; Wu Gui Lian Zhen Api; Liu Sha Wen Qu Air; Huo Hai Lu Cun Tanah.’ Penjelasan: ungkapan tentang kesehatan, vitalitas, dan rezeki di atas adalah tafsir simbolik budaya tradisional, bukan diagnosis medis, pengobatan, nasihat keuangan, atau jaminan hasil."
+        case .auto, .zhHans:
+            return "古籍出处：\(source)解释：上文涉及健康、元气与财帛的语句，属于九星名义的传统文化象征解读，不是医疗诊断、治疗或财务建议，也不保证实际结果。"
         }
     }
 }

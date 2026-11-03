@@ -352,6 +352,10 @@ public struct ExteriorShaItem: Identifiable, Codable {
     }
     
     public var localizedRemedySolution: String {
+        baseLocalizedRemedySolution + "\n\n" + localizedMetaphysicsHarm
+    }
+
+    private var baseLocalizedRemedySolution: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {
         case .en:
@@ -528,6 +532,30 @@ public struct ExteriorShaItem: Identifiable, Codable {
         }
     }
 
+    /// Localized explanation shown in the AR result card.
+    public var localizedMetaphysicsHarm: String {
+        let citation = localizedClassicalText
+        let traditionalHarm = metaphysicsHarm
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Traditional model wording: \(traditionalHarm)\nClassical source: \(citation) Explanation: this quoted text is the traditional interpretation of the observed form. Verify the structure and actual impact on site; it is not a medical, financial or professional diagnosis."
+        case .zhHant:
+            return "傳統原理：\(traditionalHarm)\n古籍出處：\(citation) 解釋：以上引文是傳統文化對該形態的原文解讀。請現場核對結構及實際影響；不構成醫療、財務或其他專業診斷。"
+        case .ja:
+            return "伝統的な原理：\(traditionalHarm)\n古典の出典：\(citation) 解説：引用は対象の形態に対する伝統的解釈です。構造と実際の影響を現地で確認し、医療・金融その他の診断として扱わないでください。"
+        case .ko:
+            return "전통 원리: \(traditionalHarm)\n고전 출처: \(citation) 설명: 위 인용은 해당 형태에 대한 전통적 해석입니다. 구조와 실제 영향을 현장에서 확인하고 의료·재정 또는 전문 진단으로 사용하지 마세요."
+        case .vi:
+            return "Nguyên lý truyền thống: \(traditionalHarm)\nNguồn cổ thư: \(citation) Giải thích: trích dẫn trên là cách diễn giải truyền thống về hình thái này. Hãy kiểm tra cấu trúc và ảnh hưởng thực tế tại chỗ; không dùng như chẩn đoán y tế, tài chính hay chuyên môn."
+        case .th:
+            return "หลักการดั้งเดิม: \(traditionalHarm)\nแหล่งคัมภีร์: \(citation) คำอธิบาย: ข้อความอ้างอิงคือการตีความรูปแบบตามวัฒนธรรมดั้งเดิม โปรดตรวจสอบโครงสร้างและผลจริงหน้างาน ไม่ใช่การวินิจฉัยทางการแพทย์ การเงิน หรือวิชาชีพ"
+        case .id:
+            return "Prinsip tradisional: \(traditionalHarm)\nSumber klasik: \(citation) Penjelasan: kutipan tersebut adalah tafsir tradisional atas bentuk ini. Periksa struktur dan dampak nyata di lokasi; jangan gunakan sebagai diagnosis medis, keuangan, atau profesional."
+        case .auto, .zhHans:
+            return "传统原理：\(traditionalHarm)\n古籍出处：\(citation) 解释：以上引文是传统文化对该形态的原文解读。请现场核对结构及实际影响；不构成医疗、财务或其他专业诊断。"
+        }
+    }
+
     public var localizedClassicalText: String {
         guard LocalizationManager.shared.effectiveLanguage != .zhHans else { return classicalText }
         let en: [String: String] = [
@@ -625,7 +653,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "气流受文丘里效应加速形成高速风刃，主血光之灾、官非破财、心脑血管突发疾厄",
             severity: .critical,
             classicalText: "《雪心赋》云：天斩迎面立，屋裂气难聚。两楼夹一罅，形同剑下劈。",
-            remedySolution: "① 挡（先做·免费）：正对楼缝的窗前或阳台，摆一排高过窗台的阔叶绿植（龟背竹、发财树），或加厚纱帘。→ 影响：减轻夹缝直冲的气流与视觉压迫，覆盖对缝的窗和阳台。\n② 隔（低成本）：若大门与对缝窗成一直线，玄关放半高鞋柜或镂空屏风，进门不一眼望穿。→ 影响：阻断穿堂直通，稳定全屋气流。\n③ 镇（可选）：正对缝口挂凸面八卦镜或山海镇，镜面朝外、略下倾3-5度，勿照邻家门窗。→ 影响：仅作用该冲射方位；注意邻里关系。\n→ 家人影响：主家中长辈与经常出入者健康（头部、骨骼不适与血光之虞）及正财破耗；影响正对楼缝的方位及该处常活动的家人。"
+            remedySolution: "① 挡（先做·免费）：正对楼缝的窗前或阳台，摆一排高过窗台的阔叶绿植（龟背竹、发财树），或加厚纱帘。→ 影响：减轻夹缝直冲的气流与视觉压迫，覆盖对缝的窗和阳台。\n② 隔（低成本）：若大门与对缝窗成一直线，玄关放半高鞋柜或镂空屏风，进门不一眼望穿。→ 影响：阻断穿堂直通，稳定全屋气流。\n③ 镇（可选）：正对缝口挂凸面八卦镜或山海镇，镜面朝外、略下倾3-5度，勿照邻家门窗。→ 影响：仅作用该冲射方位；注意邻里关系。\n→ 家人影响：提示关注现场通行、噪音与视觉安全及家庭支出；影响正对楼缝的方位及该处常活动的家人。"
         ),
         ExteriorShaItem(
             id: "luchong",
@@ -635,7 +663,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "一条直路一条枪，车流动能化作无形猛兽直冲宅气，主破耗连连、意外伤灾、人丁不安",
             severity: .critical,
             classicalText: "《堪舆指要》云：直冲门前最难当，暗箭伤人人莫详。",
-            remedySolution: "① 挡（先做·免费）：门口放门槛石或门垫，门内挂门帘；正对路的窗台放一盆高绿植。→ 影响：弱化直路冲门的压迫感，覆盖大门与正冲窗。\n② 隔（低成本）：门外加半高绿篱或屏风，让进门动线拐个弯。→ 影响：直冲气流转为缓行，全宅受益。\n③ 镇（可选）：大门上方挂山海镇或八卦镜，朝路方向微下倾，勿照邻居。→ 影响：仅针对冲射方位。\n→ 家人影响：主经常出入的家人（早晚通勤者）意外、血光与破财，家运不稳；影响直冲来路方向及出入之人。"
+            remedySolution: "① 挡（先做·免费）：门口放门槛石或门垫，门内挂门帘；正对路的窗台放一盆高绿植。→ 影响：弱化直路冲门的压迫感，覆盖大门与正冲窗。\n② 隔（低成本）：门外加半高绿篱或屏风，让进门动线拐个弯。→ 影响：直冲气流转为缓行，全宅受益。\n③ 镇（可选）：大门上方挂山海镇或八卦镜，朝路方向微下倾，勿照邻居。→ 影响：仅针对冲射方位。\n→ 家人影响：提示关注出入口的通行安全、噪音和家庭支出；影响直冲来路方向及出入之人。"
         ),
         ExteriorShaItem(
             id: "fangong",
@@ -665,7 +693,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "地气空洞不稳定，泄气极速，主财气不聚、肠胃脾胃虚寒、居者缺乏安全感",
             severity: .warning,
             classicalText: "《青囊经》云：地脉不凝，宅气空腾。穿心走气，贫困无依。",
-            remedySolution: "① 隔（先做·免费）：门与后窗成直线时，在动线正中放玄关柜、屏风或挂厚门帘。→ 影响：阻断穿堂直通，稳定全屋气流。\n② 挡（低成本）：地面铺地毯、窗台放绿植、重家具靠墙，减缓气流速度。→ 影响：降低直穿气流速度，改善室温与安稳感。\n③ 镇（可选）：入户门槛内放五帝钱或小号石敢当。→ 影响：入户区域；可选强化。\n→ 家人影响：主居住者健康不安、睡眠受扰（睡在穿心线上的人影响最大），家宅气场被穿破；影响穿心路径方向及该处家人。"
+            remedySolution: "① 隔（先做·免费）：门与后窗成直线时，在动线正中放玄关柜、屏风或挂厚门帘。→ 影响：阻断穿堂直通，稳定全屋气流。\n② 挡（低成本）：地面铺地毯、窗台放绿植、重家具靠墙，减缓气流速度。→ 影响：降低直穿气流速度，改善室温与安稳感。\n③ 镇（可选）：入户门槛内放五帝钱或小号石敢当。→ 影响：入户区域；可选强化。\n→ 家人影响：提示检查门窗直线通风、噪音和夜间休息环境；影响穿心路径方向及该处家人。"
         ),
         ExteriorShaItem(
             id: "huoxing",
@@ -675,7 +703,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "火金相克，火燥生煞，主口舌官非、视力疾厄、皮肤炎肿、脾气暴躁易燃",
             severity: .warning,
             classicalText: "《疑龙经》云：尖角冲克火星飞，灾殃临门人不归。",
-            remedySolution: "① 挡（先做·免费）：正对尖角的窗挂纱帘或百叶。→ 影响：视觉缓冲，覆盖该窗。\n② 隔（低成本）：窗台摆水养植物（水培绿萝、常春藤），缓解干燥。→ 影响：调和火燥，覆盖该区域。\n③ 镇（可选）：放黑曜石、水晶或蓝色装饰物压火气；此方位忌红色。→ 影响：仅针对该方位；忌红色。\n→ 家人影响：主家人急躁口舌、火灾之虞（脾气、心脑血管与眼目健康）；影响尖角/烟囱所指方向及该处家人。"
+            remedySolution: "① 挡（先做·免费）：正对尖角的窗挂纱帘或百叶。→ 影响：视觉缓冲，覆盖该窗。\n② 隔（低成本）：窗台摆水养植物（水培绿萝、常春藤），缓解干燥。→ 影响：调和火燥，覆盖该区域。\n③ 镇（可选）：放黑曜石、水晶或蓝色装饰物压火气；此方位忌红色。→ 影响：仅针对该方位；忌红色。\n→ 家人影响：提示检查尖角、热源、反光和消防通道；影响尖角/烟囱所指方向及该处家人。"
         ),
         ExteriorShaItem(
             id: "baihu",
@@ -685,7 +713,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "青龙委靡，白虎张狂，主阴盛阳衰、妇人专权暴烈、男丁运势受压抑阻滞",
             severity: .minor,
             classicalText: "《水龙经》云：宁叫青龙高万丈，莫教白虎昂半寸。",
-            remedySolution: "① 补（先做·免费）：左侧（青龙方）加落地灯、高大家具或高大绿植，平衡左右视觉高度。→ 影响：平衡客厅/书房气场，缓解右侧压迫。\n② 挡（低成本）：右侧若临施工或高楼，靠右窗挂厚窗帘遮挡。→ 影响：遮挡噪音与视线干扰。\n③ 镇（可选）：左侧放泰山石或麒麟摆件。→ 影响：仅象征性补强。\n→ 家人影响：主小人暗算、女眷是非与意外伤灾（家中女性感受较明显）；影响右侧白虎方位及该处家人。"
+            remedySolution: "① 补（先做·免费）：左侧（青龙方）加落地灯、高大家具或高大绿植，平衡左右视觉高度。→ 影响：平衡客厅/书房气场，缓解右侧压迫。\n② 挡（低成本）：右侧若临施工或高楼，靠右窗挂厚窗帘遮挡。→ 影响：遮挡噪音与视线干扰。\n③ 镇（可选）：左侧放泰山石或麒麟摆件。→ 影响：仅象征性补强。\n→ 家人影响：传统《水龙经》有“宁叫青龙高万丈，莫教白虎昂半寸”，古籍把白虎偏高与是非、伤灾作象征联系；影响右侧白虎方位及该处家人。解释：请优先检查噪音、采光、施工和通行安全，古籍原文不是医疗诊断或事故预测。"
         ),
         ExteriorShaItem(
             id: "gejiao",
@@ -695,7 +723,7 @@ public final class ExteriorShaEngine {
             metaphysicsHarm: "气流疾走拔除地气，财运大起大落，根基虚浮，青年得志但晚运易倾颓",
             severity: .minor,
             classicalText: "《地理正宗》云：水逼楼脚急，根浅风难立。",
-            remedySolution: "① 挡（先做·免费）：临路一侧阳台或窗前摆高盆绿植或花坛。→ 影响：缓冲急流，覆盖临路侧。\n② 隔（低成本）：临路窗换厚玻璃或加双层窗帘，降低噪音。→ 影响：减少声煞与视觉干扰。\n③ 镇（可选）：近路/水方向放貔貅或石敢当。→ 影响：该方位；可选强化。\n→ 家人影响：主退财与健康（居住者湿气不适、财运外流）；影响近水/高架割脚方向及该处家人。"
+            remedySolution: "① 挡（先做·免费）：临路一侧阳台或窗前摆高盆绿植或花坛。→ 影响：缓冲急流，覆盖临路侧。\n② 隔（低成本）：临路窗换厚玻璃或加双层窗帘，降低噪音。→ 影响：减少声煞与视觉干扰。\n③ 镇（可选）：近路/水方向放貔貅或石敢当。→ 影响：该方位；可选强化。\n→ 家人影响：提示检查潮湿、噪音、通风和家庭支出；影响近水/高架割脚方向及该处家人。"
         )
     ]
 }

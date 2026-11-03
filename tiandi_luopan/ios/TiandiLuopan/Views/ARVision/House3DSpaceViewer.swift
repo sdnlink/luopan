@@ -122,9 +122,9 @@ public struct House3DSpaceViewer: View {
                         .foregroundColor(.white)
                 }
                 Spacer()
-                // 形煞风水评分徽章
+                // 传统文化参考评分徽章
                 HStack(spacing: 4) {
-                    Text("风水体检")
+                    Text("传统文化参考")
                         .font(.adaptive(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                     Text("\(survey.fengshuiScore)分")
@@ -150,7 +150,7 @@ public struct House3DSpaceViewer: View {
                     .background(Color.yanCyan)
                     .cornerRadius(12)
                 }
-                .accessibilityLabel("导出工业级 AutoCAD DXF 矢量测绘图")
+                .accessibilityLabel("导出空间测绘 DXF 参考图")
 
                 // 毛坯房房间类型设定（一键切换类型即时刷新形煞报告）
                 Button(action: { showRoomTypePanel.toggle() }) {
@@ -1402,7 +1402,7 @@ public enum SurveyReportRenderer {
             }
 
             // 5. 底部版权与防伪印记
-            "天机演象 AI 空间测绘引擎 · LiDAR 毫米级全息数字化建档".draw(
+            "天机演象 · AR/LiDAR 空间测绘参考（需现场复核）".draw(
                 at: CGPoint(x: 50, y: size.height - 50),
                 withAttributes: [
                     .font: UIFont.monospacedSystemFont(ofSize: 16, weight: .medium),

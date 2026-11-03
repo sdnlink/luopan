@@ -138,7 +138,14 @@ public struct FenjinItem: Identifiable {
         }
     }
 
+    /// The traditional 分金口诀 is retained in full.  A source note is added
+    /// after it so health, vitality and wealth terms are clearly framed as
+    /// historical symbolism rather than professional advice.
     public var localizedLore: String {
+        baseLocalizedLore + "\n\n" + classicalSourceNote
+    }
+
+    private var baseLocalizedLore: String {
         let firstStem = String(jiaziName.prefix(1))
         let lang = LocalizationManager.shared.effectiveLanguage
         
@@ -250,6 +257,31 @@ public struct FenjinItem: Identifiable {
             }
         default:
             return lore
+        }
+    }
+
+    private var classicalSourceNote: String {
+        let original = "\(lore)"
+        let originalHant = original
+            .replacingOccurrences(of: "财", with: "財")
+            .replacingOccurrences(of: "气", with: "氣")
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Source: traditional 120 Fenjin compass formula (wording varies by transmitted edition). Original wording recorded for this line: ‘\(original)’. Interpretation: references to illness, vitality, family or wealth belong to traditional geomantic symbolism; they are not medical, safety or financial predictions."
+        case .zhHant:
+            return "出处：传统罗盘一百二十分金口诀（传本有异文）。本分金收录原文：「\(originalHant)」。解释：其中疾病、元气、丁口与财帛语句属于传统堪舆象征，不是医疗、居住安全或财务预测。"
+        case .ja:
+            return "出典：伝承本に異文のある伝統羅盤一百二十分金口訣。本線の原文：「\(original)」。解釈：病・活力・家族・財に関する語は伝統風水の象徴であり、医学・安全・金融の予測ではありません。"
+        case .ko:
+            return "출처: 전승본에 이문이 있는 전통 나침반 120분금 구결. 이 선에 기록된 원문: ‘\(original)’. 해석: 질병·활력·가족·재물 표현은 전통 풍수의 상징이며 의료·안전·재무 예측이 아닙니다."
+        case .vi:
+            return "Nguồn: khẩu quyết La Bàn Phân Kim 120 truyền thống (các bản truyền có dị văn). Nguyên văn của tuyến này: ‘\(original)’. Giải thích: các từ về bệnh tật, sinh lực, gia đình và tài lộc là biểu tượng phong thủy truyền thống, không phải dự đoán y tế, an toàn hay tài chính."
+        case .th:
+            return "ที่มา: คำ诀แบ่ง金 120 ของเข็มทิศแบบดั้งเดิม (แต่ละฉบับอาจมีถ้อยคำต่างกัน) ข้อความต้นฉบับของเส้นนี้: ‘\(original)’ คำอธิบาย: ถ้อยคำเรื่องความเจ็บป่วย พลังชีวิต ครอบครัว และทรัพย์สินเป็นสัญลักษณ์ทางฮวงจุ้ย ไม่ใช่การพยากรณ์ทางการแพทย์ ความปลอดภัย หรือการเงิน"
+        case .id:
+            return "Sumber: rumus kompas Fenjin 120 tradisional (redaksi berbeda menurut naskah). Teks asli untuk garis ini: ‘\(original)’. Penjelasan: istilah penyakit, vitalitas, keluarga, dan rezeki adalah simbolisme geomansi tradisional, bukan prediksi medis, keselamatan, atau keuangan."
+        case .auto, .zhHans:
+            return "出处：传统罗盘一百二十分金口诀（传本有异文）。本分金收录原文：“\(original)”。解释：其中疾病、元气、丁口与财帛语句属于传统堪舆象征，不是医疗、居住安全或财务预测。"
         }
     }
 }

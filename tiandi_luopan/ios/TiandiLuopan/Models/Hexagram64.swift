@@ -280,7 +280,13 @@ public struct HexagramItem: Identifiable, Codable {
         }
     }
 
+    /// Preserve the original Yi/Fenjin wording and add a source note for
+    /// health and wealth phrases such as “Flourishing health and wealth”.
     public var localizedFenJinDetail: String {
+        baseLocalizedFenJinDetail + "\n\n" + classicalSourceNote
+    }
+
+    private var baseLocalizedFenJinDetail: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         if lang == .zhHans {
             return fenJinDetail
@@ -364,6 +370,37 @@ public struct HexagramItem: Identifiable, Codable {
             }
         default:
             return fenJinDetail
+        }
+    }
+
+    private var classicalSourceNote: String {
+        let isProsperityLine = fenJinDetail.contains("旺相得令")
+        let sourceEn = isProsperityLine
+            ? "Book of Changes (Zhou Yi), Tai hexagram judgment, ‘Small go, great come; good fortune and success.’"
+            : "the original judgment of this hexagram in the Book of Changes (Zhou Yi)"
+        let sourceHans = isProsperityLine
+            ? "《周易·泰卦》卦辞：“小往大来，吉亨。”"
+            : "《周易》本卦卦辞"
+        let sourceHant = isProsperityLine
+            ? "《周易·泰卦》卦辭：「小往大來，吉亨。」"
+            : "《周易》本卦卦辭"
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Classical source: \(sourceEn) Interpretation: the prosperity, health and wealth wording is a traditional symbolic reading of the hexagram; it is not a medical, financial or outcome guarantee."
+        case .zhHant:
+            return "古籍出处：\(sourceHant)解釋：文中興盛、健康與財帛語句是卦象的傳統文化解讀，不是醫療診斷、財務建議或結果保證。"
+        case .ja:
+            return "出典：『周易』泰卦の卦辞「小往き大来たる。吉にして亨る」。解釈：繁栄・健康・財に関する表現は卦象の伝統的な象徴解釈であり、医学的診断、金融助言、結果の保証ではありません。"
+        case .ko:
+            return "출처: 《주역》 태괘 괘사 ‘소왕대래, 길하고 형통하다’. 해석: 번영·건강·재물 표현은 괘상의 전통적 상징 해석이며 의학적 진단, 재무 조언 또는 결과 보장이 아닙니다."
+        case .vi:
+            return "Nguồn cổ: quẻ Thái trong Kinh Dịch, quái từ ‘Tiểu vãng đại lai, cát hanh’. Giải thích: các từ về hưng thịnh, sức khỏe và tài lộc là cách đọc biểu tượng truyền thống của quẻ, không phải chẩn đoán y khoa, tư vấn tài chính hay bảo đảm kết quả."
+        case .th:
+            return "ที่มาโบราณ: คำตัดสินของกว้าไท่ในคัมภีร์โจวอี้ ‘สิ่งเล็กไป สิ่งใหญ่มา เป็นมงคลและราบรื่น’ คำอธิบาย: ถ้อยคำเรื่องความรุ่งเรือง สุขภาพ และทรัพย์สินเป็นการตีความเชิงสัญลักษณ์แบบดั้งเดิม ไม่ใช่การวินิจฉัย คำแนะนำทางการเงิน หรือการรับประกันผล"
+        case .id:
+            return "Sumber klasik: keputusan heksagram Tai dalam Kitab Perubahan, ‘Yang kecil pergi, yang besar datang; keberuntungan dan kelancaran.’ Penjelasan: ungkapan kemakmuran, kesehatan, dan rezeki adalah tafsir simbolik tradisional, bukan diagnosis medis, nasihat keuangan, atau jaminan hasil."
+        case .auto, .zhHans:
+            return "古籍出处：\(sourceHans)解释：文中兴盛、健康与财帛语句是卦象的传统文化解读，不是医疗诊断、财务建议或结果保证。"
         }
     }
 }

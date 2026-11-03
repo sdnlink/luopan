@@ -646,9 +646,9 @@ public enum HouseSpatialSurveyEngine {
                         title: "中宫受污 (水浸太极)",
                         severity: .critical,
                         locationName: "房屋中宫·\(room.name)",
-                        detail: "全屋太极立极中心被卫生间占据，排污秽气直冲中宫枢纽，主宅运滞涩、心肾不交。",
-                        fengshuiLore: "《撼龙经》云：'水浸心包，家门困耗'。房屋中心为皇极太极之位，宜静宜洁，不宜落水溺污。",
-                        solution: "中宫卫生间务必保持干爽排风，悬挂天然开光桃木兽头或葫芦收煞，并常点暖黄长明灯生土克水。",
+                        detail: "《撼龙经》原文有“水浸心包，家门困耗”之说。卫生间位于房屋中心属于该典籍语境下的布局象征，请结合防水、排水、通风、干燥和动线现场复核；古籍语句不等同于现实诊断。",
+                        fengshuiLore: "出处：《撼龙经》。解释：古籍以中心落水象征家门困耗，属于传统堪舆叙事，实际房屋问题仍以现场检查为准。",
+                        solution: "优先检查防水、排水、排风和检修条件，保持地面干燥、通道清晰；改造前咨询具备资质的专业人员。",
                         coordinate: room.center
                     ))
                     score -= 16
@@ -657,8 +657,8 @@ public enum HouseSpatialSurveyEngine {
                         title: "火烧中宫 (燥火焚心)",
                         severity: .critical,
                         locationName: "房屋中宫·\(room.name)",
-                        detail: "全屋太极中心被厨房或灶台占据，燥火烈焰焚烤中轴，易致心脑烦躁、家运起伏。",
-                        fengshuiLore: "《八宅明镜》云：'火居天心，病染胸膈'。太极属阴阳平衡之枢纽，纯火久煅则元气耗散。",
+                        detail: "全屋中心被厨房或灶台占据，属于传统文化中的布局提示，请结合实际通风、动线与安全条件复核。",
+                        fengshuiLore: "出处：《八宅明镜》原文：“火居天心，病染胸膈”。解释：古籍将中心火象与疾病作象征关联，属于传统文化原文，不是医疗判断。",
                         solution: "厨灶移位避开房屋正中心，厨房采用米白或浅黄色地砖引土泄火，灶台下置黄玉石辟火化煞。",
                         coordinate: room.center
                     ))
@@ -721,7 +721,7 @@ public enum HouseSpatialSurveyEngine {
                             title: "穿堂穿心煞 (一箭穿心)",
                             severity: .critical,
                             locationName: "大门 ⟷ \(win.type.rawValue)",
-                            detail: String(format: "入户门与%@轴线近乎共线直冲 (间距 %.1f 米，偏角 %.0f°)，气流直来直去不聚气，主财帛财散难聚、气场动荡。", win.type.rawValue, dist, Double(acos(min(Float(1.0), alignment))) * 180.0 / Double.pi),
+                            detail: String(format: "《葬经》原文有“气乘风则散，界水则止”。入户门与%@轴线近乎共线（间距 %.1f 米，偏角 %.0f°），古籍将其解释为穿堂气散；请结合通风、噪音、视线和通行安全现场复核。", win.type.rawValue, dist, Double(acos(min(Float(1.0), alignment))) * 180.0 / Double.pi),
                             fengshuiLore: "《葬经》云：'气乘风则散，界水则止'。前通后达直穿门户，宅内藏风聚气之基尽失，所谓'前门进宝后门流'。",
                             solution: "在大门玄关处设实木屏风、半透磨砂玄关柜阻挡视线，或在阳台处悬挂厚质遮光帘与铜葫芦聚气。",
                             coordinate: door.position,
@@ -809,7 +809,7 @@ public enum HouseSpatialSurveyEngine {
                         title: "房门冲床 (冲撞身魂)",
                         severity: .warning,
                         locationName: "房门 ⟷ 卧床",
-                        detail: String(format: "房门开启气流直冲床铺 (间距 %.1f 米)，睡眠中受冷热气流对流冲刷，不利安眠与筋骨健康。", dist),
+                        detail: String(format: "房门与床铺形成直线气流（间距 %.1f 米），建议结合实际通风、噪音与动线调整布局。", dist),
                         fengshuiLore: "门开气入直射人身，动静失衡，神魂不聚。",
                         solution: "微调床头朝向或位置避开门冲直线，若空间受限可在门边设遮挡隔断或门挂长帘缓冲。",
                         coordinate: door.position,
@@ -834,8 +834,8 @@ public enum HouseSpatialSurveyEngine {
                         title: "水火未济 (厨厕相逼)",
                         severity: .warning,
                         locationName: "灶台 ⟷ 卫浴 (间距 \(String(format: "%.1f", dist))m)",
-                        detail: "灶台五行属独火，马桶卫浴五行属坎水，水火直冲相逼，主肠胃失和、家眷情绪易燥。",
-                        fengshuiLore: "《催官篇》云：'水火不相容，宅母病腹痛'。水火同宫激荡，气脉杂乱。",
+                        detail: "《催官篇》原文有“水火不相容，宅母病腹痛”。灶台与卫浴距离较近，按古籍象征会被解释为水火相逼；请结合热源距离、通风、防水和使用安全复核。",
+                        fengshuiLore: "出处：《催官篇》。解释：原文把水火同宫与腹痛相联系，是传统象征性叙述，不是医疗诊断。",
                         solution: "炉灶与卫生间门错开避对，两者之间摆放常青绿植（木元素）以形成'水生木、木生火'通关调和。",
                         coordinate: stove.position,
                         vectorEnd: toilet.position
@@ -867,7 +867,7 @@ public enum HouseSpatialSurveyEngine {
                     locationName: "入户大门 (宽 \(String(format: "%.2f", mainDoor.width))m)",
                     detail: String(format: "大门宽度落入鲁班门光尺【%@】凶度字门，门气略有亏耗。", eval.yangSegmentName),
                     fengshuiLore: "门不合度，气散难聚。",
-                    solution: "可于入户门槛下方安置六帝钱或开运地垫，在精神尺寸上进行微调化解。",
+                    solution: "可优先确认门槛、地垫和通道尺寸，保持入口平整防滑；涉及改造时咨询具备资质的专业人员。",
                     coordinate: mainDoor.position
                 ))
                 score -= 4
@@ -904,11 +904,11 @@ public enum HouseSpatialSurveyEngine {
                 let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
                 if alignment >= 0.78 && lateral <= 1.1 {
                     shaItems.append(HouseSpatialShaItem(
-                        title: "开门见灶 (财气多耗)",
+                        title: "开门见灶 (入口视线提示)",
                         severity: .critical,
                         locationName: "入户大门 ⟷ 厨灶",
-                        detail: String(format: "入户门开启正对厨房炉灶 (间距 %.1f 米)，大门纳入门气直冲灶火，主财气虚耗、存蓄不丰。", dist),
-                        fengshuiLore: "《阳宅集成》云：'开门见灶，钱财多耗'。灶为一家食禄之源，宜藏不宜露。",
+                        detail: String(format: "《阳宅集成》原文有“开门见灶，钱财多耗”。入户门开启正对厨房炉灶（间距 %.1f 米），古籍将其解释为财耗象征；请关注入口视线、热源距离、通风和防火安全。", dist),
+                        fengshuiLore: "出处：《阳宅集成》。解释：原文中的“钱财多耗”是传统文化判断，实际财务事项不由空间测算决定。",
                         solution: "在大门与厨房之间设置玄关柜或挂隔断门帘，平时厨房推拉门常闭以避穿冲。",
                         coordinate: door.position,
                         vectorEnd: stove.position
@@ -937,7 +937,7 @@ public enum HouseSpatialSurveyEngine {
                         title: "开门见厕 (秽气迎门)",
                         severity: .warning,
                         locationName: "入户大门 ⟷ 卫生间",
-                        detail: String(format: "大门入口正冲卫生间 (间距 %.1f 米)，外来吉气甫入宅即染污秽，主家运退窒、招惹小人。", dist),
+                        detail: String(format: "《八宅明镜》原文有“门为气口，厕乃浊泉；气口冲浊，福禄散亡”。大门入口正对卫生间（间距 %.1f 米），古籍将其解释为秽气迎门象征；建议关注隐私、通风、异味控制和出入口动线。", dist),
                         fengshuiLore: "《八宅明镜》云：'门为气口，厕乃浊泉；气口冲浊，福禄散亡'。",
                         solution: "卫生间门加装闭门器保持常闭，悬挂过膝半透布帘，门内放置水种阔叶绿植净化浊气。",
                         coordinate: door.position,
@@ -960,8 +960,8 @@ public enum HouseSpatialSurveyEngine {
                         title: "厨厕同壁 (水火相战)",
                         severity: .warning,
                         locationName: "厨房 ⟷ 卫生间相隔",
-                        detail: "厨房灶台居所与卫生间共用一面实体隔墙，坎水逼近离火，易致家人脾胃不适、情绪焦躁。",
-                        fengshuiLore: "孤阳燥火与独阴浊水共处一壁，冷热相激，阴阳失和。",
+                        detail: "《催官篇》原文有“水火不相容，宅母病腹痛”。厨房灶台与卫生间共用一面实体隔墙，按古籍象征会被解释为坎水逼近离火；请结合热源距离、通风、防水和使用安全复核。此处原文属于传统文化语境，不是医疗诊断。",
+                        fengshuiLore: "出处：《催官篇》：“水火不相容，宅母病腹痛”。解释：原文把水火相逼与腹部不适作象征联系，属于传统堪舆文本，不是医疗判断。",
                         solution: "灶台与马桶避免贴在同一面隔墙的正反两侧，墙面采用土黄色瓷砖以'土'通关化解。",
                         coordinate: k.center,
                         vectorEnd: b.center
@@ -1042,7 +1042,7 @@ public enum HouseSpatialSurveyEngine {
                         title: "吉位落水 (污秽吉星)",
                         severity: .critical,
                         locationName: "\(room.name) · 落于【\(item.star.name)】大吉方",
-                        detail: String(format: "卫生间落在全屋八宅【%@】大吉方，吉星被浊水浸润，易减损屋主财官运势与健康气运。", item.star.name),
+                        detail: String(format: "卫生间落在全屋八宅【%@】方位，属于传统文化中的布局提示，请结合实际防水、通风和使用情况复核。", item.star.name),
                         fengshuiLore: "《八宅明镜》云：'吉星落厕，吉亦成殃'。生气延年宜作卧房书斋，不宜落水。",
                         solution: "卫生间马桶上方摆放一盆金边虎尾兰以木吸水，挂置开光纯铜葫芦收敛秽气护持吉星。",
                         coordinate: room.center
@@ -1104,8 +1104,8 @@ public enum HouseSpatialSurveyEngine {
                             title: "玄空理气煞 · 五黄加枕",
                             severity: .critical,
                             locationName: "卧床枕位 · 逢【五黄星】",
-                            detail: String(format: "卧床枕位位于玄空五黄大煞飞临之%@宫，久眠易感神疲力绌。", palace.palaceName),
-                            fengshuiLore: "《紫白诀》云：'五黄重叠，灾疾并临'。",
+                            detail: String(format: "《紫白诀》原文有“五黄重叠，灾疾并临”。卧床枕位位于玄空五黄星飞临之%@宫，古籍将其解释为灾疾象征，请结合通风、噪音和动线复核。", palace.palaceName),
+                            fengshuiLore: "出处：《紫白诀》。解释：此处展示古籍原句及其传统含义，不构成健康诊断。",
                             solution: "床位微调避开五黄正对方位，床头柜放置天然纯铜葫芦化解土煞。",
                             coordinate: bed.position
                         ))
@@ -1123,11 +1123,11 @@ public enum HouseSpatialSurveyEngine {
                     let brAngle = (atan2(Double(brRelX), Double(-brRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
                     if guaForAngle(brAngle) == pGua {
                         shaItems.append(HouseSpatialShaItem(
-                            title: "玄空理气煞 · 病符临卧",
+                            title: "玄空理气参考 · 二黑星临卧",
                             severity: .warning,
                             locationName: "\(br.name) · 逢【二黑病符】",
-                            detail: String(format: "%@坐落于二黑巨门病符星飞临之%@宫 (山向 %d-%d)，久居易致脾胃失调。", br.name, palace.palaceName, palace.mountainStar, palace.facingStar),
-                            fengshuiLore: "《飞星赋》云：'二黑逢五，病生胸腹'。二黑主阴浊病符。",
+                            detail: String(format: "《飞星赋》原文有“二黑逢五，病生胸腹”。%@坐落于二黑巨门星飞临之%@宫（山向 %d-%d），古籍将其解释为病符象征，请结合通风、采光、噪音和使用情况复核。", br.name, palace.palaceName, palace.mountainStar, palace.facingStar),
+                            fengshuiLore: "出处：《飞星赋》。解释：展示二黑星的古籍象征，不构成健康诊断。",
                             solution: "卧房悬挂天然开光晒干葫芦或六帝钱以金泄土，室内避免大红厚毯。",
                             coordinate: br.center
                         ))
@@ -1145,10 +1145,10 @@ public enum HouseSpatialSurveyEngine {
                     let dAngle = (atan2(Double(dRelX), Double(-dRelZ)) * 180.0 / Double.pi + compassHeading + 360.0).truncatingRemainder(dividingBy: 360.0)
                     if guaForAngle(dAngle) == pGua {
                         shaItems.append(HouseSpatialShaItem(
-                            title: "玄空旺星纳气 (财路亨通)",
+                            title: "玄空旺星纳气 (空间参考)",
                             severity: .auspicious,
                             locationName: "入户大门 · 逢【当旺向星】",
-                            detail: String(format: "入户门迎当前%d运当旺向星飞临%@宫 (山向 %d-%d)，门迎旺气，大旺家业财帛。", curPeriod, palace.palaceName, palace.mountainStar, palace.facingStar),
+                            detail: String(format: "入户门迎当前%d运当旺向星飞临%@宫（山向 %d-%d），属于传统文化中的方位提示，请结合入口采光、通风、视线和动线复核。", curPeriod, palace.palaceName, palace.mountainStar, palace.facingStar),
                             fengshuiLore: "《天玉经》云：'向首一星灾福柄，当旺乘时发万箱'。",
                             solution: "门厅保持明堂整洁开阔，设暖白长明灯引气入宅，生旺气场。",
                             coordinate: door.position

@@ -177,7 +177,7 @@ class MainActivity : AppCompatActivity() {
         motion.stop()
     }
 
-    private fun checkAndRequestLocation() {
+    fun checkAndRequestLocation() {
         val fineLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarseLocationGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!fineLocationGranted && !coarseLocationGranted) {
@@ -189,7 +189,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkAndRequestCamera() {
+    fun checkAndRequestCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
                 this,

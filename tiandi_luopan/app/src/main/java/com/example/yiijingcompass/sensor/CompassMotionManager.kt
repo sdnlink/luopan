@@ -200,6 +200,7 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         isHapticEnabled = prefs.getBoolean("compass_haptic_enabled", true)
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            @Suppress("DEPRECATION")
             vibratorManager?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
         } else {
             @Suppress("DEPRECATION")

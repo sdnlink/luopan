@@ -122,6 +122,9 @@ data class QimenPalaceCell(
     val isCenter: Boolean,
     val isFacingDirection: Boolean
 ) {
+    val tianStem: String get() = tianPanGan
+    val diStem: String get() = diPanGan
+    val doorLuck: String get() = luckType
     val localizedDoorName: String
         get() {
             val d = QimenEngine.instance.resolveDoor(doorName)
@@ -251,7 +254,11 @@ data class QimenChart(
     val worstBearing: Double?,
     val worstReason: String,
     val cells: List<QimenPalaceCell>
-)
+) {
+    val bestNavDirection: String get() = bestDirection
+    val bestNavReason: String get() = bestReason
+    val tabooDirections: String get() = worstDirection
+}
 
 class QimenEngine private constructor() {
     companion object {

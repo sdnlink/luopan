@@ -3,6 +3,8 @@ package com.example.yiijingcompass.model
 /**
  * 八宅风水吉凶模组 (BaZhai Engine)
  */
+typealias BaZhaiStar = StarLuckType
+
 enum class StarLuckType(val rawValue: String) {
     SHENG_QI("生气 (贪狼大吉)"),
     YAN_NIAN("延年 (武曲大吉)"),

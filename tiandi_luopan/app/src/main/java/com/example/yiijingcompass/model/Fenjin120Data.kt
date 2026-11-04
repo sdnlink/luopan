@@ -20,7 +20,60 @@ data class Fenjin120Item(
     val id: String get() = "$mountainName-$index"
 
     val localizedMountainName: String
-        get() = "${mountainName}山"
+        get() {
+            val m = Mountain24Data.mountains.firstOrNull { it.name == mountainName }
+            return m?.localizedName ?: "${mountainName}山"
+        }
+
+    val localizedJiaziName: String
+        get() {
+            if (jiaziName.length < 2) return jiaziName
+            val stemChar = jiaziName.substring(0, 1)
+            val branchChar = jiaziName.substring(1, 2)
+            val lang = LocalizationManager.shared.effectiveLanguage
+
+            if (lang == AppLanguage.AUTO || lang == AppLanguage.ZH_HANS || lang == AppLanguage.ZH_HANT) {
+                return jiaziName
+            }
+
+            val stemMap = mapOf(
+                "甲" to mapOf(AppLanguage.EN to "Jia", AppLanguage.JA to "甲", AppLanguage.KO to "갑", AppLanguage.VI to "Giáp", AppLanguage.TH to "เจี่ย", AppLanguage.ID to "Jia"),
+                "乙" to mapOf(AppLanguage.EN to "Yi", AppLanguage.JA to "乙", AppLanguage.KO to "을", AppLanguage.VI to "Ất", AppLanguage.TH to "อี่", AppLanguage.ID to "Yi"),
+                "丙" to mapOf(AppLanguage.EN to "Bing", AppLanguage.JA to "丙", AppLanguage.KO to "병", AppLanguage.VI to "Bính", AppLanguage.TH to "ปิ่ง", AppLanguage.ID to "Bing"),
+                "丁" to mapOf(AppLanguage.EN to "Ding", AppLanguage.JA to "丁", AppLanguage.KO to "정", AppLanguage.VI to "Đinh", AppLanguage.TH to "ติง", AppLanguage.ID to "Ding"),
+                "戊" to mapOf(AppLanguage.EN to "Wu", AppLanguage.JA to "戊", AppLanguage.KO to "무", AppLanguage.VI to "Mậu", AppLanguage.TH to "อู้", AppLanguage.ID to "Wu"),
+                "己" to mapOf(AppLanguage.EN to "Ji", AppLanguage.JA to "己", AppLanguage.KO to "기", AppLanguage.VI to "Kỷ", AppLanguage.TH to "จี่", AppLanguage.ID to "Ji"),
+                "庚" to mapOf(AppLanguage.EN to "Geng", AppLanguage.JA to "庚", AppLanguage.KO to "경", AppLanguage.VI to "Canh", AppLanguage.TH to "เกิง", AppLanguage.ID to "Geng"),
+                "辛" to mapOf(AppLanguage.EN to "Xin", AppLanguage.JA to "辛", AppLanguage.KO to "신", AppLanguage.VI to "Tân", AppLanguage.TH to "ซิน", AppLanguage.ID to "Xin"),
+                "壬" to mapOf(AppLanguage.EN to "Ren", AppLanguage.JA to "壬", AppLanguage.KO to "임", AppLanguage.VI to "Nhâm", AppLanguage.TH to "เหริน", AppLanguage.ID to "Ren"),
+                "癸" to mapOf(AppLanguage.EN to "Gui", AppLanguage.JA to "癸", AppLanguage.KO to "계", AppLanguage.VI to "Quý", AppLanguage.TH to "กุ่ย", AppLanguage.ID to "Gui")
+            )
+            val branchMap = mapOf(
+                "子" to mapOf(AppLanguage.EN to "Zi", AppLanguage.JA to "子", AppLanguage.KO to "자", AppLanguage.VI to "Tý", AppLanguage.TH to "จื่อ", AppLanguage.ID to "Zi"),
+                "丑" to mapOf(AppLanguage.EN to "Chou", AppLanguage.JA to "丑", AppLanguage.KO to "축", AppLanguage.VI to "Sửu", AppLanguage.TH to "โฉ่ว", AppLanguage.ID to "Chou"),
+                "寅" to mapOf(AppLanguage.EN to "Yin", AppLanguage.JA to "寅", AppLanguage.KO to "인", AppLanguage.VI to "Dần", AppLanguage.TH to "อิ๋น", AppLanguage.ID to "Yin"),
+                "卯" to mapOf(AppLanguage.EN to "Mao", AppLanguage.JA to "卯", AppLanguage.KO to "묘", AppLanguage.VI to "Mão", AppLanguage.TH to "เหมา", AppLanguage.ID to "Mao"),
+                "辰" to mapOf(AppLanguage.EN to "Chen", AppLanguage.JA to "辰", AppLanguage.KO to "진", AppLanguage.VI to "Thìn", AppLanguage.TH to "เฉิน", AppLanguage.ID to "Chen"),
+                "巳" to mapOf(AppLanguage.EN to "Si", AppLanguage.JA to "巳", AppLanguage.KO to "사", AppLanguage.VI to "Tỵ", AppLanguage.TH to "ซื่อ", AppLanguage.ID to "Si"),
+                "午" to mapOf(AppLanguage.EN to "Wu", AppLanguage.JA to "午", AppLanguage.KO to "오", AppLanguage.VI to "Ngọ", AppLanguage.TH to "อู่", AppLanguage.ID to "Wu"),
+                "未" to mapOf(AppLanguage.EN to "Wei", AppLanguage.JA to "未", AppLanguage.KO to "미", AppLanguage.VI to "Mùi", AppLanguage.TH to "เว่ย", AppLanguage.ID to "Wei"),
+                "申" to mapOf(AppLanguage.EN to "Shen", AppLanguage.JA to "申", AppLanguage.KO to "신", AppLanguage.VI to "Thân", AppLanguage.TH to "เซิน", AppLanguage.ID to "Shen"),
+                "酉" to mapOf(AppLanguage.EN to "You", AppLanguage.JA to "酉", AppLanguage.KO to "유", AppLanguage.VI to "Dậu", AppLanguage.TH to "โหย่ว", AppLanguage.ID to "You"),
+                "戌" to mapOf(AppLanguage.EN to "Xu", AppLanguage.JA to "戌", AppLanguage.KO to "술", AppLanguage.VI to "Tuất", AppLanguage.TH to "ซีว์", AppLanguage.ID to "Xu"),
+                "亥" to mapOf(AppLanguage.EN to "Hai", AppLanguage.JA to "亥", AppLanguage.KO to "해", AppLanguage.VI to "Hợi", AppLanguage.TH to "ไฮ่", AppLanguage.ID to "Hai")
+            )
+
+            val s = stemMap[stemChar]?.get(lang) ?: stemChar
+            val b = branchMap[branchChar]?.get(lang) ?: branchChar
+            return when (lang) {
+                AppLanguage.EN, AppLanguage.ID -> "$s-$b"
+                AppLanguage.VI -> "$s $b"
+                AppLanguage.KO -> "$s$b ($jiaziName)"
+                AppLanguage.JA -> "$jiaziName ($s$b)"
+                AppLanguage.TH -> "$s-$b"
+                else -> jiaziName
+            }
+        }
 
     val localizedGrade: String
         get() = when (LocalizationManager.instance.effectiveLanguage) {
@@ -181,6 +234,7 @@ data class Fenjin120Item(
 class Fenjin120Data private constructor() {
     companion object {
         val instance: Fenjin120Data by lazy { Fenjin120Data() }
+        val shared: Fenjin120Data get() = instance
     }
 
     val allFenjin: List<Fenjin120Item>

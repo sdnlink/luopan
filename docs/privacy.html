@@ -1,253 +1,592 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>天机演象 · 隐私保护政策 | YanXiang Compass Privacy Policy</title>
-    <style>
-        :root {
-            --gold-primary: #d4af37;
-            --gold-light: #f5e6b3;
-            --bg-dark: #0a0b0e;
-            --card-bg: #14161f;
-            --border-color: #262938;
-            --text-main: #f5f6fa;
-            --text-muted: #9aa1b2;
-            --cyan-accent: #00e5ff;
-        }
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-font-smoothing: antialiased;
-        }
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
-            line-height: 1.75;
-            padding: 24px 16px calc(48px + env(safe-area-inset-bottom));
-        }
-        .nav-header {
-            max-width: 860px;
-            margin: 0 auto 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            padding: 0 4px;
-        }
-        .nav-brand {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--gold-light);
-            text-decoration: none;
-            font-weight: 700;
-            font-size: 15px;
-        }
-        .nav-links {
-            display: inline-flex;
-            gap: 16px;
-            font-size: 13px;
-        }
-        .nav-links a {
-            color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.2s ease;
-        }
-        .nav-links a:hover {
-            color: var(--gold-light);
-        }
-        .container {
-            max-width: 860px;
-            margin: 0 auto;
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 18px;
-            padding: clamp(20px, 5vw, 44px);
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-        }
-        h1 {
-            color: var(--gold-light);
-            font-size: clamp(22px, 5vw, 28px);
-            margin-bottom: 10px;
-            line-height: 1.35;
-        }
-        h2 {
-            color: var(--gold-primary);
-            font-size: clamp(17px, 4vw, 20px);
-            margin-top: 34px;
-            margin-bottom: 14px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 8px;
-            line-height: 1.4;
-        }
-        h3 {
-            font-size: 15px;
-            margin-top: 20px;
-            margin-bottom: 6px;
-            color: #fff;
-        }
-        p, li {
-            color: var(--text-muted);
-            font-size: 14px;
-            margin-bottom: 12px;
-            word-break: break-word;
-        }
-        ul {
-            padding-left: 20px;
-            margin-bottom: 12px;
-        }
-        .meta {
-            font-size: 13px;
-            color: #7e8696;
-            margin-bottom: 18px;
-            line-height: 1.6;
-        }
-        .highlight {
-            background: rgba(212, 175, 55, 0.08);
-            border-left: 4px solid var(--gold-primary);
-            padding: 14px 18px;
-            margin: 22px 0;
-            border-radius: 6px;
-            color: #e5e9f2;
-            font-size: 14px;
-        }
-        a {
-            color: var(--gold-primary);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-        a:hover {
-            color: var(--gold-light);
-            text-decoration: underline;
-        }
-        hr {
-            border: 0;
-            border-top: 1px solid var(--border-color);
-            margin: 44px 0;
-        }
-        .footer-note {
-            text-align: center;
-            margin-top: 36px;
-            padding-top: 24px;
-            border-top: 1px solid var(--border-color);
-            font-size: 13px;
-            color: #7a8292;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            align-items: center;
-        }
-        .icp-link {
-            color: #9aa1b2;
-            text-decoration: none;
-        }
-        .icp-link:hover {
-            color: var(--gold-primary);
-            text-decoration: underline;
-        }
-
-        /* 移动端与平板响应式适配 */
-        @media (max-width: 600px) {
-            body {
-                padding: 14px 10px calc(36px + env(safe-area-inset-bottom));
-            }
-            .nav-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 8px;
-                margin-bottom: 14px;
-            }
-            .container {
-                padding: 20px 14px;
-                border-radius: 12px;
-            }
-            p, li {
-                font-size: 13.5px;
-                line-height: 1.68;
-            }
-            .highlight {
-                padding: 12px 14px;
-                margin: 16px 0;
-            }
-            hr {
-                margin: 32px 0;
-            }
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私政策 | 天机演象 · Privacy Policy</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #111216; --card: #1b1d24; --text: #f4f4f6; --muted: #b5b7c0; --gold: #e0bd5a; --gold-light: #f5e6b3; --border-gold: rgba(224, 189, 90, .35); --line: #343641; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 0 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "PingFang TC", "Yu Gothic", "Malgun Gothic", "Thonburi", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .nav-header {
+      width: calc(100% - 32px);
+      max-width: 860px;
+      margin: 0 auto 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 0 4px;
+    }
+    .nav-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--gold-light);
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .nav-links {
+      display: inline-flex;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .nav-links a:hover {
+      color: var(--gold-light);
+    }
+    main {
+      width: calc(100% - 32px);
+      max-width: 860px;
+      margin: 0 auto 48px;
+      padding: 28px clamp(20px, 5vw, 56px);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+    }
+    h1 { margin: 0 0 8px; color: var(--gold); font-size: clamp(24px, 4vw, 34px); line-height: 1.3; }
+    h2 { margin: 30px 0 8px; color: var(--gold); font-size: 21px; line-height: 1.4; }
+    h3 { margin: 18px 0 4px; font-size: 17px; }
+    p, li { color: var(--muted); }
+    strong { color: var(--text); }
+    a { color: var(--gold); }
+    .meta { color: var(--muted); font-size: 14px; }
+    .notice { margin: 22px 0; padding: 14px 16px; border-left: 4px solid var(--gold); background: rgba(224, 189, 90, .1); }
+    section footer { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 14px; }
+    hr { border: 0; border-top: 1px solid var(--line); margin: 48px 0; }
+    nav.lang { font-size: 14px; margin: 0 0 18px; }
+    nav.lang a { margin-right: 10px; }
+    /* 统一合规页脚 */
+    footer#compliance {
+      margin-top: auto;
+      background: #07080a;
+      border-top: 1px solid var(--line);
+      padding: 50px 24px 36px;
+      font-size: 13px;
+      color: #7a8292;
+    }
+    .footer-container {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: center;
+      text-align: center;
+    }
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .footer-company {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gold-light, #f5e6b3);
+    }
+    .footer-links {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .footer-links a:hover {
+      color: var(--gold);
+    }
+    .footer-divider {
+      width: 100%;
+      height: 1px;
+      background: var(--line);
+      margin: 8px 0;
+    }
+    .footer-compliance {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+      color: #7a8292;
+      font-size: 13px;
+    }
+    .footer-compliance p {
+      margin: 0;
+      color: #7a8292;
+    }
+    .icp-link {
+      color: #9aa1b2;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s ease;
+      font-weight: 500;
+    }
+    .icp-link:hover {
+      color: var(--gold);
+      text-decoration: underline;
+    }
+    @media (max-width: 768px) {
+      footer#compliance {
+        padding: 36px 16px calc(30px + env(safe-area-inset-bottom));
+      }
+      .footer-container {
+        gap: 18px;
+      }
+      .footer-brand {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .footer-links {
+        gap: 10px 16px;
+        font-size: 13px;
+      }
+      .footer-compliance {
+        font-size: 12px;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="nav-header">
-        <a href="index.html" class="nav-brand">
-            <span>🧭</span> 北京长线科技 · 天机演象
-        </a>
-        <div class="nav-links">
-            <a href="index.html">官网首页</a>
-            <a href="subscription-terms.html">服务与订阅条款</a>
-            <a href="appstore-marketing.html">产品介绍</a>
-        </div>
+<div class="nav-header">
+  <a href="index.html" class="nav-brand">
+    <span>🧭</span> 北京长线科技 · 天机演象
+  </a>
+  <div class="nav-links">
+    <a href="index.html">官网首页</a>
+    <a href="privacy.html">隐私政策</a>
+    <a href="appstore-marketing.html">产品介绍</a>
+  </div>
+</div>
+
+<main>
+<nav class="lang"><a href="#zh-CN">简体中文</a><a href="#en">English</a><a href="#zh-TW">繁體中文</a><a href="#ja">日本語</a><a href="#ko">한국어</a><a href="#th">ไทย</a><a href="#vi">Tiếng Việt</a><a href="#id">Bahasa Indonesia</a></nav>
+
+<!-- ============================== 简体中文 ============================== -->
+<section id="zh-CN" lang="zh-CN">
+  <h1>隐私政策</h1>
+  <p class="meta">生效日期：2026 年 11 月 3 日　开发者：演象团队　联系邮箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>核心原则：</strong>本应用遵循“设备端离线计算，数据归属于用户”的设计原则。除由 Apple 处理的应用内购买（IAP）交易凭证外，本应用没有自有后端服务器，不会将传感器数据、相机画面、位置信息、房间扫描数据或户型图上传至云端或第三方服务器。</div>
+
+  <h2>导言</h2>
+  <p>欢迎使用“天机演象”（以下简称“本应用”）。本应用由演象团队（以下简称“我们”）开发与运营。本政策说明我们在您使用本应用时如何处理信息，以及您享有的权利。</p>
+
+  <h2>1. 信息与权限使用说明</h2>
+  <p>本应用仅在您使用相应功能时，才向系统申请以下权限。</p>
+  <h3>运动与方向传感器</h3>
+  <p><strong>用途：</strong>使用加速度计、陀螺仪和磁力计数据，驱动罗盘转动、水平仪倾角检测和刻度瞄准。<strong>存储：</strong>仅在设备内存中实时计算，不保存，不向外传输。</p>
+  <h3>位置信息（仅在使用 App 期间）</h3>
+  <p><strong>用途：</strong>获取当前经纬度和海拔，依据世界磁场模型（WMM）在设备本地计算磁偏角，校准磁北与真北，并推算当地真太阳时和节气。<strong>存储：</strong>仅在设备本地计算，我们不记录、不追踪您的位置轨迹。</p>
+  <h3>相机</h3>
+  <p><strong>用途：</strong>仅用于 AR 实景勘测功能中的实时相机预览和空间对准。<strong>存储：</strong>画面仅在设备屏幕和离屏画布中实时处理，我们不会录制、保存或上传您的画面。</p>
+  <h3>LiDAR / RoomPlan 房间扫描</h3>
+  <p><strong>用途：</strong>在支持的设备上，使用 Apple 的 ARKit 与 RoomPlan 框架扫描房间并生成空间几何数据。<strong>存储：</strong>扫描数据在设备端处理。如果您选择导出或分享空间文件，这些文件可能包含房屋结构、方位或位置等敏感信息，是否分享由您自行决定。</p>
+  <h3>照片</h3>
+  <p><strong>读取：</strong>允许您选择建筑图纸或房型照片，用于户型分析。<strong>写入：</strong>允许您将生成的报告、文化长卷或带水印的勘测图片保存到相册。我们仅访问您明确选择的图片，不会读取相册中的其他照片。</p>
+  <h3>应用内购买（StoreKit）</h3>
+  <p><strong>用途：</strong>提供天机演象年度会员（自动续期订阅）、天机演象专业版（永久）、户型参考报告（单次）和无水印文化长卷（单次）的购买与权益恢复。<strong>存储：</strong>支付信息由 Apple 处理，我们无法获取您的银行卡或账户信息。本应用仅在设备本地验证 App Store 签名的交易凭证，并将已验证的权益状态保存在设备的 Keychain 中。</p>
+
+  <h2>2. 第三方 SDK 与数据共享</h2>
+  <p>本应用不包含第三方广告或统计 SDK，不收集广告标识符（IDFA），不进行跨应用或跨网站追踪，也不会出售、出租或向任何第三方分享您的数据。</p>
+
+  <h2>3. 数据保存与安全</h2>
+  <p>户型草稿、自定义罗盘设置和购买状态均保存在 iOS 应用沙盒和加密 Keychain 中，仅存在于您的设备本地。卸载本应用后，应用沙盒内的数据会被 iOS 清除；Keychain 中的购买状态是否保留以 iOS 系统行为为准。您保存到相册或分享给他人的文件不受此限，需要您自行管理。</p>
+
+  <h2>4. 您的权利与选择</h2>
+  <ul>
+    <li><strong>撤回授权：</strong>您可以随时在 iOS“设置 → 隐私与安全性”或本应用的系统设置页中，关闭相机、位置、照片等权限。关闭后，相关功能将无法使用，其他功能不受影响。</li>
+    <li><strong>数据删除：</strong>我们不在服务器上保存您的个人数据。您可以在应用内删除户型草稿，或直接删除本应用以清除设备上的本地数据；已导出到相册或他处的文件请自行删除。</li>
+    <li><strong>查询与咨询：</strong>如对数据处理方式有疑问，或希望行使适用法律赋予您的权利，请发送邮件至 <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>。</li>
+    <li><strong>订阅管理：</strong>订阅、退款和账单由 Apple 处理，请在“设置 → Apple ID → 订阅”中管理。</li>
+  </ul>
+
+  <h2>5. 儿童隐私</h2>
+  <p>本应用不面向 13 岁以下的儿童，我们也不会故意收集儿童的个人信息。如您是监护人并发现儿童向我们提供了信息，请联系我们处理。</p>
+
+  <h2>6. 政策变更与联系我们</h2>
+  <p>我们可能不时更新本政策，更新后会修改生效日期，并在应用更新说明或本页面公布。如有疑问、意见或投诉，请联系：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>。开发者：演象团队。</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== English ============================== -->
+<section id="en" lang="en">
+  <h1>Privacy Policy</h1>
+  <p class="meta">Effective date: November 3, 2026 · Developer: 演象团队 · <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>Core commitment:</strong> TianJi YanXiang is designed to work on-device, with data belonging to you. Apart from in-app purchase receipts processed by Apple, the app has no servers of its own and does not upload sensor data, camera frames, location, room-scan data, or floor plans to any cloud or third-party server.</div>
+
+  <h2>Introduction</h2>
+  <p>Welcome to TianJi YanXiang (“the App”), developed and operated by 演象团队 (“we”). This policy explains how information is handled when you use the App and what rights you have.</p>
+
+  <h2>1. Information and Permissions</h2>
+  <p>The App asks for the following permissions only when you use the relevant feature.</p>
+  <h3>Motion and Direction Sensors</h3>
+  <p><strong>Use:</strong> Accelerometer, gyroscope, and magnetometer data drive the compass dial, level, and bearing readings. <strong>Storage:</strong> Processed in device memory in real time; not saved or transmitted.</p>
+  <h3>Location (While Using the App)</h3>
+  <p><strong>Use:</strong> Latitude, longitude, and elevation are used on-device with the World Magnetic Model (WMM) to calculate magnetic declination, local true solar time, and seasonal terms. <strong>Storage:</strong> Calculated locally; we do not record or track your location history.</p>
+  <h3>Camera</h3>
+  <p><strong>Use:</strong> Only for live preview and spatial alignment in the AR survey feature. <strong>Storage:</strong> Frames are processed on screen and in off-screen buffers; we do not record, save, or upload them.</p>
+  <h3>LiDAR / RoomPlan Room Scanning</h3>
+  <p><strong>Use:</strong> On supported devices, the App uses Apple’s ARKit and RoomPlan frameworks to scan rooms and produce spatial geometry. <strong>Storage:</strong> Scan data is processed on-device. If you export or share spatial files, they may contain building structure, orientation, or location information; whether to share them is your decision.</p>
+  <h3>Photos</h3>
+  <p><strong>Read:</strong> Lets you pick a blueprint or floor-plan photo for analysis. <strong>Write:</strong> Lets you save generated reports, culture scrolls, or watermarked survey images to your photo library. We access only the images you explicitly select.</p>
+  <h3>In-App Purchases (StoreKit)</h3>
+  <p><strong>Use:</strong> Purchase and restoration of the TianJi YanXiang Annual Membership (auto-renewable subscription), TianJi YanXiang Pro (Lifetime), Floor-Plan Reference Report (single), and Watermark-Free Culture Scroll (single). <strong>Storage:</strong> Payment details are handled by Apple; we cannot see your card or account information. The App verifies App Store-signed transaction receipts locally and keeps verified entitlement state in the device Keychain.</p>
+
+  <h2>2. Third-Party SDKs and Data Sharing</h2>
+  <p>The App contains no third-party advertising or analytics SDKs, does not collect the advertising identifier (IDFA), does not track you across apps or websites, and does not sell, rent, or share your data with third parties.</p>
+
+  <h2>3. Data Retention and Security</h2>
+  <p>Floor-plan drafts, custom compass settings, and purchase state are stored only on your device, in the iOS app sandbox and encrypted Keychain. When you delete the App, iOS removes the app sandbox data; whether Keychain items remain is governed by iOS behavior. Files you save to Photos or share with others are outside the App and are yours to manage.</p>
+
+  <h2>4. Your Rights and Choices</h2>
+  <ul>
+    <li><strong>Withdraw permissions:</strong> You can turn off camera, location, or photo access at any time in iOS Settings → Privacy &amp; Security. The related feature will stop working; other features are unaffected.</li>
+    <li><strong>Deletion:</strong> We do not hold your personal data on any server. Delete drafts inside the App, or delete the App to remove local data. Files exported to Photos or elsewhere must be deleted by you.</li>
+    <li><strong>Questions and requests:</strong> For questions about data handling or to exercise rights available under applicable law, email <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>.</li>
+    <li><strong>Subscriptions:</strong> Subscriptions, refunds, and billing are handled by Apple; manage them in Settings → Apple ID → Subscriptions.</li>
+  </ul>
+
+  <h2>5. Children’s Privacy</h2>
+  <p>The App is not directed to children under 13, and we do not knowingly collect personal information from them. If you are a parent or guardian and believe a child has provided information, please contact us.</p>
+
+  <h2>6. Policy Changes and Contact</h2>
+  <p>We may update this policy from time to time and will revise the effective date and announce changes in the App’s release notes or on this page. Questions or complaints: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>. Developer: 演象团队.</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== 繁體中文 ============================== -->
+<section id="zh-TW" lang="zh-TW">
+  <h1>隱私權政策</h1>
+  <p class="meta">生效日期：2026 年 11 月 3 日　開發者：演象團隊　聯絡信箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>核心原則：</strong>本應用程式遵循「裝置端離線運算，資料歸屬於使用者」的設計原則。除由 Apple 處理的應用程式內購買（IAP）交易憑證外，本應用程式沒有自有後端伺服器，不會將感測器資料、相機畫面、位置資訊、房間掃描資料或戶型圖上傳至雲端或第三方伺服器。</div>
+
+  <h2>導言</h2>
+  <p>歡迎使用「天機演象」（以下稱「本應用程式」）。本應用程式由演象團隊（以下稱「我們」）開發與營運。本政策說明您使用本應用程式時資訊如何被處理，以及您享有的權利。</p>
+
+  <h2>1. 資訊與權限使用說明</h2>
+  <p>本應用程式僅在您使用相應功能時，才會向系統申請下列權限。</p>
+  <h3>動作與方向感測器</h3>
+  <p><strong>用途：</strong>使用加速計、陀螺儀及磁力計資料，驅動羅盤轉動、水平儀傾角偵測及刻度瞄準。<strong>儲存：</strong>僅在裝置記憶體中即時運算，不保存，也不向外傳輸。</p>
+  <h3>位置資訊（僅在使用 App 期間）</h3>
+  <p><strong>用途：</strong>取得目前緯度、經度及海拔，依世界磁場模型（WMM）在裝置本機計算磁偏角，並推算當地真太陽時及節氣。<strong>儲存：</strong>僅在本機運算，我們不記錄、不追蹤您的位置軌跡。</p>
+  <h3>相機</h3>
+  <p><strong>用途：</strong>僅用於 AR 實景勘測功能中的即時相機預覽及空間對準。<strong>儲存：</strong>畫面僅在螢幕及離屏畫布中即時處理，我們不會錄製、保存或上傳。</p>
+  <h3>LiDAR / RoomPlan 房間掃描</h3>
+  <p><strong>用途：</strong>在支援的裝置上，使用 Apple 的 ARKit 與 RoomPlan 框架掃描房間並產生空間幾何資料。<strong>儲存：</strong>掃描資料在裝置端處理。如您選擇匯出或分享空間檔案，檔案可能包含房屋結構、方位或位置等敏感資訊，是否分享由您自行決定。</p>
+  <h3>相片</h3>
+  <p><strong>讀取：</strong>允許您選取建築圖紙或房型照片，用於戶型分析。<strong>寫入：</strong>允許您將報告、文化長卷或帶浮水印的勘測圖片儲存至相簿。我們僅存取您明確選取的圖片。</p>
+  <h3>App 內購買（StoreKit）</h3>
+  <p><strong>用途：</strong>提供天機演象年度會員（自動續期訂閱）、天機演象專業版（永久）、戶型參考報告（單次）及無浮水印文化長卷（單次）的購買與權益恢復。<strong>儲存：</strong>付款資訊由 Apple 處理，我們無法取得您的信用卡或帳戶資訊。本應用程式僅在裝置本機驗證 App Store 簽署的交易憑證，並將已驗證的權益狀態保存於裝置 Keychain。</p>
+
+  <h2>2. 第三方 SDK 與資料共享</h2>
+  <p>本應用程式不含第三方廣告或統計 SDK，不收集廣告識別碼（IDFA），不進行跨 App 或跨網站追蹤，也不會出售、出租或與任何第三方分享您的資料。</p>
+
+  <h2>3. 資料保存與安全</h2>
+  <p>戶型草稿、自訂羅盤設定及購買狀態僅保存在您裝置上的 iOS 應用程式沙盒及加密 Keychain 中。刪除本應用程式後，iOS 會清除沙盒資料；Keychain 項目是否保留依 iOS 系統行為而定。您儲存至相簿或分享給他人的檔案不在此限，須由您自行管理。</p>
+
+  <h2>4. 您的權利與選擇</h2>
+  <ul>
+    <li><strong>撤回授權：</strong>您可隨時在 iOS「設定 → 隱私權與安全性」中關閉相機、位置、相片權限，相關功能將無法使用，其他功能不受影響。</li>
+    <li><strong>資料刪除：</strong>我們不在伺服器上保存您的個人資料。您可在 App 內刪除戶型草稿，或刪除本應用程式以清除本機資料；已匯出至相簿或他處的檔案請自行刪除。</li>
+    <li><strong>查詢與諮詢：</strong>如對資料處理有疑問，或希望行使適用法律賦予的權利，請來信 <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>。</li>
+    <li><strong>訂閱管理：</strong>訂閱、退款及帳單由 Apple 處理，請至「設定 → Apple ID → 訂閱項目」管理。</li>
+  </ul>
+
+  <h2>5. 兒童隱私</h2>
+  <p>本應用程式不以 13 歲以下兒童為對象，我們也不會故意收集兒童的個人資訊。如您是監護人並發現兒童向我們提供了資訊，請與我們聯絡。</p>
+
+  <h2>6. 政策變更與聯絡方式</h2>
+  <p>我們可能不定期更新本政策，更新時會修改生效日期，並於應用程式更新說明或本頁公布。如有疑問、意見或申訴，請聯絡 <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>。開發者：演象團隊。</p>
+  <footer><p>© 2026 演象團隊</p></footer>
+</section>
+
+<hr>
+<!-- ============================== 日本語 ============================== -->
+<section id="ja" lang="ja">
+  <h1>プライバシーポリシー</h1>
+  <p class="meta">発効日：2026年11月3日　開発者：演象团队　お問い合わせ：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>基本方針：</strong>本アプリは「端末内でのオフライン処理とユーザーへのデータ帰属」を設計原則としています。Appleが処理するアプリ内課金（IAP）の取引証明を除き、独自のバックエンドサーバーはなく、センサー情報、カメラ映像、位置情報、部屋のスキャンデータ、間取り図をクラウドや第三者のサーバーにアップロードしません。</div>
+
+  <h2>はじめに</h2>
+  <p>「天機演象」（以下「本アプリ」）をご利用いただきありがとうございます。本アプリは演象团队（以下「当社」）が開発・運営しています。本ポリシーでは、本アプリ利用時の情報の取り扱いとお客様の権利について説明します。</p>
+
+  <h2>1. 情報と権限の利用</h2>
+  <p>本アプリは、該当機能を使用する場合にのみ、次の権限を要求します。</p>
+  <h3>モーション・方向センサー</h3>
+  <p><strong>目的：</strong>加速度計、ジャイロスコープ、磁力計のデータでコンパス、水平器、方位目盛りを動作させます。<strong>保存：</strong>端末メモリ内でリアルタイム処理し、保存や外部送信はしません。</p>
+  <h3>位置情報（使用中のみ）</h3>
+  <p><strong>目的：</strong>緯度、経度、高度を世界磁気モデル（WMM）に基づき端末内で処理し、磁気偏角、真太陽時、二十四節気を計算します。<strong>保存：</strong>端末内で計算し、位置履歴の記録や追跡は行いません。</p>
+  <h3>カメラ</h3>
+  <p><strong>目的：</strong>AR空間調査機能でのリアルタイムプレビューと空間照準にのみ使用します。<strong>保存：</strong>映像は画面およびオフスクリーン領域で処理され、録画・保存・アップロードしません。</p>
+  <h3>LiDAR / RoomPlan 部屋スキャン</h3>
+  <p><strong>目的：</strong>対応端末で、AppleのARKitとRoomPlanを使用して部屋をスキャンし、空間ジオメトリを生成します。<strong>保存：</strong>スキャンデータは端末内で処理されます。空間ファイルを書き出しまたは共有する場合、建物構造、方位、位置などの機密情報が含まれる可能性があり、共有するかどうかはお客様が決定します。</p>
+  <h3>写真</h3>
+  <p><strong>読み取り：</strong>図面や間取り写真を選択して分析できます。<strong>書き込み：</strong>生成したレポート、文化スクロール、透かし付き調査画像を写真ライブラリに保存できます。お客様が明示的に選択した画像のみにアクセスします。</p>
+  <h3>アプリ内課金（StoreKit）</h3>
+  <p><strong>目的：</strong>天機演象 年間メンバーシップ（自動更新サブスクリプション）、天機演象 プロ版（永久）、間取り図参考レポート（1回分）、透かしなし文化スクロール（1回分）の購入と復元。<strong>保存：</strong>決済情報はAppleが処理し、当社はカードや口座情報を取得できません。本アプリはApp Storeが署名した取引証明を端末内で検証し、検証済みの権利状態を端末のKeychainに保存します。</p>
+
+  <h2>2. 第三者SDKとデータ共有</h2>
+  <p>本アプリには第三者の広告・分析SDKは含まれず、広告識別子（IDFA）を収集せず、アプリやウェブサイトをまたぐ追跡も行いません。データを第三者に販売、貸与、共有することもありません。</p>
+
+  <h2>3. データの保存とセキュリティ</h2>
+  <p>間取りの草案、コンパス設定、購入状態は、端末内のiOSアプリサンドボックスと暗号化されたKeychainにのみ保存されます。アプリを削除するとiOSがサンドボックス内のデータを削除します。Keychain項目の扱いはiOSの動作によります。写真ライブラリに保存したファイルや他者に共有したファイルはお客様の管理となります。</p>
+
+  <h2>4. お客様の権利と選択</h2>
+  <ul>
+    <li><strong>権限の撤回：</strong>iOSの「設定 → プライバシーとセキュリティ」でカメラ、位置情報、写真へのアクセスをいつでもオフにできます。該当機能は使用できなくなりますが、他の機能には影響しません。</li>
+    <li><strong>データの削除：</strong>当社はサーバー上にお客様の個人データを保有しません。アプリ内で草案を削除するか、アプリを削除すると端末内のデータが消去されます。写真ライブラリ等に書き出したファイルはお客様ご自身で削除してください。</li>
+    <li><strong>お問い合わせ：</strong>データの取り扱いに関するご質問や、適用法令上の権利行使は <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a> までご連絡ください。</li>
+    <li><strong>サブスクリプション：</strong>サブスクリプション、返金、請求はAppleが処理します。「設定 → Apple ID → サブスクリプション」で管理してください。</li>
+  </ul>
+
+  <h2>5. 子どものプライバシー</h2>
+  <p>本アプリは13歳未満の子どもを対象としておらず、子どもの個人情報を意図的に収集しません。保護者の方が、お子様が情報を提供したと思われる場合はご連絡ください。</p>
+
+  <h2>6. ポリシーの変更とお問い合わせ</h2>
+  <p>本ポリシーは随時更新される場合があり、更新時は発効日を改め、アプリの更新情報または本ページで告知します。ご質問やご意見は <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a> までご連絡ください。開発者：演象团队。</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== 한국어 ============================== -->
+<section id="ko" lang="ko">
+  <h1>개인정보 처리방침</h1>
+  <p class="meta">시행일: 2026년 11월 3일　개발자: 演象团队　문의: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>핵심 원칙:</strong> 본 앱은 “기기 내 오프라인 계산, 데이터는 사용자에게 귀속”을 설계 원칙으로 합니다. Apple이 처리하는 앱 내 구매(IAP) 거래 영수증을 제외하고 자체 백엔드 서버가 없으며, 센서 데이터, 카메라 영상, 위치 정보, 방 스캔 데이터 또는 평면도를 클라우드나 제3자 서버에 업로드하지 않습니다.</div>
+
+  <h2>소개</h2>
+  <p>「천기연상」(이하 “앱”)을 이용해 주셔서 감사합니다. 앱은 演象团队(이하 “당사”)이 개발·운영합니다. 본 방침은 앱 이용 시 정보가 어떻게 처리되는지와 이용자의 권리를 설명합니다.</p>
+
+  <h2>1. 정보 및 권한 사용 안내</h2>
+  <p>앱은 해당 기능을 사용할 때만 다음 권한을 요청합니다.</p>
+  <h3>동작 및 방향 센서</h3>
+  <p><strong>용도:</strong> 가속도계, 자이로스코프, 자력계 데이터로 나침반, 수평계 및 방위 눈금을 구동합니다. <strong>저장:</strong> 기기 메모리에서 실시간 처리하며 저장하거나 외부로 전송하지 않습니다.</p>
+  <h3>위치 정보 (앱 사용 중)</h3>
+  <p><strong>용도:</strong> 위도, 경도, 고도를 세계 자기 모델(WMM)에 따라 기기 내에서 처리하여 자기 편각, 진태양시 및 절기를 계산합니다. <strong>저장:</strong> 기기 내에서만 계산하며 위치 이동 경로를 기록하거나 추적하지 않습니다.</p>
+  <h3>카메라</h3>
+  <p><strong>용도:</strong> AR 공간 측량 기능의 실시간 미리보기와 공간 조준에만 사용합니다. <strong>저장:</strong> 영상은 화면과 오프스크린 버퍼에서 실시간 처리되며 녹화, 저장 또는 업로드하지 않습니다.</p>
+  <h3>LiDAR / RoomPlan 방 스캔</h3>
+  <p><strong>용도:</strong> 지원 기기에서 Apple의 ARKit 및 RoomPlan 프레임워크로 방을 스캔하고 공간 기하 데이터를 생성합니다. <strong>저장:</strong> 스캔 데이터는 기기에서 처리됩니다. 공간 파일을 내보내거나 공유하는 경우 건물 구조, 방향, 위치 등 민감한 정보가 포함될 수 있으며 공유 여부는 사용자가 결정합니다.</p>
+  <h3>사진</h3>
+  <p><strong>읽기:</strong> 도면이나 평면도 사진을 선택하여 분석할 수 있습니다. <strong>쓰기:</strong> 생성된 보고서, 문화 두루마리 또는 워터마크가 포함된 측량 이미지를 사진 보관함에 저장할 수 있습니다. 사용자가 명시적으로 선택한 이미지에만 접근합니다.</p>
+  <h3>앱 내 구매 (StoreKit)</h3>
+  <p><strong>용도:</strong> 천기연상 연간 멤버십(자동 갱신 구독), 천기연상 프로(영구), 평면도 참고 보고서(1회), 워터마크 없는 문화 두루마리(1회)의 구매 및 복원. <strong>저장:</strong> 결제 정보는 Apple이 처리하며 당사는 카드나 계좌 정보를 확인할 수 없습니다. 앱은 App Store가 서명한 거래 영수증을 기기 내에서 검증하고 검증된 권한 상태를 기기 Keychain에 저장합니다.</p>
+
+  <h2>2. 제3자 SDK 및 데이터 공유</h2>
+  <p>앱에는 제3자 광고 또는 분석 SDK가 없으며, 광고 식별자(IDFA)를 수집하지 않고, 앱 또는 웹사이트 간 추적을 하지 않으며, 데이터를 제3자에게 판매, 대여 또는 공유하지 않습니다.</p>
+
+  <h2>3. 데이터 보관 및 보안</h2>
+  <p>평면도 초안, 사용자 지정 나침반 설정 및 구매 상태는 기기 내 iOS 앱 샌드박스와 암호화된 Keychain에만 저장됩니다. 앱을 삭제하면 iOS가 샌드박스 데이터를 제거하며, Keychain 항목의 유지 여부는 iOS 동작에 따릅니다. 사진 보관함에 저장했거나 타인에게 공유한 파일은 사용자가 직접 관리해야 합니다.</p>
+
+  <h2>4. 이용자의 권리와 선택</h2>
+  <ul>
+    <li><strong>권한 철회:</strong> iOS 설정 → 개인정보 보호 및 보안에서 카메라, 위치, 사진 권한을 언제든지 끌 수 있습니다. 해당 기능은 사용할 수 없게 되지만 다른 기능에는 영향이 없습니다.</li>
+    <li><strong>데이터 삭제:</strong> 당사는 서버에 개인 데이터를 보관하지 않습니다. 앱 내에서 초안을 삭제하거나 앱을 삭제하면 기기 내 데이터가 제거됩니다. 사진 보관함 등으로 내보낸 파일은 직접 삭제해야 합니다.</li>
+    <li><strong>문의:</strong> 데이터 처리에 관한 문의나 관련 법률상 권리 행사는 <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>으로 연락해 주세요.</li>
+    <li><strong>구독 관리:</strong> 구독, 환불 및 청구는 Apple이 처리하며 설정 → Apple ID → 구독에서 관리합니다.</li>
+  </ul>
+
+  <h2>5. 아동 개인정보 보호</h2>
+  <p>앱은 만 13세 미만 아동을 대상으로 하지 않으며 아동의 개인정보를 고의로 수집하지 않습니다. 보호자께서 아동이 정보를 제공했다고 판단되면 연락해 주세요.</p>
+
+  <h2>6. 방침 변경 및 문의</h2>
+  <p>본 방침은 수시로 업데이트될 수 있으며, 변경 시 시행일을 수정하고 앱 업데이트 안내 또는 본 페이지에 게시합니다. 문의: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>. 개발자: 演象团队.</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== ไทย ============================== -->
+<section id="th" lang="th">
+  <h1>นโยบายความเป็นส่วนตัว</h1>
+  <p class="meta">วันที่มีผลบังคับใช้: 3 พฤศจิกายน 2026 · ผู้พัฒนา: 演象团队 · ติดต่อ: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>หลักการสำคัญ:</strong> แอปออกแบบให้ทำงานบนอุปกรณ์ และข้อมูลเป็นของผู้ใช้ นอกจากใบเสร็จการซื้อในแอปที่ Apple เป็นผู้ประมวลผล แอปไม่มีเซิร์ฟเวอร์ของตนเอง และจะไม่อัปโหลดข้อมูลเซ็นเซอร์ ภาพจากกล้อง ตำแหน่ง ข้อมูลการสแกนห้อง หรือแปลนไปยังคลาวด์หรือเซิร์ฟเวอร์ของบุคคลที่สาม</div>
+
+  <h2>บทนำ</h2>
+  <p>ยินดีต้อนรับสู่ “เทียนจี หยานเซียง” (ต่อไปนี้เรียกว่า “แอป”) พัฒนาและดำเนินการโดย 演象团队 (“เรา”) นโยบายนี้อธิบายวิธีการจัดการข้อมูลเมื่อคุณใช้แอป และสิทธิ์ของคุณ</p>
+
+  <h2>1. ข้อมูลและสิทธิ์การเข้าถึง</h2>
+  <p>แอปจะขอสิทธิ์ต่อไปนี้เฉพาะเมื่อคุณใช้ฟีเจอร์ที่เกี่ยวข้อง</p>
+  <h3>เซ็นเซอร์การเคลื่อนที่และทิศทาง</h3>
+  <p><strong>การใช้งาน:</strong> ใช้ข้อมูล accelerometer, gyroscope และ magnetometer เพื่อขับเคลื่อนเข็มทิศ ระดับน้ำ และสเกลองศา <strong>การจัดเก็บ:</strong> ประมวลผลในหน่วยความจำของอุปกรณ์แบบเรียลไทม์ ไม่บันทึกและไม่ส่งออก</p>
+  <h3>ตำแหน่ง (เมื่อใช้แอป)</h3>
+  <p><strong>การใช้งาน:</strong> ใช้ละติจูด ลองจิจูด และความสูงบนอุปกรณ์ตามแบบจำลองสนามแม่เหล็กโลก (WMM) เพื่อคำนวณมุมเบี่ยงเบนแม่เหล็ก เวลาสุริยะจริง และฤดูกาลตามปฏิทินจีน <strong>การจัดเก็บ:</strong> คำนวณในเครื่องเท่านั้น เราไม่บันทึกหรือติดตามประวัติตำแหน่ง</p>
+  <h3>กล้อง</h3>
+  <p><strong>การใช้งาน:</strong> ใช้เฉพาะการแสดงภาพสดและการวางแนวเชิงพื้นที่ในฟีเจอร์สำรวจ AR <strong>การจัดเก็บ:</strong> ภาพถูกประมวลผลบนหน้าจอและบัฟเฟอร์นอกจอ เราไม่บันทึก จัดเก็บ หรืออัปโหลด</p>
+  <h3>การสแกนห้องด้วย LiDAR / RoomPlan</h3>
+  <p><strong>การใช้งาน:</strong> บนอุปกรณ์ที่รองรับ แอปใช้ ARKit และ RoomPlan ของ Apple เพื่อสแกนห้องและสร้างข้อมูลเรขาคณิตเชิงพื้นที่ <strong>การจัดเก็บ:</strong> ข้อมูลสแกนประมวลผลบนอุปกรณ์ หากคุณส่งออกหรือแชร์ไฟล์เชิงพื้นที่ ไฟล์อาจมีโครงสร้างอาคาร ทิศทาง หรือตำแหน่ง การแชร์หรือไม่เป็นการตัดสินใจของคุณ</p>
+  <h3>รูปภาพ</h3>
+  <p><strong>อ่าน:</strong> ให้คุณเลือกแบบแปลนหรือภาพผังบ้านเพื่อวิเคราะห์ <strong>เขียน:</strong> ให้คุณบันทึกรายงาน ภาพเลื่อนวัฒนธรรม หรือภาพสำรวจที่มีลายน้ำลงในคลังรูปภาพ เราเข้าถึงเฉพาะภาพที่คุณเลือกอย่างชัดเจน</p>
+  <h3>การซื้อภายในแอป (StoreKit)</h3>
+  <p><strong>การใช้งาน:</strong> ซื้อและกู้คืนสมาชิกรายปี เทียนจี หยานเซียง (ต่ออายุอัตโนมัติ) เทียนจี หยานเซียง โปร (ถาวร) รายงานอ้างอิงแปลน (ครั้งเดียว) และภาพเลื่อนวัฒนธรรมไม่มีลายน้ำ (ครั้งเดียว) <strong>การจัดเก็บ:</strong> ข้อมูลการชำระเงินจัดการโดย Apple เราไม่เห็นข้อมูลบัตรหรือบัญชีของคุณ แอปตรวจสอบใบเสร็จที่ App Store ลงชื่อไว้บนอุปกรณ์ และเก็บสถานะสิทธิ์ที่ตรวจสอบแล้วใน Keychain ของอุปกรณ์</p>
+
+  <h2>2. SDK ของบุคคลที่สามและการแบ่งปันข้อมูล</h2>
+  <p>แอปไม่มี SDK โฆษณาหรือวิเคราะห์ของบุคคลที่สาม ไม่เก็บ IDFA ไม่ติดตามข้ามแอปหรือเว็บไซต์ และไม่ขาย ให้เช่า หรือแบ่งปันข้อมูลกับบุคคลที่สาม</p>
+
+  <h2>3. การเก็บรักษาและความปลอดภัยของข้อมูล</h2>
+  <p>ฉบับร่างแปลน การตั้งค่าเข็มทิศ และสถานะการซื้อจัดเก็บเฉพาะบนอุปกรณ์ใน Sandbox ของ iOS และ Keychain ที่เข้ารหัส เมื่อลบแอป iOS จะลบข้อมูลใน Sandbox ส่วนรายการใน Keychain เป็นไปตามพฤติกรรมของ iOS ไฟล์ที่คุณบันทึกลงคลังรูปภาพหรือแชร์ให้ผู้อื่นอยู่นอกการควบคุมของแอป คุณต้องจัดการเอง</p>
+
+  <h2>4. สิทธิ์และตัวเลือกของคุณ</h2>
+  <ul>
+    <li><strong>เพิกถอนสิทธิ์:</strong> ปิดสิทธิ์กล้อง ตำแหน่ง หรือรูปภาพได้ทุกเมื่อใน การตั้งค่า iOS → ความเป็นส่วนตัวและความปลอดภัย ฟีเจอร์ที่เกี่ยวข้องจะใช้ไม่ได้ ฟีเจอร์อื่นไม่ได้รับผลกระทบ</li>
+    <li><strong>การลบข้อมูล:</strong> เราไม่เก็บข้อมูลส่วนบุคคลของคุณบนเซิร์ฟเวอร์ คุณลบฉบับร่างในแอป หรือลบแอปเพื่อล้างข้อมูลในเครื่องได้ ไฟล์ที่ส่งออกไปยังคลังรูปภาพหรือที่อื่นต้องลบด้วยตนเอง</li>
+    <li><strong>สอบถามและใช้สิทธิ์:</strong> หากมีคำถามเรื่องการจัดการข้อมูลหรือต้องการใช้สิทธิ์ตามกฎหมายที่ใช้บังคับ โปรดอีเมลถึง <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></li>
+    <li><strong>การสมัครสมาชิก:</strong> Apple จัดการเรื่องสมาชิก การคืนเงิน และการเรียกเก็บเงิน จัดการได้ที่ การตั้งค่า → Apple ID → การสมัครสมาชิก</li>
+  </ul>
+
+  <h2>5. ความเป็นส่วนตัวของเด็ก</h2>
+  <p>แอปไม่ได้มุ่งเป้าไปที่เด็กอายุต่ำกว่า 13 ปี และเราไม่เก็บข้อมูลส่วนบุคคลของเด็กโดยเจตนา หากคุณเป็นผู้ปกครองและเชื่อว่าเด็กให้ข้อมูลแก่เรา โปรดติดต่อเรา</p>
+
+  <h2>6. การเปลี่ยนแปลงนโยบายและการติดต่อ</h2>
+  <p>เราอาจปรับปรุงนโยบายนี้เป็นครั้งคราว โดยจะแก้ไขวันที่มีผลบังคับใช้และประกาศผ่านบันทึกอัปเดตของแอปหรือหน้านี้ สอบถามหรือร้องเรียน: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a> ผู้พัฒนา: 演象团队</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== Tiếng Việt ============================== -->
+<section id="vi" lang="vi">
+  <h1>Chính sách quyền riêng tư</h1>
+  <p class="meta">Ngày có hiệu lực: 3 tháng 11 năm 2026 · Nhà phát triển: 演象团队 · Liên hệ: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>Nguyên tắc cốt lõi:</strong> Ứng dụng được thiết kế để xử lý ngay trên thiết bị, dữ liệu thuộc về người dùng. Ngoài biên nhận mua hàng trong ứng dụng do Apple xử lý, ứng dụng không có máy chủ riêng và không tải dữ liệu cảm biến, hình ảnh camera, vị trí, dữ liệu quét phòng hoặc sơ đồ mặt bằng lên đám mây hay máy chủ bên thứ ba.</div>
+
+  <h2>Giới thiệu</h2>
+  <p>Chào mừng bạn đến với “Thiên Cơ Diễn Tượng” (sau đây gọi là “Ứng dụng”), do 演象团队 (“chúng tôi”) phát triển và vận hành. Chính sách này giải thích cách thông tin được xử lý khi bạn sử dụng Ứng dụng và các quyền của bạn.</p>
+
+  <h2>1. Thông tin và quyền truy cập</h2>
+  <p>Ứng dụng chỉ yêu cầu các quyền sau khi bạn sử dụng tính năng tương ứng.</p>
+  <h3>Cảm biến chuyển động và hướng</h3>
+  <p><strong>Mục đích:</strong> Dùng dữ liệu gia tốc kế, con quay hồi chuyển và từ kế để vận hành la bàn, thước thủy và thang độ. <strong>Lưu trữ:</strong> Xử lý theo thời gian thực trong bộ nhớ thiết bị, không lưu và không truyền ra ngoài.</p>
+  <h3>Vị trí (khi dùng ứng dụng)</h3>
+  <p><strong>Mục đích:</strong> Dùng vĩ độ, kinh độ và độ cao, xử lý trên thiết bị theo Mô hình Từ trường Thế giới (WMM) để tính độ lệch từ, giờ mặt trời thực và tiết khí. <strong>Lưu trữ:</strong> Chỉ tính toán cục bộ; chúng tôi không ghi lại hoặc theo dõi lịch sử vị trí.</p>
+  <h3>Camera</h3>
+  <p><strong>Mục đích:</strong> Chỉ dùng để xem trước trực tiếp và căn chỉnh không gian trong tính năng khảo sát AR. <strong>Lưu trữ:</strong> Hình ảnh được xử lý trên màn hình và bộ đệm ngoài màn hình; chúng tôi không ghi hình, lưu hoặc tải lên.</p>
+  <h3>Quét phòng bằng LiDAR / RoomPlan</h3>
+  <p><strong>Mục đích:</strong> Trên thiết bị được hỗ trợ, Ứng dụng dùng ARKit và RoomPlan của Apple để quét phòng và tạo dữ liệu hình học không gian. <strong>Lưu trữ:</strong> Dữ liệu quét được xử lý trên thiết bị. Nếu bạn xuất hoặc chia sẻ tệp không gian, tệp có thể chứa cấu trúc nhà, hướng hoặc vị trí; việc có chia sẻ hay không do bạn quyết định.</p>
+  <h3>Ảnh</h3>
+  <p><strong>Đọc:</strong> Cho phép bạn chọn bản vẽ hoặc ảnh mặt bằng để phân tích. <strong>Ghi:</strong> Cho phép lưu báo cáo, cuộn văn hóa hoặc ảnh khảo sát có hình mờ vào thư viện ảnh. Chúng tôi chỉ truy cập ảnh bạn chủ động chọn.</p>
+  <h3>Mua hàng trong ứng dụng (StoreKit)</h3>
+  <p><strong>Mục đích:</strong> Mua và khôi phục Thành viên năm Thiên Cơ Diễn Tượng (đăng ký tự động gia hạn), Thiên Cơ Diễn Tượng Pro (vĩnh viễn), Báo cáo tham khảo mặt bằng (một lần) và Cuộn văn hóa không hình mờ (một lần). <strong>Lưu trữ:</strong> Thông tin thanh toán do Apple xử lý; chúng tôi không thấy thông tin thẻ hoặc tài khoản của bạn. Ứng dụng xác minh biên nhận do App Store ký ngay trên thiết bị và lưu trạng thái quyền lợi đã xác minh trong Keychain của thiết bị.</p>
+
+  <h2>2. SDK bên thứ ba và chia sẻ dữ liệu</h2>
+  <p>Ứng dụng không chứa SDK quảng cáo hoặc phân tích của bên thứ ba, không thu thập mã nhận dạng quảng cáo (IDFA), không theo dõi xuyên ứng dụng hoặc trang web, và không bán, cho thuê hay chia sẻ dữ liệu của bạn với bên thứ ba.</p>
+
+  <h2>3. Lưu giữ và bảo mật dữ liệu</h2>
+  <p>Bản nháp mặt bằng, cài đặt la bàn tùy chỉnh và trạng thái mua hàng chỉ được lưu trên thiết bị của bạn, trong Sandbox của iOS và Keychain được mã hóa. Khi bạn xóa Ứng dụng, iOS sẽ xóa dữ liệu trong Sandbox; việc các mục Keychain có còn hay không phụ thuộc vào cách iOS hoạt động. Tệp bạn lưu vào thư viện ảnh hoặc chia sẻ cho người khác nằm ngoài Ứng dụng và do bạn tự quản lý.</p>
+
+  <h2>4. Quyền và lựa chọn của bạn</h2>
+  <ul>
+    <li><strong>Thu hồi quyền:</strong> Bạn có thể tắt quyền camera, vị trí hoặc ảnh bất cứ lúc nào trong Cài đặt iOS → Quyền riêng tư và bảo mật. Tính năng liên quan sẽ không dùng được; các tính năng khác không bị ảnh hưởng.</li>
+    <li><strong>Xóa dữ liệu:</strong> Chúng tôi không lưu dữ liệu cá nhân của bạn trên máy chủ. Hãy xóa bản nháp trong Ứng dụng hoặc xóa Ứng dụng để xóa dữ liệu cục bộ. Tệp đã xuất sang thư viện ảnh hoặc nơi khác cần do bạn tự xóa.</li>
+    <li><strong>Câu hỏi và yêu cầu:</strong> Nếu có câu hỏi về xử lý dữ liệu hoặc muốn thực hiện quyền theo pháp luật hiện hành, vui lòng gửi email đến <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>.</li>
+    <li><strong>Đăng ký:</strong> Apple xử lý đăng ký, hoàn tiền và thanh toán; hãy quản lý tại Cài đặt → Apple ID → Đăng ký.</li>
+  </ul>
+
+  <h2>5. Quyền riêng tư của trẻ em</h2>
+  <p>Ứng dụng không hướng đến trẻ em dưới 13 tuổi và chúng tôi không cố ý thu thập thông tin cá nhân của trẻ em. Nếu bạn là phụ huynh hoặc người giám hộ và cho rằng trẻ đã cung cấp thông tin, vui lòng liên hệ chúng tôi.</p>
+
+  <h2>6. Thay đổi chính sách và liên hệ</h2>
+  <p>Chúng tôi có thể cập nhật chính sách này theo thời gian; khi đó chúng tôi sẽ sửa ngày có hiệu lực và thông báo trong ghi chú cập nhật của Ứng dụng hoặc trên trang này. Câu hỏi hoặc khiếu nại: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>. Nhà phát triển: 演象团队.</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+<hr>
+<!-- ============================== Bahasa Indonesia ============================== -->
+<section id="id" lang="id">
+  <h1>Kebijakan Privasi</h1>
+  <p class="meta">Tanggal berlaku: 3 November 2026 · Pengembang: 演象团队 · Kontak: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
+  <div class="notice"><strong>Prinsip utama:</strong> Aplikasi dirancang bekerja di perangkat, dengan data milik pengguna. Selain bukti transaksi pembelian dalam aplikasi yang diproses Apple, aplikasi tidak memiliki server sendiri dan tidak mengunggah data sensor, gambar kamera, lokasi, data pemindaian ruangan, atau denah ke server cloud maupun pihak ketiga.</div>
+
+  <h2>Pendahuluan</h2>
+  <p>Selamat datang di “TianJi YanXiang” (selanjutnya disebut “Aplikasi”), dikembangkan dan dioperasikan oleh 演象团队 (“kami”). Kebijakan ini menjelaskan bagaimana informasi ditangani saat Anda menggunakan Aplikasi serta hak-hak Anda.</p>
+
+  <h2>1. Informasi dan Izin Akses</h2>
+  <p>Aplikasi hanya meminta izin berikut saat Anda menggunakan fitur terkait.</p>
+  <h3>Sensor Gerak dan Arah</h3>
+  <p><strong>Penggunaan:</strong> Data akselerometer, giroskop, dan magnetometer menggerakkan kompas, pengukur kemiringan, dan skala derajat. <strong>Penyimpanan:</strong> Diproses secara real time di memori perangkat, tidak disimpan dan tidak dikirim ke luar.</p>
+  <h3>Lokasi (Saat Aplikasi Digunakan)</h3>
+  <p><strong>Penggunaan:</strong> Lintang, bujur, dan ketinggian diproses di perangkat dengan World Magnetic Model (WMM) untuk menghitung deklinasi magnet, waktu matahari sejati, dan istilah musiman. <strong>Penyimpanan:</strong> Dihitung secara lokal; kami tidak mencatat atau melacak riwayat lokasi.</p>
+  <h3>Kamera</h3>
+  <p><strong>Penggunaan:</strong> Hanya untuk pratinjau langsung dan penyejajaran spasial pada fitur survei AR. <strong>Penyimpanan:</strong> Gambar diproses di layar dan buffer luar layar; kami tidak merekam, menyimpan, atau mengunggahnya.</p>
+  <h3>Pemindaian Ruangan LiDAR / RoomPlan</h3>
+  <p><strong>Penggunaan:</strong> Pada perangkat yang didukung, Aplikasi memakai ARKit dan RoomPlan dari Apple untuk memindai ruangan dan menghasilkan data geometri spasial. <strong>Penyimpanan:</strong> Data pemindaian diproses di perangkat. Jika Anda mengekspor atau membagikan berkas spasial, berkas dapat memuat struktur bangunan, orientasi, atau lokasi; keputusan membagikan ada pada Anda.</p>
+  <h3>Foto</h3>
+  <p><strong>Baca:</strong> Memungkinkan Anda memilih denah atau foto bangunan untuk dianalisis. <strong>Tulis:</strong> Memungkinkan Anda menyimpan laporan, gulungan budaya, atau gambar survei berwatermark ke pustaka foto. Kami hanya mengakses gambar yang Anda pilih secara eksplisit.</p>
+  <h3>Pembelian Dalam Aplikasi (StoreKit)</h3>
+  <p><strong>Penggunaan:</strong> Pembelian dan pemulihan Keanggotaan Tahunan TianJi YanXiang (langganan diperpanjang otomatis), TianJi YanXiang Pro (Seumur Hidup), Laporan Referensi Denah (sekali pakai), dan Gulungan Budaya Tanpa Watermark (sekali pakai). <strong>Penyimpanan:</strong> Data pembayaran ditangani oleh Apple; kami tidak dapat melihat informasi kartu atau akun Anda. Aplikasi memverifikasi bukti transaksi yang ditandatangani App Store secara lokal dan menyimpan status hak yang telah diverifikasi di Keychain perangkat.</p>
+
+  <h2>2. SDK Pihak Ketiga dan Berbagi Data</h2>
+  <p>Aplikasi tidak memuat SDK iklan atau analitik pihak ketiga, tidak mengumpulkan pengenal iklan (IDFA), tidak melacak lintas aplikasi atau situs web, serta tidak menjual, menyewakan, atau membagikan data Anda kepada pihak ketiga.</p>
+
+  <h2>3. Penyimpanan dan Keamanan Data</h2>
+  <p>Draf denah, pengaturan kompas, dan status pembelian hanya disimpan di perangkat Anda, dalam sandbox aplikasi iOS dan Keychain terenkripsi. Saat Aplikasi dihapus, iOS menghapus data sandbox; apakah item Keychain tetap ada bergantung pada perilaku iOS. Berkas yang Anda simpan ke pustaka foto atau bagikan kepada orang lain berada di luar Aplikasi dan menjadi tanggung jawab Anda.</p>
+
+  <h2>4. Hak dan Pilihan Anda</h2>
+  <ul>
+    <li><strong>Mencabut izin:</strong> Anda dapat mematikan izin kamera, lokasi, atau foto kapan saja di Pengaturan iOS → Privasi &amp; Keamanan. Fitur terkait tidak akan berfungsi; fitur lain tidak terpengaruh.</li>
+    <li><strong>Penghapusan data:</strong> Kami tidak menyimpan data pribadi Anda di server. Hapus draf di dalam Aplikasi, atau hapus Aplikasi untuk menghapus data lokal. Berkas yang diekspor ke pustaka foto atau tempat lain harus Anda hapus sendiri.</li>
+    <li><strong>Pertanyaan dan permintaan:</strong> Untuk pertanyaan tentang pengelolaan data atau penggunaan hak menurut hukum yang berlaku, kirim email ke <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>.</li>
+    <li><strong>Langganan:</strong> Langganan, pengembalian dana, dan tagihan ditangani oleh Apple; kelola di Pengaturan → Apple ID → Langganan.</li>
+  </ul>
+
+  <h2>5. Privasi Anak</h2>
+  <p>Aplikasi tidak ditujukan bagi anak di bawah usia 13 tahun dan kami tidak sengaja mengumpulkan data pribadi anak. Jika Anda orang tua atau wali dan yakin anak telah memberikan informasi kepada kami, silakan hubungi kami.</p>
+
+  <h2>6. Perubahan Kebijakan dan Kontak</h2>
+  <p>Kami dapat memperbarui kebijakan ini dari waktu ke waktu; kami akan mengubah tanggal berlaku dan mengumumkannya melalui catatan rilis Aplikasi atau halaman ini. Pertanyaan atau keluhan: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>. Pengembang: 演象团队.</p>
+  <footer><p>© 2026 演象团队</p></footer>
+</section>
+
+</main>
+<!-- 底部备案与合规信息 -->
+<footer id="compliance">
+  <div class="footer-container">
+    <div class="footer-brand">
+      <span class="footer-company">北京长线科技有限公司</span>
+      <span style="color: var(--border-gold, rgba(224, 189, 90, 0.35));">|</span>
+      <span>Beijing Changxian Technology Co., Ltd.</span>
     </div>
 
-    <div class="container">
-        <h1>天机演象 · 隐私保护政策 (Privacy Policy)</h1>
-        <div class="meta">生效日期 / Effective Date: 2026年10月31日 · 开发者：北京长线科技有限公司 · 邮箱：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></div>
-        <p><a href="subscription-terms.html">👉 查看《用户服务协议与自动续费订阅条款》</a></p>
-
-        <div class="highlight">
-            <strong>核心承诺：</strong>本应用采用“本地优先 (Local-First)”设计原则。不设立任何外部中心化服务器，您的传感器数据、相机画面、地理位置及房型蓝图绝不上云，不进行任何跨应用广告追踪。
-        </div>
-
-        <h2>一、我们收集的信息及权限使用</h2>
-        <h3>1. 运动与方向传感器 (CoreMotion)</h3>
-        <p>调用加速度计、陀螺仪与磁力计，用于驱动 360° 罗盘旋转与双轴太极水准球。数据仅在内存中瞬时计算，绝不上传。</p>
-
-        <h3>2. 地理位置信息 (Location - When In Use)</h3>
-        <p>用于获取经纬度与海拔，依据国际地磁模型（WMM）计算磁偏角以校正真北，并推算当地真太阳时与二十四节气。不记录用户轨迹。</p>
-
-        <h3>3. 相机权限 (Camera)</h3>
-        <p>仅在“AR实景天心透视”与“形煞立向”功能中用于实时预览与空间十字线对齐，绝不录制或上传环境画面。</p>
-
-        <h3>4. 相册访问权限 (Photo Library)</h3>
-        <p>用于导入户型蓝图进行中宫立极分析，并将生成的“天机宣纸长卷”与测算存证快照写入系统相册。</p>
-
-        <h3>5. 苹果内购交易 (Apple StoreKit)</h3>
-        <p>所有支付行为均由 Apple 官方安全通道承载，本应用仅在设备本地通过加密钥匙串校验收据有效性，不收集任何银行卡或支付凭据。</p>
-
-        <h2>二、无第三方广告与追踪</h2>
-        <p>本应用零接入第三方广告 SDK，不收集 IDFA（广告标识符），不向任何第三方数据中介出售数据。</p>
-
-        <h2>三、联系我们</h2>
-        <p>若对本隐私政策有任何疑问，请联系我们：<a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
-
-        <hr>
-
-        <h1>YanXiang Compass Privacy Policy (English)</h1>
-        <div class="meta">Effective Date: October 31, 2026 · Developer: Beijing Changxian Technology Co., Ltd. · Email: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></div>
-
-        <div class="highlight">
-            <strong>Privacy Commitment:</strong> YanXiang Compass operates strictly local-first. We do not operate external cloud servers. Your sensor streams, camera feeds, location, and floorplan drawings are never transmitted off your device.
-        </div>
-
-        <h2>1. Data Collection &amp; Permissions</h2>
-        <p>• <b>Motion &amp; Sensors:</b> Drives 360° compass heading and dual-axis spirit bubble in real-time memory.</p>
-        <p>• <b>Location Services:</b> Computes local magnetic declination (True North vs. Magnetic North) offline using the World Magnetic Model (WMM).</p>
-        <p>• <b>Camera:</b> Displays real-time optical viewfinders for AR spatial surveys. No video is recorded or streamed externally.</p>
-        <p>• <b>Photo Library:</b> Imports blueprints for centroid diagnosis and exports high-definition survey scrolls to Photos.</p>
-        <p>• <b>StoreKit In-App Purchase:</b> All financial processing is securely handled by Apple Inc.</p>
-
-        <h2>2. Third-Party Analytics &amp; Tracking</h2>
-        <p>We do not integrate third-party ad SDKs, do not collect IDFA, and do not sell data to brokers.</p>
-
-        <h2>3. Contact Information</h2>
-        <p>Inquiries: <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a></p>
-
-        <div class="footer-note">
-            <p>北京长线科技有限公司 · Beijing Changxian Technology Co., Ltd.</p>
-            <p>网站备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="icp-link">京ICP备2024080356号</a></p>
-        </div>
+    <div class="footer-links">
+      <a href="index.html#features">产品功能</a>
+      <a href="index.html#architecture">技术架构</a>
+      <a href="privacy.html">隐私保护政策</a>
+      <a href="subscription-terms.html">用户服务协议</a> · <a href="subscription-terms.html">订阅说明</a>
+      <a href="mailto:support@sdnlink.cn">技术支持与合作</a>
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">工业和信息化部政务服务平台</a>
     </div>
+
+    <div class="footer-divider"></div>
+
+    <div class="footer-compliance">
+      <p>© 2024-2026 北京长线科技有限公司 版权所有 · All Rights Reserved.</p>
+      <p>
+        网站备案号：<a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="icp-link">京ICP备2024080356号</a>
+      </p>
+      <p style="font-size: 11px; color: #586070;">
+        本站严格遵守中华人民共和国网络安全法律法规 · 纯原生计算与隐私保护践行者
+      </p>
+    </div>
+  </div>
+</footer>
 </body>
 </html>
+

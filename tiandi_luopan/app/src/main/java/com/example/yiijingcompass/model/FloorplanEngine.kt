@@ -898,6 +898,7 @@ class FloorplanEngine private constructor() {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun evaluateRoom(type: FloorplanRoomType, palaceGua: String, palaceDir: String): Quad<String, String, String, String> {
         if ((type == FloorplanRoomType.KITCHEN && palaceGua in listOf("乾", "Qian", "건", "Càn", "เฉียน"))) {
             return Quad(

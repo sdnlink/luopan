@@ -405,7 +405,6 @@ class SanHeWaterEngine private constructor() {
 
         when (lang) {
             AppLanguage.EN -> {
-                badge = "Pure Needle Auspicious"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "Facing Mountain: [$pName]. Major Taboo: Water outlet towards Kun is lethal Huangquan sha (harms descendants and fortune). Inflow from Kun brings noble blessings."
@@ -454,7 +453,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.ZH_HANT -> {
-                badge = "正針合度純清"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "向首為【$pName】。水法大忌：坤方出水為殺人大黃泉（損人丁、傷小口、敗退產業）；若坤方見來水反為催官水。"
@@ -503,7 +501,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.JA -> {
-                badge = "正針合度純清"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "向首：【$pName】。水法禁忌：坤方の出水は殺人黄泉の大煞（人命損失・破産）。坤方からの来水は逆に催官の吉水。"
@@ -552,7 +549,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.KO -> {
-                badge = "정침합도순청"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "향두: 【$pName】. 수법 대기: 곤방 출수는 살인황천대살(인명 손실, 재산 파탄). 곤방 내수는 최관수."
@@ -601,7 +597,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.VI -> {
-                badge = "Chính Châm Hợp Độ"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "Hướng thủ: 【$pName】. Đại kỵ thủy pháp: Khôn phương xuất thủy phạm Sát Nhân Hoàng Tuyền (tổn thất nhân đinh, hao tán điền sản); nếu có nước Khôn phương chảy đến lại là Thôi Quan Thủy."
@@ -650,7 +645,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.TH -> {
-                badge = "ทิศตรงระเบียบมงคล"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "ทิศหันหน้า: 【$pName】 ข้อห้ามใหญ่: น้ำไหลออกทิศคุนคือมหาเคราะห์หวงเฉวียนทำลายวงศ์ตระกูล แต่น้ำไหลเข้ากลับส่งเสริมบารมี"
@@ -699,7 +693,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             AppLanguage.ID -> {
-                badge = "Jarum Lurus Murni"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "Menghadap: [$pName]. Tabu Besar: Air keluar ke arah Kun adalah petaka Huangquan yang fatal. Aliran masuk dari Kun membawa berkah."
@@ -748,7 +741,6 @@ class SanHeWaterEngine private constructor() {
                 }
             }
             else -> {
-                badge = "正针合度纯清"
                 when (name) {
                     "庚", "丁" -> {
                         desc = "向首为【${name}山向】。水法大忌：坤方出水为杀人大黄泉（损人丁、伤小口、败退产业）；若坤方见来水反为催官水。"

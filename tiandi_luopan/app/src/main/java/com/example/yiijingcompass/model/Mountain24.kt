@@ -313,19 +313,9 @@ data class Mountain24Item(
 typealias Mountain24 = Mountain24Item
 
 /**
- * 百二十分金数据项
+ * 百二十分金数据项 (与 Fenjin120Item 统一对齐)
  */
-data class FenjinItem(
-    val mountainName: String,
-    val index: Int,              // 1..5
-    val jiaziName: String,       // 如 "丙子", "庚子"
-    val startAngle: Double,
-    val endAngle: Double,
-    val centerAngle: Double,
-    val grade: String,           // "旺相大吉", "孤虚差错", "龟甲空亡", "平稳"
-    val isAuspicious: Boolean,
-    val lore: String
-)
+typealias FenjinItem = Fenjin120Item
 
 /**
  * 空亡判定等级 (正针纯清、兼针替卦、小空亡、大空亡)
@@ -407,6 +397,8 @@ data class CompassHeadingState(
 
 class Mountain24Data private constructor() {
     val mountains: List<Mountain24Item> get() = Companion.mountains
+    fun mountain(angle: Double): Mountain24Item = resolveMountain(angle)
+    fun resolveMountain(angle: Double): Mountain24Item = Companion.resolveMountain(angle)
     companion object {
         val instance: Mountain24Data by lazy { Mountain24Data() }
         val shared: Mountain24Data get() = instance
@@ -438,6 +430,7 @@ class Mountain24Data private constructor() {
             Mountain24Item(23, "亥", "Hai", 330.0, "水", "乾", "人元龙", +1)
         )
 
+        fun mountain(angle: Double): Mountain24Item = resolveMountain(angle)
         fun find(angle: Double): Mountain24Item = resolveMountain(angle)
         fun find(name: String): Mountain24Item? = mountains.firstOrNull { it.name == name }
 
@@ -456,26 +449,7 @@ class Mountain24Data private constructor() {
         }
 
         fun resolveFenjin(angle: Double): FenjinItem {
-            val norm = (angle % 360.0 + 360.0) % 360.0
-            val mountain = resolveMountain(norm)
-            val relAngle = (norm - (mountain.angleCenter - 7.5) + 360.0) % 360.0
-            val idx = (relAngle / 3.0).toInt().coerceIn(0, 4)
-
-            val grades = arrayOf("孤虚差错", "平稳", "旺相大吉", "平稳", "龟甲空亡")
-            val isAusp = (idx == 2)
-            val jiazi = "${mountain.name}${idx + 1}"
-
-            return FenjinItem(
-                mountainName = mountain.name,
-                index = idx + 1,
-                jiaziName = jiazi,
-                startAngle = (mountain.angleCenter - 7.5 + idx * 3.0) % 360.0,
-                endAngle = (mountain.angleCenter - 7.5 + (idx + 1) * 3.0) % 360.0,
-                centerAngle = (mountain.angleCenter - 7.5 + idx * 3.0 + 1.5) % 360.0,
-                grade = grades[idx],
-                isAuspicious = isAusp,
-                lore = if (isAusp) "正针旺相，催贵显达" else "退财受制，宜避用"
-            )
+            return Fenjin120Data.instance.resolveFenjin(angle)
         }
     }
 

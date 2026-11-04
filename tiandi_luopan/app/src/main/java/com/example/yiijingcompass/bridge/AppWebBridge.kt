@@ -185,8 +185,10 @@ class AppWebBridge(
             for (f in list) {
                 arr.put(JSONObject().apply {
                     put("mountainName", f.mountainName)
+                    put("localizedMountainName", f.localizedMountainName)
                     put("index", f.index)
                     put("jiaziName", f.jiaziName)
+                    put("localizedJiaziName", f.localizedJiaziName)
                     put("startAngle", f.startAngle)
                     put("endAngle", f.endAngle)
                     put("centerAngle", f.centerAngle)
@@ -241,22 +243,39 @@ class AppWebBridge(
         val obj = JSONObject().apply {
             put("heading", motion.heading)
             put("sittingMountain", state.sittingMountain.name)
+            put("sittingMountainLocalized", state.sittingMountain.localizedName)
+            put("sittingPalace", state.sittingMountain.palace)
+            put("sittingPalaceLocalized", state.sittingMountain.localizedPalace)
             put("facingMountain", state.facingMountain.name)
+            put("facingMountainLocalized", state.facingMountain.localizedName)
+            put("facingPalace", state.facingMountain.palace)
+            put("facingPalaceLocalized", state.facingMountain.localizedPalace)
             put("facingFenjin", JSONObject().apply {
                 put("jiaziName", state.facingFenjin.jiaziName)
+                put("localizedJiaziName", state.facingFenjin.localizedJiaziName)
                 put("grade", state.facingFenjin.grade)
+                put("localizedGrade", state.facingFenjin.localizedGrade)
                 put("centerAngle", state.facingFenjin.centerAngle)
                 put("isAuspicious", state.facingFenjin.isAuspicious)
                 put("lore", state.facingFenjin.lore)
+                put("localizedLore", state.facingFenjin.localizedLore)
             })
             put("kongWangLevel", state.kongWangLevel.name)
-            put("kongWangDesc", state.kongWangLevel.description)
+            put("kongWangTitle", state.kongWangLevel.localizedTitle)
+            put("kongWangDesc", state.kongWangLevel.localizedDescription)
             val hex = Hexagram64Data.instance.hexagram(motion.heading)
             put("hexagram", JSONObject().apply {
                 put("name", hex.name)
+                put("localizedName", hex.localizedName)
                 put("luckDegree", hex.luckDegree)
+                put("localizedLuckDegree", hex.localizedLuckDegree)
                 put("fenJinDetail", hex.fenJinDetail)
+                put("localizedFenJinDetail", hex.localizedFenJinDetail)
                 put("elementNumber", hex.elementNumber)
+                put("upperTrigram", hex.upperTrigram)
+                put("lowerTrigram", hex.lowerTrigram)
+                put("localizedUpperTrigram", hex.localizedUpperTrigram)
+                put("localizedLowerTrigram", hex.localizedLowerTrigram)
             })
         }
         return obj.toString()
@@ -608,7 +627,6 @@ class AppWebBridge(
     @JavascriptInterface
     fun generateAndSaveTianJiScroll(): Boolean {
         return try {
-            val shaRep = ShaSurveyStore.instance.createReport(motion.heading)
             val sampleRooms = FloorplanEngine.instance.generateSampleRooms()
             val centroid = FloorplanEngine.instance.computeCentroid(sampleRooms)
             val audited = FloorplanEngine.instance.auditFloorplan(sampleRooms, centroid, motion.heading)
@@ -619,13 +637,15 @@ class AppWebBridge(
                 coordsDesc = motion.coordsDesc,
                 solarTimeDesc = "${SolarTimeCalculator.instance.calculate(Date(), motion.longitude).trueSolarTimeString} (${SolarTimeCalculator.instance.solarTermName()})",
                 floorplanReport = audited.second,
-                shaReport = shaRep
+                panoramaArchive = ShaSurveyStore.instance.archive,
+                isPro = UserEntitlementsManager.instance.isVip,
+                language = LocalizationManager.instance.effectiveLanguage
             )
-            val saved = TianJiShuEngine.instance.saveToGallery(activity, bmp)
+            val feedback = TianJiShuEngine.instance.saveToGalleryWithFeedback(activity, bmp)
             activity.runOnUiThread {
-                Toast.makeText(activity, if (saved) "福宅长卷已成功保存至系统相册！" else "保存失败，请检查相册存储权限", Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, feedback.second, Toast.LENGTH_LONG).show()
             }
-            saved
+            feedback.first
         } catch (e: Exception) {
             e.printStackTrace()
             false

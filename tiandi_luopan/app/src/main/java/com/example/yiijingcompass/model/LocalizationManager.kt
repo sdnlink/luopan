@@ -20,6 +20,7 @@ enum class AppLanguage(val rawValue: String, val displayName: String) {
 class LocalizationManager private constructor() {
     companion object {
         val instance: LocalizationManager by lazy { LocalizationManager() }
+        val shared: LocalizationManager get() = instance
         private const val PREFS_NAME = "tianji_localization"
         private const val KEY_LANGUAGE = "app_language"
     }

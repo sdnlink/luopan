@@ -16,6 +16,140 @@ data class HexagramItem(
 ) {
     val isGreatAuspicious: Boolean get() = luckDegree == "大吉"
 
+    val localizedLuckDegree: String
+        get() = when (LocalizationManager.shared.effectiveLanguage) {
+            AppLanguage.AUTO, AppLanguage.ZH_HANS, AppLanguage.ZH_HANT -> luckDegree
+            AppLanguage.EN -> when (luckDegree) {
+                "大吉" -> "Great Auspicious"
+                "中吉" -> "Auspicious"
+                "慎用" -> "Use with Care"
+                else -> "Neutral"
+            }
+            AppLanguage.JA -> when (luckDegree) {
+                "大吉" -> "大吉"
+                "中吉" -> "中吉"
+                "慎用" -> "慎用"
+                else -> "平"
+            }
+            AppLanguage.KO -> when (luckDegree) {
+                "大吉" -> "대길 (大吉)"
+                "中吉" -> "중길 (中吉)"
+                "慎用" -> "신용 (慎用)"
+                else -> "평 (平)"
+            }
+            AppLanguage.VI -> when (luckDegree) {
+                "大吉" -> "Đại Cát"
+                "中吉" -> "Trung Cát"
+                "慎用" -> "Thận Dụng"
+                else -> "Bình"
+            }
+            AppLanguage.TH -> when (luckDegree) {
+                "大吉" -> "มหามงคล"
+                "中吉" -> "มงคลปานกลาง"
+                "慎用" -> "ควรระวัง"
+                else -> "ปานกลาง"
+            }
+            AppLanguage.ID -> when (luckDegree) {
+                "大吉" -> "Sangat Baik"
+                "中吉" -> "Cukup Baik"
+                "慎用" -> "Hati-hati"
+                else -> "Netral"
+            }
+        }
+
+    val localizedUpperTrigram: String get() = localizeTrigram(upperTrigram)
+    val localizedLowerTrigram: String get() = localizeTrigram(lowerTrigram)
+
+    private fun localizeTrigram(tri: String): String {
+        val lang = LocalizationManager.shared.effectiveLanguage
+        return when (lang) {
+            AppLanguage.AUTO, AppLanguage.ZH_HANS -> tri
+            AppLanguage.ZH_HANT -> tri.replace("离", "離").replace("兑", "兌")
+            AppLanguage.JA -> mapOf("坤" to "坤 (天)", "艮" to "艮 (山)", "坎" to "坎 (水)", "巽" to "巽 (風)", "震" to "震 (雷)", "离" to "離 (火)", "兑" to "兌 (沢)", "乾" to "乾 (天)")[tri] ?: tri
+            AppLanguage.KO -> mapOf("坤" to "곤 (坤)", "艮" to "간 (艮)", "坎" to "감 (坎)", "巽" to "손 (巽)", "震" to "진 (震)", "离" to "이 (離)", "兑" to "태 (兌)", "乾" to "건 (乾)")[tri] ?: tri
+            AppLanguage.VI -> mapOf("坤" to "Khôn", "艮" to "Cấn", "坎" to "Khảm", "巽" to "Tốn", "震" to "Chấn", "离" to "Ly", "兑" to "Đoài", "乾" to "Càn")[tri] ?: tri
+            AppLanguage.EN -> mapOf("坤" to "Kun (Earth)", "艮" to "Gen (Mountain)", "坎" to "Kan (Water)", "巽" to "Xun (Wind)", "震" to "Zhen (Thunder)", "离" to "Li (Fire)", "兑" to "Dui (Lake)", "乾" to "Qian (Heaven)")[tri] ?: tri
+            AppLanguage.TH -> mapOf("坤" to "คุน (ดิน)", "艮" to "เกิ้น (ภูเขา)", "坎" to "ข่าน (น้ำ)", "巽" to "ซวิ่น (ลม)", "震" to "เจิ้น (ฟ้าร้อง)", "离" to "หลี (ไฟ)", "兑" to "ตุ้ย (หนองน้ำ)", "乾" to "เฉียน (ฟ้า)")[tri] ?: tri
+            AppLanguage.ID -> mapOf("坤" to "Kun (Bumi)", "艮" to "Gen (Gunung)", "坎" to "Kan (Air)", "巽" to "Xun (Angin)", "震" to "Zhen (Petir)", "离" to "Li (Api)", "兑" to "Dui (Danau)", "乾" to "Qian (Langit)")[tri] ?: tri
+        }
+    }
+
+    val localizedFenJinDetail: String
+        get() = baseLocalizedFenJinDetail + "\n\n" + classicalSourceNote
+
+    private val baseLocalizedFenJinDetail: String
+        get() {
+            val lang = LocalizationManager.shared.effectiveLanguage
+            return when (lang) {
+                AppLanguage.AUTO, AppLanguage.ZH_HANS -> fenJinDetail
+                AppLanguage.ZH_HANT -> fenJinDetail
+                    .replace("财", "財")
+                    .replace("两", "兩")
+                    .replace("气", "氣")
+                    .replace("进", "進")
+                    .replace("关", "關")
+                    .replace("发", "發")
+                    .replace("变", "變")
+                    .replace("换", "換")
+                    .replace("煞", "煞")
+                AppLanguage.EN -> {
+                    if (fenJinDetail.contains("旺相得令")) "Flourishing and in season · Auspicious for family & wealth · Pure Qi reception"
+                    else if (fenJinDetail.contains("合十通关")) "Harmonious combination of Ten · Boosts scholarship and noble status"
+                    else if (fenJinDetail.contains("平常平和")) "Balanced and peaceful · Better quiet than active · Steady growth"
+                    else "Isolated void line · Empty clash · Adjustment recommended"
+                }
+                AppLanguage.JA -> {
+                    if (fenJinDetail.contains("旺相得令")) "旺相得令 · 人丁財運ともに盛ん · 気場純清"
+                    else if (fenJinDetail.contains("合十通关")) "合十通関 · 学問出世を促す"
+                    else if (fenJinDetail.contains("平常平和")) "平常平和 · 静寂を尊び平穏に発展"
+                    else "孤虚煞 · 空亡差錯 · 爻象変換による化解が必要"
+                }
+                AppLanguage.KO -> {
+                    if (fenJinDetail.contains("旺相得令")) "왕상득령 · 인정과 재물이 모두 번창 · 순청한 기 수용"
+                    else if (fenJinDetail.contains("合十通关")) "합십통관 · 문창 학업과 관운 성취"
+                    else if (fenJinDetail.contains("平常平和")) "평상평화 · 동하는 것보다 정함이 길 · 평온한 발전"
+                    else "고허출살 · 공망착오 · 효상 전환으로 화해 필요"
+                }
+                AppLanguage.VI -> {
+                    if (fenJinDetail.contains("旺相得令")) "Vượng tướng đắc lệnh · Đinh tài lưỡng vượng · Nạp khí thuần thanh"
+                    else if (fenJinDetail.contains("合十通关")) "Hợp thập thông quan · Văn Xương hiển quý · Thúc quan sinh quý"
+                    else if (fenJinDetail.contains("平常平和")) "Bình thường bình hòa · Nên tĩnh không nên động · Phát triển ổn định"
+                    else "Cô hư xuất sát · Không vong sai thác · Cần trừu hào hoán tượng hóa giải"
+                }
+                AppLanguage.TH -> {
+                    if (fenJinDetail.contains("旺相得令")) "เจริญรุ่งเรืองตามฤดูกาล · ทรัพย์และบริวารสมบูรณ์ · รับพลังงานบริสุทธิ์"
+                    else if (fenJinDetail.contains("合十通关")) "รวมสิบประสานพลัง · เจริญก้าวหน้าทางวิชาการและยศศักดิ์"
+                    else if (fenJinDetail.contains("平常平和")) "ราบเรียบสงบสุข · ควรสงบมากกว่าเคลื่อนไหว · พัฒนาอย่างมั่นคง"
+                    else "พลังโดดเดี่ยวว่างเปล่าปะทะ · ข้อผิดพลาดความว่างเปล่า · ต้องปรับเปลี่ยนเส้นพลังแก้ไข"
+                }
+                AppLanguage.ID -> {
+                    if (fenJinDetail.contains("旺相得令")) "Makmur dan beruntung · Keturunan & rezeki melimpah · Energi murni seimbang"
+                    else if (fenJinDetail.contains("合十通关")) "Harmonis selaras sepuluh · Kejayaan akademis & karir meningkat"
+                    else if (fenJinDetail.contains("平常平和")) "Biasa dan tenang · Lebih baik diam daripada bergerak · Berkembang stabil"
+                    else "Energi sha terasing · Garis kekosongan keliru · Perlu perbaikan transformasi garis"
+                }
+            }
+        }
+
+    val classicalSourceNote: String
+        get() {
+            val isProsperityLine = fenJinDetail.contains("旺相得令")
+            val sourceEn = if (isProsperityLine) "Book of Changes (Zhou Yi), Tai hexagram judgment, ‘Small go, great come; good fortune and success.’"
+            else "the original judgment of this hexagram in the Book of Changes (Zhou Yi)"
+            val sourceHans = if (isProsperityLine) "《周易·泰卦》卦辞：“小往大来，吉亨。”" else "《周易》本卦卦辞"
+            val sourceHant = if (isProsperityLine) "《周易·泰卦》卦辭：「小往大來，吉亨。」" else "《周易》本卦卦辭"
+            return when (LocalizationManager.shared.effectiveLanguage) {
+                AppLanguage.EN -> "Classical source: $sourceEn Interpretation: the prosperity, health and wealth wording is a traditional symbolic reading of the hexagram; it is not a medical, financial or outcome guarantee."
+                AppLanguage.ZH_HANT -> "古籍出處：$sourceHant 解釋：文中興盛、健康與財帛語句是卦象的傳統文化解讀，不是醫療診斷、財務建議或結果保證。"
+                AppLanguage.JA -> "出典：『周易』泰卦の卦辞「小往き大来たる。吉にして亨る」。解釈：繁栄・健康・財に関する表現は卦象の伝統的な象徴解釈であり、医学的診断、金融助言、結果の保証ではありません。"
+                AppLanguage.KO -> "출처: 《주역》 태괘 괘사 ‘소왕대래, 길하고 형통하다’. 해석: 번영·건강·재물 표현은 괘상의 전통적 상징 해석이며 의학적 진단, 재무 조언 또는 결과 보장이 아닙니다."
+                AppLanguage.VI -> "Nguồn cổ: quẻ Thái trong Kinh Dịch, quái từ ‘Tiểu vãng đại lai, cát hanh’. Giải thích: các từ về hưng thịnh, sức khỏe và tài lộc là cách đọc biểu tượng truyền thống của quẻ, không phải chẩn đoán y khoa, tư vấn tài chính hay bảo đảm kết quả."
+                AppLanguage.TH -> "ที่มาโบราณ: คำตัดสินของกว้าไท่ในคัมภีร์โจวอี้ ‘สิ่งเล็กไป สิ่งใหญ่มา เป็นมงคลและราบรื่น’ คำอธิบาย: ถ้อยคำเรื่องความรุ่งเรือง สุขภาพ และทรัพย์สินเป็นการตีความเชิงสัญลักษณ์แบบดั้งเดิม ไม่ใช่การวินิจฉัย คำแนะนำทางการเงิน หรือการรับประกันผล"
+                AppLanguage.ID -> "Sumber klasik: keputusan heksagram Tai dalam Kitab Perubahan, ‘Yang kecil pergi, yang besar datang; keberuntungan dan kelancaran.’ Penjelasan: ungkapan kemakmuran, kesehatan, dan rezeki adalah tafsir simbolik tradisional, bukan diagnosis medis, nasihat keuangan, atau jaminan hasil."
+                AppLanguage.AUTO, AppLanguage.ZH_HANS -> "古籍出处：$sourceHans 解释：文中兴盛、健康与财帛语句是卦象的传统文化解读，不是医疗诊断、财务建议或结果保证。"
+            }
+        }
+
     val localizedName: String
         get() {
             val language = LocalizationManager.instance.effectiveLanguage
@@ -196,6 +330,7 @@ data class HexagramItem(
 class Hexagram64Data private constructor() {
     companion object {
         val instance: Hexagram64Data by lazy { Hexagram64Data() }
+        val shared: Hexagram64Data get() = instance
     }
 
     val hexagrams: List<HexagramItem>

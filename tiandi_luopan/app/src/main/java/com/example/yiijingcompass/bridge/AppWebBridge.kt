@@ -279,24 +279,33 @@ class AppWebBridge(
             put("sittingMountain", chart.sittingMountain)
             put("facingMountain", chart.facingMountain)
             put("patternType", chart.patternType)
+            put("patternDesc", chart.patternDesc)
+            put("chartModeTitle", chart.chartModeTitle)
             put("isSanBanGua", chart.isSanBanGua)
             put("isQiXingDaJie", chart.isQiXingDaJie)
             put("isTiGua", chart.isTiGua)
             put("summaryAnalysis", chart.summaryAnalysis)
+            put("wealthAdvice", chart.wealthAdvice)
+            put("healthAdvice", chart.healthAdvice)
+            put("remedyAdvice", chart.remedyAdvice)
             val palacesArr = JSONArray()
             for (p in chart.palaces) {
                 palacesArr.put(JSONObject().apply {
                     put("id", p.id)
                     put("palaceName", p.palaceName)
+                    put("localizedPalaceName", p.localizedPalaceName)
                     put("direction", p.direction)
                     put("periodStar", p.periodStar)
                     put("mountainStar", p.mountainStar)
                     put("facingStar", p.facingStar)
+                    put("element", p.element)
+                    put("localizedElement", p.localizedElement)
                     put("isWangMountain", p.isWangMountain)
                     put("isWangFacing", p.isWangFacing)
                     put("isShaWuHuang", p.isShaWuHuang)
                     put("isShaErHei", p.isShaErHei)
                     put("evaluation", p.baseEvaluation)
+                    put("localizedEvaluation", p.localizedEvaluation)
                 })
             }
             put("palaces", palacesArr)
@@ -378,10 +387,14 @@ class AppWebBridge(
                 cellsArr.put(JSONObject().apply {
                     put("id", c.id)
                     put("palaceName", c.palaceName)
+                    put("localizedPalaceName", c.localizedPalaceName)
                     put("direction", c.direction)
                     put("doorName", c.doorName)
+                    put("localizedDoorName", c.localizedDoorName)
                     put("starName", c.starName)
+                    put("localizedStarName", c.localizedStarName)
                     put("godName", c.godName)
+                    put("localizedGodName", c.localizedGodName)
                     put("tianPanGan", c.tianPanGan)
                     put("diPanGan", c.diPanGan)
                     put("isAuspicious", c.isAuspicious)
@@ -402,13 +415,14 @@ class AppWebBridge(
         for (item in list) {
             arr.put(JSONObject().apply {
                 put("id", item.id)
-                put("name", item.name)
-                put("aliases", item.aliases)
-                put("visualFeature", item.visualFeature)
-                put("metaphysicsHarm", item.metaphysicsHarm)
+                put("name", item.localizedName)
+                put("aliases", item.localizedAliases)
+                put("visualFeature", item.localizedVisualFeature)
+                put("metaphysicsHarm", item.localizedMetaphysicsHarm)
                 put("severity", item.severity.name)
-                put("classicalText", item.classicalText)
-                put("remedySolution", item.remedySolution)
+                put("severityTitle", item.severity.localizedTitle)
+                put("classicalText", item.localizedClassicalText)
+                put("remedySolution", item.localizedRemedySolution)
             })
         }
         return arr.toString()
@@ -722,5 +736,112 @@ class AppWebBridge(
     fun t(key: String): String {
         return LocalizationManager.instance.t(key)
     }
-}
 
+    @JavascriptInterface
+    fun saveImageToGallery(base64Data: String): Boolean {
+        return try {
+            val cleanBase64 = if (base64Data.contains(",")) base64Data.substringAfter(",") else base64Data
+            val bytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return false
+            TianJiShuEngine.instance.saveToGallery(activity, bitmap)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun refreshLocation() {
+        activity.runOnUiThread {
+            (activity as? com.example.yiijingcompass.MainActivity)?.checkAndRequestLocation()
+                ?: motion.start(activity)
+        }
+    }
+
+    @JavascriptInterface
+    fun hasCameraPermission(): Boolean {
+        return androidx.core.content.ContextCompat.checkSelfPermission(
+            activity,
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }
+
+    @JavascriptInterface
+    fun requestCameraPermission() {
+        activity.runOnUiThread {
+            (activity as? com.example.yiijingcompass.MainActivity)?.checkAndRequestCamera()
+        }
+    }
+
+    @JavascriptInterface
+    fun calculateSanHeWaterJson(sittingName: String, facingName: String): String {
+        return try {
+            val mList = Mountain24Data.instance.mountains
+            val sitting = mList.firstOrNull { it.name == sittingName } ?: mList[1]
+            val facing = mList.firstOrNull { it.name == facingName } ?: mList[13]
+            val hq = SanHeWaterEngine.instance.resolveHuangQuanWater(facing)
+            val bs = SanHeWaterEngine.instance.resolveBaSha(sitting)
+            val waterMethods = SanHeWaterEngine.instance.resolveWaterMethod(sitting, facing)
+
+            val arr = JSONArray()
+            for (w in waterMethods) {
+                arr.put(JSONObject().apply {
+                    put("mountainName", w.mountainName)
+                    put("localizedMountainName", w.localizedMountainName)
+                    put("phase", w.phase.rawValue)
+                    put("phaseName", w.phase.localizedName)
+                    put("isAuspicious", w.isAuspicious)
+                    put("lore", w.lore)
+                })
+            }
+
+            JSONObject().apply {
+                put("sitting", sitting.name)
+                put("facing", facing.name)
+                put("huangQuan", JSONObject().apply {
+                    put("isDanger", hq.isDanger)
+                    put("isJiuPin", hq.isJiuPin)
+                    put("badgeText", hq.badgeText)
+                    put("waterDesc", hq.waterDesc)
+                    put("quote", hq.localizedQuote)
+                })
+                put("baSha", JSONObject().apply {
+                    put("sittingPalace", bs.sittingPalace)
+                    put("shaZhi", bs.shaZhi)
+                    put("shaDir", bs.localizedShaDir)
+                    put("lore", bs.lore)
+                    put("remedy", bs.remedy)
+                    put("song", bs.localizedSong)
+                    put("xiaoShaRule", bs.localizedXiaoShaRule)
+                })
+                put("waterMethods", arr)
+            }.toString()
+        } catch (e: Exception) {
+            "{}"
+        }
+    }
+
+    @JavascriptInterface
+    fun calculateZeRiJson(sittingName: String, dateMillis: Long): String {
+        return try {
+            val mList = Mountain24Data.instance.mountains
+            val sitting = mList.firstOrNull { it.name == sittingName } ?: mList[1]
+            val date = if (dateMillis > 0) Date(dateMillis) else Date()
+            val analysis = ZeRiEngine.instance.analyze(sitting, date)
+
+            JSONObject().apply {
+                put("fourPillars", analysis.fourPillarsText)
+                put("overallStatus", analysis.overallStatus)
+                put("isAuspicious", analysis.isAuspicious)
+                put("suiPoWarning", analysis.suiPoWarning ?: "")
+                put("yuePoWarning", analysis.yuePoWarning ?: "")
+                put("sittingClashWarning", analysis.sittingClashWarning ?: "")
+                put("detailsText", analysis.detailsText)
+                put("yiList", JSONArray(analysis.yiActivities))
+                put("jiList", JSONArray(analysis.jiActivities))
+            }.toString()
+        } catch (e: Exception) {
+            "{}"
+        }
+    }
+}

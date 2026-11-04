@@ -588,6 +588,15 @@
             text-align: center;
         }
 
+        .footer-logo {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            object-fit: cover;
+            vertical-align: middle;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
         .footer-brand {
             display: flex;
             align-items: center;
@@ -809,7 +818,16 @@
             .footer-container {
                 gap: 18px;
             }
-            .footer-brand {
+            .footer-logo {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            object-fit: cover;
+            vertical-align: middle;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .footer-brand {
                 flex-direction: column;
                 gap: 4px;
             }
@@ -1042,6 +1060,7 @@
     <footer id="compliance">
         <div class="footer-container">
             <div class="footer-brand">
+                <img src="assets/icon.png" alt="天机演象 图标" class="footer-logo">
                 <span class="footer-company">北京长线科技有限公司</span>
                 <span style="color: var(--border-gold);">|</span>
                 <span>Beijing Changxian Technology Co., Ltd.</span>

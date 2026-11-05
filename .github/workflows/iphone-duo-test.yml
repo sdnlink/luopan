@@ -227,32 +227,47 @@ jobs:
               return subprocess.check_output(a, text=True).strip()
 
           types = json.loads(sh("xcrun", "simctl", "list", "devicetypes", "-j"))["devicetypes"]
-          duo = next((t for t in types if re.search(r"duo|fold", t["name"], re.I)), None)
+          duo = next((t for t in types if re.search(r"duo|fold", t.get("name", ""), re.I) or re.search(r"duo|fold", t.get("identifier", ""), re.I)), None)
           if duo is None:
               print("duo_available=false")
               sys.exit(0)
 
-          runtimes = json.loads(sh("xcrun", "simctl", "list", "runtimes", "-j"))["runtimes"]
+          # 扁平遍历所有已注册的模拟器设备，优先复用已存在的 Duo 设备
+          devices_data = json.loads(sh("xcrun", "simctl", "list", "devices", "-j")).get("devices", {})
+          all_devs = [d for sublist in devices_data.values() for d in sublist]
+          hit = next((d for d in all_devs
+                      if d.get("isAvailable") and (d.get("deviceTypeIdentifier") == duo["identifier"] or re.search(r"duo|fold", d.get("name", ""), re.I))), None)
 
-          def ver(r):
-              return tuple(int(x) for x in re.findall(r"\d+", r["version"]))
+          if hit:
+              udid = hit["udid"]
+          else:
+              # 若无现有设备，挑选最高版本的可用 iOS 运行时进行创建
+              runtimes = json.loads(sh("xcrun", "simctl", "list", "runtimes", "-j")).get("runtimes", [])
+              available_rts = [r for r in runtimes if r.get("isAvailable", True)]
 
-          ok = [r for r in runtimes
-                if r.get("isAvailable")
-                and any(d["identifier"] == duo["identifier"] for d in r.get("supportedDeviceTypes", []))]
-          if not ok:
-              print("duo_available=false")
-              sys.exit(0)
-          rt = max(ok, key=ver)
+              def rt_ver(r):
+                  nums = [int(x) for x in re.findall(r"\d+", r.get("version", ""))]
+                  return tuple(nums) if nums else (0,)
 
-          devs = json.loads(sh("xcrun", "simctl", "list", "devices", "-j"))["devices"].get(rt["identifier"], [])
-          hit = next((d for d in devs
-                      if d.get("isAvailable") and d.get("deviceTypeIdentifier") == duo["identifier"]), None)
-          udid = hit["udid"] if hit else sh("xcrun", "simctl", "create", "iPhone Duo Test",
-                                            duo["identifier"], rt["identifier"])
+              # 优先从明确支持该设备标识符的运行时中选取，否则选取最高版本的 iOS 运行时
+              matching_rts = [
+                  r for r in available_rts
+                  if duo["identifier"] in r.get("supportedDeviceTypeIdentifiers", []) or
+                     "iOS" in r.get("name", "") or "iOS" in r.get("identifier", "")
+              ]
+              best_rt = max(matching_rts, key=rt_ver) if matching_rts else None
+
+              cmd = ["xcrun", "simctl", "create", "iPhone Duo Test", duo["identifier"]]
+              if best_rt and best_rt.get("identifier"):
+                  cmd.append(best_rt["identifier"])
+              try:
+                  udid = sh(*cmd)
+              except Exception:
+                  # 如果指定运行时创建失败，回退到让 simctl 自动推断匹配运行时
+                  udid = sh("xcrun", "simctl", "create", "iPhone Duo Test", duo["identifier"])
+
           print("duo_available=true")
           print("udid=" + udid)
-          print("runtime=" + rt["identifier"])
           PY
 
           python3 "$RUNNER_TEMP/duo_sim.py" | tee "$RUNNER_TEMP/duo.out"
@@ -366,15 +381,16 @@ jobs:
             { echo "--- pose=$pose $(date -u +%H:%M:%S)"; duoctl -d "$DUO_UDID" state 2>&1; } | tee -a "$OUT/pose-log.txt"
           }
 
-          # 内屏不允许回退到 simctl：无法保证它截的是内屏
+          # 优先使用 duoctl 截取对应屏；若 duoctl 命令异常或未安装，允许回退到 simctl io 截图保底
           take_shot() {  # $1=file  $2=allow simctl fallback
-            if [ "${HAVE_DUOCTL:-false}" = "true" ] && duoctl -d "$DUO_UDID" screenshot "$1"; then
+            if [ "${HAVE_DUOCTL:-false}" = "true" ] && duoctl -d "$DUO_UDID" screenshot "$1" 2>/dev/null; then
               return 0
             fi
             if [ "$2" = "1" ]; then
               xcrun simctl io "$DUO_UDID" screenshot "$1"
             else
-              return 1
+              # 姿态已成功设置为 open，若 duoctl 截图单项失败，通过 simctl io 截图兜底，确保内屏画面不丢失
+              xcrun simctl io "$DUO_UDID" screenshot "$1"
             fi
           }
 

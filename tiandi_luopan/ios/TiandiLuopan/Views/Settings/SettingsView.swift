@@ -41,6 +41,7 @@ private enum LegalDocument: String, Identifiable {
 public struct SettingsView: View {
     public var isActive: Bool = true
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -328,8 +329,9 @@ public struct SettingsView: View {
             // 以上（阅读距离过长）；iPhone 宽度远小于上限，行为完全不变。
             // 外层全宽 frame 铺与 InsetGroupedList 分组背景一致的底色
             //（App 固定 dark，systemGroupedBackground == black），
-            // 避免 700pt 之外露出不同底色形成色块。
-            .frame(maxWidth: 700)
+            // 避免内容宽度之外露出不同底色形成色块。
+            // regular（iPad）放宽到 900pt：700pt 在 1032pt 竖屏上两侧留白过大。
+            .frame(maxWidth: horizontalSizeClass == .regular ? 900 : 700)
             .frame(maxWidth: .infinity)
             .background(Color.black.ignoresSafeArea())
             .navigationBarTitle(lang.t("tab_settings"), displayMode: .inline)

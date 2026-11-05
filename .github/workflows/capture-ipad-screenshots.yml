@@ -22,11 +22,23 @@ on:
 permissions:
   contents: read
 
+# 本 workflow 是 iPad 截图的唯一入口，覆盖两组：
+#   ① 竖屏单列：8 语言 × 5 Tab（语言由 target_language 选择）
+#   ② 横屏左右双栏：英文 5 Tab，--rotate-landscape 真旋转优先，
+#      失败回退 -forceLandscapeLayout；渲染模式写入 GITHUB_OUTPUT / Step Summary。
+# 两组分别做张数 + 白屏校验，任一失败 CI 变红，避免白屏/半套截图假绿。
+#
+# 与 iphone-duo-test / build-ios 共用自托管 xcode-27 runner，且脚本复用同一个 iPad UDID。
+# 不互斥时一个 job 的 simctl shutdown 会关掉另一个 job 正在截图的设备 → 白屏/黑屏。
+concurrency:
+  group: ios-simulator-${{ github.repository }}
+  cancel-in-progress: false
+
 jobs:
   capture-ipad-screenshots:
-    name: Auto Capture iPad 12.9" Screenshots
+    name: Auto Capture iPad 12.9" Screenshots (portrait + landscape two-pane)
     runs-on: xcode-27   # 官方标签只有 xcode-27 / xcode-27-xlarge；macos-27 不存在，job 会一直排队
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Code
@@ -104,6 +116,9 @@ jobs:
               ;;
           esac
 
+          # 供竖屏、横屏两个截图步骤共用，避免路径在多处硬编码
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
       # iOS 27.1 运行时目前只包含 iPhone Duo；iPad 在 iOS 27.0 运行时。
       # 先把可用运行时/设备打印出来，脚本选错运行时时一眼能定位。
       - name: List Simulator Runtimes & Devices
@@ -111,15 +126,59 @@ jobs:
           xcrun simctl list runtimes
           xcrun simctl list devices available
 
-      - name: Run Automated iPad 12.9" Screenshot Capture
+      # ① 竖屏单列：语言由 dispatch 输入选择，默认 8 语言 × 5 Tab = 40 张
+      - name: Capture iPad Portrait Screenshots
+        id: capture_ipad
+        env:
+          TARGET_LANGUAGE: ${{ inputs.target_language }}
         run: |
           python3 .github/scripts/capture_ipad_screenshots.py \
-            --app-path "tiandi_luopan/build/Build/Products/Debug-iphonesimulator/TiandiLuopan.app" \
-            --lang "${{ inputs.target_language }}" \
-            --output-dir "dist-screenshots"
+            --app-path "$APP_PATH" \
+            --lang "$TARGET_LANGUAGE" \
+            --settle 3 \
+            --ready-timeout 20 \
+            --output-dir "dist-screenshots/portrait"
+
+      # ② 横屏左右双栏：与 iPhone Duo 展开内屏同一套 SwiftUI 双栏代码路径。
+      # 脚本先尝试 AppleScript 真旋转；Xcode 27 Device Hub 不响应时自动回退
+      # -forceLandscapeLayout（横屏布局、竖屏像素），render_mode 写入 GITHUB_OUTPUT。
+      # 输出目录与竖屏平级，避免竖屏校验的 find 把横屏 PNG 一起数进去。
+      - name: Capture iPad Landscape Two-Pane Screenshots
+        id: capture_landscape
+        run: |
+          python3 .github/scripts/capture_ipad_screenshots.py \
+            --app-path "$APP_PATH" \
+            --lang en \
+            --rotate-landscape \
+            --settle 3 \
+            --ready-timeout 20 \
+            --output-dir "dist-screenshots/landscape"
+
+      # 结果级校验：脚本退出 0 只代表命令跑完，还要按实际张数与内容体检兜底，
+      # 避免白屏图或半套截图被上传且 CI 全绿。两组分别校验，互不放行。
+      - name: Validate Captured Screenshots (count + blank detection)
+        run: |
+          set -euo pipefail
+          P_DIR="dist-screenshots/portrait/native_ipad_12.9"
+          L_DIR="dist-screenshots/landscape/native_ipad_12.9"
+          P_EXPECTED="${{ steps.capture_ipad.outputs.expected }}"
+          L_EXPECTED="${{ steps.capture_landscape.outputs.expected }}"
+          P_COUNT="$(find "$P_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+          L_COUNT="$(find "$L_DIR" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+          echo "portrait=$P_COUNT/$P_EXPECTED, landscape=$L_COUNT/$L_EXPECTED, render_mode=${{ steps.capture_landscape.outputs.render_mode }}"
+          if [ -z "$P_EXPECTED" ] || [ "$P_COUNT" -ne "$P_EXPECTED" ]; then
+            echo "::error::竖屏截图张数不符：实际 $P_COUNT，应有 ${P_EXPECTED:-未知}"
+            exit 1
+          fi
+          if [ -z "$L_EXPECTED" ] || [ "$L_COUNT" -ne "$L_EXPECTED" ]; then
+            echo "::error::横屏分栏截图张数不符：实际 $L_COUNT，应有 ${L_EXPECTED:-未知}"
+            exit 1
+          fi
+          python3 .github/scripts/screenshot_guard.py --dir "$P_DIR" --expect "$P_EXPECTED"
+          python3 .github/scripts/screenshot_guard.py --dir "$L_DIR" --expect "$L_EXPECTED"
 
       - name: Upload Screenshots as Artifact
-        if: ${{ !cancelled() }}
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: iPad-12.9-Screenshots
@@ -136,5 +195,7 @@ jobs:
           echo "   ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           echo "2. 滑动到页面底部的 'Artifacts' (工件) 区域"
           echo "3. 点击下载 'iPad-12.9-Screenshots' 压缩包"
+          echo "   - portrait/   竖屏单列（${{ steps.capture_ipad.outputs.captured }} 张原生 + 同量 1600x1200）"
+          echo "   - landscape/  横屏左右双栏（${{ steps.capture_landscape.outputs.captured }} 张，渲染模式 ${{ steps.capture_landscape.outputs.render_mode }}）"
           echo "=========================================================================="
 

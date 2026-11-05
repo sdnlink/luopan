@@ -120,10 +120,12 @@ public struct FloorplanView: View {
     //   isLargeLayout：宽屏（iPad 全形态 + Duo 内屏）—— 决定画布/内容宽度上限与控件档位；
     //                  iPad 竖屏仍是上下单列，只有界面横屏才分栏。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// 布局环境值：iPad 横屏与 Duo 内屏一样分栏，竖屏回单列。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
     private var isLargeLayout: Bool {
         AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
@@ -151,19 +153,20 @@ public struct FloorplanView: View {
                 GeometryReader { geo in
                     let screenW: CGFloat = geo.size.width
                     let screenH: CGFloat = geo.size.height
-                    // 展开态双栏：左栏宽度 = 全宽 × mainRatio，画布按左栏宽度反算，
-                    // 与下方 FoldableTwoPane 的 mainColumnRatio 严格一致，避免画布越出左栏。
-                    let mainRatio: CGFloat = 0.60
-                    // iPad 单列时内容不再硬顶 720pt：按可用宽取 min(可用宽-32, 900)，
-                    // iPad 竖屏 1032pt 宽下原本两侧空出约 330pt，像手机放大版。
-                    let contentMax: CGFloat = isLargeLayout ? min(screenW - 32, 900) : .infinity
+                    // 展开态双栏：左栏宽度由 AdaptiveLayout 按当前有效宽度统一计算，
+                    // 与 FoldableTwoPane / ProportionalTwoPaneLayout 用的是同一个函数，
+                    // 因此画布能按左栏真实占比自适应并铺满，不会越出左栏。
+                    let paneWidth = AdaptiveLayout.mainPaneWidth(totalWidth: screenW)
+                    // 分栏态不设 900 之类的固定上限：工具条与画板一起铺满左栏。
+                    // 合上外屏 / 普通 iPhone 走 .infinity，与手机口径完全一致。
+                    let contentMax: CGFloat = isSplitLayout
+                        ? .infinity
+                        : (isLargeLayout ? min(screenW - 32, 900) : .infinity)
+                    // 画布边长 = 左栏可用宽与可用高中较小者；只扣必要的交互边距，
+                    // 不再用 screenH*0.55/0.62 这类固定系数把画板压小留白。
                     let canvasSide: CGFloat = isSplitLayout
-                        // 双栏（Duo 内屏 / iPad 横屏）：画布按左栏宽度反算，绝不越出左栏；
-                        // 横屏纵向更紧，按可用高度的 0.62 取，竖持分栏仍按 0.55。
-                        ? min(screenW * mainRatio - 32,
-                              screenH * (screenW > screenH ? 0.62 : 0.55))
+                        ? min(paneWidth - 16, max(240, screenH - 160))
                         : isLargeLayout
-                            // iPad 单列：画布跟随可用宽度，受内容上限 900 与高度 0.62 约束
                             ? min(screenW - 64, screenH * 0.62)
                             : min(screenW - 32, screenH < 700 ? 250.0 : (screenH > 900 ? 380.0 : min(340.0, screenH * 0.40)))
 
@@ -214,7 +217,7 @@ public struct FloorplanView: View {
 
                     if isSplitLayout {
                         // 双栏（Duo 内屏 / iPad 横屏）：两栏各自独立滚动 —— 工具全开不溢出、报告再长也可读
-                        FoldableTwoPane(mainColumnRatio: mainRatio, compactSpacing: 8) {
+                        FoldableTwoPane(compactSpacing: 8) {
                             ScrollView { mainColumn }
                         } analysis: {
                             ScrollView { auditColumn }

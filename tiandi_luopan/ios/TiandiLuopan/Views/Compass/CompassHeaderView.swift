@@ -5,6 +5,9 @@ import SwiftUI
 public struct CompassHeaderView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.adaptiveLayoutForm) private var layoutForm
     
     public init() {}
     
@@ -117,8 +120,10 @@ public struct CompassHeaderView: View {
         }
         // iPad 宽屏单列下顶部仪表会被拉得很宽，度数在左、按钮在右，中间一片空白；
         // 限宽 720pt 居中，保持与内容区同一视觉宽度。
-        // 分栏时仪表已在左栏（约 55%~60% 宽），720 上限自然不生效。
-        .frame(maxWidth: 720)
+        // 分栏时铺满左栏；单列宽屏仍保留 720 上限保证长行文字可读性。
+        .frame(maxWidth: AdaptiveLayout.isTwoPane(
+            horizontal: horizontalSizeClass, vertical: verticalSizeClass,
+            form: layoutForm) ? .infinity : 720)
         .frame(maxWidth: .infinity)
         .padding(.top, 6)
     }

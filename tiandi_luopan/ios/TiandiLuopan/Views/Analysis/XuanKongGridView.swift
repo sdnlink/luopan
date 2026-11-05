@@ -31,10 +31,12 @@ public struct XuanKongGridView: View {
     // 宽屏（iPad 全形态、iPhone Duo 展开态内屏）启用放大的内容宽度与控件尺寸；
     // 是否左右分栏由 FoldableTwoPane/AdaptiveLayout 决定（iPad 横屏分栏、竖屏单列）。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// 布局环境值：iPad 横屏时九宫排盘进左栏，需按左栏宽度放大而非沿用 580 上限。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
     private var isLargeLayout: Bool {
         AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
@@ -86,9 +88,9 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
-            // 分栏时放宽到 1320，让左画板真正占满“左半屏”（约 740pt）；
-            // 单列宽屏仍 1100，手机全宽。
-            .frame(maxWidth: isSplitLayout ? 1320 : (isLargeLayout ? 1100 : .infinity))
+            // 分栏态不设固定上限：两栏已按当前有效宽度分配，画板铺满左栏；
+            // 单列宽屏仍 1100，合上外屏 / 普通 iPhone 全宽（与手机一致）。
+            .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 1100 : .infinity))
             .frame(maxWidth: .infinity)
             .padding(.top, 10)
             .padding(.bottom, 24)
@@ -241,7 +243,7 @@ public struct XuanKongGridView: View {
         // 分栏态（Duo 内屏 / iPad 横屏）：左栏 = 元运切换/格局徽章/九宫飞星排盘，
         // 右栏 = 格局评析与财富/健康/化解建议。independentScroll 让两栏各自滚动，
         // 避免右栏长解释把整页撑长、左栏画板跟着一起滚；折叠态保持原单列纵排。
-        FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 14,
+        FoldableTwoPane(compactSpacing: 14,
                         independentScroll: true) {
             VStack(spacing: 14) {
                 periodPickerBar(chart: chart)
@@ -380,8 +382,8 @@ public struct XuanKongGridView: View {
                     }
             }
         }
-        // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
-        .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
+        // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
+        .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
         .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     

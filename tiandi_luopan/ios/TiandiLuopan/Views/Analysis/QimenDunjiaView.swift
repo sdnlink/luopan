@@ -27,9 +27,11 @@ public struct QimenDunjiaView: View {
     // 两套口径（见 AdaptiveLayout）：isSplitLayout = Duo 内屏 / iPad 横屏左右分栏；
     // isLargeLayout 为宽屏（含 iPad），只放大九宫与内容尺寸。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
     private var isLargeLayout: Bool {
         AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
@@ -54,7 +56,7 @@ public struct QimenDunjiaView: View {
 
                 // iPhone Duo 展开态双栏：左栏 = 奇门九宫方阵（主交互），
                 // 右栏 = 选中宫门星神摘要与出行动身方位导航（分析解释）；折叠态保持原单列纵排。
-                FoldableTwoPane(mainColumnRatio: 0.58, compactSpacing: 12) {
+                FoldableTwoPane(compactSpacing: 12) {
                 VStack(spacing: 12) {
             // 局数标题栏
             HStack {
@@ -97,8 +99,8 @@ public struct QimenDunjiaView: View {
                             }
                     }
                 }
-                // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
-                .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
+                // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
+                .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
                 }
                 }

@@ -5,6 +5,7 @@ import SwiftUI
 public struct CompassMainView: View {
     public var isActive: Bool = true
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// 布局环境值：iPad 横屏与 Duo 内屏一样走右栏研判工作台，竖屏回底部状态卡。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     @ObservedObject var motion = CompassMotionManager.shared
@@ -30,7 +31,7 @@ public struct CompassMainView: View {
             if isActive {
                 // 分栏态（Duo 内屏 / iPad 横屏）：左栏 = 罗盘主交互（仪表/工具条/盘面），
                 // 右栏 = 周易分金与八宅提示卡（分析解释）；单列态保持原纵排。
-                FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 4) {
+                FoldableTwoPane(compactSpacing: 4) {
                     VStack(spacing: 4) {
                         // 1. 顶部数据仪表
                         CompassHeaderView()
@@ -77,7 +78,8 @@ public struct CompassMainView: View {
                 } analysis: {
                     // 4. 展开态右侧专业研判工作台（独立滚动）/ 单列态底部快捷卡片
                     // Duo 内屏与 iPad 横屏都走右栏；iPad 竖屏保持单列，改用底部状态卡。
-                    if AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass,
+                    if AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                                vertical: verticalSizeClass,
                                                 form: layoutForm) {
                         ScrollView {
                             unfoldedCompassAnalysisPanel()

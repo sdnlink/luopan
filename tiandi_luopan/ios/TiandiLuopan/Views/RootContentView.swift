@@ -169,30 +169,68 @@ public extension View {
 
 // MARK: - 布局形态判定 (Adaptive Layout Form)
 //
-// 产品口径：
-//   · iPhone Duo 展开内屏（phone 设备族 + regular 宽度）→ 左右双栏
-//   · iPad 界面横屏（regular 宽度 + UIWindowScene.interfaceOrientation.isLandscape）
-//     → 与 Duo 内屏一致的左右双栏：左栏 = 画板/取景/盘面（按左半屏宽度自适应），
-//       右栏 = 解释与研判
-//   · iPad 竖屏 / 分屏窄窗 / 常规 iPhone / Duo 折叠外屏 → 上下单列
+// 适配依据（Apple Tech Talks / iPhone Duo 适配方案）：
+//   · 布局只依赖**当前 Window / Scene 的有效几何**：Size Class、Safe Area、窗口尺寸。
+//     不按机型常量、不按铰链角度、不缓存首次几何值。
+//   · 外屏（合上）整体接近传统 iPhone 的 compact 体验 → 与普通 iPhone 完全一致的单列。
+//   · 内屏（展开）通常是 regular / regular 的更大空间 → 用多出的横向空间做左右双栏，
+//     而不是把单列的元素等比放大。
+//   · 「是否分栏」表达的是「当前空间是否足以并排两块内容」，不是「设备是否展开」；
+//     开合只是几何变化的输入，不参与基础布局判断。
 //
-// 口径说明：`userInterfaceIdiom` 在此**只用于区分设备族**（iPad 与 iPhone Duo），
-// 不用于决定任何尺寸或布局；尺寸一律由 size class / 窗口尺寸决定。
-// 方向取真实界面方向 `UIWindowScene.interfaceOrientation`，不用窗口宽高比猜测：
-// Stage Manager 的可调窗口会让「宽 > 高」与「设备横屏」不再对应。
+// 产品口径：
+//   · iPhone Duo 展开内屏 → 左右双栏；合上外屏 / 常规 iPhone → 上下单列（普通 iPhone 口径）。
+//   · iPad 界面横屏 → 与 Duo 内屏一致的左右双栏；iPad 竖屏 / 分屏窄窗 → 上下单列。
+//   · `userInterfaceIdiom` 只用于区分设备族（iPad 与 iPhone Duo），不决定任何尺寸；
+//     iPad 的接口方向沿用既有产品口径，Duo 一律用 Size Class 判定。
 public enum AdaptiveLayout {
-    /// 左右双栏：iPhone Duo 展开内屏，或 iPad 界面横屏。
+    /// iPad 并排两块内容所需的最小有效宽度：用于排除分屏 / 侧拉窄窗。
+    /// 只作用于 iPad；iPhone Duo 的展开与否完全由 Size Class 表达，
+    /// 不叠加机型式宽度常量（文章：应表达「空间是否足以双列」，而非设备型号）。
+    public static let iPadTwoPaneMinimumWidth: CGFloat = 900
+    /// 左栏占比插值基准（仅用于连续调节比例，不作为分栏开关）。
+    private static let ratioInterpolationBase: CGFloat = 900
+
+    /// 左右双栏：iPhone Duo 仅展开内屏（regular/regular）成立；iPad 横屏且够宽成立。
+    public static func isTwoPane(horizontal: UserInterfaceSizeClass?,
+                                vertical: UserInterfaceSizeClass?,
+                                form: AdaptiveLayoutForm) -> Bool {
+        // 合上外屏 / 常规 iPhone / 分屏窄窗：水平 compact 一律单列。
+        // 此时各页 isWide(sizeClass:) 同为 false，画布、控件、字号全部走普通 iPhone 口径，
+        // 不会变成「手机放大版」——这正是「合上时与普通 iPhone 一样」的保证。
+        guard horizontal == .regular else { return false }
+        if form.isPhoneIdiom {
+            // iPhone Duo：展开内屏是 regular/regular；合上外屏或普通大屏 iPhone 横屏
+            // 的垂直尺寸类是 compact，必须回退单列。不依赖 interfaceOrientation、
+            // 不依赖设备宽度常量，展开态完全由当前 Scene 的 Size Class 表达。
+            return vertical == .regular
+        }
+        // iPad：保留「界面横屏才分栏」的产品口径；竖屏 / 分屏窄窗不分栏。
+        return form.isLandscape && form.size.width >= iPadTwoPaneMinimumWidth
+    }
+
+    /// 便捷重载：垂直尺寸类取布局快照中由根视图实时注入的值。
     public static func isTwoPane(sizeClass: UserInterfaceSizeClass?, form: AdaptiveLayoutForm) -> Bool {
-        guard sizeClass == .regular else { return false }
-        // iPhone Duo 展开内屏：phone 设备族 + regular 宽度
-        if form.isPhoneIdiom { return true }
-        // iPad：仅界面横屏分栏；900pt 下限排除分屏/侧拉窄窗，避免两栏被压到不可读
-        return form.isLandscape && form.size.width >= 900
+        isTwoPane(horizontal: sizeClass, vertical: form.verticalSizeClass, form: form)
     }
 
     /// 宽屏（iPad 全形态 + Duo 内屏）：只决定“更大”，不决定“是否分栏”。
     public static func isWide(sizeClass: UserInterfaceSizeClass?) -> Bool {
         sizeClass == .regular
+    }
+
+    /// 左栏占比随有效宽度自适应：窄展开屏把更多空间留给画布，宽屏收敛让右栏解释够宽。
+    /// 各页不再各自硬编码 0.55/0.56/0.58/0.60，画布才能按左栏实际占比铺满。
+    public static func mainColumnRatio(forWidth width: CGFloat) -> CGFloat {
+        let t = min(max((width - ratioInterpolationBase) / 500, 0), 1)
+        return 0.62 - 0.07 * t
+    }
+
+    /// 当前有效宽度下左栏的真实可用宽度（扣掉 1pt 分隔线）。
+    /// 各页画布用它替代「整屏宽 × 猜测比例 - 32」与 720/900/1320 等固定上限，
+    /// 保证画板按左栏占比自适应并铺满；开合、旋转、Split View 时随几何连续变化。
+    public static func mainPaneWidth(totalWidth: CGFloat) -> CGFloat {
+        max(0, totalWidth * mainColumnRatio(forWidth: totalWidth) - 1)
     }
 }
 
@@ -208,16 +246,25 @@ public struct AdaptiveLayoutForm: Equatable {
     public let isLandscape: Bool
     /// 设备族：仅用于区分 iPhone Duo 内屏与 iPad，不参与尺寸决策
     public let isPhoneIdiom: Bool
+    /// 当前视图所在 Window / Scene 的垂直尺寸类（由 SwiftUI Environment 注入）。
+    /// Duo 合上外屏与普通 iPhone 横屏都是 compact，展开内屏为 regular。
+    public let verticalSizeClass: UserInterfaceSizeClass?
 
-    public init(size: CGSize = .zero, isLandscape: Bool = false, isPhoneIdiom: Bool = false) {
+    public init(size: CGSize = .zero,
+                isLandscape: Bool = false,
+                isPhoneIdiom: Bool = false,
+                verticalSizeClass: UserInterfaceSizeClass? = nil) {
         self.size = size
         self.isLandscape = isLandscape
         self.isPhoneIdiom = isPhoneIdiom
+        self.verticalSizeClass = verticalSizeClass
     }
 
     /// 从当前 UIWindowScene 读取方向、设备族与窗口尺寸。
     /// - Parameter size: GeometryReader 给出的根视图尺寸（优先使用）。
-    public static func current(size: CGSize = .zero) -> AdaptiveLayoutForm {
+    /// - Parameter verticalSizeClass: 当前视图所在 Scene 的垂直尺寸类（SwiftUI Environment）。
+    public static func current(size: CGSize = .zero,
+                               verticalSizeClass: UserInterfaceSizeClass? = nil) -> AdaptiveLayoutForm {
         var windowSize = size
         var isLandscape = false
         var isPhoneIdiom = false
@@ -250,7 +297,8 @@ public struct AdaptiveLayoutForm: Equatable {
         }
         return AdaptiveLayoutForm(size: windowSize,
                                   isLandscape: forcedLandscape || isLandscape,
-                                  isPhoneIdiom: isPhoneIdiom)
+                                  isPhoneIdiom: isPhoneIdiom,
+                                  verticalSizeClass: verticalSizeClass)
     }
 }
 
@@ -276,11 +324,12 @@ public extension EnvironmentValues {
 //   （尺寸口径由各页 isLargeLayout 控制）。
 public struct FoldableTwoPane<Main: View, Analysis: View>: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// 布局环境值：界面方向 / 窗口尺寸 / 设备族，随旋转同步刷新。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
 
-    /// 展开态左栏（主交互区）占整宽比例，收敛到 0.5 ~ 0.7。
-    private let mainColumnRatio: CGFloat
+    /// 展开态左栏（主交互区）占整宽比例。`nil` 时按当前有效宽度自动计算。
+    private let requestedMainColumnRatio: CGFloat?
     /// 折叠态纵向排布间距（须与调用方原布局 VStack spacing 一致）。
     private let compactSpacing: CGFloat
     /// 展开态右栏底色（与各 Tab 深色底一致）。
@@ -293,14 +342,15 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
     private let main: Main
     private let analysis: Analysis
 
-    public init(mainColumnRatio: CGFloat = 0.6,
+    public init(mainColumnRatio: CGFloat? = nil,
                 compactSpacing: CGFloat = 8,
                 analysisBackground: Color = Color(red: 0.07, green: 0.07, blue: 0.09),
                 analysisAlignment: Alignment = .top,
                 independentScroll: Bool = false,
                 @ViewBuilder main: () -> Main,
                 @ViewBuilder analysis: () -> Analysis) {
-        self.mainColumnRatio = min(max(mainColumnRatio, 0.5), 0.7)
+        // 保留调用方显式比例（并夹到可读区间）；不传时由 AdaptiveLayout 按有效宽度自适应。
+        self.requestedMainColumnRatio = mainColumnRatio.map { min(max($0, 0.5), 0.7) }
         self.compactSpacing = compactSpacing
         self.analysisBackground = analysisBackground
         self.analysisAlignment = analysisAlignment
@@ -309,14 +359,29 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
         self.analysis = analysis()
     }
 
+    /// 当前这次渲染真正使用的左栏占比。
+    private var mainColumnRatio: CGFloat {
+        requestedMainColumnRatio
+            ?? AdaptiveLayout.mainColumnRatio(forWidth: layoutForm.size.width)
+    }
+
+    private var isSplitHere: Bool {
+        // 垂直尺寸类直接取本视图的 Environment，不用可能滞后一帧的快照，
+        // 保证开合 / 分屏 / Split View 变化时同帧切换。
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                 vertical: verticalSizeClass,
+                                 form: layoutForm)
+    }
+
     public var body: some View {
-        if AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm) {
+        if isSplitHere {
             if independentScroll {
                 independentScrollPanes
             } else {
                 standardPanes
             }
         } else {
+            // 合上外屏 / 常规 iPhone / 窄窗：与普通 iPhone 完全一致的单列纵排。
             VStack(spacing: compactSpacing) {
                 main
                 analysis
@@ -340,15 +405,15 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
         }
     }
 
-    /// 独立滚动分栏：外层是 ScrollView 时，用窗口高度给两栏确定高度并各包 ScrollView，
-    /// 避免「右栏解释内容把整页撑长、两栏只能一起滚」。
-    /// 不用 GeometryReader：ScrollView 内它拿不到确定高度（会塌缩）。
+    /// 独立滚动分栏：两栏各自滚动，避免「右栏长解释把整页撑长、左栏画板跟着一起滚」。
+    /// 高度来自布局环境值（根视图 GeometryReader 实时刷新，不缓存首次几何），
+    /// 扣掉子 Tab 栏与上下留白，保证两栏落在可视区内并各自铺满。
     private var independentScrollPanes: some View {
-        // 扣掉子 Tab 栏与上下留白，保证两栏落在可视区内
         let paneHeight = max(320, layoutForm.size.height - 140)
         return ProportionalTwoPaneLayout(mainRatio: mainColumnRatio) {
             ScrollView {
                 main
+                    .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
             .frame(height: paneHeight)
@@ -359,6 +424,7 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
 
             ScrollView {
                 analysis
+                    .frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity)
             .frame(height: paneHeight)
@@ -432,10 +498,13 @@ public struct RootContentView: View {
     // 重渲染并级联子视图 body 重算，使 Font.adaptive 的静态查询同步刷新
     //（配合 body 尾部 onChange 一起生效）。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// 垂直尺寸类：Duo 合上外屏 / 普通 iPhone 横屏为 compact，展开内屏为 regular。
+    /// 与水平尺寸类一起作为「空间是否足以并排两栏」的唯一布局依据。
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     // 读取 Dynamic Type 环境值建立依赖：系统「文字大小」变化时根视图重算 body，
     // 级联刷新 Font.adaptive（它按窗口 trait 计算，不读环境值，需要这里触发）。
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// 注入给所有子视图的布局环境值（窗口尺寸 / 界面方向 / 设备族）。
+    /// 注入给所有子视图的布局环境值（窗口尺寸 / 界面方向 / 设备族 / 垂直尺寸类）。
     @State private var layoutForm = AdaptiveLayoutForm.current()
     
     public init() {
@@ -452,9 +521,19 @@ public struct RootContentView: View {
     }
 
     /// 同步刷新布局环境值：只在值真正变化时写 @State，避免无谓重绘。
+    /// 开合、旋转、Split View、Safe Area 变化时几何会连续变化，这里每次都重算，
+    /// 不缓存首次出现时的窗口尺寸 / 尺寸类。
     private func refreshLayoutForm(size: CGSize) {
         guard size.width > 1, size.height > 1 else { return }
-        let next = AdaptiveLayoutForm.current(size: size)
+        let next = AdaptiveLayoutForm.current(size: size,
+                                              verticalSizeClass: verticalSizeClass)
+        if next != layoutForm { layoutForm = next }
+    }
+
+    /// 尺寸类变化但窗口尺寸不变时（开合 / 分屏）也要重算快照。
+    private func refreshLayoutFormKeepingSize() {
+        let next = AdaptiveLayoutForm.current(size: layoutForm.size,
+                                              verticalSizeClass: verticalSizeClass)
         if next != layoutForm { layoutForm = next }
     }
 
@@ -581,7 +660,13 @@ public struct RootContentView: View {
             }
         )
         .environment(\.adaptiveLayoutForm, layoutForm)
+        .onChange(of: verticalSizeClass) { _ in
+            // 开合/分屏可能只改尺寸类不改窗口尺寸：此时几何探针的 onChange 不会触发，
+            // 必须单独刷新快照，否则分栏判据会滞后一帧甚至停在旧形态。
+            refreshLayoutFormKeepingSize()
+        }
         .onChange(of: horizontalSizeClass) { newValue in
+            refreshLayoutFormKeepingSize()
             // 折叠/展开（或 iPad 分屏拖动）切换：重建 TabBar 外观刷新 Tab 字号；
             // 本视图因依赖 size class 而重渲染，级联子视图 body 重算，
             // 使 Font.adaptive 的静态查询同步更新 1.0x ↔ 1.35x 字号比例。

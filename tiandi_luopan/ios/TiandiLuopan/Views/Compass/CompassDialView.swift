@@ -196,8 +196,8 @@ public struct CompassDialView: View {
             Rectangle()
                 .fill(is30 ? Color(red: 0.95, green: 0.85, blue: 0.45) : (is10 ? Color.white.opacity(0.8) : Color.white.opacity(0.35)))
                 .frame(width: (is30 ? 1.5 : (is10 ? 1.0 : 0.6)) * grow,
-                       height: (is30 ? 9 : (is10 ? 6 : 4)) * grow)
-                .offset(y: -radius + (is30 ? 4.5 : (is10 ? 3 : 2)) * grow)
+                       height: (is30 ? 9.0 : (is10 ? 6.0 : 4.0)) * grow)
+                .offset(y: -radius + (is30 ? 4.5 : (is10 ? 3.0 : 2.0)) * grow)
                 .rotationEffect(.degrees(angle))
         }
     }
@@ -301,7 +301,7 @@ public struct CompassDialView: View {
         ForEach(Fenjin120Data.shared.allFenjin) { f in
             Rectangle()
                 .fill(f.isAuspicious ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.2))
-                .frame(width: 1 * grow, height: (f.isAuspicious ? 6 : 4) * grow)
+                .frame(width: 1.0 * grow, height: (f.isAuspicious ? 6.0 : 4.0) * grow)
                 .offset(y: -radius)
                 .rotationEffect(.degrees(f.centerAngle))
         }
@@ -314,7 +314,7 @@ public struct CompassDialView: View {
                 let isMainBranch = m.isCardinalOrCorner
                 // 标签高度跟随系统字号（1.0 ... 1.3x）与盘径放大（grow），
                 // 取自当前窗口的 Environment，多窗口下各窗口各取各的。
-                let baseLabelHeight = horizontalSizeClass == .regular ? 36 : 30
+                let baseLabelHeight: CGFloat = horizontalSizeClass == .regular ? 36.0 : 30.0
                 let labelHeight = baseLabelHeight
                     * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize) * grow
 

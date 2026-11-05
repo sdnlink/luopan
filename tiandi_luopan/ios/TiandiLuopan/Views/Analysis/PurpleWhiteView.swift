@@ -20,9 +20,11 @@ public struct PurpleWhiteView: View {
     // 两套口径（见 AdaptiveLayout）：isSplitLayout = Duo 内屏 / iPad 横屏左右分栏；
     // isLargeLayout 为宽屏（含 iPad），只放大宫格与内容尺寸。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
     private var isLargeLayout: Bool {
         AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
@@ -74,7 +76,7 @@ public struct PurpleWhiteView: View {
         let lang = LocalizationManager.shared
         // iPhone Duo 展开态双栏：左栏 = 太岁三煞警戒与九宫飞星盘（主交互），
         // 右栏 = 选中宫位流年流月客星详解（分析解释）；折叠态保持原单列纵排。
-        FoldableTwoPane(mainColumnRatio: 0.58, compactSpacing: 12) {
+        FoldableTwoPane(compactSpacing: 12) {
         VStack(spacing: 12) {
             // 标题与太岁/三煞摘要栏
             HStack {
@@ -132,8 +134,8 @@ public struct PurpleWhiteView: View {
                         }
                     }
                 }
-                // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
-                .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
+                // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
+                .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
                 }
                 }

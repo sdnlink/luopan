@@ -594,9 +594,11 @@ public struct ARVisionView: View {
     // 布局形态：Duo 内屏 / iPad 横屏启用“取景 + 研判”双栏（见 AdaptiveLayout）；
     // iPad 竖屏保持与 iPhone 一致的单列全屏取景 + HUD 悬浮布局。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
 
     public var body: some View {
@@ -607,7 +609,7 @@ public struct ARVisionView: View {
                 // 右栏 = 形煞智能研判与化解解释（独立滚动）。
                 // 复用共享按比例布局（0.6 左栏），折叠态全屏 HUD 布局保持不变，
                 // 故不经过 FoldableTwoPane 的纵排折叠分支。
-                ProportionalTwoPaneLayout(mainRatio: 0.6) {
+                ProportionalTwoPaneLayout(mainRatio: AdaptiveLayout.mainColumnRatio(forWidth: layoutForm.size.width)) {
                     ZStack {
                         cameraLayer(edgeToEdge: false)
                         scanBeamLayer

@@ -8,6 +8,7 @@ format (1600x1200).
 """
 
 import argparse
+import atexit
 import json
 import os
 import subprocess
@@ -15,6 +16,10 @@ import sys
 import re
 import time
 from PIL import Image
+
+# 脚本与 screenshot_guard.py 同目录；CI 从仓库根调用，显式加入以免 import 失败。
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import screenshot_guard  # noqa: E402
 
 LANGUAGES = [
     {"code": "zh-Hans", "name": "简体中文", "locale": "zh_CN"},
@@ -118,8 +123,8 @@ def convert_to_1600x1200(src_path, dst_path):
         w, h = img.size
         target_w, target_h = (1600, 1200)
 
-        # Sample background color from top-left corner
-        bg_pixel = img.convert("RGB").getpixel((0, 0))
+        # 四角众数：白屏/启动屏时左上角常是纯白，单点采样会把整张 marketing 图染白
+        bg_pixel = sample_background_color(img)
 
         # Scale proportionally to fit target height (1200)
         scale = target_h / h
@@ -136,6 +141,74 @@ def convert_to_1600x1200(src_path, dst_path):
 
         os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         canvas.save(dst_path, "PNG")
+
+
+def sample_background_color(img):
+    """取四角像素的众数做背景色，避免左上角恰是状态栏白字时把整张画布染白。"""
+    w, h = img.size
+    rgb = img.convert("RGB")
+    probes = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+    counts = {}
+    for point in probes:
+        color = rgb.getpixel(point)
+        counts[color] = counts.get(color, 0) + 1
+    return max(counts, key=counts.get)
+
+
+def terminate_app(udid):
+    run_cmd(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
+
+
+def launch_app(udid, launch_args):
+    """terminate 与 launch 之间必须留出进程真正退出的时间。
+
+    `simctl terminate` 是异步的；紧接着 launch 时旧进程可能尚未退出，simctl 会附着到
+    旧进程并把本次的 -selectedTab / 语言参数全部忽略 —— 表现为截图停在上一页、
+    启动屏或空白 window。启动成功时 simctl 会打印 `<bundle>: <pid>`，据此确认。
+    """
+    terminate_app(udid)
+    out = ""
+    for attempt in range(1, 4):
+        time.sleep(0.8 if attempt == 1 else 0.5)
+        try:
+            out = run_cmd(launch_args)
+        except subprocess.CalledProcessError:
+            if attempt == 3:
+                raise
+            print("    ... launch 第 %d 次失败，重试" % attempt)
+            continue
+        if re.search(r"\b\d{3,}\b", out or ""):
+            return out
+        print("    ... launch 未返回 PID（可能附着到旧进程），重试")
+    return out
+
+
+def capture_rendered_frame(udid, dest, launch_args, settle, ready_timeout, poll_interval):
+    """轮询截图直到画面真的渲染出来；持续白屏则重新拉起 App 再给一轮机会。
+
+    返回 (metrics, attempts, blank)。blank=True 表示最终仍是白屏，调用方必须记为失败，
+    绝不能把白屏当成「✓ Captured」上传并让 CI 变绿。
+    """
+    last_metrics = {}
+    total_attempts = 0
+    for round_no in (1, 2):
+        if round_no == 2:
+            print("    ... 持续白屏，重新拉起 App 后再给一轮机会")
+            launch_app(udid, launch_args)
+            time.sleep(settle)
+        deadline = time.time() + ready_timeout
+        while True:
+            total_attempts += 1
+            run_cmd(["xcrun", "simctl", "io", udid, "screenshot", dest])
+            blank, metrics = screenshot_guard.analyze(dest)
+            last_metrics = metrics
+            if not blank:
+                return metrics, total_attempts, False
+            print("    ... 第 %d 次截图仍是白屏 %s，继续等渲染" % (total_attempts, metrics))
+            if time.time() >= deadline:
+                break
+            time.sleep(poll_interval)
+    return last_metrics, total_attempts, True
 
 
 def simulator_is_landscape(udid):
@@ -156,6 +229,55 @@ def simulator_is_landscape(udid):
             os.remove(probe)
         except OSError:
             pass
+
+
+def ensure_portrait(udid):
+    """竖屏调用前把设备方向复位。
+
+    模拟器复用同一个 UDID，shutdown 未必清除方向偏好；若上一次横屏真旋转残留，
+    本次「竖屏 8 语言」会全程产出横屏像素。先探测，横屏则尝试 Cmd+Down 旋回。
+    """
+    if not simulator_is_landscape(udid):
+        return
+    print("WARNING: device still landscape at start of a portrait run; rotating back.")
+    try:
+        subprocess.run(
+            ["osascript",
+             "-e", 'tell application "Simulator" to activate',
+             "-e", "delay 0.5",
+             "-e", 'tell application "System Events" to key code 125 using {command down}'],
+            check=False, capture_output=True, text=True, timeout=30)
+        time.sleep(2.5)
+    except Exception as exc:  # noqa: BLE001 - best effort only
+        print("WARNING: AppleScript portrait rotation unavailable: %s" % exc)
+    if simulator_is_landscape(udid):
+        print("::error::设备方向残留横屏且无法复位；竖屏截图不可信，终止本次采集。"
+              "请在 runner 上重置该模拟器方向或删除后重建。")
+        sys.exit(2)
+
+
+def restore_portrait(udid):
+    """横屏采集结束后 best-effort 旋回竖屏，避免方向偏好污染下一次竖屏运行。
+
+    与 ensure_portrait 不同：这里失败只告警，绝不让已经成功采集的截图流程变红。
+    """
+    if not simulator_is_landscape(udid):
+        return
+    try:
+        subprocess.run(
+            ["osascript",
+             "-e", 'tell application "Simulator" to activate',
+             "-e", "delay 0.5",
+             "-e", 'tell application "System Events" to key code 125 using {command down}'],
+            check=False, capture_output=True, text=True, timeout=30)
+        time.sleep(2.0)
+    except Exception as exc:  # noqa: BLE001 - best effort only
+        print("WARNING: portrait restoration unavailable: %s" % exc)
+    if simulator_is_landscape(udid):
+        print("::warning::模拟器方向未能复位为竖屏；下次竖屏采集会由 ensure_portrait 再尝试。"
+              "若持续失败，请在 runner 上重置该模拟器方向或删除后重建。")
+    else:
+        print("Orientation restored to portrait.")
 
 
 def try_rotate_to_landscape(udid):
@@ -193,7 +315,11 @@ def main():
     parser.add_argument("--lang", default="all", help="Target language code(s), comma separated, or 'all'")
     parser.add_argument("--output-dir", default="dist-screenshots", help="Output directory")
     parser.add_argument("--settle", type=float, default=2.5,
-                        help="Seconds to wait after launch before each screenshot (default 2.5)")
+                        help="Seconds to wait after launch before the first frame probe (default 2.5)")
+    parser.add_argument("--ready-timeout", type=float, default=18.0,
+                        help="Max seconds to keep polling a blank screen per launch round (default 18)")
+    parser.add_argument("--ready-interval", type=float, default=1.5,
+                        help="Seconds between blank-frame probes (default 1.5)")
     parser.add_argument("--rotate-landscape", action="store_true",
                         help="Capture the iPad LANDSCAPE two-pane layout. Tries a real device "
                              "rotation first; if that is unavailable, falls back to the "
@@ -227,14 +353,21 @@ def main():
 
     # 1. Locate / Boot Simulator
     udid, sim_name = find_or_create_ipad_simulator()
+    # boot / bootstatus / install / privacy 任一抛异常时也要 shutdown：
+    # 原实现把这些放在 try 之外，finally 覆盖不到，设备会残留 Booted 并污染下一次运行。
+    atexit.register(lambda: subprocess.run(
+        ["xcrun", "simctl", "shutdown", udid], check=False))
     print(f"Booting simulator: {sim_name} ({udid})...")
     subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
     run_cmd(["xcrun", "simctl", "bootstatus", udid, "-b"])
 
-    # 横屏分栏覆盖：先尝试真旋转，失败则由 App 侧启动参数强制横屏布局。
+    # 方向状态：每次 boot 后都显式管理。竖屏调用必须确保设备真是竖屏，
+    # 横屏调用才尝试真旋转，避免复用设备时上一次的方向污染本次全部截图。
     real_rotation = False
     if args.rotate_landscape:
         real_rotation = try_rotate_to_landscape(udid)
+    else:
+        ensure_portrait(udid)
 
     # Disable hardware keyboard for clean full-screen rendering
     # (Xcode 27's Device Hub replaced Simulator.app; if this domain no longer applies it is a harmless no-op)
@@ -299,11 +432,10 @@ def main():
 
                 print(f"--> [{code}] Tab {tab}: {title} ({s_id})...")
 
+                native_file = os.path.join(dir_native, code, f"{s_id}.png")
+                scaled_file = os.path.join(dir_1600, code, f"{s_id}_1600x1200.png")
                 try:
-                    # Make sure each launch is a clean start
-                    run_cmd(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
-
-                    # Launch app with command line arguments
+                    # 启动参数：语言、Tab、横屏兜底布局
                     launch_args = [
                         "xcrun", "simctl", "launch", udid, BUNDLE_ID,
                         "-AppleLanguages", f"({code})",
@@ -313,21 +445,42 @@ def main():
                     ]
                     if args.rotate_landscape and not real_rotation:
                         launch_args.append("-forceLandscapeLayout")
-                    run_cmd(launch_args)
+                    launch_app(udid, launch_args)
 
-                    # Wait for view transition and canvas rendering to stabilize
+                    # 冷启动首帧之前的固定等待；之后由内容轮询接管，不再靠猜时间
                     time.sleep(args.settle)
 
-                    # Save native screenshot
-                    native_file = os.path.join(dir_native, code, f"{s_id}.png")
                     os.makedirs(os.path.dirname(native_file), exist_ok=True)
-                    run_cmd(["xcrun", "simctl", "io", udid, "screenshot", native_file])
+                    metrics, attempts, blank = capture_rendered_frame(
+                        udid, native_file, launch_args, args.settle,
+                        args.ready_timeout, args.ready_interval)
+                    if blank:
+                        # 删掉残留的白屏文件，避免即使 CI 变红、artifact 里仍混着白图
+                        try:
+                            os.remove(native_file)
+                        except OSError:
+                            pass
+                        raise RuntimeError(
+                            f"白屏/未渲染帧：{attempts} 次截图后仍为空白 {metrics} "
+                            f"(settle={args.settle}s, ready_timeout={args.ready_timeout}s)")
 
                     with Image.open(native_file) as im:
                         native_size = f"{im.size[0]}x{im.size[1]}"
+                        w, h = im.size
+                        # 结果级断言：真旋转必须是横屏像素；竖屏调用不能被上次横屏污染
+                        if args.rotate_landscape and real_rotation and w <= h:
+                            raise RuntimeError(
+                                f"真旋转方向在截图中途丢失：{native_size} 不是横屏像素")
+                        if not args.rotate_landscape and w > h:
+                            raise RuntimeError(
+                                f"竖屏调用被上次横屏状态污染：{native_size} 是横屏像素")
+
+                    # 逐图复检：内容体检必须通过，避免把误判帧写进产物
+                    blank2, _metrics2 = screenshot_guard.analyze(native_file)
+                    if blank2:
+                        raise RuntimeError("native 截图复检仍为白屏")
 
                     # Convert to 1600x1200 format
-                    scaled_file = os.path.join(dir_1600, code, f"{s_id}_1600x1200.png")
                     convert_to_1600x1200(native_file, scaled_file)
                 except Exception as e:  # noqa: BLE001 - keep capturing the remaining screens
                     detail = str(e)
@@ -354,26 +507,50 @@ def main():
                 print(f"    ✓ Captured: {os.path.basename(native_file)} ({native_size}) & {os.path.basename(scaled_file)}")
 
     finally:
+        # 真旋转成功的横屏调用必须在 shutdown 前把方向复位：模拟器复用同一个 UDID，
+        # 方向偏好可能跨 shutdown 残留，否则下一次竖屏采集会被 ensure_portrait()
+        # 判为「残留横屏」并在 AppleScript 不可用时直接终止，连竖屏 40 张都拿不到。
+        if args.rotate_landscape and real_rotation:
+            print("Restoring simulator orientation to portrait before shutdown...")
+            restore_portrait(udid)
         print("\nShutting down simulator...")
         subprocess.run(["xcrun", "simctl", "shutdown", udid], check=False)
 
-    # 7. Generate GitHub Actions Step Summary
+    # 7. 把真实结果写进 GITHUB_OUTPUT，供 workflow 的 Summary / 上传前校验读取。
+    #    不再由 workflow 用 always() 静态宣称「左右双栏 / 不假绿」。
+    mode_key = ("real-rotation" if real_rotation
+                else "forced-landscape" if args.rotate_landscape else "portrait")
+    blank_failures = sum(1 for r in failures
+                         if "白屏" in r["error"] or "blank" in r["error"])
+    output_file = os.environ.get("GITHUB_OUTPUT")
+    if output_file:
+        with open(output_file, "a", encoding="utf-8") as f:
+            f.write(f"captured={len(captured_records)}\n")
+            f.write(f"failed={len(failures)}\n")
+            f.write(f"blank_failed={blank_failures}\n")
+            f.write(f"render_mode={mode_key}\n")
+            f.write(f"expected={len(selected_langs) * len(SCREENS)}\n")
+
+    # 8. Generate GitHub Actions Step Summary（如实报告，不静态宣称验证通过）
+    expected = len(selected_langs) * len(SCREENS)
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
+        heading = ("iPad 横屏分栏截屏报告" if args.rotate_landscape
+                   else "iPad 竖屏单列截屏报告")
         with open(summary_file, "a", encoding="utf-8") as f:
-            f.write("## 📸 iPad 12.9-inch 自动截屏生成报告\n\n")
+            f.write(f"## 📸 {heading}\n\n")
             f.write(f"- **目标模拟器**：`{sim_name}` (`{udid}`)\n")
             f.write(f"- **截屏语言总数**：{len(selected_langs)} 种语言\n")
+            f.write(f"- **成功 / 应有**：{len(captured_records)} / {expected} 张\n")
             if args.rotate_landscape:
                 mode = ("设备真实旋转（横屏像素）" if real_rotation
                         else "App 强制横屏布局（`-forceLandscapeLayout`，设备仍为竖屏像素）")
-                f.write(f"- **横屏分栏渲染模式**：{mode}\n")
-                f.write("- **覆盖目标**：5 Tab 的左右双栏（左画板 / 右解释），"
-                        "与 iPhone Duo 展开内屏同一代码路径。\n")
-            f.write(f"- **总截屏张数**：{len(captured_records)} 张（原图原生分辨率） + {len(captured_records)} 张（1600×1200 格式）\n")
-            if failures:
-                f.write(f"- **失败张数**：{len(failures)} 张（见下方清单）\n")
-            f.write("- **截图下载方式**：请前往当前 Actions 运行页面的 **Artifacts** 区域下载 `iPad-12.9-Screenshots` 压缩包。\n\n")
+                f.write(f"- **横屏渲染模式**：{mode}\n")
+                f.write("- **说明**：脚本只保证按横屏布局路径渲染，"
+                        "**未做双栏特征像素校验**，是否真的左右分栏仍需人工看图确认。\n")
+            f.write(f"- **白屏剔除**：{blank_failures} 张（白屏一律记为失败，不写入产物）\n")
+            f.write(f"- **总产出**：{len(captured_records)} 张原生 + {len(captured_records)} 张 1600×1200\n")
+            f.write("- **下载**：Actions 运行页 **Artifacts** 区域下载本次 workflow 上传的截图压缩包。\n\n")
             if failures:
                 f.write("### ❌ 失败清单\n\n")
                 f.write("| 语言 | 界面 | 错误 |\n| :--- | :--- | :--- |\n")
@@ -398,4 +575,17 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as exc:  # boot/install/privacy 等 try 之外的异常也要留下证据
+        print(f"::error::iPad screenshot setup/capture aborted: {exc}")
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as fh:
+                fh.write("## ❌ iPad 截屏流程中断\n\n")
+                fh.write(f"- 阶段：模拟器 boot / install / 权限预置 / 截图循环\n")
+                fh.write(f"- 错误：`{str(exc).replace('|', '\\|')[:400]}`\n")
+                fh.write("- 本次**没有**产出可信截图；请勿把 Artifacts 中的旧图当作本次结果。\n\n")
+        sys.exit(1)

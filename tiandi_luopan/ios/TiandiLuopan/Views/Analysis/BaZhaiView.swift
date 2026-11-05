@@ -15,12 +15,14 @@ public struct BaZhaiView: View {
     @State private var cachedZeRi: ZeRiAnalysis?
     public var isEmbedded: Bool = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// 布局环境值：iPad 横屏与 Duo 内屏一样分栏，竖屏回单列。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     /// 左右双栏形态（Duo 内屏 / iPad 横屏）—— 右栏展示三合 VIP 预览卡。
     private var isSplitLayout: Bool {
-        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+        AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
+                                      vertical: verticalSizeClass, form: layoutForm)
     }
     private static let clockRefreshTimer = Timer.publish(
         every: 60,
@@ -157,7 +159,7 @@ public struct BaZhaiView: View {
     private func baZhaiContent(bz: BaZhaiAnalysis, zeri: ZeRiAnalysis, state: CompassHeadingState) -> some View {
         // iPhone Duo 展开态双栏：左栏 = 宅型概览与八方游年星（命盘核心），
         // 右栏 = 天星择日日课（分析解释）；折叠态保持原单列纵排。
-        FoldableTwoPane(mainColumnRatio: 0.55, compactSpacing: 12) {
+        FoldableTwoPane(compactSpacing: 12) {
         VStack(spacing: 12) {
             // 宅型概览卡
             HStack {
@@ -292,7 +294,7 @@ public struct BaZhaiView: View {
         let lang = LocalizationManager.shared
         // iPhone Duo 展开态双栏：左栏 = 黄泉水法判据与曜煞消砂（判据核心），
         // 右栏 = 十二长生水法总纲与流派列表（分析解释）；折叠态保持原单列纵排。
-        return FoldableTwoPane(mainColumnRatio: 0.55, compactSpacing: 12) {
+        return FoldableTwoPane(compactSpacing: 12) {
         VStack(spacing: 12) {
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(

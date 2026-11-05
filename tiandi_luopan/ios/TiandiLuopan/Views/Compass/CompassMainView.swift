@@ -4,6 +4,7 @@ import SwiftUI
 
 public struct CompassMainView: View {
     public var isActive: Bool = true
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     
@@ -25,53 +26,64 @@ public struct CompassMainView: View {
                 .ignoresSafeArea()
             
             if isActive {
-                VStack(spacing: 4) {
-                // 1. 顶部数据仪表
-                CompassHeaderView()
-                
-                // 强磁干扰动态告警条
-                if motion.isDistorted {
-                    Button(action: {
-                        showCalibSheet = true
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(Color.orange)
-                            Text("\(lang.t("mag_warning_tap")) (\(String(format: "%.0f", motion.magneticStrengthUT)) μT) · \(lang.t("tap_to_calib"))")
-                                .font(.adaptive(size: 11, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.65)
-                                .layoutPriority(1)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.adaptive(size: 10))
-                                .foregroundColor(.white.opacity(0.7))
+                // iPhone Duo 展开态双栏：左栏 = 罗盘主交互（仪表/工具条/盘面），
+                // 右栏 = 周易分金与八宅提示卡（分析解释）；折叠态保持原单列纵排。
+                FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 4) {
+                    VStack(spacing: 4) {
+                        // 1. 顶部数据仪表
+                        CompassHeaderView()
+                        
+                        // 强磁干扰动态告警条
+                        if motion.isDistorted {
+                            Button(action: {
+                                showCalibSheet = true
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(Color.orange)
+                                    Text("\(lang.t("mag_warning_tap")) (\(String(format: "%.0f", motion.magneticStrengthUT)) μT) · \(lang.t("tap_to_calib"))")
+                                        .font(.adaptive(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.65)
+                                        .layoutPriority(1)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.adaptive(size: 10))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.orange.opacity(0.25))
+                                .cornerRadius(6)
+                                .padding(.horizontal, 16)
+                            }
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.orange.opacity(0.25))
-                        .cornerRadius(6)
-                        .padding(.horizontal, 16)
+                        
+                        // 2. 罗盘快捷辅助工具条 (锁定朝向 / 分金详勘 / 空亡诊断 / 八方全鉴)
+                        compassToolBar()
+                            .padding(.top, 2)
+                        
+                        Spacer(minLength: 4)
+                        
+                        // 3. 核心随动罗盘盘面 (包含 120分金、64卦、24山、八卦、水准仪)
+                        CompassDialView()
+                            .padding(.horizontal, 8)
+                        
+                        Spacer(minLength: 4)
                     }
-                }
-                
-                // 2. 罗盘快捷辅助工具条 (锁定朝向 / 分金详勘 / 空亡诊断 / 八方全鉴)
-                compassToolBar()
-                    .padding(.top, 2)
-                
-                Spacer(minLength: 4)
-                
-                // 3. 核心随动罗盘盘面 (包含 120分金、64卦、24山、八卦、水准仪)
-                CompassDialView()
-                    .padding(.horizontal, 8)
-                
-                Spacer(minLength: 4)
-                
-                // 4. 底部快捷周易分金与八宅提示卡 (可点击调起详细诊断)
-                bottomStatusCard()
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                } analysis: {
+                    // 4. 展开态右侧专业研判工作台（独立滚动）/ 折叠态底部快捷卡片
+                    if horizontalSizeClass == .regular {
+                        ScrollView {
+                            unfoldedCompassAnalysisPanel()
+                                .padding(16)
+                        }
+                    } else {
+                        bottomStatusCard()
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    }
                 }
             }
         }
@@ -194,6 +206,226 @@ public struct CompassMainView: View {
         }
     }
     
+    // MARK: - 展开态右侧研判工作台 (iPhone Duo 内屏 / iPad)
+    //
+    // 展开态右栏（独立滚动）：向首总览、一百二十分金度数跨度与秘传断语、
+    // 六十四卦卦象与分金描述、空亡判级与化解指引，并附四个快捷入口。
+    // 折叠态不渲染本面板（右栏改用 bottomStatusCard()，见 body 内分支）。
+    private func unfoldedCompassAnalysisPanel() -> some View {
+        let heading = motion.headingState
+        let hex = Hexagram64Data.shared.hexagram(for: heading.facingAngle)
+        let fenjin = Fenjin120Data.shared.resolveFenjin(for: heading.facingAngle)
+        let kwLevel = heading.kongWangLevel
+
+        // 空亡判级配色与文案 key（四档均有完整多语种文案，避免硬编码）
+        let kwColor: Color
+        let kwGradeKey: String
+        let kwDescKey: String
+        let kwRemedyKey: String
+        switch kwLevel {
+        case .pure:
+            kwColor = Color.green
+            kwGradeKey = "kw_pure_grade"
+            kwDescKey = "kw_pure_desc"
+            kwRemedyKey = "kw_pure_remedy"
+        case .jianXiang:
+            kwColor = Color.yellow
+            kwGradeKey = "kw_sub_grade"
+            kwDescKey = "kw_sub_desc"
+            kwRemedyKey = "kw_sub_remedy"
+        case .smallVoid:
+            kwColor = Color.orange
+            kwGradeKey = "kw_small_grade"
+            kwDescKey = "kw_small_desc"
+            kwRemedyKey = "kw_small_remedy"
+        case .largeVoid:
+            kwColor = Color.red
+            kwGradeKey = "kw_large_grade"
+            kwDescKey = "kw_large_desc"
+            kwRemedyKey = "kw_large_remedy"
+        }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            // 1. 向首总览：实时度数 / 二十四山 / 俯仰横滚 / 磁场强度
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(lang.t("kw_heading_prefix"))
+                        .font(.adaptive(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.6))
+                    Text(String(format: "%.1f°", heading.facingAngle))
+                        .font(.adaptive(size: 24, weight: .bold, design: .monospaced))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Spacer()
+                    Text(fenjin.localizedMountainName)
+                        .font(.adaptive(size: 12, weight: .bold))
+                        .foregroundColor(Color.yanCyan)
+                }
+                HStack(spacing: 12) {
+                    Text("\(lang.t("pitch_label")) \(String(format: "%.1f°", motion.pitch))")
+                    Text("\(lang.t("roll_label")) \(String(format: "%.1f°", motion.roll))")
+                    Text(String(format: "%.0f μT", motion.magneticStrengthUT))
+                }
+                .font(.adaptive(size: 10))
+                .foregroundColor(.white.opacity(0.6))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(analysisPanelBackground())
+
+            // 2. 一百二十分金：度数跨度 + 孤虚旺相秘传断语 + 立向指引
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(lang.t("fenjin_range_section"))
+                        .font(.adaptive(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(fenjin.localizedJiaziName)
+                        .font(.adaptive(size: 13, weight: .bold, design: .serif))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text(fenjin.localizedGrade)
+                        .font(.adaptive(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                        .foregroundColor(fenjin.isAuspicious ? Color.green : Color.red)
+                        .cornerRadius(4)
+                }
+                Text("\(String(format: "%.1f", fenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", fenjin.endAngle))° · \(lang.t("fenjin_center_deg")) \(String(format: "%.1f", fenjin.centerAngle))°")
+                    .font(.adaptive(size: 11, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Text(lang.t("fenjin_lore_section"))
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(fenjin.localizedLore)
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(3)
+                Text(fenjin.isAuspicious ? lang.t("fenjin_auspicious_advice") : lang.t("fenjin_inauspicious_advice"))
+                    .font(.adaptive(size: 10))
+                    .foregroundColor(.white.opacity(0.6))
+                    .lineSpacing(2)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(analysisPanelBackground())
+
+            // 3. 六十四卦：卦名 / 上下卦 / 卦气吉凶 / 穿山透地分金描述
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(hex.localizedName)
+                        .font(.adaptive(size: 18, weight: .bold, design: .serif))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text("\(hex.localizedUpperTrigram) · \(hex.localizedLowerTrigram)")
+                        .font(.adaptive(size: 11))
+                        .foregroundColor(.white.opacity(0.6))
+                    Spacer()
+                    Text(hex.localizedLuckDegree)
+                        .font(.adaptive(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(hex.isGreatAuspicious ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
+                        .foregroundColor(hex.isGreatAuspicious ? Color.green : .white.opacity(0.85))
+                        .cornerRadius(4)
+                }
+                Text(hex.localizedFenJinDetail)
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineSpacing(3)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(analysisPanelBackground())
+
+            // 4. 空亡判级与化解指引
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 6) {
+                    Text(lang.t("kw_sheet_title"))
+                        .font(.adaptive(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(lang.t(kwGradeKey))
+                        .font(.adaptive(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(kwColor.opacity(0.2))
+                        .foregroundColor(kwColor)
+                        .cornerRadius(4)
+                }
+                Text(kwLevel.localizedTitle)
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .foregroundColor(kwColor)
+                Text(lang.t(kwDescKey))
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineSpacing(3)
+                Text("\(lang.t("kw_master_remedy_section"))\(lang.t(kwRemedyKey))")
+                    .font(.adaptive(size: 10))
+                    .foregroundColor(.white.opacity(0.6))
+                    .lineSpacing(2)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(analysisPanelBackground())
+
+            // 5. 快捷工具入口
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    analysisPanelToolButton(title: lang.t("btn_fenjin_detail"),
+                                            systemImage: "ruler",
+                                            tint: Color.yanCyan) { showFenjinSheet = true }
+                    analysisPanelToolButton(title: lang.t("kw_sheet_title"),
+                                            systemImage: "scope",
+                                            tint: kwColor) { showKongwangSheet = true }
+                }
+                HStack(spacing: 8) {
+                    analysisPanelToolButton(title: lang.t("btn_palace_all"),
+                                            systemImage: "square.grid.2x2",
+                                            tint: Color(red: 0.83, green: 0.68, blue: 0.21)) { showPalaceSheet = true }
+                    analysisPanelToolButton(title: lang.t("btn_calib"),
+                                            systemImage: "safari.fill",
+                                            tint: motion.isDistorted ? Color.orange : Color(red: 0.95, green: 0.82, blue: 0.4)) { showCalibSheet = true }
+                }
+            }
+        }
+    }
+
+    /// 研判工作台卡片底：深色圆角 + 淡金描边（与全工程卡片口径一致）
+    private func analysisPanelBackground() -> some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(Color(red: 0.12, green: 0.12, blue: 0.15))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
+            )
+    }
+
+    /// 研判工作台快捷工具按钮
+    private func analysisPanelToolButton(title: String,
+                                        systemImage: String,
+                                        tint: Color,
+                                        action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: systemImage)
+                    .font(.adaptive(size: 11))
+                Text(title)
+                    .font(.adaptive(size: 11, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundColor(tint)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.06))
+            .cornerRadius(8)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
     // MARK: - 底部状态卡
     private func bottomStatusCard() -> some View {
         let hex = Hexagram64Data.shared.hexagram(for: motion.headingState.facingAngle)

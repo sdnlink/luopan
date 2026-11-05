@@ -117,7 +117,7 @@ public struct House3DSpaceViewer: View {
                     Image(systemName: "cube.transparent")
                         .font(.adaptive(size: 15, weight: .bold))
                         .foregroundColor(.yanGold)
-                    Text("全屋 3D 空间测绘模型")
+                    Text(lang.t("ar_3d_model_title"))
                         .font(.adaptive(size: 15, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -293,7 +293,7 @@ public struct House3DSpaceViewer: View {
                     .foregroundColor(.white)
                 Spacer()
                 Button(action: { showRoomTypePanel = false }) {
-                    Text("完成")
+                    Text(lang.t("done"))
                         .font(.adaptive(size: 11, weight: .bold))
                         .foregroundColor(.black)
                         .padding(.horizontal, 10)

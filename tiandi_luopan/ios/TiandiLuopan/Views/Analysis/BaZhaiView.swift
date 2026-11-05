@@ -14,6 +14,7 @@ public struct BaZhaiView: View {
     @State private var cachedWaterItems: [SanHeWaterItem]?
     @State private var cachedZeRi: ZeRiAnalysis?
     public var isEmbedded: Bool = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private static let clockRefreshTimer = Timer.publish(
         every: 60,
         on: .main,
@@ -147,6 +148,9 @@ public struct BaZhaiView: View {
     
     // MARK: - 八宅明镜内容
     private func baZhaiContent(bz: BaZhaiAnalysis, zeri: ZeRiAnalysis, state: CompassHeadingState) -> some View {
+        // iPhone Duo 展开态双栏：左栏 = 宅型概览与八方游年星（命盘核心），
+        // 右栏 = 天星择日日课（分析解释）；折叠态保持原单列纵排。
+        FoldableTwoPane(mainColumnRatio: 0.55, compactSpacing: 12) {
         VStack(spacing: 12) {
             // 宅型概览卡
             HStack {
@@ -203,8 +207,9 @@ public struct BaZhaiView: View {
                 }
             }
             .padding(.horizontal, 16)
-            
-            // 天星择日 · 动土安门日课自检卡
+            }
+            } analysis: {
+            // 天星择日 · 动土安门日课自检卡（展开态右栏 / 折叠态底部）
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     HStack(spacing: 5) {
@@ -278,7 +283,10 @@ public struct BaZhaiView: View {
         let basha = SanHeWaterEngine.shared.resolveBaSha(sitting: state.sittingMountain)
         
         let lang = LocalizationManager.shared
-        return VStack(spacing: 12) {
+        // iPhone Duo 展开态双栏：左栏 = 黄泉水法判据与曜煞消砂（判据核心），
+        // 右栏 = 十二长生水法总纲与流派列表（分析解释）；折叠态保持原单列纵排。
+        return FoldableTwoPane(mainColumnRatio: 0.55, compactSpacing: 12) {
+        VStack(spacing: 12) {
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
                     title: lang.t("privilege_sanhe_title"),
@@ -361,8 +369,11 @@ public struct BaZhaiView: View {
                 .background(Color(red: 0.13, green: 0.11, blue: 0.11))
                 .cornerRadius(12)
                 .padding(.horizontal, 16)
-                
-                // 3. 三合十二长生水法总纲卡
+                }
+                }
+                } analysis: {
+                // 3. 三合十二长生水法总纲卡 + 4. 十二长生流派列表（展开态右栏 / 折叠态底部）
+                if iap.hasUnlockedVIP {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(lang.t("water_rule_12")): \(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))")
@@ -415,7 +426,74 @@ public struct BaZhaiView: View {
                     }
                 }
                 .padding(.horizontal, 16)
+                } else if horizontalSizeClass == .regular {
+                    sanHeVIPPreviewCard()
+                }
+            }
+    }
+    // MARK: - 三合水法 VIP 展开态预览占位卡 (消除展开态双栏右侧留白)
+    private func sanHeVIPPreviewCard() -> some View {
+        let lang = LocalizationManager.shared
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.adaptive(size: 16))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(lang.t("privilege_sanhe_title"))
+                    .font(.adaptive(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+                Text(lang.t("vip_badge_title"))
+                    .font(.adaptive(size: 10, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(4)
+            }
+
+            Text(lang.t("privilege_sanhe_desc"))
+                .font(.adaptive(size: 11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(3)
+
+            Divider().background(Color.white.opacity(0.1))
+
+            Text("💡 \(lang.t("water_rule_12")) · \(lang.t("privilege_sh_feature_title"))")
+                .font(.adaptive(size: 12, weight: .semibold))
+                .foregroundColor(Color.yanCyan)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("• \(lang.t("privilege_sh_bullet_1"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_sh_bullet_2"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_sh_bullet_3"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: { showPaywall = true }) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "crown.fill")
+                    Text(lang.t("unlock_vip_now"))
+                    Spacer()
+                }
+                .font(.adaptive(size: 12, weight: .bold))
+                .padding(.vertical, 8)
+                .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                .foregroundColor(.black)
+                .cornerRadius(8)
             }
         }
+        .padding(14)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
     }
 }

@@ -1193,7 +1193,7 @@ public struct ARRoomPlanSurveyView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "cube.transparent")
                                         .font(.adaptive(size: 13, weight: .bold))
-                                    Text("3D空间")
+                                    Text(lang.t("ar_3d_space"))
                                         .font(.adaptive(size: 10, weight: .bold))
                                 }
                                 .foregroundColor(.black)

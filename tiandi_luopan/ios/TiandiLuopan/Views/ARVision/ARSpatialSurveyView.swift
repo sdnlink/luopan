@@ -2281,7 +2281,7 @@ public struct ARSpatialSurveyView: View {
                         HStack(spacing: 3) {
                             Image(systemName: "cube.transparent")
                                 .font(.adaptive(size: 13, weight: .bold))
-                            Text("当前实测3D")
+                            Text(lang.t("floorplan_3d_recent_actual"))
                                 .font(.adaptive(size: 10, weight: .bold))
                         }
                         .foregroundColor(.black)
@@ -2361,7 +2361,7 @@ public struct ARSpatialSurveyView: View {
                         }
                         .accessibilityLabel("落一个墙角点")
                         Button(action: { _ = model.finishCornerRoom() }) {
-                            Text("完成")
+                            Text(lang.t("done"))
                                 .font(.adaptive(size: 10, weight: .bold))
                                 .foregroundColor(.black)
                                 .padding(.horizontal, 8)

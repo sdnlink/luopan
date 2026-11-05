@@ -44,6 +44,9 @@ public struct QimenDunjiaView: View {
                 // heading or language changes.
                 let chart = cachedChart ?? QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
 
+                // iPhone Duo 展开态双栏：左栏 = 奇门九宫方阵（主交互），
+                // 右栏 = 选中宫门星神摘要与出行动身方位导航（分析解释）；折叠态保持原单列纵排。
+                FoldableTwoPane(mainColumnRatio: 0.58, compactSpacing: 12) {
                 VStack(spacing: 12) {
             // 局数标题栏
             HStack {
@@ -88,7 +91,11 @@ public struct QimenDunjiaView: View {
                 }
                 .frame(maxWidth: isLargeLayout ? 580 : .infinity)
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
-                
+                }
+                }
+                } analysis: {
+                // 选中宫门星神摘要与出行动身方位导航（展开态右栏 / 折叠态底部）
+                if iap.hasUnlockedVIP {
                 if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
                     HStack(spacing: 8) {
@@ -146,8 +153,10 @@ public struct QimenDunjiaView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal, 16)
-            }
+                } else if horizontalSizeClass == .regular {
+                    qimenVIPPreviewCard()
                 }
+            }
             } else {
                 Color.clear
             }
@@ -242,5 +251,69 @@ public struct QimenDunjiaView: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(borderColor, lineWidth: 1)
         )
+    }
+    // MARK: - 奇门遁甲 VIP 展开态预览占位卡 (消除展开态双栏右侧留白)
+    private func qimenVIPPreviewCard() -> some View {
+        let lang = LocalizationManager.shared
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.adaptive(size: 16))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(lang.t("privilege_qimen_title"))
+                    .font(.adaptive(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+                Text(lang.t("vip_badge_title"))
+                    .font(.adaptive(size: 10, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(4)
+            }
+
+            Text(lang.t("privilege_qimen_desc"))
+                .font(.adaptive(size: 11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(3)
+
+            Divider().background(Color.white.opacity(0.1))
+
+            Text("🧭 \(lang.t("privilege_qm_feature_title"))")
+                .font(.adaptive(size: 12, weight: .semibold))
+                .foregroundColor(Color.yanCyan)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("• \(lang.t("privilege_qm_bullet_1"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_qm_bullet_2"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_qm_bullet_3"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: { showPaywall = true }) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "crown.fill")
+                    Text(lang.t("unlock_vip_now"))
+                    Spacer()
+                }
+                .font(.adaptive(size: 12, weight: .bold))
+                .padding(.vertical, 8)
+                .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                .foregroundColor(.black)
+                .cornerRadius(8)
+            }
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(12)
     }
 }

@@ -145,52 +145,78 @@ public struct FloorplanView: View {
                 GeometryReader { geo in
                     let screenW: CGFloat = geo.size.width
                     let screenH: CGFloat = geo.size.height
+                    // 展开态双栏：左栏宽度 = 全宽 × mainRatio，画布按左栏宽度反算，
+                    // 与下方 FoldableTwoPane 的 mainColumnRatio 严格一致，避免画布越出左栏。
+                    let mainRatio: CGFloat = 0.60
                     let canvasSide: CGFloat = isLargeLayout
-                        ? min(screenW - 48, screenH * 0.46)
+                        ? min(screenW * mainRatio - 32, screenH * 0.55)
                         : min(screenW - 32, screenH < 700 ? 250.0 : (screenH > 900 ? 380.0 : min(340.0, screenH * 0.40)))
 
-                    VStack(spacing: 8) {
-                        // 1. 顶部控制栏
-                        topControlBar()
-                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-
-                        headingQualityNotice()
-                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-
-                        if userFloorplanImage != nil {
-                            roomDetectionBar()
-                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-                            roomCalibrationBar()
-                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-                        }
-
-                        if isEditingRooms {
-                            roomLayoutTools()
-                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-                            if let editingRoom = editingRoom {
-                                roomResizeTools(room: editingRoom)
+                    // 左栏内容（画布 + 全部操作工具）：展开态与折叠态共用同一份定义
+                    let mainColumn = VStack(spacing: 8) {
+                                topControlBar()
                                     .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-                            }
-                        }
-                        
-                        // 2. 户型交互画布 (户型图 + 随动罗盘半透明扇区 + 立极中宫点)
-                        floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
-                            .frame(width: isLargeLayout ? canvasSide : nil, height: canvasSide)
-                            .frame(maxWidth: .infinity)
-                            .padding(.horizontal, isLargeLayout ? 0 : 16)
 
-                        if !isSyncWithCompass {
-                            manualHeadingControl()
-                                .frame(maxWidth: isLargeLayout ? 720 : .infinity)
-                                .padding(.horizontal, 16)
-                        }
-                        
-                        // 3. 底部体检报告与房间列表
+                                headingQualityNotice()
+                                    .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+
+                                if userFloorplanImage != nil {
+                                    roomDetectionBar()
+                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                    roomCalibrationBar()
+                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                }
+
+                                if isEditingRooms {
+                                    roomLayoutTools()
+                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                    if let editingRoom = editingRoom {
+                                        roomResizeTools(room: editingRoom)
+                                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                    }
+                                }
+                                
+                                floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
+                                    .frame(width: isLargeLayout ? canvasSide : nil, height: canvasSide)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, isLargeLayout ? 0 : 16)
+
+                                if !isSyncWithCompass {
+                                    manualHeadingControl()
+                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                        .padding(.horizontal, 16)
+                                }
+                    }
+                    .padding(.bottom, 16)
+
+                    // 右栏 / 页尾内容：体检报告与房间列表
+                    let auditColumn = VStack(spacing: 8) {
                         auditListSection(report: auditResult.report)
                             .frame(maxWidth: isLargeLayout ? 720 : .infinity)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
+                    .padding(.horizontal, isLargeLayout ? 16 : 0)
+                    .padding(.bottom, 16)
+
+                    if isLargeLayout {
+                        // 展开态：左右双栏，两栏各自独立滚动 —— 工具全开不溢出、报告再长也可读
+                        FoldableTwoPane(mainColumnRatio: mainRatio, compactSpacing: 8) {
+                            ScrollView { mainColumn }
+                        } analysis: {
+                            ScrollView { auditColumn }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
+                    } else {
+                        // 折叠态：整页单一 ScrollView 驱动（画布 + 工具 + 体检报告连续下划），
+                        // 消除小屏底部体检清单被挤出屏幕且无法下滑的问题
+                        ScrollView {
+                            VStack(spacing: 8) {
+                                mainColumn
+                                auditColumn
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
                 }
             }
         }
@@ -793,7 +819,7 @@ public struct FloorplanView: View {
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: iap.hasUnlockedVIP ? "cube.transparent" : "lock.fill")
-                    Text("当前户型3D")
+                    Text(lang.t("floorplan_3d_current"))
                     if !iap.hasUnlockedVIP {
                         Text(lang.t("vip_badge_title"))
                             .font(.adaptive(size: 8, weight: .bold))
@@ -824,7 +850,7 @@ public struct FloorplanView: View {
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: isVR && !iap.hasUnlockedVIP ? "lock.fill" : "cube.transparent")
-                        Text(isVR ? "最近VR仿真3D" : "最近实测3D")
+                        Text(isVR ? lang.t("floorplan_3d_recent_vr") : lang.t("floorplan_3d_recent_actual"))
                         if isVR && !iap.hasUnlockedVIP {
                             Text(lang.t("vip_badge_title"))
                                 .font(.adaptive(size: 8, weight: .bold))
@@ -855,7 +881,7 @@ public struct FloorplanView: View {
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: iap.hasUnlockedVIP ? "view.3d" : "lock.fill")
-                        Text("最近VR仿真3D")
+                        Text(lang.t("floorplan_3d_recent_vr"))
                         if !iap.hasUnlockedVIP {
                             Text(lang.t("vip_badge_title"))
                                 .font(.adaptive(size: 8, weight: .bold))
@@ -2151,30 +2177,28 @@ public struct FloorplanView: View {
             }
             .padding(.horizontal, 16)
             
-            ScrollView {
-                VStack(spacing: 8) {
-                    if !hasFloorplanAccess {
-                        VIPLockCardView(
-                            title: lang.t("privilege_floorplan_title"),
-                            featureDesc: lang.t("privilege_floorplan_desc"),
-                            badge: lang.t("vip_badge_title"),
-                            targetProductId: .floorplanSingle,
-                            onUnlockTap: { showPaywall = true }
-                        )
-                        
-                        // 免费展示首条体检概览
-                        if let firstItem = report.first {
-                            auditItemRow(item: firstItem)
-                        }
-                    } else {
-                        ForEach(report) { item in
-                            auditItemRow(item: item)
-                        }
+            VStack(spacing: 8) {
+                if !hasFloorplanAccess {
+                    VIPLockCardView(
+                        title: lang.t("privilege_floorplan_title"),
+                        featureDesc: lang.t("privilege_floorplan_desc"),
+                        badge: lang.t("vip_badge_title"),
+                        targetProductId: .floorplanSingle,
+                        onUnlockTap: { showPaywall = true }
+                    )
+                    
+                    // 免费展示首条体检概览
+                    if let firstItem = report.first {
+                        auditItemRow(item: firstItem)
+                    }
+                } else {
+                    ForEach(report) { item in
+                        auditItemRow(item: item)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
             }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
     }
     

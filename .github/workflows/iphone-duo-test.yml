@@ -12,35 +12,70 @@ permissions:
 
 # 两个并行 Job：
 #  Job 1 (regular-layout-ipad)：iPad 13" 模拟器 —— 保证跑。
-#    App 的双栏布局判定是 horizontalSizeClass == .regular（与设备 idiom 无关，
-#    与 FoldableTwoPane/ProportionalTwoPaneLayout 同口径），iPad 全形态必然
-#    命中同一套展开态双栏代码路径，因此这是确定性的双屏布局截图验证。
-#  Job 2 (iphone-duo-best-effort)：iPhone Duo 模拟器 —— 尽力跑。
-#    需要 runner 的 Xcode 提供 "iPhone Duo" 设备类型；展开姿态依赖 duoctl
+#    产品口径（2026-11 更新）：iPad **竖屏** = 与 iPhone 一致的上下单列（画布/内容放大）；
+#    iPad **界面横屏** = 与 iPhone Duo 展开内屏一致的左右双栏（左画布 + 右解释）。
+#    双栏判据 AdaptiveLayout.isTwoPane = regular 宽度 且（phone 设备族 或 界面横屏且宽 ≥ 900）；
+#    方向取 UIWindowScene.interfaceOrientation，不再用窗口宽高比猜测。
+#    本 Job 采集两组：① 竖屏单列 8 语言 × 5 Tab；② 横屏双栏 5 Tab（真旋转优先，
+#    失败回退 -forceLandscapeLayout 启动参数，渲染模式写入脚本报告，绝不假绿）。
+#  Job 2 (iphone-duo-best-effort)：iPhone Duo 模拟器 —— 尽力跑，内屏双栏验证途径。
+#    需要 runner 的 Xcode 提供折叠设备类型；展开姿态依赖 duoctl
 #    （skarol/duoctl，向模拟器注入私有 HID 事件）。任一环节不可用则优雅跳过，
-#    由 Job 1 兜底验证布局。
+#    此时仅 Duo 内屏路径无覆盖；iPad 横屏分栏已由 Job 1 覆盖同一套 SwiftUI 代码路径。
+#
+# SDK 硬性要求：所有 Job 必须用 iOS 27.1 SDK 编译（xcode-27 镜像默认 Xcode 27.1）。
+#   低版本 SDK 构建的 App 在 Duo 内屏会以兼容模式显示（缩小的 iPhone 画面 + 黑边），
+#   双栏代码路径根本不会被触达，截图不可信。CI 因此做两级校验：
+#   ① 选择 Xcode 后断言 iphoneos / iphonesimulator SDK >= 27.1；
+#   ② 构建完成后断言产物 Info.plist 的 DTSDKName 含 27.1（链接 SDK 的最终证据）。
 
 jobs:
   # ================================================================
-  # Job 1: regular 宽度双栏布局截图（iPad，确定性通过）
+  # Job 1: iPad 截图（竖屏单列 + 横屏双栏，确定性通过）
   # ================================================================
   regular-layout-ipad:
-    name: Two-Pane Layout Screenshots (iPad = regular size class)
-    runs-on: macos-latest
+    name: iPad Screenshots (portrait = stacked, landscape = two-pane)
+    runs-on: xcode-27   # 官方标签只有 xcode-27 / xcode-27-xlarge；macos-27 不存在，job 会一直排队
     timeout-minutes: 40
 
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Select Highest Available Xcode
+      # 硬性要求：必须用 iOS 27.1 SDK 编译。低版本 SDK 构建的 App 在 iPhone Duo
+      # 内屏上会进入兼容模式（按 iPhone 尺寸等比缩放 + 黑边），双栏布局根本不生效，
+      # 截图只会得到“熟悉的 iPhone 尺寸”的缩小画面。
+      - name: Select Xcode 27 & Require iOS 27.1 SDK
         run: |
-          HIGHEST_XCODE="$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)"
-          if [ -n "$HIGHEST_XCODE" ]; then
-            echo "Selecting Xcode at: $HIGHEST_XCODE"
-            sudo xcode-select -s "$HIGHEST_XCODE/Contents/Developer"
+          set -euo pipefail
+          echo "===== Available Xcode ====="
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+
+          XCODE_APP=""
+          for cand in /Applications/Xcode_27.1.app /Applications/Xcode_27*.app; do
+            if [ -d "$cand" ]; then XCODE_APP="$cand"; break; fi
+          done
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::No Xcode installation found on runner"
+            exit 1
+          fi
+          echo "Selecting Xcode: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
+
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo missing)"
+          SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || echo missing)"
+          echo "Device SDK: $IOS_SDK | Simulator SDK: $SIM_SDK"
+          for sdk in "$IOS_SDK" "$SIM_SDK"; do
+            if ! awk -v v="$sdk" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+              echo "::error::iOS SDK 27.1+ required (got $sdk). Older SDK builds run in iPhone Duo compatibility mode (scaled-down iPhone canvas + letterbox), so the two-pane layout cannot be exercised."
+              exit 1
+            fi
+          done
+          echo "SDK check passed: iOS $IOS_SDK / Simulator $SIM_SDK"
 
       - name: Set up Python & Pillow
         run: |
@@ -60,21 +95,55 @@ jobs:
 
           APP_PATH="tiandi_luopan/build/Build/Products/Debug-iphonesimulator/TiandiLuopan.app"
           [ -d "$APP_PATH" ] || { echo "::error::Built app not found at $APP_PATH"; exit 1; }
+
+          # DTSDKName 由构建时链接的 SDK 写入，是“确实用 iOS 27.1 编译”的最终证据；
+          # 若非 27.1，App 在 Duo 内屏会退回兼容模式，截图无参考价值。
+          DTSDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$APP_PATH/Info.plist" 2>/dev/null || true)"
+          echo "DTSDKName = $DTSDK"
+          case "$DTSDK" in
+            *27.1*) : ;;
+            *)
+              echo "::error::App not built against iOS 27.1 SDK (DTSDKName=$DTSDK); Duo screenshots would show a scaled-down compatibility-mode canvas."
+              exit 1
+              ;;
+          esac
+
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
+      # iOS 27.1 运行时目前只包含 iPhone Duo；iPad 在 iOS 27.0 运行时。
+      # 先打印可用运行时/设备，脚本选错运行时时一眼能定位。
+      - name: List Simulator Runtimes & Devices
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+
       # 复用既有 iPad 截图脚本：8 语言 × 5 Tab（-selectedTab 启动参数由
-      # RootContentView.init 支持），iPad 上即 regular 双栏布局。
-      - name: Capture Two-Pane Screenshots (8 langs x 5 tabs)
+      # RootContentView.init 支持）。iPad 模拟器默认竖屏 → 走上下单列分支，
+      # 用于确认“竖屏不被误判为双栏”；横屏双栏由下一步单独采集。
+      - name: Capture iPad Screenshots (8 langs x 5 tabs, portrait)
         run: |
           python3 .github/scripts/capture_ipad_screenshots.py \
             --app-path "$APP_PATH" \
             --lang all \
             --output-dir "two-pane-screenshots/ipad"
 
+      # 横屏分栏覆盖（本次布局改动的自动化验证，不再只靠人工旋转核对）：
+      # 脚本先尝试 AppleScript 真旋转；Xcode 27 Device Hub 不支持时自动回退到
+      # -forceLandscapeLayout 启动参数，仍走同一套双栏 SwiftUI 布局代码路径。
+      # 渲染模式（真旋转 / 强制布局）会写进脚本的截屏报告，绝不假绿。
+      - name: Capture iPad Landscape Two-Pane Screenshots (5 tabs)
+        run: |
+          python3 .github/scripts/capture_ipad_screenshots.py \
+            --app-path "$APP_PATH" \
+            --lang en \
+            --rotate-landscape \
+            --output-dir "two-pane-screenshots/ipad-landscape"
+
       - name: Upload Screenshots
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: Two-Pane-iPad-Screenshots
+          name: iPad-Screenshots
           path: two-pane-screenshots/
           retention-days: 14
           if-no-files-found: error
@@ -83,12 +152,13 @@ jobs:
         if: always()
         run: |
           {
-            echo "## 🖥️ 展开态双栏布局截图（iPad = regular size class）"
+            echo "## 🖥️ iPad 截图（竖屏单列 / 横屏双栏）"
             echo ""
-            echo "- 覆盖 8 语言 × 5 Tab；iPad 全形态 \`horizontalSizeClass == .regular\`，"
-            echo "  与 iPhone Duo 展开态走 **同一套** FoldableTwoPane / ProportionalTwoPaneLayout 代码路径。"
-            echo "- 检查要点：罗盘盘面/九宫排盘/户型画布位于左栏（约 58%~62% 宽），"
-            echo "  分金卡/格局评析/体检报告位于右栏，右栏可独立滚动。"
+            echo "- 竖屏：8 语言 × 5 Tab，**上下单列**；户型画布放大（上限 720pt）；"
+            echo "  三张 VIP 预览卡不出现（仅分栏右栏展示）。"
+            echo "- 横屏：单独采集 ipad-landscape/ 的 5 Tab，**左右双栏** —— 左栏画板"
+            echo "  宽约 55%~60% 且按左栏自适应，右栏为解释研判并可独立滚动。"
+            echo "- 横屏渲染模式（设备真旋转 / App 强制横屏布局）见脚本截屏报告，不假绿。"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # ================================================================
@@ -96,56 +166,112 @@ jobs:
   # ================================================================
   iphone-duo-best-effort:
     name: iPhone Duo Simulator (folded outer + unfolded inner if possible)
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 45
 
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Select Highest Available Xcode
-        run: |
-          HIGHEST_XCODE="$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)"
-          if [ -n "$HIGHEST_XCODE" ]; then
-            echo "Selecting Xcode at: $HIGHEST_XCODE"
-            sudo xcode-select -s "$HIGHEST_XCODE/Contents/Developer"
-          fi
-          xcodebuild -version
-
-      # 检测（非致命）：Duo 设备类型缺失时跳过本 Job 后续步骤，
-      # 布局验证由 Job 1 的 regular size class 路径兜底。
-      - name: Detect iPhone Duo Device Type
-        id: detect_duo
-        run: |
-          echo "===== Device Types matching 'Duo' ====="
-          xcrun simctl list devicetypes | grep -i duo || true
-          if xcrun simctl list devicetypes -j | python3 -c 'import json,sys;d=json.load(sys.stdin);exit(0 if any("Duo" in t["name"] for t in d["devicetypes"]) else 1)'; then
-            echo "duo_available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::iPhone Duo simulator device type is not available on this runner (Xcode $(xcodebuild -version | head -1)). Two-pane layout is still verified by the iPad job (same .regular code path)."
-            echo "duo_available=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create & Boot iPhone Duo Simulator
-        if: steps.detect_duo.outputs.duo_available == 'true'
+      # 硬性要求：必须用 iOS 27.1 SDK 编译。低版本 SDK 构建的 App 在 iPhone Duo
+      # 内屏上会进入兼容模式（按 iPhone 尺寸等比缩放 + 黑边），双栏布局根本不生效，
+      # 截图只会得到“熟悉的 iPhone 尺寸”的缩小画面。
+      - name: Select Xcode 27 & Require iOS 27.1 SDK
         run: |
           set -euo pipefail
-          DUO_TYPE_ID="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next(t["identifier"] for t in d["devicetypes"] if "Duo" in t["name"]))')"
-          echo "Device type: $DUO_TYPE_ID"
+          echo "===== Available Xcode ====="
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
 
-          UDID="$(xcrun simctl list devices -j | python3 -c 'import json,sys;d=json.load(sys.stdin);devs=[x for rt in d["devices"].values() for x in rt if "Duo" in x.get("name","")];print(devs[0]["udid"] if devs else "")')"
-          if [ -z "$UDID" ]; then
-            UDID="$(xcrun simctl create "iPhone Duo Test" "$DUO_TYPE_ID")"
-            echo "Created simulator: $UDID"
-          else
-            echo "Using existing simulator: $UDID"
+          XCODE_APP=""
+          for cand in /Applications/Xcode_27.1.app /Applications/Xcode_27*.app; do
+            if [ -d "$cand" ]; then XCODE_APP="$cand"; break; fi
+          done
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
-          echo "DUO_UDID=$UDID" >> "$GITHUB_ENV"
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::No Xcode installation found on runner"
+            exit 1
+          fi
+          echo "Selecting Xcode: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
 
-          xcrun simctl boot "$UDID" 2>/dev/null || true
-          xcrun simctl bootstatus "$UDID" -b
-          echo "===== Booted ====="
-          xcrun simctl list devices | grep -i duo || true
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo missing)"
+          SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || echo missing)"
+          echo "Device SDK: $IOS_SDK | Simulator SDK: $SIM_SDK"
+          for sdk in "$IOS_SDK" "$SIM_SDK"; do
+            if ! awk -v v="$sdk" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+              echo "::error::iOS SDK 27.1+ required (got $sdk). Older SDK builds run in iPhone Duo compatibility mode (scaled-down iPhone canvas + letterbox), so the two-pane layout cannot be exercised."
+              exit 1
+            fi
+          done
+          echo "SDK check passed: iOS $IOS_SDK / Simulator $SIM_SDK"
+
+      # 检测、创建并启动 iPhone Duo 模拟器。
+      # 运行时不能写死也不能省略：iOS 27.1 运行时目前只有 iPhone Duo，
+      # 这里选“支持 Duo 设备类型的最新可用运行时”，并只复用该运行时下的 Duo 设备。
+      - name: Detect, Create & Boot iPhone Duo Simulator
+        id: detect_duo
+        run: |
+          set -euo pipefail
+          echo "===== Runtimes ====="
+          xcrun simctl list runtimes
+          echo "===== Device types matching 'duo|fold' ====="
+          xcrun simctl list devicetypes | grep -Ei 'duo|fold' || true
+
+          cat > "$RUNNER_TEMP/duo_sim.py" <<'PY'
+          import json, re, subprocess, sys
+
+          def sh(*a):
+              return subprocess.check_output(a, text=True).strip()
+
+          types = json.loads(sh("xcrun", "simctl", "list", "devicetypes", "-j"))["devicetypes"]
+          duo = next((t for t in types if re.search(r"duo|fold", t["name"], re.I)), None)
+          if duo is None:
+              print("duo_available=false")
+              sys.exit(0)
+
+          runtimes = json.loads(sh("xcrun", "simctl", "list", "runtimes", "-j"))["runtimes"]
+
+          def ver(r):
+              return tuple(int(x) for x in re.findall(r"\d+", r["version"]))
+
+          ok = [r for r in runtimes
+                if r.get("isAvailable")
+                and any(d["identifier"] == duo["identifier"] for d in r.get("supportedDeviceTypes", []))]
+          if not ok:
+              print("duo_available=false")
+              sys.exit(0)
+          rt = max(ok, key=ver)
+
+          devs = json.loads(sh("xcrun", "simctl", "list", "devices", "-j"))["devices"].get(rt["identifier"], [])
+          hit = next((d for d in devs
+                      if d.get("isAvailable") and d.get("deviceTypeIdentifier") == duo["identifier"]), None)
+          udid = hit["udid"] if hit else sh("xcrun", "simctl", "create", "iPhone Duo Test",
+                                            duo["identifier"], rt["identifier"])
+          print("duo_available=true")
+          print("udid=" + udid)
+          print("runtime=" + rt["identifier"])
+          PY
+
+          python3 "$RUNNER_TEMP/duo_sim.py" | tee "$RUNNER_TEMP/duo.out"
+
+          if grep -q '^duo_available=true' "$RUNNER_TEMP/duo.out"; then
+            UDID="$(sed -n 's/^udid=//p' "$RUNNER_TEMP/duo.out")"
+            echo "duo_available=true" >> "$GITHUB_OUTPUT"
+            echo "DUO_UDID=$UDID" >> "$GITHUB_ENV"
+            xcrun simctl boot "$UDID" 2>/dev/null || true
+            xcrun simctl bootstatus "$UDID" -b
+            echo "===== Booted ====="
+            xcrun simctl list devices | grep -F "$UDID" || true
+          else
+            # 去掉 xcodebuild 版本号自带的 "Xcode " 前缀，避免输出 "Xcode Xcode 26.6"
+            XCODE_VER="$(xcodebuild -version | head -1 | sed 's/^Xcode[[:space:]]*//')"
+            echo "::warning::Foldable simulator device type or a runtime supporting it is not available on this runner (Xcode ${XCODE_VER}). Duo inner-display capture is unavailable; the iPad job covers the landscape two-pane layout (real rotation or forced layout), which uses the same SwiftUI code path."
+            echo "duo_available=false" >> "$GITHUB_OUTPUT"
+            echo "xcode_version=${XCODE_VER}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build App for iPhone Duo (Debug)
         if: steps.detect_duo.outputs.duo_available == 'true'
@@ -163,6 +289,18 @@ jobs:
 
           APP_PATH="tiandi_luopan/build-duo/Build/Products/Debug-iphonesimulator/TiandiLuopan.app"
           [ -d "$APP_PATH" ] || { echo "::error::Built app not found at $APP_PATH"; exit 1; }
+
+          # 同 Job 1：产物必须确实链接 iOS 27.1 SDK，否则 Duo 内屏为兼容模式
+          DTSDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$APP_PATH/Info.plist" 2>/dev/null || true)"
+          echo "DTSDKName = $DTSDK"
+          case "$DTSDK" in
+            *27.1*) : ;;
+            *)
+              echo "::error::App not built against iOS 27.1 SDK (DTSDKName=$DTSDK); unfolded inner display would render in compatibility mode."
+              exit 1
+              ;;
+          esac
+
           echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
       - name: Install, Grant Permissions, Set GPS & Launch
@@ -188,81 +326,149 @@ jobs:
             || { echo "::error::App process is not alive on iPhone Duo simulator"; tail -30 launchctl.out; exit 1; }
           echo "App process is alive: $BUNDLE_ID"
 
-      # 外屏（折叠态）截图：8 语言 × 5 Tab。
-      # 模拟器若暴露多显示器，外屏为 primary（--display=1）；单显示器则回退默认截图。
+      # 折叠/展开：simctl 与 devicectl 都没有铰链命令，只能靠 duoctl（skarol/duoctl）。
+      # 它通过 `xcrun simctl spawn` 在模拟器内起一个小助手，不依赖 GUI。
+      # 安装失败时：外屏截图仍会跑（但姿态无法保证），内屏截图跳过。
+      # 注：brew tap 为第三方、未固定版本；本 job 只有 contents: read 权限且无任何 secret。
+      - name: Install duoctl
+        if: steps.detect_duo.outputs.duo_available == 'true'
+        run: |
+          if ! command -v duoctl >/dev/null 2>&1; then
+            brew install skarol/tap/duoctl || true
+          fi
+          if command -v duoctl >/dev/null 2>&1; then
+            echo "HAVE_DUOCTL=true" >> "$GITHUB_ENV"
+            duoctl --help 2>&1 | head -30 || true
+          else
+            echo "HAVE_DUOCTL=false" >> "$GITHUB_ENV"
+            echo "::warning::duoctl unavailable; fold pose cannot be controlled. Outer screenshots use whatever pose the simulator booted in; inner capture is skipped."
+          fi
+
+      # 外屏/内屏共用的截图逻辑：先显式设置姿态（close=外屏，open=内屏），再 8 语言 × 5 Tab。
+      # 每张图的像素尺寸写入 manifest.csv，每次切姿态后的 `duoctl state` 写入 pose-log.txt，
+      # 方便事后核对“这张图到底是哪块屏”。
+      - name: Write capture helper
+        if: steps.detect_duo.outputs.duo_available == 'true'
+        run: |
+          cat > "$RUNNER_TEMP/duo_capture.sh" <<'SH'
+          # usage: capture_set <close|open> <outer|inner> <file-prefix> <allow-simctl-fallback:0|1>
+          BUNDLE_ID="com.yanxiang.compass"
+          LANGS=(zh-Hans zh-Hant en ja ko vi th id)
+          LOCALES=(zh_CN zh_TW en_US ja_JP ko_KR vi_VN th_TH id_ID)
+          OUT="duo-screenshots"
+
+          set_pose() {
+            local pose="$1"
+            if [ "${HAVE_DUOCTL:-false}" != "true" ]; then return 1; fi
+            duoctl -d "$DUO_UDID" "$pose" || return 1
+            duoctl -d "$DUO_UDID" rotate portrait || echo "::warning::duoctl rotate failed; continuing"
+            sleep 3
+            { echo "--- pose=$pose $(date -u +%H:%M:%S)"; duoctl -d "$DUO_UDID" state 2>&1; } | tee -a "$OUT/pose-log.txt"
+          }
+
+          # 内屏不允许回退到 simctl：无法保证它截的是内屏
+          take_shot() {  # $1=file  $2=allow simctl fallback
+            if [ "${HAVE_DUOCTL:-false}" = "true" ] && duoctl -d "$DUO_UDID" screenshot "$1"; then
+              return 0
+            fi
+            if [ "$2" = "1" ]; then
+              xcrun simctl io "$DUO_UDID" screenshot "$1"
+            else
+              return 1
+            fi
+          }
+
+          capture_set() {
+            local pose="$1" sub="$2" prefix="$3" fallback="$4"
+            mkdir -p "$OUT/$sub"
+            if ! set_pose "$pose"; then
+              if [ "$fallback" = "1" ]; then
+                echo "::warning::could not set pose '$pose'; capturing in the simulator's current pose"
+              else
+                return 1
+              fi
+            fi
+            for ((k=0; k<${#LANGS[@]}; k++)); do
+              local lang="${LANGS[$k]}" locale="${LOCALES[$k]}"
+              mkdir -p "$OUT/$sub/$lang"
+              for i in 0 1 2 3 4; do
+                xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
+                xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" \
+                  -selectedTab "$i" -AppleLanguages "($lang)" -AppleLocale "$locale"
+                sleep 8
+                local f="$OUT/$sub/$lang/$prefix-$i.png"
+                if take_shot "$f" "$fallback"; then
+                  local w h
+                  w="$(sips -g pixelWidth "$f" | awk '/pixelWidth/{print $2}')"
+                  h="$(sips -g pixelHeight "$f" | awk '/pixelHeight/{print $2}')"
+                  echo "$sub,$lang,$i,${w}x${h}" >> "$OUT/manifest.csv"
+                else
+                  echo "::warning::screenshot failed: $sub / $lang / tab $i"
+                fi
+              done
+            done
+          }
+          SH
+
+      # 外屏（折叠态）：8 语言 × 5 Tab。selectedTab 由 RootContentView.init 支持。
       - name: Capture Folded Outer Display (8 langs x 5 tabs)
         if: steps.detect_duo.outputs.duo_available == 'true'
         run: |
           set -euo pipefail
-          BUNDLE_ID="com.yanxiang.compass"
-          LANGS="zh-Hans zh-Hant en ja ko vi th id"
-          LOCALES="zh_CN zh_TW en_US ja_JP ko_KR vi_VN th_TH id_ID"
-          L=($LANGS); C=($LOCALES)
-          for ((k=0; k<${#L[@]}; k++)); do
-            lang="${L[$k]}"; locale="${C[$k]}"
-            mkdir -p "duo-screenshots/outer/$lang"
-            for i in 0 1 2 3 4; do
-              xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
-              xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" \
-                -selectedTab "$i" -AppleLanguages "($lang)" -AppleLocale "$locale"
-              sleep 8
-              xcrun simctl io "$DUO_UDID" screenshot --display=1 "duo-screenshots/outer/$lang/duo-tab-$i.png" 2>/dev/null \
-                || xcrun simctl io "$DUO_UDID" screenshot "duo-screenshots/outer/$lang/duo-tab-$i.png"
-            done
-          done
-          find duo-screenshots/outer -type f | sort | wc -l
+          source "$RUNNER_TEMP/duo_capture.sh"
+          mkdir -p "$OUT/outer" "$OUT/inner"
+          echo "display,lang,tab,pixels" > "$OUT/manifest.csv"
+          capture_set close outer duo-tab 1
+          echo "Outer screenshots: $(find "$OUT/outer" -name '*.png' | wc -l | tr -d ' ')"
 
-      # 展开内屏截图：完全依赖 duoctl（skarol/duoctl，私有 HID 事件注入）。
-      # 安装/open 任一失败 → 跳过并告警，布局验证由 Job 1（iPad regular）兜底。
-      - name: Unfold & Capture Inner Display (duoctl, best-effort)
+      # 内屏（展开态）：依赖 duoctl，不可用或展开失败则跳过并在 Summary 里如实标注。
+      - name: Unfold & Capture Inner Display (duoctl)
         if: steps.detect_duo.outputs.duo_available == 'true'
         run: |
           set -euo pipefail
-          BUNDLE_ID="com.yanxiang.compass"
-          if ! command -v duoctl >/dev/null 2>&1; then
-            brew install skarol/tap/duoctl || true
-          fi
-          if ! command -v duoctl >/dev/null 2>&1; then
-            echo "::warning::duoctl unavailable on this runner; unfolded inner-display capture skipped. Two-pane layout is still verified by the iPad job."
+          if [ "${HAVE_DUOCTL:-false}" != "true" ]; then
+            echo "::warning::duoctl unavailable; unfolded inner-display capture skipped. The Duo inner-display path is not covered here; the iPad landscape job covers the same SwiftUI two-pane code path."
+            echo "INNER_STATUS=skipped (duoctl unavailable)" >> "$GITHUB_ENV"
             exit 0
           fi
-          export DUOCTL_UDID="$DUO_UDID"
-          duoctl open || { echo "::warning::duoctl open failed; unfolded capture skipped"; exit 0; }
-          duoctl rotate portrait || echo "::warning::duoctl rotate failed; continuing"
-
-          LANGS="zh-Hans zh-Hant en ja ko vi th id"
-          LOCALES="zh_CN zh_TW en_US ja_JP ko_KR vi_VN th_TH id_ID"
-          L=($LANGS); C=($LOCALES)
-          for ((k=0; k<${#L[@]}; k++)); do
-            lang="${L[$k]}"; locale="${C[$k]}"
-            mkdir -p "duo-screenshots/inner/$lang"
-            for i in 0 1 2 3 4; do
-              xcrun simctl terminate "$DUO_UDID" "$BUNDLE_ID" 2>/dev/null || true
-              xcrun simctl launch "$DUO_UDID" "$BUNDLE_ID" \
-                -selectedTab "$i" -AppleLanguages "($lang)" -AppleLocale "$locale"
-              sleep 8
-              duoctl screenshot "duo-screenshots/inner/$lang/duo-inner-tab-$i.png" \
-                || echo "::warning::unfolded inner screenshot failed for tab $i (lang $lang)"
-            done
-          done
-          find duo-screenshots/inner -type f | sort | wc -l
+          source "$RUNNER_TEMP/duo_capture.sh"
+          if capture_set open inner duo-inner-tab 0; then
+            echo "INNER_STATUS=captured" >> "$GITHUB_ENV"
+          else
+            echo "::warning::duoctl could not unfold the simulator; inner capture skipped"
+            echo "INNER_STATUS=skipped (unfold failed)" >> "$GITHUB_ENV"
+          fi
+          echo "Inner screenshots: $(find "$OUT/inner" -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
 
       - name: Upload iPhone Duo Screenshots
-        if: steps.detect_duo.outputs.duo_available == 'true'
+        if: ${{ !cancelled() && steps.detect_duo.outputs.duo_available == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: iPhone-Duo-Screenshots
           path: duo-screenshots/
           retention-days: 14
-          if-no-files-found: warn
+          if-no-files-found: error
 
       - name: Summary
         if: always()
         run: |
+          AVAILABLE="${{ steps.detect_duo.outputs.duo_available }}"
+          XCODE_VER="${{ steps.detect_duo.outputs.xcode_version }}"
+          OUTER="$(find duo-screenshots/outer -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
+          INNER="$(find duo-screenshots/inner -name '*.png' 2>/dev/null | wc -l | tr -d ' ')"
           {
-            echo "## 📱 iPhone Duo 模拟器截图（best-effort）"
+            echo "## 📱 iPhone Duo 模拟器截图"
             echo ""
-            echo "- 设备类型可用性：\`${{ steps.detect_duo.outputs.duo_available }}\`"
-            echo "- 折叠外屏：8 语言 × 5 Tab（\`-selectedTab\` 由 RootContentView 启动参数支持）"
-            echo "- 展开内屏：依赖 duoctl；不可用时跳过（布局已由 iPad Job 以同一 \`.regular\` 代码路径验证）"
+            if [ "$AVAILABLE" = "true" ]; then
+              echo "- 设备类型可用性：\`true\`"
+              echo "- 外屏（折叠）：${OUTER:-0} 张"
+              echo "- 内屏（展开）：${INNER:-0} 张 —— ${INNER_STATUS:-未执行}"
+              echo "- 每张图的像素尺寸见 artifact 里的 \`manifest.csv\`，姿态/当前屏幕记录见 \`pose-log.txt\`，可据此核对外屏/内屏。"
+            else
+              echo "- 设备类型可用性：\`false\` —— **本次未验证折叠外屏/内屏**"
+              echo "  runner 的 Xcode${XCODE_VER:+ $XCODE_VER} 未提供 iPhone Duo/Fold 设备类型或对应运行时。"
+              echo "- 因此仅 **Duo 内屏** 分栏无 CI 覆盖；iPad 横屏分栏已由 Job 1 采图覆盖"
+              echo "  （同一套 SwiftUI 双栏代码路径，渲染模式见截屏报告）。"
+            fi
+            echo "- 截图范围：8 语言 × 5 Tab（\`-selectedTab\` 由 RootContentView 启动参数支持）"
           } >> "$GITHUB_STEP_SUMMARY"

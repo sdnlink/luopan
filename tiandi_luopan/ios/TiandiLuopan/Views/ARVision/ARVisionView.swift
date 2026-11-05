@@ -55,6 +55,10 @@ public struct CameraPreviewView: UIViewRepresentable {
         private var sessionObservers: [NSObjectProtocol] = []
         private let sessionQueue = DispatchQueue(label: "com.yanxiang.compass.camera-session")
         private var wantsRunning = true
+        // iPad 声明了四个方向，预览层与照片输出必须跟随界面旋转；
+        // iOS 17 用 AVCaptureDeviceRotationCoordinator，iOS 16 用 videoOrientation。
+        private var rotationCoordinator: Any?
+        private var rotationObservation: NSKeyValueObservation?
 
         deinit {
             sessionObservers.forEach { NotificationCenter.default.removeObserver($0) }
@@ -78,6 +82,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         override public func layoutSubviews() {
             super.layoutSubviews()
             previewLayer?.frame = bounds
+            syncRotation()
         }
         
         public func setupSession(position: AVCaptureDevice.Position) {
@@ -158,6 +163,7 @@ public struct CameraPreviewView: UIViewRepresentable {
             
             self.captureSession = session
             self.previewLayer = preview
+            startRotationTracking(device: camera, preview: preview)
 
             // A phone call, Control Center camera, or another app can interrupt
             // capture without destroying the preview view. Resume the same
@@ -227,6 +233,54 @@ public struct CameraPreviewView: UIViewRepresentable {
             
             sessionQueue.async {
                 session.startRunning()
+            }
+        }
+
+        /// 让预览层与照片输出跟随界面方向。
+        /// iPhone 端只支持竖屏，这段代码在 iPhone 上是空转；
+        /// iPad 支持四向，缺了它横屏取景会整体旋转 90°、存证照片方向也会错。
+        private func startRotationTracking(device: AVCaptureDevice, preview: AVCaptureVideoPreviewLayer) {
+            rotationObservation = nil
+            rotationCoordinator = nil
+            if #available(iOS 17.0, *) {
+                let coordinator = AVCaptureDeviceRotationCoordinator(device: device, previewLayer: preview)
+                rotationCoordinator = coordinator
+                rotationObservation = coordinator.observe(
+                    \.videoRotationAngleForHorizonLevelPreview,
+                    options: [.initial, .new]
+                ) { [weak self] _, _ in
+                    DispatchQueue.main.async { self?.syncRotation() }
+                }
+            }
+            syncRotation()
+        }
+
+        private func syncRotation() {
+            guard let connection = previewLayer?.connection else { return }
+            if #available(iOS 17.0, *) {
+                if let coordinator = rotationCoordinator as? AVCaptureDeviceRotationCoordinator {
+                    // isVideoRotationAngleSupported 是方法（传入角度），不是 Bool 属性。
+                    let previewAngle = coordinator.videoRotationAngleForHorizonLevelPreview
+                    if connection.isVideoRotationAngleSupported(previewAngle) {
+                        connection.videoRotationAngle = previewAngle
+                    }
+                    let captureAngle = coordinator.videoRotationAngleForHorizonLevelCapture
+                    if let photoConnection = photoCaptureOutput?.connection(with: .video),
+                       photoConnection.isVideoRotationAngleSupported(captureAngle) {
+                        photoConnection.videoRotationAngle = captureAngle
+                    }
+                    return
+                }
+            }
+            // iOS 16 兼容分支：界面方向与 AVCaptureVideoOrientation 的横屏命名相反，
+            // 竖屏 UI 下两者一致，横屏需要互换左右，否则 iPad 横屏会得到 180° 倒像。
+            let captureOrientation = (window?.windowScene?.interfaceOrientation ?? .portrait).avCaptureOrientation
+            if connection.isVideoOrientationSupported {
+                connection.videoOrientation = captureOrientation
+            }
+            if let photoConnection = photoCaptureOutput?.connection(with: .video),
+               photoConnection.isVideoOrientationSupported {
+                photoConnection.videoOrientation = captureOrientation
             }
         }
 
@@ -307,6 +361,8 @@ public struct CameraPreviewView: UIViewRepresentable {
             previewLayer?.removeFromSuperlayer()
             previewLayer = nil
             photoCaptureOutput = nil
+            rotationObservation = nil
+            rotationCoordinator = nil
             sessionQueue.async {
                 if sessionToStop.isRunning {
                     sessionToStop.stopRunning()
@@ -352,6 +408,9 @@ public struct CameraPreviewView: UIViewRepresentable {
     public func makeUIView(context: Context) -> CameraUIView {
         let view = CameraUIView()
         view.backgroundColor = .black
+        // 同 ARSCNView：SwiftUI .clipped() 对 UIViewRepresentable 不保证生效，
+        // 分栏左栏时在 UIView 层自行裁剪，确保预览层不越界。
+        view.clipsToBounds = true
         controller?.activeView = view
         if isActive {
             view.setupSession(position: cameraPosition)
@@ -532,24 +591,25 @@ public struct ARVisionView: View {
         return min(max(selectedShaIndex, 0), shaList.count - 1)
     }
     
-    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
-    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用取景/研判双栏布局。
+    // 布局形态：Duo 内屏 / iPad 横屏启用“取景 + 研判”双栏（见 AdaptiveLayout）；
+    // iPad 竖屏保持与 iPhone 一致的单列全屏取景 + HUD 悬浮布局。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    private var isLargeLayout: Bool {
-        horizontalSizeClass == .regular
+    @Environment(\.adaptiveLayoutForm) private var layoutForm
+    private var isSplitLayout: Bool {
+        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
     }
 
     public var body: some View {
         ZStack {
             if isActive {
-            if isLargeLayout {
-                // iPhone Duo 展开态双栏：左栏 = 取景与形煞锁定交互，
+            if isSplitLayout {
+                // 分栏态（Duo 内屏 / iPad 横屏）：左栏 = 取景与形煞锁定交互，
                 // 右栏 = 形煞智能研判与化解解释（独立滚动）。
                 // 复用共享按比例布局（0.6 左栏），折叠态全屏 HUD 布局保持不变，
                 // 故不经过 FoldableTwoPane 的纵排折叠分支。
                 ProportionalTwoPaneLayout(mainRatio: 0.6) {
                     ZStack {
-                        cameraLayer()
+                        cameraLayer(edgeToEdge: false)
                         scanBeamLayer
                         crosshairCenterLayer()
                         targetBoundingBoxLayer()
@@ -564,6 +624,8 @@ public struct ARVisionView: View {
                         .padding(.bottom, 12)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    // 双保险：整个左栏（取景 + HUD）严格裁在左栏 bounds 内
+                    .clipped()
 
                     Rectangle()
                         .fill(Color.white.opacity(0.10))
@@ -703,7 +765,9 @@ public struct ARVisionView: View {
             Button(lang.t("cancel"), role: .cancel) { }
         }
         .fullScreenCover(isPresented: $showSpatialSurvey) {
-            ARSpatialSurveyView()
+            CameraExclusiveGate {
+                ARSpatialSurveyView()
+            }
         }
         .onDisappear {
             cameraModel.stopSession()
@@ -768,37 +832,57 @@ public struct ARVisionView: View {
 
     /// 取景层：真机摄像头 / ARKit+LiDAR 融合流 / 模拟器仿真画板
     /// (仅在 AR Tab 激活时工作，后台休眠避免发烫)
-    @ViewBuilder
-    private func cameraLayer() -> some View {
-        if hasCameraPermission && isActive && !showSpatialSurvey {
-            if cameraPosition == .back && ARWorldTrackingConfiguration.isSupported {
-                ARFusionCaptureView(
-                    model: fusionModel,
-                    isActive: isActive && !showSpatialSurvey,
-                    captureTrigger: captureTrigger,
-                    onFrameCaptured: { frame in
-                        handleCapturedFrame(frame)
-                    }
-                )
-                .id("ar_fusion_back")
-                .ignoresSafeArea()
+    /// 单列全屏时铺满安全区；分栏左栏时必须裁剪，否则取景层会突破左栏 bounds，
+    /// 与按左栏几何计算的扫描线 / 靶心 / 形煞标注框产生错位。
+    private struct ARSafeAreaClipModifier: ViewModifier {
+        let edgeToEdge: Bool
+
+        @ViewBuilder
+        func body(content: Content) -> some View {
+            if edgeToEdge {
+                content.ignoresSafeArea()
             } else {
-                CameraPreviewView(
-                    controller: cameraModel,
-                    cameraPosition: cameraPosition,
-                    isActive: isActive && !showSpatialSurvey,
-                    captureTrigger: captureTrigger,
-                    onPhotoCaptured: { image in
-                        handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
-                    }
-                )
-                .id("camera_preview_\(cameraPosition.rawValue)")
-                .ignoresSafeArea()
+                content.clipped()
             }
-        } else {
-            simulationCanvasLayer()
-                .ignoresSafeArea()
         }
+    }
+
+    private func cameraLayer(edgeToEdge: Bool = true) -> some View {
+        Group {
+            if hasCameraPermission && isActive && !showSpatialSurvey {
+                // 相机闸门：另一个窗口正在用相机时不构造采集会话（融合 AR 与前台预览两条路径都覆盖），
+                // 改为提示卡；模拟画布分支不需要相机，不经过闸门。
+                CameraExclusiveGate {
+                    Group {
+                        if cameraPosition == .back && ARWorldTrackingConfiguration.isSupported {
+                            ARFusionCaptureView(
+                                model: fusionModel,
+                                isActive: isActive && !showSpatialSurvey,
+                                captureTrigger: captureTrigger,
+                                onFrameCaptured: { frame in
+                                    handleCapturedFrame(frame)
+                                }
+                            )
+                            .id("ar_fusion_back")
+                        } else {
+                            CameraPreviewView(
+                                controller: cameraModel,
+                                cameraPosition: cameraPosition,
+                                isActive: isActive && !showSpatialSurvey,
+                                captureTrigger: captureTrigger,
+                                onPhotoCaptured: { image in
+                                    handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
+                                }
+                            )
+                            .id("camera_preview_\(cameraPosition.rawValue)")
+                        }
+                    }
+                }
+            } else {
+                simulationCanvasLayer()
+            }
+        }
+        .modifier(ARSafeAreaClipModifier(edgeToEdge: edgeToEdge))
     }
 
     /// 激光天心扫描光束 (动态往返扫掠)
@@ -826,7 +910,7 @@ public struct ARVisionView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
                 Text(lang.t("save_success"))
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(.white)
                 if latestSnapshotImage != nil {
                     Button(action: {
@@ -836,7 +920,7 @@ public struct ARVisionView: View {
                             Image(systemName: "square.and.arrow.up")
                             Text(lang.t("share_and_print"))
                         }
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.yanCyan)
@@ -870,12 +954,12 @@ public struct ARVisionView: View {
             
             VStack(spacing: 8) {
                 Image(systemName: "viewfinder")
-                    .font(.adaptive(size: 40))
+                    .adaptiveFont(size: 40)
                     .foregroundColor(Color.yanCyan.opacity(0.5))
                 let cameraDenied = AVCaptureDevice.authorizationStatus(for: .video) == .denied ||
                     AVCaptureDevice.authorizationStatus(for: .video) == .restricted
                 Text(cameraDenied ? lang.t("camera_permission_denied") : lang.t("simulation_mode"))
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(.white.opacity(0.7))
                 if cameraDenied {
                     Button {
@@ -883,7 +967,7 @@ public struct ARVisionView: View {
                         UIApplication.shared.open(url)
                     } label: {
                         Text(lang.t("open_system_settings"))
-                            .font(.adaptive(size: 11, weight: .semibold))
+                            .adaptiveFont(size: 11, weight: .semibold)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Color.yanCyan.opacity(0.25))
@@ -892,7 +976,7 @@ public struct ARVisionView: View {
                     }
                 } else {
                     Text(lang.t("ar_drag_hint"))
-                        .font(.adaptive(size: 11))
+                        .adaptiveFont(size: 11)
                         .foregroundColor(.white.opacity(0.4))
                 }
             }
@@ -932,7 +1016,7 @@ public struct ARVisionView: View {
                 .frame(width: 180, height: 1)
             
             Text("\(String(format: "%.1f", motion.headingState.facingAngle))° · \(String(format: "%+.1f°", elevDeg))")
-                .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
+                .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundColor(isHorizontalLevel ? .yanCyan : .orange)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -941,7 +1025,7 @@ public struct ARVisionView: View {
 
             if cameraPosition == .back, let dist = fusionModel.distance {
                 Text("\(fusionModel.lidarAvailable ? "LiDAR" : "AR") · \(String(format: "%.2f m", dist))")
-                    .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
+                    .adaptiveFont(size: 10, weight: .bold, design: .monospaced)
                     .foregroundColor(fusionModel.lidarAvailable ? .green : .yanCyan)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -979,7 +1063,7 @@ public struct ARVisionView: View {
                 x: min(max(0.5 + clampedOffset.width / max(proxy.size.width, 1), 0.02), 0.98),
                 y: min(max(0.5 + clampedOffset.height / max(proxy.size.height, 1), 0.02), 0.98)
             )
-            let targetDist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: normPoint) : nil
+            let targetDist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: normPoint) : nil
 
             let waterItem = targetSanHeWater
             let hitBaSha = isTargetHitBaSha
@@ -996,14 +1080,14 @@ public struct ARVisionView: View {
                             .fill(Color.red)
                             .frame(width: 6, height: 6)
                         Text("\(lang.t("ar_target_center")) · \(m.localizedName)\(lang.t("mountain_suffix"))")
-                            .font(.adaptive(size: 10, weight: .bold))
+                            .adaptiveFont(size: 10, weight: .bold)
                             .foregroundColor(.yellow)
                     }
                     Text(currentSha.localizedName)
-                        .font(.adaptive(size: 15, weight: .bold, design: .serif))
+                        .adaptiveFont(size: 15, weight: .bold, design: .serif)
                         .foregroundColor(.white)
                     Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
-                        .font(.adaptive(size: 10, weight: .bold))
+                        .adaptiveFont(size: 10, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -1012,17 +1096,17 @@ public struct ARVisionView: View {
                             ? "⚠️ 犯坐山八煞"
                             : (water.isHuangQuanSha ? "⚠️ 犯八路黄泉" : "水法: \(water.stage)")
                         Text(statusTag)
-                            .font(.adaptive(size: 9, weight: .bold))
+                            .adaptiveFont(size: 9, weight: .bold)
                             .foregroundColor((hitBaSha || water.isHuangQuanSha) ? .red : (water.isAuspicious ? .green : .yanCyan))
                             .lineLimit(1)
                     }
                     if let d = targetDist {
                         Text("\(fusionModel.lidarAvailable ? "LiDAR" : "AR") \(String(format: "%.2f m", d))")
-                            .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
+                            .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                             .foregroundColor(.green)
                     }
                     Text(currentSha.localizedAliases)
-                        .font(.adaptive(size: 9))
+                        .adaptiveFont(size: 9)
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
                 }
@@ -1066,10 +1150,10 @@ public struct ARVisionView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(lang.t("ar_title"))
-                        .font(.adaptive(size: 15, weight: .bold))
+                        .adaptiveFont(size: 15, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
-                        .font(.adaptive(size: 11))
+                        .adaptiveFont(size: 11)
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -1115,7 +1199,7 @@ public struct ARVisionView: View {
                     }
                 }) {
                     Image(systemName: "camera.rotate.fill")
-                        .font(.adaptive(size: 13))
+                        .adaptiveFont(size: 13)
                         .padding(8)
                         .background(Color.white.opacity(0.2))
                         .foregroundColor(.white)
@@ -1132,7 +1216,7 @@ public struct ARVisionView: View {
                             Image(systemName: isAIScanning ? "hourglass" : "sparkles")
                             Text(isAIScanning ? lang.t("ar_ai_scanning") : lang.t("ar_ai_scan"))
                         }
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(Color.yanCyan.opacity(0.85))
@@ -1152,7 +1236,7 @@ public struct ARVisionView: View {
                             Image(systemName: "arkit")
                             Text(lang.t("ar_spatial_survey"))
                         }
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(Color.purple.opacity(0.82))
@@ -1182,7 +1266,7 @@ public struct ARVisionView: View {
                             Image(systemName: "camera.fill")
                             Text(lang.t("capture_proof"))
                         }
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(Color.green.opacity(0.8))
@@ -1199,7 +1283,7 @@ public struct ARVisionView: View {
                             Image(systemName: "shield.lefthalf.fill")
                             Text(lang.t("remedy_guide"))
                         }
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 6)
                         .background(Color(red: 0.83, green: 0.68, blue: 0.21))
@@ -1243,11 +1327,11 @@ public struct ARVisionView: View {
 
                 VStack(spacing: 1) {
                     Text("\(m.localizedName)\(isCenter ? "▲" : "")")
-                        .font(.adaptive(size: isCenter ? 11 : 10, weight: .bold))
+                        .adaptiveFont(size: isCenter ? 11 : 10, weight: .bold)
                         .foregroundColor(isCenter ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
                     if let water = water {
                         Text((isBaSha || isHQ) ? "\(shaPrefix)\(water.stage)" : water.stage)
-                            .font(.adaptive(size: 8, weight: .semibold))
+                            .adaptiveFont(size: 8, weight: .semibold)
                             .foregroundColor((isBaSha || isHQ) ? .red : (water.isAuspicious ? .green : .white.opacity(0.72)))
                             .lineLimit(1)
                     }
@@ -1283,7 +1367,7 @@ public struct ARVisionView: View {
                         Image(systemName: isAutoFollowingDirection ? "location.fill" : "lock.fill")
                         Text(isAutoFollowingDirection ? lang.t("ar_auto_follow") : lang.t("ar_manual_lock"))
                     }
-                    .font(.adaptive(size: 10, weight: .bold))
+                    .adaptiveFont(size: 10, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(isAutoFollowingDirection ? Color.green.opacity(0.3) : Color.orange.opacity(0.3))
@@ -1294,7 +1378,7 @@ public struct ARVisionView: View {
                 Spacer()
                 
                 Text("\(lang.t("ar_current_facing")): \(targetMountain.localizedPalace) · \(targetMountain.localizedName)\(lang.t("mountain_suffix"))")
-                    .font(.adaptive(size: 10, weight: .medium))
+                    .adaptiveFont(size: 10, weight: .medium)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     .lineLimit(1)
                     .minimumScaleFactor(0.65)
@@ -1321,7 +1405,7 @@ public struct ARVisionView: View {
                             manualTargetNormalizedOffset = 0.0
                         }) {
                             Text(item.localizedName)
-                                .font(.adaptive(size: 11, weight: isSelected ? .bold : .medium))
+                                .adaptiveFont(size: 11, weight: isSelected ? .bold : .medium)
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 5)
                                 .background(isSelected ? Color.yanCyan.opacity(0.85) : Color.white.opacity(0.15))
@@ -1337,7 +1421,7 @@ public struct ARVisionView: View {
                     Image(systemName: "checkmark.seal.fill")
                         .foregroundColor(.green)
                     Text("\(lang.t("ar_ai_result")): \(String(format: "%.0f", aiResult.confidence * 100))% · \(aiResult.detectedRegions)")
-                        .font(.adaptive(size: 10, weight: .medium))
+                        .adaptiveFont(size: 10, weight: .medium)
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -1345,14 +1429,14 @@ public struct ARVisionView: View {
                 }
                 .padding(.horizontal, 8)
                 Text(lang.t("ar_ai_disclaimer"))
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(.orange.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 8)
             } else if let aiError = aiError {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(aiError)
-                        .font(.adaptive(size: 10))
+                        .adaptiveFont(size: 10)
                         .foregroundColor(.orange)
                     if photoPermissionDenied {
                         Button(lang.t("open_system_settings")) {
@@ -1360,7 +1444,7 @@ public struct ARVisionView: View {
                                   UIApplication.shared.canOpenURL(url) else { return }
                             UIApplication.shared.open(url)
                         }
-                        .font(.adaptive(size: 10, weight: .semibold))
+                        .adaptiveFont(size: 10, weight: .semibold)
                         .foregroundColor(.yanCyan)
                     }
                 }
@@ -1370,15 +1454,15 @@ public struct ARVisionView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("【\(sha.localizedName)】\(aiResult == nil ? lang.t("ar_manual_analysis") : lang.t("ar_ai_candidate")):")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
                     Text(sha.severity.localizedTitle)
-                        .font(.adaptive(size: 10, weight: .bold))
+                        .adaptiveFont(size: 10, weight: .bold)
                         .foregroundColor(sha.severity == .critical ? Color.red : Color.orange)
                 }
                 Text(sha.localizedMetaphysicsHarm)
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.9))
                     .lineSpacing(2)
             }
@@ -1390,7 +1474,7 @@ public struct ARVisionView: View {
             HStack(spacing: 8) {
                 Button(action: markCurrentSha) {
                     Label("\(lang.t("ar_mark_sha")) (\(shaStore.records.count))", systemImage: "mappin.and.ellipse")
-                        .font(.adaptive(size: 10, weight: .bold))
+                        .adaptiveFont(size: 10, weight: .bold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.yanCyan.opacity(0.25))
@@ -1399,7 +1483,7 @@ public struct ARVisionView: View {
                 }
                 Button(action: { showPanoramaReport = true }) {
                     Label(lang.t("ar_panorama_report"), systemImage: "gauge")
-                        .font(.adaptive(size: 10, weight: .bold))
+                        .adaptiveFont(size: 10, weight: .bold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.green.opacity(0.2))
@@ -1411,7 +1495,7 @@ public struct ARVisionView: View {
                         showShaActions = true
                     }) {
                         Image(systemName: "ellipsis.circle")
-                            .font(.adaptive(size: 11, weight: .bold))
+                            .adaptiveFont(size: 11, weight: .bold)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 5)
                             .background(Color.white.opacity(0.18))
@@ -1633,7 +1717,7 @@ public struct ARVisionView: View {
                 x: min(max(Double(targetNormalizedPoint.x), 0.02), 0.98),
                 y: min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
             )
-            let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: sample) : nil
+            let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
             shaStore.addRecord(ExteriorShaRecord(
                 shaID: analysis.shaID,
                 bearingDegrees: targetCalculatedHeading,
@@ -1660,7 +1744,7 @@ public struct ARVisionView: View {
     private func markCurrentSha() {
         let sha = shaList[activeShaIndex]
         let sample = currentTargetSamplePoint
-        let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atPortraitNormalizedPoint: sample) : nil
+        let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
         let record = ExteriorShaRecord(
             shaID: sha.id,
             bearingDegrees: targetCalculatedHeading,
@@ -1678,7 +1762,19 @@ public struct ARVisionView: View {
     private func captureAndSaveSnapshot(baseImage: UIImage) {
         snapshotGeneration += 1
         let generation = snapshotGeneration
-        let size = CGSize(width: 1080, height: 1920)
+        // 存证画布跟随底图**显示方向**的长宽比：iPad 横屏拍到的是横版照片，
+        // 塞进 1080×1920 竖版画布会被 aspectFill 左右裁掉 25%~45%，形煞位置与叠加 HUD 全部对不上。
+        // 注意不能用 `size` 直接比：AR 融合路径的底图是 ARKit 的横向像素缓冲（1920×1440），
+        // 靠 `imageOrientation`（.right/.left）旋成竖屏显示，`size` 仍是横向的；
+        // 这里按 orientation 是否 90°/270° 交换宽高得到真实显示尺寸，两条路径才都判得对。
+        let isQuarterTurn = [UIImage.Orientation.left, .right, .leftMirrored, .rightMirrored]
+            .contains(baseImage.imageOrientation)
+        let displayWidth = isQuarterTurn ? baseImage.size.height : baseImage.size.width
+        let displayHeight = isQuarterTurn ? baseImage.size.width : baseImage.size.height
+        let isLandscapeShot = displayWidth > displayHeight
+        let size = isLandscapeShot
+            ? CGSize(width: 1920, height: 1080)
+            : CGSize(width: 1080, height: 1920)
         // Keep the proof image at its declared pixel dimensions instead of
         // inheriting a 2x/3x Retina scale and allocating a much larger bitmap.
         let format = UIGraphicsImageRendererFormat()
@@ -1705,7 +1801,7 @@ public struct ARVisionView: View {
         let normTargetX = min(max(Double(targetNormalizedPoint.x) + manualTargetNormalizedOffset, 0.08), 0.92)
         let normTargetY = min(max(Double(targetNormalizedPoint.y), 0.12), 0.72)
         let sampledDist = (cameraPosition == .back)
-            ? fusionModel.sampleDepth(atPortraitNormalizedPoint: CGPoint(x: normTargetX, y: normTargetY))
+            ? fusionModel.sampleDepth(atViewNormalizedPoint: CGPoint(x: normTargetX, y: normTargetY))
             : nil
         let isLidar = fusionModel.lidarAvailable
         let solarTimeStr = motion.trueSolarTimeStr
@@ -1977,11 +2073,11 @@ public struct ShaRemedyDetailSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(lang.t("ar_sha_analysis_prefix"))
-                    .font(.adaptive(size: 13, weight: .semibold))
+                    .adaptiveFont(size: 13, weight: .semibold)
                     .foregroundColor(Color.yanCyan)
                 Spacer()
                 Text("8大经典形煞锦囊库")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.6))
             }
             
@@ -1999,7 +2095,7 @@ public struct ShaRemedyDetailSheet: View {
                                         .frame(width: 5, height: 5)
                                 }
                                 Text(item.localizedName)
-                                    .font(.adaptive(size: 12, weight: isSelected ? .bold : .medium))
+                                    .adaptiveFont(size: 12, weight: isSelected ? .bold : .medium)
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -2025,15 +2121,15 @@ public struct ShaRemedyDetailSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(currentSha.localizedName)
-                        .font(.adaptive(size: 22, weight: .bold, design: .serif))
+                        .adaptiveFont(size: 22, weight: .bold, design: .serif)
                         .foregroundColor(Color(red: 0.96, green: 0.88, blue: 0.55))
                     Text(currentSha.localizedAliases)
-                        .font(.adaptive(size: 12))
+                        .adaptiveFont(size: 12)
                         .foregroundColor(.white.opacity(0.65))
                 }
                 Spacer()
                 Text(currentSha.severity.localizedTitle)
-                    .font(.adaptive(size: 11, weight: .bold))
+                    .adaptiveFont(size: 11, weight: .bold)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
                     .background(Color.red.opacity(0.2))
@@ -2047,10 +2143,10 @@ public struct ShaRemedyDetailSheet: View {
             // 现场特征
             VStack(alignment: .leading, spacing: 4) {
                 Label(lang.t("ar_env_features"), systemImage: "eye.fill")
-                    .font(.adaptive(size: 12, weight: .semibold))
+                    .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(Color.yanCyan)
                 Text(currentSha.localizedVisualFeature)
-                    .font(.adaptive(size: 12))
+                    .adaptiveFont(size: 12)
                     .foregroundColor(.white.opacity(0.9))
                     .lineSpacing(2)
             }
@@ -2058,10 +2154,10 @@ public struct ShaRemedyDetailSheet: View {
             // 玄学危害机理
             VStack(alignment: .leading, spacing: 4) {
                 Label("⚡ 玄学危害机理剖析", systemImage: "bolt.trianglebranch.fill")
-                    .font(.adaptive(size: 12, weight: .semibold))
+                    .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(Color.orange)
                 Text(currentSha.localizedMetaphysicsHarm)
-                    .font(.adaptive(size: 12))
+                    .adaptiveFont(size: 12)
                     .foregroundColor(.white.opacity(0.9))
                     .lineSpacing(2)
             }
@@ -2069,10 +2165,10 @@ public struct ShaRemedyDetailSheet: View {
             // 古籍赋文
             VStack(alignment: .leading, spacing: 4) {
                 Label(lang.t("ar_classic_lore"), systemImage: "book.closed.fill")
-                    .font(.adaptive(size: 12, weight: .semibold))
+                    .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(Color(red: 0.9, green: 0.75, blue: 0.35))
                 Text(currentSha.localizedClassicalText)
-                    .font(.adaptive(size: 12, weight: .medium, design: .serif))
+                    .adaptiveFont(size: 12, weight: .medium, design: .serif)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.65))
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -2092,11 +2188,11 @@ public struct ShaRemedyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("🛠 化解三步走 · 直接可做", systemImage: "checkmark.circle.fill")
-                    .font(.adaptive(size: 14, weight: .bold))
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(.green)
                 Spacer()
                 Text("先做① → 再②③")
-                    .font(.adaptive(size: 10, weight: .medium))
+                    .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color.green.opacity(0.18))
@@ -2105,11 +2201,11 @@ public struct ShaRemedyDetailSheet: View {
             }
             
             Text("① 立即可做（免费）→ ② 低成本改造 → ③ 可选强化。每一步都标明影响范围，按需执行即可。")
-                .font(.adaptive(size: 11))
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.7))
             
             Text(currentSha.localizedRemedySolution)
-                .font(.adaptive(size: 12))
+                .adaptiveFont(size: 12)
                 .foregroundColor(.white.opacity(0.95))
                 .lineSpacing(3)
                 .padding(12)
@@ -2129,11 +2225,11 @@ public struct ShaRemedyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("📋 进阶调理参考", systemImage: "text.book.closed.fill")
-                    .font(.adaptive(size: 14, weight: .bold))
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
                 Spacer()
                 Text("免费")
-                    .font(.adaptive(size: 10, weight: .medium))
+                    .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color(red: 0.0, green: 1.0, blue: 1.0).opacity(0.18))
@@ -2167,11 +2263,11 @@ public struct ShaRemedyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("🛡 进阶法物参考", systemImage: "shield.checkered")
-                    .font(.adaptive(size: 14, weight: .bold))
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.8, blue: 0.3))
                 Spacer()
                 Text("VIP 可选")
-                    .font(.adaptive(size: 10, weight: .medium))
+                    .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color.yellow.opacity(0.15))
@@ -2216,10 +2312,10 @@ public struct ShaRemedyDetailSheet: View {
     private func talismanItemRow(title: String, content: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
-                .font(.adaptive(size: 12, weight: .bold))
+                .adaptiveFont(size: 12, weight: .bold)
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             Text(content)
-                .font(.adaptive(size: 11))
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.9))
                 .lineSpacing(2)
         }
@@ -2232,14 +2328,14 @@ public struct ShaRemedyDetailSheet: View {
     private func timingPointRow(tag: String, content: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(tag)
-                .font(.adaptive(size: 10, weight: .bold))
+                .adaptiveFont(size: 10, weight: .bold)
                 .foregroundColor(.orange)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 3)
                 .background(Color.orange.opacity(0.18))
                 .cornerRadius(4)
             Text(content)
-                .font(.adaptive(size: 11))
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(2)
         }
@@ -2303,7 +2399,7 @@ private struct ShaPanoramaReportSheet: View {
                     HStack {
                         VStack {
                             Text("\(records.count)")
-                                .font(.system(size: 26, weight: .bold))
+                                .adaptiveFont(size: 26, weight: .bold)
                             Text(lang.t("ar_panorama_records"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -2311,7 +2407,7 @@ private struct ShaPanoramaReportSheet: View {
                         Spacer()
                         VStack {
                             Text("\(grouped.filter { !$0.isEmpty }.count)/8")
-                                .font(.system(size: 26, weight: .bold))
+                                .adaptiveFont(size: 26, weight: .bold)
                             Text(lang.t("ar_panorama_palaces"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -2319,7 +2415,7 @@ private struct ShaPanoramaReportSheet: View {
                         Spacer()
                         VStack {
                             Text("\(records.filter { effectiveSeverity(for: $0) == .critical }.count)")
-                                .font(.system(size: 26, weight: .bold))
+                                .adaptiveFont(size: 26, weight: .bold)
                                 .foregroundColor(.red)
                             Text(lang.t("ar_panorama_critical"))
                                 .font(.caption)
@@ -2399,7 +2495,7 @@ private struct ShaPanoramaReportSheet: View {
                                                 shaStore.removeRecord(id: record.id)
                                             }) {
                                                 Image(systemName: "trash")
-                                                    .font(.system(size: 12))
+                                                    .adaptiveFont(size: 12)
                                                     .foregroundColor(.red.opacity(0.75))
                                                     .padding(6)
                                                     .contentShape(Rectangle())
@@ -2429,7 +2525,7 @@ private struct ShaPanoramaReportSheet: View {
                                 Image(systemName: "trash")
                                 Text(lang.t("ar_panorama_clear"))
                             }
-                            .font(.system(size: 13, weight: .medium))
+                            .adaptiveFont(size: 13, weight: .medium)
                             .foregroundColor(.red)
                         }
                     }
@@ -2448,6 +2544,27 @@ private struct ShaPanoramaReportSheet: View {
                     secondaryButton: .cancel(Text(lang.t("cancel")))
                 )
             }
+        }
+        // iPad 自适应：缺少该修饰符时 NavigationView 在 iPad 上会退化为
+        // 分栏容器（左侧列表 + 右侧空占位 “未选择”），内容被压到半屏。
+        // 统一用 Stack 样式，保证 iPhone / iPad 都是单列全宽页面。
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+// MARK: - 界面方向 → 相机方向映射
+
+extension UIInterfaceOrientation {
+    /// UIInterfaceOrientation 的横屏命名与 AVCaptureVideoOrientation 相反：
+    /// 界面 landscapeLeft（Home 键在左）对应设备 landscapeRight。
+    /// 竖屏两种取值两者一致，横屏若直接透传会得到 180° 倒像。
+    var avCaptureOrientation: AVCaptureVideoOrientation {
+        switch self {
+        case .portrait: return .portrait
+        case .portraitUpsideDown: return .portraitUpsideDown
+        case .landscapeLeft: return .landscapeRight
+        case .landscapeRight: return .landscapeLeft
+        default: return .portrait
         }
     }
 }

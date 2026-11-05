@@ -7,6 +7,8 @@ public struct CompassDialView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var layers = CompassLayerManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     // 手势与缩放状态
     @State private var lastDragAngle: Double = 0.0
@@ -209,13 +211,13 @@ public struct CompassDialView: View {
             ForEach(SolarTermsData.shared.terms) { term in
                 VStack(spacing: 0) {
                     Text(term.localizedName)
-                        .font(.adaptive(size: 7, weight: term.isMajorTerm ? .bold : .regular))
+                        .adaptiveFont(size: 7, weight: term.isMajorTerm ? .bold : .regular)
                         .foregroundColor(term.name == motion.currentSolarTermName
                             ? Color.black
                             : (term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65)))
                     if let hex = term.localizedHexagramLabel {
                         Text(hex)
-                            .font(.adaptive(size: 6, weight: .bold))
+                            .adaptiveFont(size: 6, weight: .bold)
                             .foregroundColor(term.name == motion.currentSolarTermName ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
                     }
                 }
@@ -282,7 +284,7 @@ public struct CompassDialView: View {
     private func hexagramsLayer(radius: CGFloat) -> some View {
         ForEach(hexagrams) { hex in
             Text(hex.localizedName.prefix(2))
-                .font(.adaptive(size: 7, weight: .semibold, design: .serif))
+                .adaptiveFont(size: 7, weight: .semibold, design: .serif)
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
                 .offset(y: -radius + 8)
                 .rotationEffect(.degrees(hex.angleCenter))
@@ -305,21 +307,30 @@ public struct CompassDialView: View {
         return ZStack {
             ForEach(mountains) { m in
                 let isMainBranch = m.isCardinalOrCorner
+                // 标签高度跟随系统字号（1.0 ... 1.3x），取自当前窗口的 Environment，
+                // 多窗口下各窗口各取各的，不再读全局 key window。
+                let labelHeight = (horizontalSizeClass == .regular ? 36 : 30)
+                    * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize)
 
                 VStack(spacing: 1) {
                     Text(m.localizedName)
-                        .font(.adaptive(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif))
+                        .adaptiveFont(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
                     Text(m.localizedElement)
-                        .font(.adaptive(size: 7, weight: .medium))
+                        .adaptiveFont(size: 7, weight: .medium)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .foregroundColor(Color.white.opacity(0.5))
                 }
-                .frame(width: max(24, radius * 0.25), height: 30)
-                .offset(y: -radius + 14)
+                // 24 山标签是"山名 + 五行"两行：iPad regular 宽度下字号被放大到 1.35x，
+                // 30pt 固定高度装不下两行，会向下压到 64 卦环。
+                // 高度跟随系统字号，保持"字 / 框"比例恒定。
+                .frame(width: max(24, radius * 0.25), height: labelHeight)
+                // 外沿固定：标签变高时中心向盘心方向补偿一半增量，
+                // 避免放大后外沿压到度数环、内沿继续挤 64 卦环。
+                .offset(y: -radius + 14 + (labelHeight - 30) / 2)
                 .rotationEffect(.degrees(m.angleCenter))
             }
         }
@@ -347,7 +358,7 @@ public struct CompassDialView: View {
         ]
         return ForEach(guas) { item in
             Text(lang.t(item.key))
-                .font(.adaptive(size: 14, weight: .black, design: .serif))
+                .adaptiveFont(size: 14, weight: .black, design: .serif)
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
                 .offset(y: -radius + 12)
                 .rotationEffect(.degrees(item.angle))
@@ -463,7 +474,7 @@ public struct CompassDialView: View {
             .frame(width: radius * 2, height: radius * 2)
             
             Text(lang.t("true_north_short"))
-                .font(.adaptive(size: 7, weight: .bold))
+                .adaptiveFont(size: 7, weight: .bold)
                 .foregroundColor(Color.black)
                 .offset(y: -radius * 0.72)
         }

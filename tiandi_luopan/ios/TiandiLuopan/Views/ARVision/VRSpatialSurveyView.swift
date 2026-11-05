@@ -122,23 +122,23 @@ public struct VRSpatialSurveyView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Image(systemName: "view.3d")
-                .font(.adaptive(size: 14, weight: .bold))
+                .adaptiveFont(size: 14, weight: .bold)
                 .foregroundColor(.yanCyan)
             VStack(alignment: .leading, spacing: 2) {
                 Text(lang.t("vr_survey_title"))
-                    .font(.adaptive(size: 15, weight: .bold))
+                    .adaptiveFont(size: 15, weight: .bold)
                     .foregroundColor(.white)
                 Text(lang.t("vr_survey_hint"))
-                    .font(.adaptive(size: 10, weight: .medium))
+                    .adaptiveFont(size: 10, weight: .medium)
                     .foregroundColor(.orange)
                 Text("仿真模型：请先填写实测开间、进深和层高；画布仅用于按比例重建")
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(.white.opacity(0.6))
             }
             Spacer()
             Button(action: { presentationMode.wrappedValue.dismiss() }) {
                 Image(systemName: "xmark")
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(.white)
                     .padding(9)
                     .background(Color.black.opacity(0.55))
@@ -218,7 +218,7 @@ public struct VRSpatialSurveyView: View {
                         .stroke(tint, lineWidth: selected ? 2.5 : 1.5)
                 )
             Text(room.type.localizedName)
-                .font(.adaptive(size: 9, weight: .semibold))
+                .adaptiveFont(size: 9, weight: .semibold)
                 .foregroundColor(.white)
                 .padding(3)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -245,7 +245,7 @@ public struct VRSpatialSurveyView: View {
                 .fill(color.opacity(0.55))
                 .overlay(RoundedRectangle(cornerRadius: 4).stroke(color, lineWidth: selected ? 2 : 1.2))
             Text(op.isDoor ? lang.t("vr_survey_door") : lang.t("vr_survey_window"))
-                .font(.adaptive(size: 8, weight: .semibold))
+                .adaptiveFont(size: 8, weight: .semibold)
                 .foregroundColor(.black.opacity(0.85))
                 .padding(1)
             if selected {
@@ -325,7 +325,7 @@ public struct VRSpatialSurveyView: View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
                 Text("实测尺寸(m)")
-                    .font(.adaptive(size: 10, weight: .semibold))
+                    .adaptiveFont(size: 10, weight: .semibold)
                     .foregroundColor(.white.opacity(0.8))
                 dimensionField(title: "开间", text: $widthMetersText)
                 dimensionField(title: "进深", text: $depthMetersText)
@@ -333,7 +333,7 @@ public struct VRSpatialSurveyView: View {
             }
             if let validationMessage {
                 Text(validationMessage)
-                    .font(.adaptive(size: 10, weight: .semibold))
+                    .adaptiveFont(size: 10, weight: .semibold)
                     .foregroundColor(.orange)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -342,7 +342,7 @@ public struct VRSpatialSurveyView: View {
                     ForEach(selectableTypes, id: \.self) { type in
                         Button(action: { selectedType = type }) {
                             Text(type.localizedName)
-                                .font(.adaptive(size: 11, weight: .semibold))
+                                .adaptiveFont(size: 11, weight: .semibold)
                                 .foregroundColor(selectedType == type ? .black : .white)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
@@ -355,7 +355,7 @@ public struct VRSpatialSurveyView: View {
             HStack(spacing: 8) {
                 Button(action: { addRoom(at: nil, in: nil) }) {
                     Label(lang.t("vr_survey_add_room"), systemImage: "plus.square.on.square")
-                        .font(.adaptive(size: 11, weight: .semibold))
+                        .adaptiveFont(size: 11, weight: .semibold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -364,7 +364,7 @@ public struct VRSpatialSurveyView: View {
                 }
                 Button(action: { addOpening(isDoor: true) }) {
                     Label(lang.t("vr_survey_add_door"), systemImage: "door.left.hand.open")
-                        .font(.adaptive(size: 11, weight: .semibold))
+                        .adaptiveFont(size: 11, weight: .semibold)
                         .foregroundColor(.black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -373,7 +373,7 @@ public struct VRSpatialSurveyView: View {
                 }
                 Button(action: { addOpening(isDoor: false) }) {
                     Label(lang.t("vr_survey_add_window"), systemImage: "rectangle.split.3x1")
-                        .font(.adaptive(size: 11, weight: .semibold))
+                        .adaptiveFont(size: 11, weight: .semibold)
                         .foregroundColor(.black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -382,7 +382,7 @@ public struct VRSpatialSurveyView: View {
                 }
                 Button(action: clearAll) {
                     Label(lang.t("vr_survey_clear"), systemImage: "trash")
-                        .font(.adaptive(size: 11, weight: .semibold))
+                        .adaptiveFont(size: 11, weight: .semibold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -391,7 +391,7 @@ public struct VRSpatialSurveyView: View {
                 }
                 Button(action: generateReport) {
                     Label(lang.t("vr_survey_generate"), systemImage: "wand.and.stars")
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .foregroundColor(.black)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
@@ -438,11 +438,11 @@ public struct VRSpatialSurveyView: View {
     private func dimensionField(title: String, text: Binding<String>) -> some View {
         HStack(spacing: 2) {
             Text(title)
-                .font(.adaptive(size: 9))
+                .adaptiveFont(size: 9)
                 .foregroundColor(.white.opacity(0.65))
             TextField("", text: text)
                 .keyboardType(.decimalPad)
-                .font(.system(size: 11, design: .monospaced))
+                .adaptiveFont(size: 11, design: .monospaced)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 42)

@@ -1146,6 +1146,7 @@ public struct ARRoomPlanSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @StateObject private var model = ARRoomPlanModel()
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var shareItem: ARRoomPlanShareItem?
     @State private var reportMessage: String?
     @State private var show3DViewer: Bool = false
@@ -1158,122 +1159,137 @@ public struct ARRoomPlanSurveyView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                HStack {
+                HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(lang.t("ar_roomplan_title"))
-                            .font(.adaptive(size: 16, weight: .bold))
+                            .adaptiveFont(size: 16, weight: .bold)
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
                         Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : "\(lang.t("ar_roomplan_finished")) (\(max(1, model.scannedRoomCount)) 室)")
-                            .font(.adaptive(size: 10, weight: .medium))
+                            .adaptiveFont(size: 10, weight: .medium)
                             .foregroundColor(model.isCapturing ? .green : .orange)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
-                    Spacer()
-                    if model.isCapturing {
-                        Button(action: { model.finishCurrentRoomSegment() }) {
-                            Image(systemName: "checkmark")
-                                .font(.adaptive(size: 13, weight: .bold))
-                                .foregroundColor(.black)
-                                .padding(9)
-                                .background(Color.green)
-                                .clipShape(Circle())
-                        }
-                        .accessibilityLabel(lang.t("ar_roomplan_finish"))
-                    } else if model.didFinish {
-                        Button(action: { model.startNextRoomSegment() }) {
-                            Image(systemName: "plus.square.on.square")
-                                .font(.adaptive(size: 13, weight: .bold))
-                                .foregroundColor(.black)
-                                .padding(9)
-                                .background(Color.green.opacity(0.9))
-                                .clipShape(Circle())
-                        }
-                        .accessibilityLabel("继续加扫下一间")
-                        if model.currentSpatialSurvey != nil {
-                            Button(action: { show3DViewer = true }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "cube.transparent")
-                                        .font(.adaptive(size: 13, weight: .bold))
-                                    Text(lang.t("ar_3d_space"))
-                                        .font(.adaptive(size: 10, weight: .bold))
+                    .frame(maxWidth: horizontalSizeClass == .regular ? 240 : 150, alignment: .leading)
+                    .layoutPriority(1)
+
+                    // 扫描完成态同一行要并列 6 个控件（继续加扫 / 3D / 大门朝向旋钮 / 同步 / 分享），
+                    // 固定部分就有 416pt，iPhone 375~430pt 屏宽下必然溢出。
+                    // 这里把操作区放进横向滚动兜底，标题留在左侧、关闭键常驻右侧，任何宽度下都能点全。
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            if model.isCapturing {
+                                Button(action: { model.finishCurrentRoomSegment() }) {
+                                    Image(systemName: "checkmark")
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.black)
+                                        .padding(9)
+                                        .background(Color.green)
+                                        .clipShape(Circle())
                                 }
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 6)
-                                .background(Color.yanGold)
-                                .cornerRadius(14)
+                                .accessibilityLabel(lang.t("ar_roomplan_finish"))
+                            } else if model.didFinish {
+                                Button(action: { model.startNextRoomSegment() }) {
+                                    Image(systemName: "plus.square.on.square")
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.black)
+                                        .padding(9)
+                                        .background(Color.green.opacity(0.9))
+                                        .clipShape(Circle())
+                                }
+                                .accessibilityLabel("继续加扫下一间")
+                                if model.currentSpatialSurvey != nil {
+                                    Button(action: { show3DViewer = true }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "cube.transparent")
+                                                .adaptiveFont(size: 13, weight: .bold)
+                                            Text(lang.t("ar_3d_space"))
+                                                .adaptiveFont(size: 10, weight: .bold)
+                                        }
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 6)
+                                        .background(Color.yanGold)
+                                        .cornerRadius(14)
+                                    }
+                                    .accessibilityLabel("查看全屋3D空间布局与形煞")
+                                }
+                                // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
+                                VStack(spacing: 2) {
+                                    Text(String(format: "大门朝向 %.1f°", model.effectiveHeadingForDisplay))
+                                        .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
+                                        .foregroundColor(.white)
+                                    HStack(spacing: 3) {
+                                        Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 5.0) }) {
+                                            Text("−5°")
+                                                .adaptiveFont(size: 9, weight: .bold)
+                                                .foregroundColor(.black)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 4)
+                                                .background(Color.orange)
+                                                .cornerRadius(8)
+                                        }
+                                        Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 1.0) }) {
+                                            Text("−1°")
+                                                .adaptiveFont(size: 9, weight: .bold)
+                                                .foregroundColor(.black)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 4)
+                                                .background(Color.white.opacity(0.85))
+                                                .cornerRadius(8)
+                                        }
+                                        Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 1.0) }) {
+                                            Text("+1°")
+                                                .adaptiveFont(size: 9, weight: .bold)
+                                                .foregroundColor(.black)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 4)
+                                                .background(Color.white.opacity(0.85))
+                                                .cornerRadius(8)
+                                        }
+                                        Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 5.0) }) {
+                                            Text("+5°")
+                                                .adaptiveFont(size: 9, weight: .bold)
+                                                .foregroundColor(.black)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 4)
+                                                .background(Color.orange)
+                                                .cornerRadius(8)
+                                        }
+                                    }
+                                }
+                                .accessibilityLabel("大门朝向罗盘校准旋钮")
+                                Button(action: syncToFloorplan) {
+                                    Image(systemName: "scope")
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.black)
+                                        .padding(9)
+                                        .background(Color.yanCyan)
+                                        .clipShape(Circle())
+                                }
+                                .accessibilityLabel(lang.t("tab_floorplan"))
+                                Button(action: shareReport) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.white)
+                                        .padding(9)
+                                        .background(Color.blue.opacity(0.8))
+                                        .clipShape(Circle())
+                                }
+                                .accessibilityLabel(lang.t("ar_roomplan_share"))
                             }
-                            .accessibilityLabel("查看全屋3D空间布局与形煞")
                         }
-                        // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
-                        VStack(spacing: 2) {
-                            Text(String(format: "大门朝向 %.1f°", model.effectiveHeadingForDisplay))
-                                .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white)
-                            HStack(spacing: 3) {
-                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 5.0) }) {
-                                    Text("−5°")
-                                        .font(.adaptive(size: 9, weight: .bold))
-                                        .foregroundColor(.black)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 4)
-                                        .background(Color.orange)
-                                        .cornerRadius(8)
-                                }
-                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees - 1.0) }) {
-                                    Text("−1°")
-                                        .font(.adaptive(size: 9, weight: .bold))
-                                        .foregroundColor(.black)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 4)
-                                        .background(Color.white.opacity(0.85))
-                                        .cornerRadius(8)
-                                }
-                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 1.0) }) {
-                                    Text("+1°")
-                                        .font(.adaptive(size: 9, weight: .bold))
-                                        .foregroundColor(.black)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 4)
-                                        .background(Color.white.opacity(0.85))
-                                        .cornerRadius(8)
-                                }
-                                Button(action: { model.applyHeadingOffset(model.headingOffsetDegrees + 5.0) }) {
-                                    Text("+5°")
-                                        .font(.adaptive(size: 9, weight: .bold))
-                                        .foregroundColor(.black)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 4)
-                                        .background(Color.orange)
-                                        .cornerRadius(8)
-                                }
-                            }
-                        }
-                        .accessibilityLabel("大门朝向罗盘校准旋钮")
-                        Button(action: syncToFloorplan) {
-                            Image(systemName: "scope")
-                                .font(.adaptive(size: 13, weight: .bold))
-                                .foregroundColor(.black)
-                                .padding(9)
-                                .background(Color.yanCyan)
-                                .clipShape(Circle())
-                        }
-                        .accessibilityLabel(lang.t("tab_floorplan"))
-                        Button(action: shareReport) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.adaptive(size: 13, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(9)
-                                .background(Color.blue.opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                        .accessibilityLabel(lang.t("ar_roomplan_share"))
+                        .padding(.vertical, 2)
                     }
+
                     Button(action: {
                         model.stop()
                         presentationMode.wrappedValue.dismiss()
                     }) {
                         Image(systemName: "xmark")
-                            .font(.adaptive(size: 13, weight: .bold))
+                            .adaptiveFont(size: 13, weight: .bold)
                             .foregroundColor(.white)
                             .padding(9)
                             .background(Color.black.opacity(0.6))
@@ -1291,7 +1307,7 @@ public struct ARRoomPlanSurveyView: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     Text(lang.t("ar_roomplan_semantic_note"))
-                        .font(.adaptive(size: 10, weight: .medium))
+                        .adaptiveFont(size: 10, weight: .medium)
                         .foregroundColor(.white.opacity(0.72))
                     if model.estimatedAreaSqMeters > 0 {
                         Text(String(
@@ -1300,7 +1316,7 @@ public struct ARRoomPlanSurveyView: View {
                             model.estimatedDepthMeters,
                             model.estimatedAreaSqMeters
                         ))
-                        .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
+                        .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                         .foregroundColor(.yanCyan)
                     }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
@@ -1314,7 +1330,7 @@ public struct ARRoomPlanSurveyView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             ForEach(model.spatialFindings, id: \.self) { finding in
                                 Text(finding)
-                                    .font(.adaptive(size: 10, weight: .bold))
+                                    .adaptiveFont(size: 10, weight: .bold)
                                     .foregroundColor(finding.contains("⚠️") ? .orange : .green)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
@@ -1328,12 +1344,12 @@ public struct ARRoomPlanSurveyView: View {
                     }
                     if let error = model.errorMessage {
                         Text("\(lang.t("ar_roomplan_failed")): \(error)")
-                            .font(.adaptive(size: 10))
+                            .adaptiveFont(size: 10)
                             .foregroundColor(.orange)
                     }
                     if let reportMessage = reportMessage {
                         Text(reportMessage)
-                            .font(.adaptive(size: 10, weight: .semibold))
+                            .adaptiveFont(size: 10, weight: .semibold)
                             .foregroundColor(.yanCyan)
                     }
                 }
@@ -1376,7 +1392,7 @@ public struct ARRoomPlanSurveyView: View {
 
     private func semanticCount(_ key: String, value: Int, icon: String) -> some View {
         Label("\(lang.t(key)): \(value)", systemImage: icon)
-            .font(.adaptive(size: 11, weight: .medium))
+            .adaptiveFont(size: 11, weight: .medium)
             .foregroundColor(.white)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

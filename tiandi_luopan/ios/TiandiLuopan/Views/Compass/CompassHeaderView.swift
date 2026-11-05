@@ -17,13 +17,13 @@ public struct CompassHeaderView: View {
                 // 实时度数 (大字体)
                 HStack(alignment: .top, spacing: 2) {
                     Text(String(format: "%.1f", state.facingAngle))
-                        .font(.adaptive(size: 34, weight: .black, design: .rounded))
+                        .adaptiveFont(size: 34, weight: .black, design: .rounded)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                         .fixedSize(horizontal: true, vertical: false)
                     Text("°")
-                        .font(.adaptive(size: 17, weight: .bold))
+                        .adaptiveFont(size: 17, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.8))
                 }
                 
@@ -31,13 +31,13 @@ public struct CompassHeaderView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                     Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix"))")
-                            .font(.adaptive(size: 18, weight: .bold, design: .serif))
+                            .adaptiveFont(size: 18, weight: .bold, design: .serif)
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.65)
                         
                         Text(state.facingMountain.localizedPalace + lang.t("palace_suffix"))
-                            .font(.adaptive(size: 11, weight: .semibold))
+                            .adaptiveFont(size: 11, weight: .semibold)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.25))
@@ -46,7 +46,7 @@ public struct CompassHeaderView: View {
                     }
                     
                     Text(state.fenJinDesc)
-                        .font(.adaptive(size: 12, weight: .medium))
+                        .adaptiveFont(size: 12, weight: .medium)
                         .foregroundColor(state.isJianXiang ? Color.orange : Color(red: 0.8, green: 0.8, blue: 0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -60,7 +60,7 @@ public struct CompassHeaderView: View {
                         motion.resetManualOffset()
                     }) {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.adaptive(size: 13, weight: .bold))
+                            .adaptiveFont(size: 13, weight: .bold)
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
                             .background(Color.white.opacity(0.12))
@@ -71,7 +71,7 @@ public struct CompassHeaderView: View {
                         motion.toggleLock()
                     }) {
                         Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
-                            .font(.adaptive(size: 13, weight: .bold))
+                            .adaptiveFont(size: 13, weight: .bold)
                             .foregroundColor(motion.isLocked ? Color.yellow : Color.white)
                             .frame(width: 32, height: 32)
                             .background(motion.isLocked ? Color.yellow.opacity(0.25) : Color.white.opacity(0.12))
@@ -86,10 +86,10 @@ public struct CompassHeaderView: View {
                 // 真太阳时
                 HStack(spacing: 4) {
                     Image(systemName: "sun.max.fill")
-                        .font(.adaptive(size: 11))
+                        .adaptiveFont(size: 11)
                         .foregroundColor(Color.orange)
                     Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
-                        .font(.adaptive(size: 11, weight: .medium))
+                        .adaptiveFont(size: 11, weight: .medium)
                         .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -103,7 +103,7 @@ public struct CompassHeaderView: View {
                         .fill(motion.isLevel ? Color.green : Color.orange)
                         .frame(width: 6, height: 6)
                     Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
-                        .font(.adaptive(size: 11, weight: .regular, design: .monospaced))
+                        .adaptiveFont(size: 11, weight: .regular, design: .monospaced)
                         .foregroundColor(.white.opacity(0.75))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -115,6 +115,11 @@ public struct CompassHeaderView: View {
             .cornerRadius(8)
             .padding(.horizontal, 12)
         }
+        // iPad 宽屏单列下顶部仪表会被拉得很宽，度数在左、按钮在右，中间一片空白；
+        // 限宽 720pt 居中，保持与内容区同一视觉宽度。
+        // 分栏时仪表已在左栏（约 55%~60% 宽），720 上限自然不生效。
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity)
         .padding(.top, 6)
     }
 }

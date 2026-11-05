@@ -21,7 +21,7 @@ public struct LayerSettingsSheet: View {
                                     layers.applyPreset(preset)
                                 }) {
                                     Text(preset.localizedTitle)
-                                        .font(.adaptive(size: 13, weight: layers.activePreset == preset ? .bold : .medium))
+                                        .adaptiveFont(size: 13, weight: layers.activePreset == preset ? .bold : .medium)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 8)
                                         .background(layers.activePreset == preset ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.08))

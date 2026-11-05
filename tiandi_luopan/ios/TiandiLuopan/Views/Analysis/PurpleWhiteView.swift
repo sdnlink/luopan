@@ -17,11 +17,19 @@ public struct PurpleWhiteView: View {
     @State private var lastFacingSector: Int?
     @State private var lastCalendarDayKey: Int?
 
-    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
-    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用大屏布局。
+    // 两套口径（见 AdaptiveLayout）：isSplitLayout = Duo 内屏 / iPad 横屏左右分栏；
+    // isLargeLayout 为宽屏（含 iPad），只放大宫格与内容尺寸。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.adaptiveLayoutForm) private var layoutForm
+    private var isSplitLayout: Bool {
+        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+    }
     private var isLargeLayout: Bool {
-        horizontalSizeClass == .regular
+        AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
+    }
+    /// 分栏后左栏只有 55~60% 宽，控件尺寸不能沿用「整屏宽屏」的放大档位。
+    private var isRoomyLayout: Bool {
+        isLargeLayout && !isSplitLayout
     }
     
     public init(isActive: Bool = true) {
@@ -74,7 +82,7 @@ public struct PurpleWhiteView: View {
                     Image(systemName: "calendar.badge.clock")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("purplewhite_header_title"))
-                        .font(.adaptive(size: 14, weight: .bold))
+                        .adaptiveFont(size: 14, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
@@ -83,7 +91,7 @@ public struct PurpleWhiteView: View {
                     ? "\(chart.year) / \(chart.month)"
                     : "\(chart.year)\(lang.t("year_suffix")) · \(chart.month)\(lang.t("month_suffix"))"
                 Text(dateLabel)
-                    .font(.adaptive(size: 11, weight: .bold))
+                    .adaptiveFont(size: 11, weight: .bold)
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -124,7 +132,8 @@ public struct PurpleWhiteView: View {
                         }
                     }
                 }
-                .frame(maxWidth: isLargeLayout ? 580 : .infinity)
+                // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
+                .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
                 }
                 }
@@ -135,7 +144,7 @@ public struct PurpleWhiteView: View {
                         palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
                             .padding(.horizontal, 16)
                     }
-                } else if horizontalSizeClass == .regular {
+                } else if isSplitLayout {
                     purpleWhiteVIPPreviewCard()
                         .padding(.horizontal, 16)
                 }
@@ -148,14 +157,14 @@ public struct PurpleWhiteView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "lock.shield.fill")
-                    .font(.adaptive(size: 16))
+                    .adaptiveFont(size: 16)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text(lang.t("privilege_purplewhite_title"))
-                    .font(.adaptive(size: 14, weight: .bold))
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Spacer()
                 Text(lang.t("vip_badge_title"))
-                    .font(.adaptive(size: 10, weight: .bold))
+                    .adaptiveFont(size: 10, weight: .bold)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
@@ -164,25 +173,25 @@ public struct PurpleWhiteView: View {
             }
 
             Text(lang.t("privilege_purplewhite_desc"))
-                .font(.adaptive(size: 11))
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(3)
 
             Divider().background(Color.white.opacity(0.1))
 
             Text("🌟 \(lang.t("privilege_pw_feature_title"))")
-                .font(.adaptive(size: 12, weight: .semibold))
+                .adaptiveFont(size: 12, weight: .semibold)
                 .foregroundColor(Color.yanCyan)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("• \(lang.t("privilege_pw_bullet_1"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
                 Text("• \(lang.t("privilege_pw_bullet_2"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
                 Text("• \(lang.t("privilege_pw_bullet_3"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
             }
 
@@ -195,7 +204,7 @@ public struct PurpleWhiteView: View {
                     Text(lang.t("unlock_vip_now"))
                     Spacer()
                 }
-                .font(.adaptive(size: 12, weight: .bold))
+                .adaptiveFont(size: 12, weight: .bold)
                 .padding(.vertical, 8)
                 .background(Color(red: 0.83, green: 0.68, blue: 0.21))
                 .foregroundColor(.black)
@@ -238,14 +247,14 @@ public struct PurpleWhiteView: View {
     private func tagPill(title: String, value: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Text(title)
-                .font(.adaptive(size: 10, weight: .bold))
+                .adaptiveFont(size: 10, weight: .bold)
                 .foregroundColor(.black)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 2)
                 .background(color)
                 .cornerRadius(4)
             Text(value)
-                .font(.adaptive(size: 10, weight: .medium))
+                .adaptiveFont(size: 10, weight: .medium)
                 .foregroundColor(.white)
         }
         .padding(.horizontal, 6)
@@ -261,18 +270,18 @@ public struct PurpleWhiteView: View {
                 Image(systemName: isDanger ? "exclamationmark.triangle.fill" : "sparkles")
                     .foregroundColor(isDanger ? .red : Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text(item.palaceName)
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(.white)
                 Text("· \(item.starName)")
-                    .font(.adaptive(size: 12, weight: .semibold))
+                    .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(isDanger ? .red : Color.yanCyan)
                 Spacer()
                 Text("\(item.yearGuestStar) / \(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
-                    .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
+                    .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
             Text(item.advice)
-                .font(.adaptive(size: 12))
+                .adaptiveFont(size: 12)
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(3)
         }
@@ -298,21 +307,21 @@ public struct PurpleWhiteView: View {
             // 顶行: 宫位名 + 冲犯标签
             HStack {
                 Text(item.direction)
-                    .font(.adaptive(size: 10, weight: .bold))
+                    .adaptiveFont(size: 10, weight: .bold)
                     .foregroundColor(.white)
                 Spacer()
                 if item.isTaiSui {
                     Text(lang.t("tag_taisui"))
-                        .font(.adaptive(size: 8, weight: .bold))
+                        .adaptiveFont(size: 8, weight: .bold)
                         .foregroundColor(.red)
                 } else if item.isSanSha {
                     Text(lang.t("tag_sansha"))
-                        .font(.adaptive(size: 8, weight: .bold))
+                        .adaptiveFont(size: 8, weight: .bold)
                         .foregroundColor(.purple)
                 }
                 if isFacing {
                     Image(systemName: "location.north.fill")
-                        .font(.adaptive(size: 8, weight: .bold))
+                        .adaptiveFont(size: 8, weight: .bold)
                         .foregroundColor(.yanCyan)
                 }
             }
@@ -322,11 +331,11 @@ public struct PurpleWhiteView: View {
             // 中行: 年飞星数字 (大字显影)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text("\(item.yearGuestStar)")
-                    .font(.adaptive(size: 20, weight: .bold, design: .serif))
+                    .adaptiveFont(size: 20, weight: .bold, design: .serif)
                     .foregroundColor(isDanger ? Color.red : (isJi ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.7)))
                 
                 Text("\(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(.white.opacity(0.5))
             }
             
@@ -334,11 +343,11 @@ public struct PurpleWhiteView: View {
             
             // 底行: 星名与化解提示
             Text(item.starName)
-                .font(.adaptive(size: 8))
+                .adaptiveFont(size: 8)
                 .foregroundColor(isDanger ? Color.red : Color.white.opacity(0.65))
                 .lineLimit(1)
         }
-        .padding(isLargeLayout ? 10 : 6)
+        .padding(isRoomyLayout ? 10 : 6)
         .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)

@@ -24,11 +24,19 @@ public struct QimenDunjiaView: View {
         in: .common
     ).autoconnect()
 
-    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
-    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用大屏布局。
+    // 两套口径（见 AdaptiveLayout）：isSplitLayout = Duo 内屏 / iPad 横屏左右分栏；
+    // isLargeLayout 为宽屏（含 iPad），只放大九宫与内容尺寸。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.adaptiveLayoutForm) private var layoutForm
+    private var isSplitLayout: Bool {
+        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+    }
     private var isLargeLayout: Bool {
-        horizontalSizeClass == .regular
+        AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
+    }
+    /// 分栏后左栏只有 55~60% 宽，控件尺寸不能沿用「整屏宽屏」的放大档位。
+    private var isRoomyLayout: Bool {
+        isLargeLayout && !isSplitLayout
     }
     
     public init(isActive: Bool = true) {
@@ -54,12 +62,12 @@ public struct QimenDunjiaView: View {
                     Image(systemName: "sparkles")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("qimen_header_title"))
-                        .font(.adaptive(size: 14, weight: .bold))
+                        .adaptiveFont(size: 14, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 }
                 Spacer()
                 Text(chart.title)
-                    .font(.adaptive(size: 11, weight: .bold))
+                    .adaptiveFont(size: 11, weight: .bold)
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -89,7 +97,8 @@ public struct QimenDunjiaView: View {
                             }
                     }
                 }
-                .frame(maxWidth: isLargeLayout ? 580 : .infinity)
+                // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
+                .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
                 }
                 }
@@ -100,14 +109,14 @@ public struct QimenDunjiaView: View {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
                     HStack(spacing: 8) {
                         Text("【\(activeCell.localizedPalaceName)】")
-                            .font(.adaptive(size: 11, weight: .bold))
+                            .adaptiveFont(size: 11, weight: .bold)
                             .foregroundColor(Color.yanCyan)
                         Text("\(activeCell.localizedDoorName) [\(doorObj.localizedLuckType)] · \(activeCell.localizedGodName) · \(activeCell.localizedStarName)")
-                            .font(.adaptive(size: 11, weight: .semibold))
+                            .adaptiveFont(size: 11, weight: .semibold)
                             .foregroundColor(activeCell.isDoorAuspicious ? .green : (activeCell.isDoorInauspicious ? .red : Color(red: 0.95, green: 0.85, blue: 0.45)))
                         Spacer()
                         Text(doorObj.localizedLore)
-                            .font(.adaptive(size: 10))
+                            .adaptiveFont(size: 10)
                             .foregroundColor(.white.opacity(0.8))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -125,22 +134,22 @@ public struct QimenDunjiaView: View {
                         Image(systemName: "location.north.circle.fill")
                             .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                         Text(lang.t("qimen_travel_best"))
-                            .font(.adaptive(size: 12, weight: .bold))
+                            .adaptiveFont(size: 12, weight: .bold)
                             .foregroundColor(.white)
                         Spacer()
                         Text(lang.t("qimen_pattern_best"))
-                            .font(.adaptive(size: 10))
+                            .adaptiveFont(size: 10)
                             .foregroundColor(.green)
                     }
                     
                     Text("\(lang.t("qimen_best_nav"))【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
-                        .font(.adaptive(size: 11))
+                        .adaptiveFont(size: 11)
                         .foregroundColor(Color.green)
                         .lineLimit(2)
                     
                     if !chart.tabooDirections.isEmpty {
                         Text("\(lang.t("qimen_taboo_nav"))【\(chart.tabooDirections)】\(lang.t("qimen_taboo_suffix"))")
-                            .font(.adaptive(size: 11))
+                            .adaptiveFont(size: 11)
                             .foregroundColor(Color.orange)
                             .lineLimit(2)
                     }
@@ -153,7 +162,7 @@ public struct QimenDunjiaView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
                 )
                 .padding(.horizontal, 16)
-                } else if horizontalSizeClass == .regular {
+                } else if isSplitLayout {
                     qimenVIPPreviewCard()
                 }
             }
@@ -215,11 +224,11 @@ public struct QimenDunjiaView: View {
             // 顶行: 八神 / 九星
             HStack {
                 Text(cell.localizedGodName)
-                    .font(.adaptive(size: 9, weight: .bold))
+                    .adaptiveFont(size: 9, weight: .bold)
                     .foregroundColor(Color.yellow)
                 Spacer()
                 Text(cell.localizedStarName)
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(Color.yanCyan)
             }
             
@@ -227,7 +236,7 @@ public struct QimenDunjiaView: View {
             
             // 中行: 八门 (大字显影)
             Text(cell.localizedDoorName)
-                .font(.adaptive(size: 15, weight: .bold, design: .serif))
+                .adaptiveFont(size: 15, weight: .bold, design: .serif)
                 .foregroundColor(isJi ? Color.green : (isXiong ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45)))
             
             Spacer(minLength: 2)
@@ -235,15 +244,15 @@ public struct QimenDunjiaView: View {
             // 底行: 宫名 / 天地三奇六仪
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.adaptive(size: 8))
+                    .adaptiveFont(size: 8)
                     .foregroundColor(.white.opacity(0.6))
                 Spacer()
                 Text("\(cell.tianStem)/\(cell.diStem)")
-                    .font(.adaptive(size: 9, weight: .bold, design: .monospaced))
+                    .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
         }
-        .padding(isLargeLayout ? 10 : 6)
+        .padding(isRoomyLayout ? 10 : 6)
         .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)
@@ -258,14 +267,14 @@ public struct QimenDunjiaView: View {
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "lock.shield.fill")
-                    .font(.adaptive(size: 16))
+                    .adaptiveFont(size: 16)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Text(lang.t("privilege_qimen_title"))
-                    .font(.adaptive(size: 14, weight: .bold))
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Spacer()
                 Text(lang.t("vip_badge_title"))
-                    .font(.adaptive(size: 10, weight: .bold))
+                    .adaptiveFont(size: 10, weight: .bold)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
                     .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
@@ -274,25 +283,25 @@ public struct QimenDunjiaView: View {
             }
 
             Text(lang.t("privilege_qimen_desc"))
-                .font(.adaptive(size: 11))
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(3)
 
             Divider().background(Color.white.opacity(0.1))
 
             Text("🧭 \(lang.t("privilege_qm_feature_title"))")
-                .font(.adaptive(size: 12, weight: .semibold))
+                .adaptiveFont(size: 12, weight: .semibold)
                 .foregroundColor(Color.yanCyan)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("• \(lang.t("privilege_qm_bullet_1"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
                 Text("• \(lang.t("privilege_qm_bullet_2"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
                 Text("• \(lang.t("privilege_qm_bullet_3"))")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
             }
 
@@ -305,7 +314,7 @@ public struct QimenDunjiaView: View {
                     Text(lang.t("unlock_vip_now"))
                     Spacer()
                 }
-                .font(.adaptive(size: 12, weight: .bold))
+                .adaptiveFont(size: 12, weight: .bold)
                 .padding(.vertical, 8)
                 .background(Color(red: 0.83, green: 0.68, blue: 0.21))
                 .foregroundColor(.black)

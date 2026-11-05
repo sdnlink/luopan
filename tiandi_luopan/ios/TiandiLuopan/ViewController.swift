@@ -32,6 +32,11 @@ public class ViewController: UIHostingController<RootContentView> {
     }
     
     deinit {
+        // 多窗口（Stage Manager）：关掉一个窗口的宿主控制器，不代表 App 不再需要传感器。
+        // 只有当前没有任何前台活跃场景时才停，否则另一个窗口里的罗盘会被误停。
+        let hasActiveScene = UIApplication.shared.connectedScenes
+            .contains { $0.activationState == .foregroundActive }
+        guard !hasActiveScene else { return }
         UIApplication.shared.isIdleTimerDisabled = false
         CompassMotionManager.shared.stop()
     }

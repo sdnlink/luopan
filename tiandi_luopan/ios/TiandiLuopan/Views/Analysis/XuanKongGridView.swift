@@ -28,10 +28,21 @@ public struct XuanKongGridView: View {
     private let gridDisplayOrder = [3, 8, 1, 2, 4, 6, 7, 0, 5]
 
     // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
-    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用大屏布局。
+    // 宽屏（iPad 全形态、iPhone Duo 展开态内屏）启用放大的内容宽度与控件尺寸；
+    // 是否左右分栏由 FoldableTwoPane/AdaptiveLayout 决定（iPad 横屏分栏、竖屏单列）。
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// 布局环境值：iPad 横屏时九宫排盘进左栏，需按左栏宽度放大而非沿用 580 上限。
+    @Environment(\.adaptiveLayoutForm) private var layoutForm
+    private var isSplitLayout: Bool {
+        AdaptiveLayout.isTwoPane(sizeClass: horizontalSizeClass, form: layoutForm)
+    }
     private var isLargeLayout: Bool {
-        horizontalSizeClass == .regular
+        AdaptiveLayout.isWide(sizeClass: horizontalSizeClass)
+    }
+    /// 分栏后左栏只有 55~60% 宽，控件尺寸不能沿用「整屏宽屏」的放大档位。
+    /// 字号由 Font.adaptive 统一放大，不受此口径影响。
+    private var isRoomyLayout: Bool {
+        isLargeLayout && !isSplitLayout
     }
     
     public init(isActive: Bool = true) {
@@ -75,7 +86,9 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
-            .frame(maxWidth: isLargeLayout ? 1100 : .infinity)
+            // 分栏时放宽到 1320，让左画板真正占满“左半屏”（约 740pt）；
+            // 单列宽屏仍 1100，手机全宽。
+            .frame(maxWidth: isSplitLayout ? 1320 : (isLargeLayout ? 1100 : .infinity))
             .frame(maxWidth: .infinity)
             .padding(.top, 10)
             .padding(.bottom, 24)
@@ -165,11 +178,11 @@ public struct XuanKongGridView: View {
             selectedSubTab = index
         }) {
             Text(title)
-                .font(.adaptive(size: 12, weight: selectedSubTab == index ? .bold : .medium))
+                .adaptiveFont(size: 12, weight: selectedSubTab == index ? .bold : .medium)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, isLargeLayout ? 10 : 8)
+                .padding(.vertical, isRoomyLayout ? 10 : 8)
                 .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
                 .foregroundColor(selectedSubTab == index ? .black : .white.opacity(0.75))
         }
@@ -183,11 +196,11 @@ public struct XuanKongGridView: View {
                     Image(systemName: "scroll.fill")
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text(lang.t("tianji_scroll"))
-                        .font(.adaptive(size: 13, weight: .bold))
+                        .adaptiveFont(size: 13, weight: .bold)
                         .foregroundColor(.white)
                 }
                 Text(lang.t("xuankong_integrated_title"))
-                    .font(.adaptive(size: 10))
+                    .adaptiveFont(size: 10)
                     .foregroundColor(.white.opacity(0.65))
             }
             
@@ -197,7 +210,7 @@ public struct XuanKongGridView: View {
                 showTianJiShuSheet = true
             }) {
                 Text(lang.t("one_click_export"))
-                    .font(.adaptive(size: 11, weight: .bold))
+                    .adaptiveFont(size: 11, weight: .bold)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(
@@ -225,9 +238,11 @@ public struct XuanKongGridView: View {
     
     // MARK: - 玄空九星排盘内容
     private func xuanKongContent(chart: XuanKongChart) -> some View {
-        // iPhone Duo 展开态双栏：左栏 = 元运切换/格局徽章/九宫飞星排盘（主交互），
-        // 右栏 = 格局评析与财富/健康/化解建议（分析解释）；折叠态保持原单列纵排。
-        FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 14) {
+        // 分栏态（Duo 内屏 / iPad 横屏）：左栏 = 元运切换/格局徽章/九宫飞星排盘，
+        // 右栏 = 格局评析与财富/健康/化解建议。independentScroll 让两栏各自滚动，
+        // 避免右栏长解释把整页撑长、左栏画板跟着一起滚；折叠态保持原单列纵排。
+        FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 14,
+                        independentScroll: true) {
             VStack(spacing: 14) {
                 periodPickerBar(chart: chart)
                 patternBadgeView(chart: chart)
@@ -237,7 +252,7 @@ public struct XuanKongGridView: View {
             VStack(spacing: 12) {
                 analysisCard(chart: chart)
             }
-            .padding(.horizontal, isLargeLayout ? 0 : 16)
+            .padding(.horizontal, isSplitLayout ? 12 : (isLargeLayout ? 0 : 16))
         }
     }
     
@@ -247,7 +262,7 @@ public struct XuanKongGridView: View {
         
         return VStack(spacing: 6) {
             Text(chart.periodMeta.label)
-                .font(.adaptive(size: 12, weight: .bold))
+                .adaptiveFont(size: 12, weight: .bold)
                 .foregroundColor(chart.periodMeta.isCurrent ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.75))
             
             ScrollView(.horizontal, showsIndicators: false) {
@@ -268,11 +283,11 @@ public struct XuanKongGridView: View {
                                 Text("\(p)\(lang.t("xuankong_period_unit"))")
                                 if isLocked {
                                     Image(systemName: "lock.fill")
-                                        .font(.adaptive(size: 8))
+                                        .adaptiveFont(size: 8)
                                 }
                             }
-                            .font(.adaptive(size: 13, weight: isSelected ? .bold : .medium))
-                            .frame(width: isLocked ? (isLargeLayout ? 62 : 52) : (isLargeLayout ? 52 : 44), height: isLargeLayout ? 36 : 32)
+                            .adaptiveFont(size: 13, weight: isSelected ? .bold : .medium)
+                            .frame(width: isLocked ? (isRoomyLayout ? 62 : 52) : (isRoomyLayout ? 52 : 44), height: isRoomyLayout ? 36 : 32)
                             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .black : .white)
                             .cornerRadius(8)
@@ -289,13 +304,13 @@ public struct XuanKongGridView: View {
         VStack(spacing: 6) {
             HStack(spacing: 8) {
                 Text("\(chart.sittingMountain)\(lang.t("mountain_suffix"))\(chart.facingMountain)\(lang.t("facing_suffix"))")
-                    .font(.adaptive(size: 18, weight: .bold, design: .serif))
+                    .adaptiveFont(size: 18, weight: .bold, design: .serif)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 
                 Text(chart.patternType)
-                    .font(.adaptive(size: 12, weight: .bold))
+                    .adaptiveFont(size: 12, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Color.orange.opacity(0.2))
@@ -312,9 +327,9 @@ public struct XuanKongGridView: View {
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.adaptive(size: 9, weight: .bold))
+                            .adaptiveFont(size: 9, weight: .bold)
                         Text(chart.chartModeTitle)
-                            .font(.adaptive(size: 11, weight: .semibold))
+                            .adaptiveFont(size: 11, weight: .semibold)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -327,7 +342,7 @@ public struct XuanKongGridView: View {
                 HStack(spacing: 6) {
                     if chart.isSanBanGua {
                         Text(sanBanGuaBadgeText())
-                            .font(.adaptive(size: 10, weight: .bold))
+                            .adaptiveFont(size: 10, weight: .bold)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(Color.green.opacity(0.2))
@@ -336,7 +351,7 @@ public struct XuanKongGridView: View {
                     }
                     if chart.isQiXingDaJie {
                         Text(qiXingDaJieBadgeText())
-                            .font(.adaptive(size: 10, weight: .bold))
+                            .adaptiveFont(size: 10, weight: .bold)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
                             .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.22))
@@ -365,7 +380,8 @@ public struct XuanKongGridView: View {
                     }
             }
         }
-        .frame(maxWidth: isLargeLayout ? 580 : .infinity)
+        // 分栏时按左栏宽度放大（720 上限），单列宽屏仍 580、手机全宽
+        .frame(maxWidth: isSplitLayout ? 720 : (isLargeLayout ? 580 : .infinity))
         .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
@@ -379,33 +395,33 @@ public struct XuanKongGridView: View {
         return VStack {
             HStack {
                 Text("\(cell.sittingStar)")
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(Color.yanCyan)
                 Spacer()
                 Text("\(cell.facingStar)")
-                    .font(.adaptive(size: 13, weight: .bold))
+                    .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(Color.orange)
             }
             
             Spacer(minLength: 2)
             
             Text("\(cell.periodStar)")
-                .font(.adaptive(size: 22, weight: .bold, design: .serif))
+                .adaptiveFont(size: 22, weight: .bold, design: .serif)
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
             Spacer(minLength: 2)
             
             HStack {
                 Text(cell.localizedPalaceName)
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(.white.opacity(0.5))
                 Spacer()
                 Text(cell.localizedElement)
-                    .font(.adaptive(size: 9))
+                    .adaptiveFont(size: 9)
                     .foregroundColor(.white.opacity(0.5))
             }
         }
-        .padding(isLargeLayout ? 12 : 8)
+        .padding(isRoomyLayout ? 12 : 8)
         .aspectRatio(1.0, contentMode: .fit)
         .background(bgColor)
         .cornerRadius(8)
@@ -419,11 +435,11 @@ public struct XuanKongGridView: View {
     private func analysisCard(chart: XuanKongChart) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(lang.t("xuankong_deep_analysis"))
-                .font(.adaptive(size: 14, weight: .bold))
+                .adaptiveFont(size: 14, weight: .bold)
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             
             Text(chart.patternDesc)
-                .font(.adaptive(size: 13))
+                .adaptiveFont(size: 13)
                 .foregroundColor(.white.opacity(0.85))
                 .lineSpacing(4)
             
@@ -433,14 +449,14 @@ public struct XuanKongGridView: View {
                 let sel = chart.palaces[selectedPalaceIdx]
                 HStack(spacing: 6) {
                     Text("【\(sel.localizedPalaceName)】")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(Color.yanCyan)
                     Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
-                        .font(.adaptive(size: 11, weight: .semibold, design: .monospaced))
+                        .adaptiveFont(size: 11, weight: .semibold, design: .monospaced)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                     Spacer()
                     Text(sel.localizedEvaluation)
-                        .font(.adaptive(size: 11, weight: .medium))
+                        .adaptiveFont(size: 11, weight: .medium)
                         .foregroundColor(.white.opacity(0.9))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -456,7 +472,7 @@ public struct XuanKongGridView: View {
                 Text(chart.healthAdvice)
                 Text(chart.remedyAdvice)
             }
-            .font(.adaptive(size: 11))
+            .adaptiveFont(size: 11)
             .foregroundColor(.white.opacity(0.7))
         }
         .padding(14)

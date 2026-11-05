@@ -31,7 +31,7 @@ public struct CalibrationSheet: View {
                         Image(systemName: "safari.fill")
                             .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                         Text(lang.t("calib_sheet_title"))
-                            .font(.adaptive(size: 16, weight: .bold))
+                            .adaptiveFont(size: 16, weight: .bold)
                             .foregroundColor(.white)
                         
                         Spacer()
@@ -40,7 +40,7 @@ public struct CalibrationSheet: View {
                             presentationMode.wrappedValue.dismiss()
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .font(.adaptive(size: 20))
+                                .adaptiveFont(size: 20)
                                 .foregroundColor(.white.opacity(0.6))
                         }
                     }
@@ -89,7 +89,7 @@ public struct CalibrationSheet: View {
                         HStack(spacing: 6) {
                             Text("🧭")
                             Text(lang.t("calib_dual_needle_section"))
-                                .font(.adaptive(size: 13, weight: .bold))
+                                .adaptiveFont(size: 13, weight: .bold)
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         }
                         
@@ -97,7 +97,7 @@ public struct CalibrationSheet: View {
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color.green).frame(width: 6, height: 6).padding(.top, 4)
                                 Text(lang.t("calib_magnetic_needle_desc"))
-                                    .font(.adaptive(size: 12))
+                                    .adaptiveFont(size: 12)
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
                             }
@@ -105,7 +105,7 @@ public struct CalibrationSheet: View {
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color(red: 0.95, green: 0.82, blue: 0.4)).frame(width: 6, height: 6).padding(.top, 4)
                                 Text(lang.t("calib_true_needle_desc"))
-                                    .font(.adaptive(size: 12))
+                                    .adaptiveFont(size: 12)
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
                             }
@@ -113,7 +113,7 @@ public struct CalibrationSheet: View {
                             HStack(alignment: .top, spacing: 4) {
                                 Circle().fill(Color.yanCyan).frame(width: 6, height: 6).padding(.top, 4)
                                 Text(lang.t("calib_angle_desc"))
-                                    .font(.adaptive(size: 12))
+                                    .adaptiveFont(size: 12)
                                     .foregroundColor(.white.opacity(0.85))
                                     .lineSpacing(2)
                             }
@@ -127,16 +127,16 @@ public struct CalibrationSheet: View {
                     VStack(spacing: 10) {
                         HStack {
                             Image(systemName: "infinity")
-                                .font(.adaptive(size: 24, weight: .bold))
+                                .adaptiveFont(size: 24, weight: .bold)
                                 .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                                 .rotationEffect(.degrees(rotateDegree))
                             
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(lang.t("calib_eight_quick"))
-                                    .font(.adaptive(size: 13, weight: .bold))
+                                    .adaptiveFont(size: 13, weight: .bold)
                                     .foregroundColor(.white)
                                 Text(lang.t("calib_eight_desc"))
-                                    .font(.adaptive(size: 11))
+                                    .adaptiveFont(size: 11)
                                     .foregroundColor(.white.opacity(0.75))
                                     .lineSpacing(2)
                             }
@@ -166,7 +166,7 @@ public struct CalibrationSheet: View {
                                 Image(systemName: isCalibrating ? "arrow.2.circlepath" : "arrow.triangle.2.circlepath")
                                 Text(isCalibrating ? lang.t("calibrating_now") : lang.t("recalibrate_btn"))
                             }
-                            .font(.adaptive(size: 14, weight: .bold))
+                            .adaptiveFont(size: 14, weight: .bold)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .background(
@@ -185,7 +185,7 @@ public struct CalibrationSheet: View {
                             presentationMode.wrappedValue.dismiss()
                         }) {
                             Text(lang.t("i_know"))
-                                .font(.adaptive(size: 13))
+                                .adaptiveFont(size: 13)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
                                 .background(Color.white.opacity(0.1))
@@ -228,13 +228,13 @@ public struct CalibrationSheet: View {
     private func statusRow(title: String, value: String, isOk: Bool, customColor: Color? = nil) -> some View {
         HStack {
             Text(title)
-                .font(.adaptive(size: 13))
+                .adaptiveFont(size: 13)
                 .foregroundColor(.white.opacity(0.75))
             
             Spacer()
             
             Text(value)
-                .font(.adaptive(size: 12, weight: .semibold))
+                .adaptiveFont(size: 12, weight: .semibold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .padding(.horizontal, 6)

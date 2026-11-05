@@ -19,26 +19,52 @@ on:
           - vi
           - id
 
+permissions:
+  contents: read
+
 jobs:
   capture-ipad-screenshots:
     name: Auto Capture iPad 12.9" Screenshots
-    runs-on: macos-15
-    timeout-minutes: 30
+    runs-on: xcode-27   # 官方标签只有 xcode-27 / xcode-27-xlarge；macos-27 不存在，job 会一直排队
+    timeout-minutes: 40
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Select Highest Available Xcode
+      # 必须用 iOS 27.1 SDK 编译：低版本 SDK 在 iPhone Duo 内屏会以兼容模式
+      # （缩小的 iPhone 画面 + 黑边）运行，布局与截图均不可信。
+      - name: Select Xcode 27 & Require iOS 27.1 SDK
         run: |
+          set -euo pipefail
           echo "=== Detecting Xcode Versions on Runner ==="
-          find /Applications -maxdepth 1 -name "Xcode*.app" -print
-          HIGHEST_XCODE="$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)"
-          if [ -n "$HIGHEST_XCODE" ]; then
-            echo "Selecting Xcode at: $HIGHEST_XCODE"
-            sudo xcode-select -s "$HIGHEST_XCODE/Contents/Developer"
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+
+          XCODE_APP=""
+          for cand in /Applications/Xcode_27.1.app /Applications/Xcode_27*.app; do
+            if [ -d "$cand" ]; then XCODE_APP="$cand"; break; fi
+          done
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::No Xcode installation found on runner"
+            exit 1
+          fi
+          echo "Selecting Xcode: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
+
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo missing)"
+          SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || echo missing)"
+          echo "Device SDK: $IOS_SDK | Simulator SDK: $SIM_SDK"
+          for sdk in "$IOS_SDK" "$SIM_SDK"; do
+            if ! awk -v v="$sdk" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+              echo "::error::iOS SDK 27.1+ required (got $sdk). Older SDK builds run in iPhone Duo compatibility mode."
+              exit 1
+            fi
+          done
+          echo "SDK check passed: iOS $IOS_SDK / Simulator $SIM_SDK"
 
       - name: Set up Python & Dependencies
         run: |
@@ -67,6 +93,24 @@ jobs:
             exit 1
           fi
 
+          # 产物必须确实链接 iOS 27.1 SDK（DTSDKName 由构建时 SDK 写入）
+          DTSDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$APP_PATH/Info.plist" 2>/dev/null || true)"
+          echo "DTSDKName = $DTSDK"
+          case "$DTSDK" in
+            *27.1*) : ;;
+            *)
+              echo "::error::App not built against iOS 27.1 SDK (DTSDKName=$DTSDK)."
+              exit 1
+              ;;
+          esac
+
+      # iOS 27.1 运行时目前只包含 iPhone Duo；iPad 在 iOS 27.0 运行时。
+      # 先把可用运行时/设备打印出来，脚本选错运行时时一眼能定位。
+      - name: List Simulator Runtimes & Devices
+        run: |
+          xcrun simctl list runtimes
+          xcrun simctl list devices available
+
       - name: Run Automated iPad 12.9" Screenshot Capture
         run: |
           python3 .github/scripts/capture_ipad_screenshots.py \
@@ -75,6 +119,7 @@ jobs:
             --output-dir "dist-screenshots"
 
       - name: Upload Screenshots as Artifact
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: iPad-12.9-Screenshots

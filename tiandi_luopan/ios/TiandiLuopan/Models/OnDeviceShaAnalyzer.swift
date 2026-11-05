@@ -172,7 +172,7 @@ public final class OnDeviceShaAnalyzer {
         request.quadratureTolerance = quadratureTolerance
         let handler = VNImageRequestHandler(cgImage: cgImage, orientation: orientation, options: [:])
         try handler.perform([request])
-        return (request.results as? [VNRectangleObservation]) ?? []
+        return request.results ?? []
     }
 
     /// Uses `VNDetectContoursRequest` (iOS 14.0+) to detect non-rectangular

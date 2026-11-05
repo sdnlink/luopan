@@ -56,7 +56,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         private let sessionQueue = DispatchQueue(label: "com.yanxiang.compass.camera-session")
         private var wantsRunning = true
         // iPad 声明了四个方向，预览层与照片输出必须跟随界面旋转；
-        // iOS 17 用 AVCaptureDeviceRotationCoordinator，iOS 16 用 videoOrientation。
+        // iOS 17 用 AVCaptureDevice.RotationCoordinator，iOS 16 用 videoOrientation。
         private var rotationCoordinator: Any?
         private var rotationObservation: NSKeyValueObservation?
 
@@ -243,7 +243,7 @@ public struct CameraPreviewView: UIViewRepresentable {
             rotationObservation = nil
             rotationCoordinator = nil
             if #available(iOS 17.0, *) {
-                let coordinator = AVCaptureDeviceRotationCoordinator(device: device, previewLayer: preview)
+                let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: preview)
                 rotationCoordinator = coordinator
                 rotationObservation = coordinator.observe(
                     \.videoRotationAngleForHorizonLevelPreview,
@@ -258,7 +258,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         private func syncRotation() {
             guard let connection = previewLayer?.connection else { return }
             if #available(iOS 17.0, *) {
-                if let coordinator = rotationCoordinator as? AVCaptureDeviceRotationCoordinator {
+                if let coordinator = rotationCoordinator as? AVCaptureDevice.RotationCoordinator {
                     // isVideoRotationAngleSupported 是方法（传入角度），不是 Bool 属性。
                     let previewAngle = coordinator.videoRotationAngleForHorizonLevelPreview
                     if connection.isVideoRotationAngleSupported(previewAngle) {

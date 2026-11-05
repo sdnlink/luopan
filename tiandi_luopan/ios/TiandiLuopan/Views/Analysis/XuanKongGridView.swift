@@ -75,7 +75,7 @@ public struct XuanKongGridView: View {
                     QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
                 }
             }
-            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+            .frame(maxWidth: isLargeLayout ? 1100 : .infinity)
             .frame(maxWidth: .infinity)
             .padding(.top, 10)
             .padding(.bottom, 24)
@@ -157,7 +157,6 @@ public struct XuanKongGridView: View {
         }
         .background(Color.white.opacity(0.08))
         .cornerRadius(8)
-        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
         .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
@@ -221,19 +220,24 @@ public struct XuanKongGridView: View {
                         .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
                 )
         )
-        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
         .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
     
     // MARK: - 玄空九星排盘内容
     private func xuanKongContent(chart: XuanKongChart) -> some View {
-        VStack(spacing: 14) {
-            periodPickerBar(chart: chart)
-            patternBadgeView(chart: chart)
-            ninePalacesGrid(chart: chart)
-            analysisCard(chart: chart)
-                .frame(maxWidth: isLargeLayout ? 680 : .infinity)
-                .padding(.horizontal, isLargeLayout ? 0 : 16)
+        // iPhone Duo 展开态双栏：左栏 = 元运切换/格局徽章/九宫飞星排盘（主交互），
+        // 右栏 = 格局评析与财富/健康/化解建议（分析解释）；折叠态保持原单列纵排。
+        FoldableTwoPane(mainColumnRatio: 0.56, compactSpacing: 14) {
+            VStack(spacing: 14) {
+                periodPickerBar(chart: chart)
+                patternBadgeView(chart: chart)
+                ninePalacesGrid(chart: chart)
+            }
+        } analysis: {
+            VStack(spacing: 12) {
+                analysisCard(chart: chart)
+            }
+            .padding(.horizontal, isLargeLayout ? 0 : 16)
         }
     }
     
@@ -342,7 +346,6 @@ public struct XuanKongGridView: View {
                 }
             }
         }
-        .frame(maxWidth: isLargeLayout ? 680 : .infinity)
     }
     
     // MARK: - 3x3 九宫飞星网格

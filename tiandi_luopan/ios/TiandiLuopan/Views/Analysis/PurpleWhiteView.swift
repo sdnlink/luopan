@@ -64,6 +64,9 @@ public struct PurpleWhiteView: View {
     @ViewBuilder
     private func chartContent(chart: PurpleWhiteChart) -> some View {
         let lang = LocalizationManager.shared
+        // iPhone Duo 展开态双栏：左栏 = 太岁三煞警戒与九宫飞星盘（主交互），
+        // 右栏 = 选中宫位流年流月客星详解（分析解释）；折叠态保持原单列纵排。
+        FoldableTwoPane(mainColumnRatio: 0.58, compactSpacing: 12) {
         VStack(spacing: 12) {
             // 标题与太岁/三煞摘要栏
             HStack {
@@ -123,13 +126,85 @@ public struct PurpleWhiteView: View {
                 }
                 .frame(maxWidth: isLargeLayout ? 580 : .infinity)
                 .padding(.horizontal, isLargeLayout ? 0 : 16)
-                
-                if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
-                    palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
+                }
+                }
+                } analysis: {
+                // 选中宫位流年/流月客星详解与宜忌建议（展开态右栏 / 折叠态底部）
+                if iap.hasUnlockedVIP {
+                    if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
+                        palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
+                            .padding(.horizontal, 16)
+                    }
+                } else if horizontalSizeClass == .regular {
+                    purpleWhiteVIPPreviewCard()
                         .padding(.horizontal, 16)
                 }
             }
+    }
+
+    // MARK: - 紫白飞星 VIP 展开态预览卡 (消除展开态双栏右侧留白)
+    private func purpleWhiteVIPPreviewCard() -> some View {
+        let lang = LocalizationManager.shared
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.adaptive(size: 16))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(lang.t("privilege_purplewhite_title"))
+                    .font(.adaptive(size: 14, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+                Text(lang.t("vip_badge_title"))
+                    .font(.adaptive(size: 10, weight: .bold))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(4)
+            }
+
+            Text(lang.t("privilege_purplewhite_desc"))
+                .font(.adaptive(size: 11))
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(3)
+
+            Divider().background(Color.white.opacity(0.1))
+
+            Text("🌟 \(lang.t("privilege_pw_feature_title"))")
+                .font(.adaptive(size: 12, weight: .semibold))
+                .foregroundColor(Color.yanCyan)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("• \(lang.t("privilege_pw_bullet_1"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_pw_bullet_2"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+                Text("• \(lang.t("privilege_pw_bullet_3"))")
+                    .font(.adaptive(size: 11))
+                    .foregroundColor(.white.opacity(0.75))
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: { showPaywall = true }) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "crown.fill")
+                    Text(lang.t("unlock_vip_now"))
+                    Spacer()
+                }
+                .font(.adaptive(size: 12, weight: .bold))
+                .padding(.vertical, 8)
+                .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                .foregroundColor(.black)
+                .cornerRadius(8)
+            }
         }
+        .padding(14)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(12)
     }
 
     private func refreshChart(force: Bool = false) {

@@ -294,7 +294,6 @@ public class QimenEngine {
     ]
     
     private let nineStars = ["天蓬", "天芮", "天冲", "天辅", "天禽", "天心", "天柱", "天任", "天英"]
-    private let eightGods = ["值符", "螣蛇", "太阴", "六合", "白虎", "玄武", "九地", "九天"]
     private let sixYiStems = ["戊", "己", "庚", "辛", "壬", "癸", "丁", "丙", "乙"]
     
     // 洛书九宫展示顺序: 4(东南巽), 9(正南离), 2(西南坤), 3(正东震), 5(中宫), 7(正西兑), 8(东北艮), 1(正北坎), 6(西北乾)
@@ -331,12 +330,6 @@ public class QimenEngine {
         }
         let n = luoOrderSkip.count
         return luoOrderSkip[(i + (forward ? 1 : -1) + n) % n]
-    }
-    private func flyFull(start: Int, steps: Int, forward: Bool) -> Int {
-        var cur = start
-        let s = ((steps % 9) + 9) % 9
-        for _ in 0..<s { cur = stepFull(cur, forward: forward) }
-        return cur
     }
     private func flySkip(start: Int, steps: Int, forward: Bool) -> Int {
         var cur = luoOrderSkip.contains(start)

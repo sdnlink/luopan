@@ -532,54 +532,58 @@ public struct ARVisionView: View {
         return min(max(selectedShaIndex, 0), shaList.count - 1)
     }
     
+    // 布局按“可用空间”而非设备 idiom 决策（苹果 iPhone Duo 适配要求）：
+    // regular 宽度（iPad、iPhone Duo 展开态内屏）启用取景/研判双栏布局。
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isLargeLayout: Bool {
+        horizontalSizeClass == .regular
+    }
+
     public var body: some View {
         ZStack {
             if isActive {
-            // 1. 真机摄像头实时预览 / ARKit+LiDAR融合流 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
-            if hasCameraPermission && isActive && !showSpatialSurvey {
-                if cameraPosition == .back && ARWorldTrackingConfiguration.isSupported {
-                    ARFusionCaptureView(
-                        model: fusionModel,
-                        isActive: isActive && !showSpatialSurvey,
-                        captureTrigger: captureTrigger,
-                        onFrameCaptured: { frame in
-                            handleCapturedFrame(frame)
+            if isLargeLayout {
+                // iPhone Duo 展开态双栏：左栏 = 取景与形煞锁定交互，
+                // 右栏 = 形煞智能研判与化解解释（独立滚动）。
+                // 复用共享按比例布局（0.6 左栏），折叠态全屏 HUD 布局保持不变，
+                // 故不经过 FoldableTwoPane 的纵排折叠分支。
+                ProportionalTwoPaneLayout(mainRatio: 0.6) {
+                    ZStack {
+                        cameraLayer()
+                        scanBeamLayer
+                        crosshairCenterLayer()
+                        targetBoundingBoxLayer()
+                        VStack(spacing: 6) {
+                            topStatusBar()
+                            horizonCompassRibbon()
+                            Spacer()
+                            snapshotToastView()
                         }
-                    )
-                    .id("ar_fusion_back")
-                    .ignoresSafeArea()
-                } else {
-                    CameraPreviewView(
-                        controller: cameraModel,
-                        cameraPosition: cameraPosition,
-                        isActive: isActive && !showSpatialSurvey,
-                        captureTrigger: captureTrigger,
-                        onPhotoCaptured: { image in
-                            handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
-                        }
-                    )
-                    .id("camera_preview_\(cameraPosition.rawValue)")
-                    .ignoresSafeArea()
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 12)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.10))
+                        .frame(width: 1)
+
+                    ScrollView {
+                        bottomShaControlPanel()
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                            .padding(.bottom, 12)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(red: 0.07, green: 0.07, blue: 0.09))
                 }
             } else {
-                simulationCanvasLayer()
-                    .ignoresSafeArea()
-            }
+            // 1. 真机摄像头实时预览 / ARKit+LiDAR融合流 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
+            cameraLayer()
             
             // 2. 激光天心扫描光束 (动态往返扫掠)
-            VStack {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.clear, Color.yanCyan.opacity(0.6), Color.yanCyan, Color.clear],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(height: 2)
-                    .offset(y: scanOffset)
-            }
-            .allowsHitTesting(false)
+            scanBeamLayer
             
             // 3. 屏幕中心天心透视十字准星
             crosshairCenterLayer()
@@ -595,36 +599,7 @@ public struct ARVisionView: View {
                 Spacer()
                 
                 // 截图存证保存提示 + 一键分享
-                if showSnapshotToast {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text(lang.t("save_success"))
-                            .font(.adaptive(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                        if latestSnapshotImage != nil {
-                            Button(action: {
-                                showSnapshotShareSheet = true
-                            }) {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "square.and.arrow.up")
-                                    Text(lang.t("share_and_print"))
-                                }
-                                .font(.adaptive(size: 11, weight: .bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.yanCyan)
-                                .foregroundColor(.black)
-                                .cornerRadius(12)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.85))
-                    .cornerRadius(20)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                snapshotToastView()
                 
                 // 6. 底部形煞智能研判卡与操作栏
                 bottomShaControlPanel()
@@ -633,6 +608,7 @@ public struct ARVisionView: View {
             .padding(.top, 10)
             .padding(.bottom, 12)
             }
+        }
         }
         .onAppear {
             guard isActive else { return }
@@ -788,6 +764,95 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 模拟器或无相机时的实景演练仿真画板
+    // MARK: - 取景层与悬浮组件 (展开态双栏 / 折叠态单屏共用)
+
+    /// 取景层：真机摄像头 / ARKit+LiDAR 融合流 / 模拟器仿真画板
+    /// (仅在 AR Tab 激活时工作，后台休眠避免发烫)
+    @ViewBuilder
+    private func cameraLayer() -> some View {
+        if hasCameraPermission && isActive && !showSpatialSurvey {
+            if cameraPosition == .back && ARWorldTrackingConfiguration.isSupported {
+                ARFusionCaptureView(
+                    model: fusionModel,
+                    isActive: isActive && !showSpatialSurvey,
+                    captureTrigger: captureTrigger,
+                    onFrameCaptured: { frame in
+                        handleCapturedFrame(frame)
+                    }
+                )
+                .id("ar_fusion_back")
+                .ignoresSafeArea()
+            } else {
+                CameraPreviewView(
+                    controller: cameraModel,
+                    cameraPosition: cameraPosition,
+                    isActive: isActive && !showSpatialSurvey,
+                    captureTrigger: captureTrigger,
+                    onPhotoCaptured: { image in
+                        handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
+                    }
+                )
+                .id("camera_preview_\(cameraPosition.rawValue)")
+                .ignoresSafeArea()
+            }
+        } else {
+            simulationCanvasLayer()
+                .ignoresSafeArea()
+        }
+    }
+
+    /// 激光天心扫描光束 (动态往返扫掠)
+    private var scanBeamLayer: some View {
+        VStack {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.clear, Color.yanCyan.opacity(0.6), Color.yanCyan, Color.clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(height: 2)
+                .offset(y: scanOffset)
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// 截图存证保存提示 + 一键分享 Toast
+    @ViewBuilder
+    private func snapshotToastView() -> some View {
+        if showSnapshotToast {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                Text(lang.t("save_success"))
+                    .font(.adaptive(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                if latestSnapshotImage != nil {
+                    Button(action: {
+                        showSnapshotShareSheet = true
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "square.and.arrow.up")
+                            Text(lang.t("share_and_print"))
+                        }
+                        .font(.adaptive(size: 11, weight: .bold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.yanCyan)
+                        .foregroundColor(.black)
+                        .cornerRadius(12)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.85))
+            .cornerRadius(20)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
     private func simulationCanvasLayer() -> some View {
         ZStack {
             Color(red: 0.08, green: 0.09, blue: 0.12)

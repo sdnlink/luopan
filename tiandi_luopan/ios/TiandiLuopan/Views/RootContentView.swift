@@ -75,9 +75,9 @@ extension Font {
 public enum AdaptiveFontMetrics {
     /// 宽屏（regular 宽度：iPad 全形态 / Duo 内屏）的大屏放大比例。
     public static let regularWidthScale: CGFloat = 1.35
-    /// Dynamic Type 放大上限：固定尺寸容器（24 山 30/36pt、十二长生 90/110pt 列、
-    /// 顶部 34pt 圆钮）跟到无障碍最大字号会被撑破，故封顶 1.3x。
-    public static let maxDynamicTypeScale: CGFloat = 1.3
+    /// Dynamic Type 放大比例：直接跟随系统「文字大小」（default 1.0，辅助功能最大约 2.35x）。
+    /// 不再人为封顶——各固定尺寸容器（24 山标签、顶部度数、VIP 卡等）已用
+    /// `minimumScaleFactor` / 随 dynamicTypeScale 同步放大的 frame 自行兜底，避免溢出。
 
     private static var cache: [String: CGFloat] = [:]
     private static let cacheLock = NSLock()
@@ -113,7 +113,7 @@ public enum AdaptiveFontMetrics {
 
         let traits = UITraitCollection(preferredContentSizeCategory: category)
         let factor = UIFontMetrics(forTextStyle: .body).scaledValue(for: 17, compatibleWith: traits) / 17
-        let scale = factor.isFinite ? min(max(factor, 1.0), maxDynamicTypeScale) : 1.0
+        let scale = factor.isFinite ? max(factor, 1.0) : 1.0
 
         cacheLock.lock()
         cache[key] = scale

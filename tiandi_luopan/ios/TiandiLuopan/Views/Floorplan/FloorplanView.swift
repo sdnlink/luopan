@@ -154,37 +154,40 @@ public struct FloorplanView: View {
                     // 展开态双栏：左栏宽度 = 全宽 × mainRatio，画布按左栏宽度反算，
                     // 与下方 FoldableTwoPane 的 mainColumnRatio 严格一致，避免画布越出左栏。
                     let mainRatio: CGFloat = 0.60
+                    // iPad 单列时内容不再硬顶 720pt：按可用宽取 min(可用宽-32, 900)，
+                    // iPad 竖屏 1032pt 宽下原本两侧空出约 330pt，像手机放大版。
+                    let contentMax: CGFloat = isLargeLayout ? min(screenW - 32, 900) : .infinity
                     let canvasSide: CGFloat = isSplitLayout
                         // 双栏（Duo 内屏 / iPad 横屏）：画布按左栏宽度反算，绝不越出左栏；
                         // 横屏纵向更紧，按可用高度的 0.62 取，竖持分栏仍按 0.55。
                         ? min(screenW * mainRatio - 32,
                               screenH * (screenW > screenH ? 0.62 : 0.55))
                         : isLargeLayout
-                            // iPad 单列：画布明显放大（受内容宽度上限 720 约束）
-                            ? min(min(screenW - 64, 720), screenH * 0.58)
+                            // iPad 单列：画布跟随可用宽度，受内容上限 900 与高度 0.62 约束
+                            ? min(screenW - 64, screenH * 0.62)
                             : min(screenW - 32, screenH < 700 ? 250.0 : (screenH > 900 ? 380.0 : min(340.0, screenH * 0.40)))
 
                     // 左栏内容（画布 + 全部操作工具）：展开态与折叠态共用同一份定义
                     let mainColumn = VStack(spacing: 8) {
                                 topControlBar()
-                                    .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                    .frame(maxWidth: contentMax)
 
                                 headingQualityNotice()
-                                    .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                    .frame(maxWidth: contentMax)
 
                                 if userFloorplanImage != nil {
                                     roomDetectionBar()
-                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                        .frame(maxWidth: contentMax)
                                     roomCalibrationBar()
-                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                        .frame(maxWidth: contentMax)
                                 }
 
                                 if isEditingRooms {
                                     roomLayoutTools()
-                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                        .frame(maxWidth: contentMax)
                                     if let editingRoom = editingRoom {
                                         roomResizeTools(room: editingRoom)
-                                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                            .frame(maxWidth: contentMax)
                                     }
                                 }
                                 
@@ -195,7 +198,7 @@ public struct FloorplanView: View {
 
                                 if !isSyncWithCompass {
                                     manualHeadingControl()
-                                        .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                                        .frame(maxWidth: contentMax)
                                         .padding(.horizontal, 16)
                                 }
                     }
@@ -204,7 +207,7 @@ public struct FloorplanView: View {
                     // 右栏 / 页尾内容：体检报告与房间列表
                     let auditColumn = VStack(spacing: 8) {
                         auditListSection(report: auditResult.report)
-                            .frame(maxWidth: isLargeLayout ? 720 : .infinity)
+                            .frame(maxWidth: contentMax)
                     }
                     .padding(.horizontal, isLargeLayout ? 16 : 0)
                     .padding(.bottom, 16)
@@ -2071,7 +2074,10 @@ public struct FloorplanView: View {
 
     private func compassOverlayLayer(centerPt: CGPoint, size: CGFloat) -> some View {
         let r = size * 0.44
-        let badgeR = size * 0.37
+        // 角标原放在 0.37（金环内侧），正好落在房间卡片上，压住房间名
+        //（截图里"乾西北 三碧"叠在 Gourmet Kitchen 上）。挪到金环外侧
+        // 0.465：角标落在环与画布边缘之间的空环带上，不再压房间标题。
+        let badgeR = size * 0.465
 
         return ZStack {
             // 八宫分界辐射线 (位于每宫 ±22.5° 交界处，与 FloorplanEngine.palaceForPoint 完全对齐)

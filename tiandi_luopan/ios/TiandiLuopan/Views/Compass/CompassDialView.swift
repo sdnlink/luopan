@@ -31,6 +31,10 @@ public struct CompassDialView: View {
             // points of breathing room on compact devices.
             let radius = max(0, size * 0.5 - 18)
             let dialCanvasSize = radius * 2 + 32
+            // 盘径自适应：iPhone 参考半径约 175pt；iPad 上盘径放到 ~470pt，
+            // 盘面文字（节气/六十四卦/24山/八卦环）原本还是手机字号，显得极小。
+            // 这里让盘面文字与刻度随盘径同比放大，封顶 1.8x 避免密环互相挤压。
+            let dialGrow = max(1.0, min(radius / 175.0, 1.8))
             
             ZStack {
                 // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)
@@ -40,34 +44,34 @@ public struct CompassDialView: View {
                     
                     // 360 度外圈主刻度
                     if layers.showDegreeTicks {
-                        degreeTicksLayer(radius: radius)
+                        degreeTicksLayer(radius: radius, grow: dialGrow)
                     }
-                    
+
                     // 二十四节气与十二消息卦环
                     if layers.showSolarTerms {
-                        solarTermsLayer(radius: radius * 0.91)
+                        solarTermsLayer(radius: radius * 0.91, grow: dialGrow)
                     }
-                    
+
                     // 六十四卦分金环
                     if layers.showHexagrams64 {
-                        hexagramsLayer(radius: radius * 0.83)
+                        hexagramsLayer(radius: radius * 0.83, grow: dialGrow)
                     }
-                    
+
                     // 一百二十分金环
                     if layers.showFenjin120 {
-                        fenjinLayer(radius: radius * 0.75)
+                        fenjinLayer(radius: radius * 0.75, grow: dialGrow)
                     }
-                    
+
                     // 二十四山正针环
                     if layers.showMountain24 {
-                        mountain24Layer(radius: radius * 0.66)
+                        mountain24Layer(radius: radius * 0.66, grow: dialGrow)
                     }
-                    
+
                     // 八卦八方环
                     if layers.showEightGua {
-                        eightGuaLayer(radius: radius * 0.46)
+                        eightGuaLayer(radius: radius * 0.46, grow: dialGrow)
                     }
-                    
+
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
@@ -80,7 +84,7 @@ public struct CompassDialView: View {
                 
                 // 3. 地理真北金针 (根据当地磁偏角偏转，双指针系统)
                 if layers.showTrueNorthNeedle && motion.hasDeclination {
-                    trueNorthNeedleLayer(radius: radius * 0.28)
+                    trueNorthNeedleLayer(radius: radius * 0.28, grow: dialGrow)
                 }
                 
                 // 4. 天池中央红蓝双色红宝石磁针 (南朱雀红 / 北玄武青)
@@ -183,22 +187,23 @@ public struct CompassDialView: View {
     }
     
     // MARK: - 360 度外圈主刻度
-    private func degreeTicksLayer(radius: CGFloat) -> some View {
+    private func degreeTicksLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(0..<120) { i in
             let angle = Double(i) * 3.0
             let is10 = (i % 10 == 0)
             let is30 = (i % 30 == 0)
-            
+
             Rectangle()
                 .fill(is30 ? Color(red: 0.95, green: 0.85, blue: 0.45) : (is10 ? Color.white.opacity(0.8) : Color.white.opacity(0.35)))
-                .frame(width: is30 ? 1.5 : (is10 ? 1.0 : 0.6), height: is30 ? 9 : (is10 ? 6 : 4))
-                .offset(y: -radius + (is30 ? 4.5 : (is10 ? 3 : 2)))
+                .frame(width: (is30 ? 1.5 : (is10 ? 1.0 : 0.6)) * grow,
+                       height: (is30 ? 9 : (is10 ? 6 : 4)) * grow)
+                .offset(y: -radius + (is30 ? 4.5 : (is10 ? 3 : 2)) * grow)
                 .rotationEffect(.degrees(angle))
         }
     }
     
     // MARK: - 二十四节气与十二消息卦环
-    private func solarTermsLayer(radius: CGFloat) -> some View {
+    private func solarTermsLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         let activeTerm = SolarTermsData.shared.terms.first {
             $0.name == motion.currentSolarTermName
         }
@@ -211,17 +216,17 @@ public struct CompassDialView: View {
             ForEach(SolarTermsData.shared.terms) { term in
                 VStack(spacing: 0) {
                     Text(term.localizedName)
-                        .adaptiveFont(size: 7, weight: term.isMajorTerm ? .bold : .regular)
+                        .adaptiveFont(size: 7 * grow, weight: term.isMajorTerm ? .bold : .regular)
                         .foregroundColor(term.name == motion.currentSolarTermName
                             ? Color.black
                             : (term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65)))
                     if let hex = term.localizedHexagramLabel {
                         Text(hex)
-                            .adaptiveFont(size: 6, weight: .bold)
+                            .adaptiveFont(size: 6 * grow, weight: .bold)
                             .foregroundColor(term.name == motion.currentSolarTermName ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
                     }
                 }
-                .offset(y: -radius + 6)
+                .offset(y: -radius + 6 * grow)
                 .rotationEffect(.degrees(term.angleCenter))
             }
         }
@@ -281,56 +286,55 @@ public struct CompassDialView: View {
     }
     
     // MARK: - 六十四卦分金环
-    private func hexagramsLayer(radius: CGFloat) -> some View {
+    private func hexagramsLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(hexagrams) { hex in
             Text(hex.localizedName.prefix(2))
-                .adaptiveFont(size: 7, weight: .semibold, design: .serif)
+                .adaptiveFont(size: 7 * grow, weight: .semibold, design: .serif)
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
-                .offset(y: -radius + 8)
+                .offset(y: -radius + 8 * grow)
                 .rotationEffect(.degrees(hex.angleCenter))
         }
     }
     
     // MARK: - 一百二十分金环 (每山5分金, 旺相红金/孤虚白灰)
-    private func fenjinLayer(radius: CGFloat) -> some View {
+    private func fenjinLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(Fenjin120Data.shared.allFenjin) { f in
             Rectangle()
                 .fill(f.isAuspicious ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.2))
-                .frame(width: 1, height: f.isAuspicious ? 6 : 4)
+                .frame(width: 1 * grow, height: (f.isAuspicious ? 6 : 4) * grow)
                 .offset(y: -radius)
                 .rotationEffect(.degrees(f.centerAngle))
         }
     }
     
     // MARK: - 二十四山正针环
-    private func mountain24Layer(radius: CGFloat) -> some View {
+    private func mountain24Layer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         return ZStack {
             ForEach(mountains) { m in
                 let isMainBranch = m.isCardinalOrCorner
-                // 标签高度跟随系统字号（1.0 ... 1.3x），取自当前窗口的 Environment，
-                // 多窗口下各窗口各取各的，不再读全局 key window。
-                let labelHeight = (horizontalSizeClass == .regular ? 36 : 30)
-                    * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize)
+                // 标签高度跟随系统字号（1.0 ... 1.3x）与盘径放大（grow），
+                // 取自当前窗口的 Environment，多窗口下各窗口各取各的。
+                let baseLabelHeight = horizontalSizeClass == .regular ? 36 : 30
+                let labelHeight = baseLabelHeight
+                    * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize) * grow
 
                 VStack(spacing: 1) {
                     Text(m.localizedName)
-                        .adaptiveFont(size: isMainBranch ? 15 : 12, weight: .bold, design: .serif)
+                        .adaptiveFont(size: (isMainBranch ? 15 : 12) * grow, weight: .bold, design: .serif)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
                     Text(m.localizedElement)
-                        .adaptiveFont(size: 7, weight: .medium)
+                        .adaptiveFont(size: 7 * grow, weight: .medium)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .foregroundColor(Color.white.opacity(0.5))
                 }
-                // 24 山标签是"山名 + 五行"两行：iPad regular 宽度下字号被放大到 1.35x，
-                // 30pt 固定高度装不下两行，会向下压到 64 卦环。
-                // 高度跟随系统字号，保持"字 / 框"比例恒定。
-                .frame(width: max(24, radius * 0.25), height: labelHeight)
+                // 24 山标签是"山名 + 五行"两行：高度随系统字号与盘径放大。
                 // 外沿固定：标签变高时中心向盘心方向补偿一半增量，
                 // 避免放大后外沿压到度数环、内沿继续挤 64 卦环。
-                .offset(y: -radius + 14 + (labelHeight - 30) / 2)
+                .frame(width: max(24 * grow, radius * 0.25), height: labelHeight)
+                .offset(y: -radius + 14 * grow + (labelHeight - baseLabelHeight) / 2)
                 .rotationEffect(.degrees(m.angleCenter))
             }
         }
@@ -344,7 +348,7 @@ public struct CompassDialView: View {
         let angle: Double
     }
     
-    private func eightGuaLayer(radius: CGFloat) -> some View {
+    private func eightGuaLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         let lang = LocalizationManager.shared
         let guas: [GuaItem] = [
             GuaItem(id: "kan", key: "gua_kan", angle: 0.0),
@@ -358,9 +362,9 @@ public struct CompassDialView: View {
         ]
         return ForEach(guas) { item in
             Text(lang.t(item.key))
-                .adaptiveFont(size: 14, weight: .black, design: .serif)
+                .adaptiveFont(size: 14 * grow, weight: .black, design: .serif)
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
-                .offset(y: -radius + 12)
+                .offset(y: -radius + 12 * grow)
                 .rotationEffect(.degrees(item.angle))
         }
     }
@@ -446,7 +450,7 @@ public struct CompassDialView: View {
     }
     
     // MARK: - 地理真北金针 (根据当地磁偏角偏转，双指针系统)
-    private func trueNorthNeedleLayer(radius: CGFloat) -> some View {
+    private func trueNorthNeedleLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         let center = radius
         let rotationAngle: Double
         if motion.northReference == .trueNorth {
@@ -474,7 +478,7 @@ public struct CompassDialView: View {
             .frame(width: radius * 2, height: radius * 2)
             
             Text(lang.t("true_north_short"))
-                .adaptiveFont(size: 7, weight: .bold)
+                .adaptiveFont(size: 7 * grow, weight: .bold)
                 .foregroundColor(Color.black)
                 .offset(y: -radius * 0.72)
         }

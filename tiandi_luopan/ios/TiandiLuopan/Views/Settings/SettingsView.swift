@@ -280,7 +280,7 @@ public struct SettingsView: View {
                     }
                     HStack(spacing: 16) {
                         Button {
-                            _ = openURL(LegalLinks.termsOfUse)
+                            openURL(LegalLinks.termsOfUse)
                         } label: {
                             Label(lang.t("legal_terms_button"), systemImage: "safari")
                         }
@@ -289,7 +289,7 @@ public struct SettingsView: View {
                         .foregroundColor(Color.yanCyan)
                         Spacer()
                         Button {
-                            _ = openURL(LegalLinks.privacyPolicy)
+                            openURL(LegalLinks.privacyPolicy)
                         } label: {
                             Label(lang.t("legal_privacy_button"), systemImage: "safari")
                         }
@@ -299,7 +299,7 @@ public struct SettingsView: View {
                     }
                     HStack {
                         Button {
-                            _ = openURL(LegalLinks.subscriptionInfo)
+                            openURL(LegalLinks.subscriptionInfo)
                         } label: {
                             Label(lang.t("subscription_info_button"), systemImage: "safari")
                         }

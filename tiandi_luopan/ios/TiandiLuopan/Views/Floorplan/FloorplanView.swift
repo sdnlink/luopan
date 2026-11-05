@@ -1498,7 +1498,7 @@ public struct FloorplanView: View {
             )
             try handler.perform([request])
             return normalizedRoomCandidates(
-                from: request.results as? [VNRectangleObservation] ?? []
+                from: request.results ?? []
             )
         } catch {
             return []
@@ -2479,7 +2479,7 @@ private struct FloorplanRoomTypeEditor: View {
                 } header: {
                     Text(LocalizationManager.shared.t(titleKey))
                 }
-                if let onDelete = onDelete {
+                if onDelete != nil {
                     Section {
                         Button(action: { showDeleteConfirmation = true }) {
                             Label(LocalizationManager.shared.t("floorplan_delete_room"), systemImage: "trash")
@@ -2653,7 +2653,7 @@ public struct RoomAuditDetailSheet: View {
                             }
                         }
 
-                        if let onDelete = onDelete {
+                        if onDelete != nil {
                             Button(action: { showDeleteConfirmation = true }) {
                                 Label(lang.t("floorplan_delete_room"), systemImage: "trash")
                                     .adaptiveFont(size: 12, weight: .semibold)

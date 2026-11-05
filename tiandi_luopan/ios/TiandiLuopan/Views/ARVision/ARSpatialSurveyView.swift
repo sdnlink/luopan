@@ -639,10 +639,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         guard !planes.isEmpty else { return nil }
 
         var walls3D: [SpatialWall3D] = []
-        var openings3D: [SpatialOpening3D] = []
+        let openings3D: [SpatialOpening3D] = []
         var beams3D: [SpatialBeam3D] = []
         var rooms3D: [SpatialRoom3D] = []
-        var objects3D: [SpatialObject3D] = []
+        let objects3D: [SpatialObject3D] = []
 
         let vertPlanes = planes.filter { $0.alignment == .vertical }
         var minX: Float = .greatestFiniteMagnitude

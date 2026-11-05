@@ -285,19 +285,19 @@ public struct VIPPaywallSheet: View {
 
                             HStack(spacing: 18) {
                                 Button {
-                                    _ = openURL(LegalLinks.termsOfUse)
+                                    openURL(LegalLinks.termsOfUse)
                                 } label: {
                                     Label(LocalizationManager.shared.t("legal_terms_button"), systemImage: "safari")
                                 }
                                 .buttonStyle(.plain)
                                 Button {
-                                    _ = openURL(LegalLinks.privacyPolicy)
+                                    openURL(LegalLinks.privacyPolicy)
                                 } label: {
                                     Label(LocalizationManager.shared.t("legal_privacy_button"), systemImage: "safari")
                                 }
                                 .buttonStyle(.plain)
                                 Button {
-                                    _ = openURL(LegalLinks.subscriptionInfo)
+                                    openURL(LegalLinks.subscriptionInfo)
                                 } label: {
                                     Label(LocalizationManager.shared.t("subscription_info_button"), systemImage: "safari")
                                 }

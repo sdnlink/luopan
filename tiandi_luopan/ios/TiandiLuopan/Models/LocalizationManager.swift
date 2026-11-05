@@ -176,6 +176,7 @@ public class LocalizationManager: ObservableObject {
             "ar_roomplan_synced_floorplan": "已同步至户型立极图纸",
             "day_unit": "日",
             "tab_ar": "全景形煞",
+            "ar_camera_busy": "另一窗口正在使用相机，同一时间只能有一个窗口打开相机页面。",
             "tab_floorplan": "户型立极",
             "tab_analysis": "玄空理气",
             "tab_settings": "大师会员",
@@ -690,6 +691,7 @@ public class LocalizationManager: ObservableObject {
             "tab_compass": "時空羅盤",
             "ar_roomplan_synced_floorplan": "已同步至戶型立極圖紙",
             "day_unit": "日",
+            "ar_camera_busy": "另一視窗正在使用相機，同一時間只能有一個視窗開啟相機頁面。",
             "tab_ar": "全景形煞",
             "tab_floorplan": "戶型立極",
             "tab_analysis": "玄空理氣",
@@ -1204,6 +1206,7 @@ public class LocalizationManager: ObservableObject {
             // Tab Bar
             "tab_compass": "Compass",
             "ar_roomplan_synced_floorplan": "Synced to Floorplan Blueprint",
+            "ar_camera_busy": "Another window is using the camera. Only one window can open a camera page at a time.",
             "day_unit": " Day",
             "tab_ar": "AR Vision",
             "tab_floorplan": "Floor Plan",
@@ -1713,6 +1716,7 @@ public class LocalizationManager: ObservableObject {
         ],
         .th: [
             "tab_compass": "เข็มทิศ",
+            "ar_camera_busy": "หน้าต่างอื่นกำลังใช้กล้อง เปิดหน้ากล้องได้ทีละหนึ่งหน้าต่างเท่านั้น",
             "ar_roomplan_synced_floorplan": "ซิงค์ไปยังผังแปลนบ้านแล้ว",
             "day_unit": "วัน",
             "tab_ar": "ดูสภาพ",
@@ -2209,6 +2213,7 @@ public class LocalizationManager: ObservableObject {
             "desc_dui": "ตุ้ย (兌) คือแอ่งน้ำหล่อเลี้ยง กำกับวาทศิลป์ ความปีติ และการคบหาของบุตรสาวคนเล็ก ควรกลมกลืนอุดม",
         ],
         .vi: [
+            "ar_camera_busy": "Cửa sổ khác đang dùng camera. Chỉ một cửa sổ được mở trang camera tại một thời điểm.",
             "tab_compass": "La bàn",
             "ar_roomplan_synced_floorplan": "Đã đồng bộ sang bản vẽ mặt bằng",
             "day_unit": " Ngày",
@@ -2706,6 +2711,7 @@ public class LocalizationManager: ObservableObject {
             "desc_dui": "Đoài là đầm nước nhuần vật, chủ khẩu tài hỷ duyệt và giao tế thiếu nữ; nên hòa mục phong doanh.",
         ],
         .id: [
+            "ar_camera_busy": "Jendela lain sedang menggunakan kamera. Hanya satu jendela yang dapat membuka halaman kamera pada satu waktu.",
             "tab_compass": "Kompas",
             "ar_roomplan_synced_floorplan": "Disinkronkan ke Denah Lantai",
             "day_unit": " Hari",
@@ -3203,6 +3209,7 @@ public class LocalizationManager: ObservableObject {
             "desc_dui": "Dui (兌) adalah rawa yang menyuburkan, mengatur tutur kata, sukacita, dan pergaulan; jagalah rukun dan berlimpah.",
         ],
         .ja: [
+            "ar_camera_busy": "別のウィンドウがカメラを使用中です。カメラ画面は同時に1つのウィンドウでのみ開けます。",
             "tab_compass": "羅盤",
             "ar_roomplan_synced_floorplan": "間取り立極図面へ同期しました",
             "day_unit": "日",
@@ -3700,6 +3707,7 @@ public class LocalizationManager: ObservableObject {
             "desc_dui": "兌は沢の水にて物を潤し、口才と喜悦・少女の社交を主る。和睦し豊かに保つ。",
         ],
         .ko: [
+            "ar_camera_busy": "다른 창에서 카메라를 사용 중입니다. 카메라 화면은 한 번에 하나의 창에서만 열 수 있습니다.",
             "tab_compass": "나침반",
             "ar_roomplan_synced_floorplan": "평면도 입극 도면에 동기화됨",
             "day_unit": "일",

@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Automated iPad 12.9" Screenshot Capture Script for GitHub Actions
-Captures all tabs across all 8 supported languages on iPad Pro 12.9" simulator,
-saving both native resolution (2048x2732) and marketing format (1600x1200).
+Captures all tabs across all 8 supported languages on an iPad Pro 12.9"/13" simulator,
+saving both native resolution (2048x2732 for 12.9", 2064x2752 for 13") and marketing
+format (1600x1200).
 """
 
 import argparse
@@ -11,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import re
 import time
 from PIL import Image
 
@@ -37,62 +39,74 @@ BUNDLE_ID = "com.yanxiang.compass"
 
 
 def run_cmd(cmd, check=True, capture=True):
-    """Execute command and return stdout string."""
+    """Execute command and return stdout string. On failure, show captured output first."""
     if isinstance(cmd, list):
         print(f"Running: {' '.join(cmd)}")
     else:
         print(f"Running: {cmd}")
-    res = subprocess.run(cmd, check=check, capture_output=capture, text=True, shell=isinstance(cmd, str))
+    try:
+        res = subprocess.run(cmd, check=check, capture_output=capture, text=True, shell=isinstance(cmd, str))
+    except subprocess.CalledProcessError as e:
+        # capture_output=True 会吞掉 stderr，不打印的话 CI 日志里只剩一个没有信息的 traceback
+        print(f"!! Command failed (exit {e.returncode})")
+        if e.stdout:
+            print(f"   stdout: {e.stdout.strip()}")
+        if e.stderr:
+            print(f"   stderr: {e.stderr.strip()}")
+        raise
     return res.stdout.strip() if capture else ""
 
 
+def _version_key(version):
+    return tuple(int(x) for x in re.findall(r"\d+", version))
+
+
+def _is_big_ipad_pro(name):
+    return "iPad Pro" in name and ("12.9" in name or "13" in name)
+
+
 def find_or_create_ipad_simulator():
-    """Locate an available iPad Pro 12.9" simulator or create one."""
-    print("=== Scanning available iPad Pro 12.9\" simulators ===")
-    out = run_cmd(["xcrun", "simctl", "list", "-j", "devices"])
-    data = json.loads(out)
-    devices_by_runtime = data.get("devices", {})
+    """
+    Locate (or create) an iPad Pro 12.9"/13" simulator.
 
-    target_udid = None
-    target_name = None
+    The runtime is chosen explicitly: the newest available iOS runtime that actually
+    supports such a device type. This matters on the Xcode 27 runner image, where the
+    iOS 27.1 runtime only contains iPhone Duo and iPad devices live in the 27.0 runtime;
+    `simctl create` without a runtime, or picking the first iPad found in dict order,
+    can land on the wrong one.
+    """
+    print("=== Scanning iPad Pro 12.9\"/13\" simulators ===")
+    runtimes = json.loads(run_cmd(["xcrun", "simctl", "list", "-j", "runtimes"])).get("runtimes", [])
+    types = json.loads(run_cmd(["xcrun", "simctl", "list", "-j", "devicetypes"])).get("devicetypes", [])
+    devices_by_runtime = json.loads(run_cmd(["xcrun", "simctl", "list", "-j", "devices"])).get("devices", {})
 
-    # Scan for existing iPad Pro 12.9" or 13" devices
-    for runtime, devices in devices_by_runtime.items():
-        if "iOS" not in runtime:
+    ipad_types = [t for t in types if _is_big_ipad_pro(t.get("name", ""))]
+    ios_runtimes = [r for r in runtimes
+                    if ".iOS-" in r.get("identifier", "") and r.get("isAvailable", True)]
+
+    for rt in sorted(ios_runtimes, key=lambda r: _version_key(r.get("version", "0")), reverse=True):
+        supported = {d.get("identifier") for d in rt.get("supportedDeviceTypes", [])}
+        cands = [t for t in ipad_types if t["identifier"] in supported]
+        if not cands:
             continue
-        for dev in devices:
-            if not dev.get("isAvailable", True):
-                continue
-            name = dev.get("name", "")
-            # Match 12.9-inch or 13-inch iPad Pro
-            if ("iPad Pro" in name and ("12.9" in name or "13" in name)) or ("iPad" in name and "12.9" in name):
-                target_udid = dev.get("udid")
-                target_name = name
-                print(f"Found iPad simulator: {target_name} ({target_udid}) [{runtime}]")
-                break
-        if target_udid:
-            break
+        cand_ids = {t["identifier"] for t in cands}
 
-    # If no 12.9" iPad found, look for device types to create one
-    if not target_udid:
-        print("No existing iPad 12.9\" found. Searching devicetypes...")
-        types_out = run_cmd(["xcrun", "simctl", "list", "-j", "devicetypes"])
-        types_data = json.loads(types_out)
-        type_id = None
-        for t in types_data.get("devicetypes", []):
-            t_name = t.get("name", "")
-            if "iPad Pro" in t_name and ("12.9" in t_name or "13" in t_name):
-                type_id = t.get("identifier")
-                break
+        # Reuse an existing available device of such a type on this runtime
+        for dev in devices_by_runtime.get(rt["identifier"], []):
+            if dev.get("isAvailable", True) and dev.get("deviceTypeIdentifier") in cand_ids:
+                print(f"Found iPad simulator: {dev['name']} ({dev['udid']}) [{rt['identifier']}]")
+                return dev["udid"], dev["name"]
 
-        if not type_id:
-            type_id = "com.apple.CoreSimulator.SimDeviceType.iPad-Pro-12-9-inch-6th-generation"
+        # Otherwise create one (list order is chronological -> last = newest model)
+        t = cands[-1]
+        print(f"Creating {t['name']} on {rt['identifier']}")
+        udid = run_cmd(["xcrun", "simctl", "create", t["name"], t["identifier"], rt["identifier"]])
+        return udid, t["name"]
 
-        print(f"Creating new iPad 12.9\" simulator with type: {type_id}")
-        target_udid = run_cmd(["xcrun", "simctl", "create", "iPad Pro (12.9-inch)", type_id])
-        target_name = "iPad Pro (12.9-inch)"
-
-    return target_udid, target_name
+    print("ERROR: no available iOS runtime supports an iPad Pro 12.9\"/13\" device type.")
+    print("iOS runtimes seen: " + (", ".join(f"{r.get('identifier')} ({r.get('version')})" for r in ios_runtimes) or "none"))
+    print("iPad Pro device types seen: " + (", ".join(t["name"] for t in ipad_types) or "none"))
+    sys.exit(2)
 
 
 def convert_to_1600x1200(src_path, dst_path):
@@ -124,11 +138,66 @@ def convert_to_1600x1200(src_path, dst_path):
         canvas.save(dst_path, "PNG")
 
 
+def simulator_is_landscape(udid):
+    """Probe the device's real orientation via a throwaway screenshot."""
+    probe = os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"),
+                         "orientation_probe_%s.png" % udid)
+    try:
+        run_cmd(["xcrun", "simctl", "io", udid, "screenshot", probe])
+        with Image.open(probe) as im:
+            width, height = im.size
+        print("Orientation probe: %dx%d" % (width, height))
+        return width > height
+    except Exception as exc:  # noqa: BLE001 - probe must never abort the capture
+        print("WARNING: orientation probe failed: %s" % exc)
+        return False
+    finally:
+        try:
+            os.remove(probe)
+        except OSError:
+            pass
+
+
+def try_rotate_to_landscape(udid):
+    """Best-effort real rotation; returns True when the device is landscape.
+
+    `simctl` has no orientation command. On classic Xcode images Simulator.app's
+    Hardware > Rotate Left (Cmd+Left) works through AppleScript. Xcode 27 replaced
+    it with Device Hub, where System Events control often lacks Accessibility
+    permission. In that case the caller falls back to `-forceLandscapeLayout`,
+    which still exercises the real two-pane SwiftUI layout code path.
+    """
+    if simulator_is_landscape(udid):
+        print("Simulator is already landscape.")
+        return True
+    try:
+        subprocess.run(
+            ["osascript",
+             "-e", 'tell application "Simulator" to activate',
+             "-e", "delay 0.5",
+             "-e", 'tell application "System Events" to key code 123 using {command down}'],
+            check=False, capture_output=True, text=True, timeout=30)
+        time.sleep(2.5)
+    except Exception as exc:  # noqa: BLE001 - best effort only
+        print("WARNING: AppleScript rotation unavailable: %s" % exc)
+    if simulator_is_landscape(udid):
+        print("Real rotation succeeded: screenshots will be landscape pixels.")
+        return True
+    print("WARNING: real rotation failed -> falling back to -forceLandscapeLayout.")
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Capture iPad 12.9\" screenshots")
     parser.add_argument("--app-path", required=True, help="Path to built TiandiLuopan.app")
-    parser.add_argument("--lang", default="all", help="Target language code or 'all'")
+    parser.add_argument("--lang", default="all", help="Target language code(s), comma separated, or 'all'")
     parser.add_argument("--output-dir", default="dist-screenshots", help="Output directory")
+    parser.add_argument("--settle", type=float, default=2.5,
+                        help="Seconds to wait after launch before each screenshot (default 2.5)")
+    parser.add_argument("--rotate-landscape", action="store_true",
+                        help="Capture the iPad LANDSCAPE two-pane layout. Tries a real device "
+                             "rotation first; if that is unavailable, falls back to the "
+                             "-forceLandscapeLayout launch argument (landscape layout, portrait pixels).")
     args = parser.parse_args()
 
     app_path = os.path.abspath(args.app_path)
@@ -143,15 +212,16 @@ def main():
     os.makedirs(dir_native, exist_ok=True)
     os.makedirs(dir_1600, exist_ok=True)
 
-    # Filter target languages
+    # Filter target languages (exact, case-insensitive match; a typo is an error, not "all")
     if args.lang.strip().lower() in ["all", ""]:
         selected_langs = LANGUAGES
     else:
-        req_codes = [c.strip() for c in args.lang.split(",")]
-        selected_langs = [l for l in LANGUAGES if l["code"] in req_codes or any(c.lower() in l["code"].lower() for c in req_codes)]
+        req_codes = {c.strip().lower() for c in args.lang.split(",") if c.strip()}
+        selected_langs = [l for l in LANGUAGES if l["code"].lower() in req_codes]
         if not selected_langs:
-            print(f"Warning: No matching languages for '{args.lang}', defaulting to all.")
-            selected_langs = LANGUAGES
+            print(f"Error: no matching languages for '{args.lang}'. "
+                  f"Valid codes: {', '.join(l['code'] for l in LANGUAGES)}")
+            sys.exit(2)
 
     print(f"Selected languages ({len(selected_langs)}): {[l['name'] for l in selected_langs]}")
 
@@ -161,10 +231,18 @@ def main():
     subprocess.run(["xcrun", "simctl", "boot", udid], check=False)
     run_cmd(["xcrun", "simctl", "bootstatus", udid, "-b"])
 
+    # 横屏分栏覆盖：先尝试真旋转，失败则由 App 侧启动参数强制横屏布局。
+    real_rotation = False
+    if args.rotate_landscape:
+        real_rotation = try_rotate_to_landscape(udid)
+
     # Disable hardware keyboard for clean full-screen rendering
+    # (Xcode 27's Device Hub replaced Simulator.app; if this domain no longer applies it is a harmless no-op)
     run_cmd(["defaults", "write", "com.apple.iphonesimulator", "ConnectHardwareKeyboard", "0"], check=False)
 
     # 2. Install App
+    # Note: the app is built with the iOS 27.1 SDK but runs on whatever runtime hosts the iPad
+    # (27.0 on the Xcode 27 image). Its deployment target must therefore be <= that runtime.
     print(f"Installing {app_path} onto simulator...")
     run_cmd(["xcrun", "simctl", "install", udid, app_path])
 
@@ -199,8 +277,11 @@ def main():
     ], check=False)
 
     captured_records = []
+    failures = []
 
     # 6. Iterate Languages & Screens
+    # A failure on one screenshot is recorded and the run continues, so the artifact still holds
+    # everything that did succeed; the script exits non-zero at the end if anything failed.
     try:
         for lang_info in selected_langs:
             code = lang_info["code"]
@@ -218,30 +299,47 @@ def main():
 
                 print(f"--> [{code}] Tab {tab}: {title} ({s_id})...")
 
-                # Launch app with command line arguments
-                launch_args = [
-                    "xcrun", "simctl", "launch", udid, BUNDLE_ID,
-                    "-AppleLanguages", f"({code})",
-                    "-AppleLocale", locale,
-                    "-appLanguage", code,
-                    "-selectedTab", str(tab)
-                ]
-                run_cmd(launch_args)
+                try:
+                    # Make sure each launch is a clean start
+                    run_cmd(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
 
-                # Wait for view transition and canvas rendering to stabilize
-                time.sleep(2.5)
+                    # Launch app with command line arguments
+                    launch_args = [
+                        "xcrun", "simctl", "launch", udid, BUNDLE_ID,
+                        "-AppleLanguages", f"({code})",
+                        "-AppleLocale", locale,
+                        "-appLanguage", code,
+                        "-selectedTab", str(tab)
+                    ]
+                    if args.rotate_landscape and not real_rotation:
+                        launch_args.append("-forceLandscapeLayout")
+                    run_cmd(launch_args)
 
-                # Save native screenshot
-                native_file = os.path.join(dir_native, code, f"{s_id}.png")
-                os.makedirs(os.path.dirname(native_file), exist_ok=True)
-                run_cmd(["xcrun", "simctl", "io", udid, "screenshot", native_file])
+                    # Wait for view transition and canvas rendering to stabilize
+                    time.sleep(args.settle)
 
-                # Convert to 1600x1200 format
-                scaled_file = os.path.join(dir_1600, code, f"{s_id}_1600x1200.png")
-                convert_to_1600x1200(native_file, scaled_file)
+                    # Save native screenshot
+                    native_file = os.path.join(dir_native, code, f"{s_id}.png")
+                    os.makedirs(os.path.dirname(native_file), exist_ok=True)
+                    run_cmd(["xcrun", "simctl", "io", udid, "screenshot", native_file])
 
-                # Terminate app for next clean start
-                run_cmd(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
+                    with Image.open(native_file) as im:
+                        native_size = f"{im.size[0]}x{im.size[1]}"
+
+                    # Convert to 1600x1200 format
+                    scaled_file = os.path.join(dir_1600, code, f"{s_id}_1600x1200.png")
+                    convert_to_1600x1200(native_file, scaled_file)
+                except Exception as e:  # noqa: BLE001 - keep capturing the remaining screens
+                    detail = str(e)
+                    if isinstance(e, subprocess.CalledProcessError) and e.stderr and e.stderr.strip():
+                        detail = f"simctl {e.cmd[2]}: {e.stderr.strip().splitlines()[-1]}"
+                    print(f"    ✗ FAILED [{code}] {s_id}: {detail}")
+                    failures.append({"lang_code": code, "lang_name": name, "tab": tab,
+                                     "title": title, "error": detail})
+                    continue
+                finally:
+                    # Terminate app for next clean start
+                    run_cmd(["xcrun", "simctl", "terminate", udid, BUNDLE_ID], check=False)
 
                 captured_records.append({
                     "lang_code": code,
@@ -249,35 +347,55 @@ def main():
                     "tab": tab,
                     "title": title,
                     "native_path": native_file,
-                    "scaled_path": scaled_file
+                    "scaled_path": scaled_file,
+                    "native_size": native_size
                 })
 
-                print(f"    ✓ Captured: {os.path.basename(native_file)} & {os.path.basename(scaled_file)}")
+                print(f"    ✓ Captured: {os.path.basename(native_file)} ({native_size}) & {os.path.basename(scaled_file)}")
 
     finally:
         print("\nShutting down simulator...")
         subprocess.run(["xcrun", "simctl", "shutdown", udid], check=False)
 
-    # 4. Generate GitHub Actions Step Summary
+    # 7. Generate GitHub Actions Step Summary
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
         with open(summary_file, "a", encoding="utf-8") as f:
             f.write("## 📸 iPad 12.9-inch 自动截屏生成报告\n\n")
             f.write(f"- **目标模拟器**：`{sim_name}` (`{udid}`)\n")
             f.write(f"- **截屏语言总数**：{len(selected_langs)} 种语言\n")
+            if args.rotate_landscape:
+                mode = ("设备真实旋转（横屏像素）" if real_rotation
+                        else "App 强制横屏布局（`-forceLandscapeLayout`，设备仍为竖屏像素）")
+                f.write(f"- **横屏分栏渲染模式**：{mode}\n")
+                f.write("- **覆盖目标**：5 Tab 的左右双栏（左画板 / 右解释），"
+                        "与 iPhone Duo 展开内屏同一代码路径。\n")
             f.write(f"- **总截屏张数**：{len(captured_records)} 张（原图原生分辨率） + {len(captured_records)} 张（1600×1200 格式）\n")
+            if failures:
+                f.write(f"- **失败张数**：{len(failures)} 张（见下方清单）\n")
             f.write("- **截图下载方式**：请前往当前 Actions 运行页面的 **Artifacts** 区域下载 `iPad-12.9-Screenshots` 压缩包。\n\n")
+            if failures:
+                f.write("### ❌ 失败清单\n\n")
+                f.write("| 语言 | 界面 | 错误 |\n| :--- | :--- | :--- |\n")
+                for r in failures:
+                    err = r["error"].replace("|", "\\|").replace("\n", " ")[:200]
+                    f.write(f"| {r['lang_name']} (`{r['lang_code']}`) | Tab {r['tab']}: {r['title']} | {err} |\n")
+                f.write("\n")
             f.write("### 截图详细清单\n\n")
-            f.write("| 语言 | 界面编号与标题 | 原生高分辨率截图 | 1600×1200 标准格式 |\n")
-            f.write("| :--- | :--- | :--- | :--- |\n")
+            f.write("| 语言 | 界面编号与标题 | 原生高分辨率截图 | 原生尺寸 | 1600×1200 标准格式 |\n")
+            f.write("| :--- | :--- | :--- | :--- | :--- |\n")
             for r in captured_records:
-                f.write(f"| {r['lang_name']} (`{r['lang_code']}`) | Tab {r['tab']}: {r['title']} | `{os.path.basename(r['native_path'])}` | `{os.path.basename(r['scaled_path'])}` |\n")
+                f.write(f"| {r['lang_name']} (`{r['lang_code']}`) | Tab {r['tab']}: {r['title']} | `{os.path.basename(r['native_path'])}` | {r['native_size']} | `{os.path.basename(r['scaled_path'])}` |\n")
             f.write("\n")
 
-    print(f"\n🎉 Successfully captured {len(captured_records)} screenshots across {len(selected_langs)} languages!")
+    print(f"\n🎉 Captured {len(captured_records)} screenshots across {len(selected_langs)} languages.")
     print(f"Artifacts output directory: {out_base}")
+    if failures:
+        print(f"\n❌ {len(failures)} screenshot(s) failed:")
+        for r in failures:
+            print(f"   - [{r['lang_code']}] Tab {r['tab']} {r['title']}: {r['error'][:200]}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

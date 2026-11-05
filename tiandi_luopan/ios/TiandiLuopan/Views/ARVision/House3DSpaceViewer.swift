@@ -9,6 +9,8 @@ public struct House3DSpaceViewer: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @State public var survey: HouseSpatialSurvey
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     
     @State private var viewMode: ViewAngleMode = .perspective
     @State private var palaceGridMode: PalaceGridMode = .baZhai
@@ -70,10 +72,10 @@ public struct House3DSpaceViewer: View {
                 if survey.centroidIndirect {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.adaptive(size: 12, weight: .bold))
+                            .adaptiveFont(size: 12, weight: .bold)
                             .foregroundColor(.orange)
                         Text("立极点落空警示：户型凹凸缺角严重（面积比 < 75%），立极中宫已回退至主功能区重心，请以主厅立极为准")
-                            .font(.adaptive(size: 10, weight: .semibold))
+                            .adaptiveFont(size: 10, weight: .semibold)
                             .foregroundColor(.orange)
                         Spacer()
                     }
@@ -112,76 +114,87 @@ public struct House3DSpaceViewer: View {
     // MARK: - 顶部测绘总览看板
     private var topMetricsHeader: some View {
         VStack(spacing: 6) {
-            HStack {
+            HStack(spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "cube.transparent")
-                        .font(.adaptive(size: 15, weight: .bold))
+                        .adaptiveFont(size: 15, weight: .bold)
                         .foregroundColor(.yanGold)
                     Text(lang.t("ar_3d_model_title"))
-                        .font(.adaptive(size: 15, weight: .bold))
+                        .adaptiveFont(size: 15, weight: .bold)
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                Spacer()
-                // 传统文化参考评分徽章
-                HStack(spacing: 4) {
-                    Text("传统文化参考")
-                        .font(.adaptive(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                    Text("\(survey.fengshuiScore)分")
-                        .font(.adaptive(size: 14, weight: .bold, design: .monospaced))
-                        .foregroundColor(scoreColor(survey.fengshuiScore))
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.12))
-                .cornerRadius(12)
+                .frame(maxWidth: horizontalSizeClass == .regular ? 260 : 160, alignment: .leading)
+                .layoutPriority(1)
 
-                // 导出 CAD DXF 矢量图
-                Button(action: exportAndShareDXF) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "doc.badge.gearshape")
-                            .font(.adaptive(size: 11, weight: .bold))
-                        Text("CAD")
-                            .font(.adaptive(size: 10, weight: .bold, design: .monospaced))
+                // 徽章 + CAD + 房间 + 分享在中文标题下需求约 280pt，加上标题会超出 iPhone 375pt，
+                // 操作区放进横向滚动兜底；关闭键留在外面常驻可点。
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // 传统文化参考评分徽章
+                        HStack(spacing: 4) {
+                            Text("传统文化参考")
+                                .adaptiveFont(size: 11, weight: .medium)
+                                .foregroundColor(.white.opacity(0.7))
+                            Text("\(survey.fengshuiScore)分")
+                                .adaptiveFont(size: 14, weight: .bold, design: .monospaced)
+                                .foregroundColor(scoreColor(survey.fengshuiScore))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.12))
+                        .cornerRadius(12)
+
+                        // 导出 CAD DXF 矢量图
+                        Button(action: exportAndShareDXF) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "doc.badge.gearshape")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                Text("CAD")
+                                    .adaptiveFont(size: 10, weight: .bold, design: .monospaced)
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .background(Color.yanCyan)
+                            .cornerRadius(12)
+                        }
+                        .accessibilityLabel("导出空间测绘 DXF 参考图")
+
+                        // 毛坯房房间类型设定（一键切换类型即时刷新形煞报告）
+                        Button(action: { showRoomTypePanel.toggle() }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "door.sliding.left.hand.closed")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                Text("房间")
+                                    .adaptiveFont(size: 10, weight: .bold)
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 5)
+                            .background(showRoomTypePanel ? Color.orange : Color.white.opacity(0.85))
+                            .cornerRadius(12)
+                        }
+                        .accessibilityLabel("毛坯房房间类型设定")
+
+                        // 导出与分享长图存证
+                        Button(action: exportAndShareReport) {
+                            Image(systemName: "square.and.arrow.up")
+                                .adaptiveFont(size: 12, weight: .bold)
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.blue.opacity(0.75))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("导出全屋测绘与形煞报告")
                     }
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 5)
-                    .background(Color.yanCyan)
-                    .cornerRadius(12)
+                    .padding(.vertical, 2)
                 }
-                .accessibilityLabel("导出空间测绘 DXF 参考图")
-
-                // 毛坯房房间类型设定（一键切换类型即时刷新形煞报告）
-                Button(action: { showRoomTypePanel.toggle() }) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "door.sliding.left.hand.closed")
-                            .font(.adaptive(size: 11, weight: .bold))
-                        Text("房间")
-                            .font(.adaptive(size: 10, weight: .bold))
-                    }
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 5)
-                    .background(showRoomTypePanel ? Color.orange : Color.white.opacity(0.85))
-                    .cornerRadius(12)
-                }
-                .accessibilityLabel("毛坯房房间类型设定")
-
-                // 导出与分享长图存证
-                Button(action: exportAndShareReport) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.adaptive(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(8)
-                        .background(Color.blue.opacity(0.75))
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("导出全屋测绘与形煞报告")
 
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     Image(systemName: "xmark")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
                         .padding(8)
                         .background(Color.black.opacity(0.6))
@@ -223,7 +236,7 @@ public struct House3DSpaceViewer: View {
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
             }
-            .font(.adaptive(size: 9, weight: .semibold))
+            .adaptiveFont(size: 9, weight: .semibold)
             .foregroundColor(survey.scanMethod.contains("VR") ? .orange : .yanCyan)
             .padding(.horizontal, 10)
         }
@@ -239,10 +252,10 @@ public struct House3DSpaceViewer: View {
     private func inspectedElementBanner(desc: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "scope")
-                .font(.adaptive(size: 13, weight: .bold))
+                .adaptiveFont(size: 13, weight: .bold)
                 .foregroundColor(.yanGold)
             Text(desc)
-                .font(.adaptive(size: 11, weight: .medium))
+                .adaptiveFont(size: 11, weight: .medium)
                 .foregroundColor(.white)
                 .lineLimit(2)
             Spacer()
@@ -250,7 +263,7 @@ public struct House3DSpaceViewer: View {
                 withAnimation { self.inspectedElementDesc = nil }
             }) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.adaptive(size: 13))
+                    .adaptiveFont(size: 13)
                     .foregroundColor(.white.opacity(0.6))
             }
         }
@@ -267,10 +280,10 @@ public struct House3DSpaceViewer: View {
     private func metricCell(title: String, value: String) -> some View {
         VStack(spacing: 2) {
             Text(title)
-                .font(.adaptive(size: 9, weight: .medium))
+                .adaptiveFont(size: 9, weight: .medium)
                 .foregroundColor(.white.opacity(0.65))
             Text(value)
-                .font(.adaptive(size: 11, weight: .bold, design: .monospaced))
+                .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundColor(.yanGold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -289,12 +302,12 @@ public struct House3DSpaceViewer: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Text("房间类型设定（毛坯房/空置房）")
-                    .font(.adaptive(size: 12, weight: .bold))
+                    .adaptiveFont(size: 12, weight: .bold)
                     .foregroundColor(.white)
                 Spacer()
                 Button(action: { showRoomTypePanel = false }) {
                     Text(lang.t("done"))
-                        .font(.adaptive(size: 11, weight: .bold))
+                        .adaptiveFont(size: 11, weight: .bold)
                         .foregroundColor(.black)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
@@ -304,7 +317,7 @@ public struct House3DSpaceViewer: View {
             }
             if survey.rooms.isEmpty {
                 Text("暂无可设定房间，请先完成测绘")
-                    .font(.adaptive(size: 11))
+                    .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.7))
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
@@ -312,21 +325,26 @@ public struct House3DSpaceViewer: View {
                         ForEach(survey.rooms) { room in
                             HStack {
                                 Text(room.name)
-                                    .font(.adaptive(size: 11, weight: .medium))
+                                    .adaptiveFont(size: 11, weight: .medium)
                                     .foregroundColor(.white)
-                                    .frame(width: 66, alignment: .leading)
+                                    .frame(minWidth: 66 * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize),
+                                           alignment: .leading)
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .layoutPriority(1)
                                 Text(String(format: "%.1f㎡", room.areaSqMeters))
-                                    .font(.adaptive(size: 10, design: .monospaced))
+                                    .adaptiveFont(size: 10, design: .monospaced)
                                     .foregroundColor(.white.opacity(0.6))
-                                    .frame(width: 52, alignment: .trailing)
+                                    .frame(minWidth: 52 * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize),
+                                           alignment: .trailing)
+                                    .fixedSize(horizontal: true, vertical: false)
                                 Picker(room.name, selection: roomTypeBinding(room)) {
                                     ForEach(FloorplanRoomType.allCases) { t in
                                         Text(t.localizedName).tag(t)
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .font(.adaptive(size: 11))
+                                .adaptiveFont(size: 11)
                                 .tint(.yanCyan)
                             }
                             .padding(.horizontal, 8)
@@ -339,7 +357,7 @@ public struct House3DSpaceViewer: View {
                 .frame(maxHeight: 190)
             }
             Text("切换类型后形煞报告即时重算（毛坯房默认按面积启发式预判）")
-                .font(.adaptive(size: 9))
+                .adaptiveFont(size: 9)
                 .foregroundColor(.white.opacity(0.55))
         }
         .padding(12)
@@ -420,7 +438,7 @@ public struct House3DSpaceViewer: View {
                                         .fill(severityColor(item.severity))
                                         .frame(width: 7, height: 7)
                                     Text(item.title)
-                                        .font(.adaptive(size: 11, weight: .bold))
+                                        .adaptiveFont(size: 11, weight: .bold)
                                         .foregroundColor(.white)
                                 }
                                 .padding(.horizontal, 10)
@@ -440,14 +458,14 @@ public struct House3DSpaceViewer: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("【\(item.title)】")
-                                .font(.adaptive(size: 12, weight: .bold))
+                                .adaptiveFont(size: 12, weight: .bold)
                                 .foregroundColor(severityColor(item.severity))
                             Text(item.locationName)
-                                .font(.adaptive(size: 10, weight: .medium))
+                                .adaptiveFont(size: 10, weight: .medium)
                                 .foregroundColor(.white.opacity(0.7))
                             Spacer()
                             Text(item.severity.rawValue)
-                                .font(.adaptive(size: 9, weight: .bold))
+                                .adaptiveFont(size: 9, weight: .bold)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(severityColor(item.severity).opacity(0.25))
@@ -455,11 +473,11 @@ public struct House3DSpaceViewer: View {
                                 .foregroundColor(severityColor(item.severity))
                         }
                         Text(item.detail)
-                            .font(.adaptive(size: 10, weight: .regular))
+                            .adaptiveFont(size: 10, weight: .regular)
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(2)
                         Text("💡 化解方案：\(item.solution)")
-                            .font(.adaptive(size: 10, weight: .medium))
+                            .adaptiveFont(size: 10, weight: .medium)
                             .foregroundColor(.yanGold)
                             .lineLimit(2)
                     }
@@ -480,7 +498,7 @@ public struct House3DSpaceViewer: View {
                     ForEach(ViewAngleMode.allCases, id: \.self) { mode in
                         Button(action: { viewMode = mode }) {
                             Text(mode.rawValue)
-                                .font(.adaptive(size: 10, weight: .medium))
+                                .adaptiveFont(size: 10, weight: .medium)
                                 .foregroundColor(viewMode == mode ? .black : .white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
@@ -504,7 +522,7 @@ public struct House3DSpaceViewer: View {
                         Image(systemName: "square.grid.3x3.fill")
                         Text(palaceGridMode == .baZhai ? "八宅" : (palaceGridMode == .xuanKong ? "玄空" : "理气关"))
                     }
-                    .font(.adaptive(size: 10, weight: .bold))
+                    .adaptiveFont(size: 10, weight: .bold)
                     .foregroundColor(palaceGridMode != .off ? .yanGold : .white.opacity(0.6))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 6)
@@ -516,7 +534,7 @@ public struct House3DSpaceViewer: View {
                 // 尺寸标注开关
                 Button(action: { showDimensions.toggle() }) {
                     Image(systemName: showDimensions ? "ruler.fill" : "ruler")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(showDimensions ? .yanCyan : .white.opacity(0.6))
                         .padding(7)
                         .background(Color.white.opacity(0.12))
@@ -527,7 +545,7 @@ public struct House3DSpaceViewer: View {
                 // 形煞警示标注开关
                 Button(action: { showShaAlerts.toggle() }) {
                     Image(systemName: showShaAlerts ? "exclamationmark.triangle.fill" : "exclamationmark.triangle")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(showShaAlerts ? .orange : .white.opacity(0.6))
                         .padding(7)
                         .background(Color.white.opacity(0.12))
@@ -540,7 +558,7 @@ public struct House3DSpaceViewer: View {
                     sceneCoordinator?.resetCamera(mode: viewMode)
                 }) {
                     Image(systemName: "arrow.counterclockwise")
-                        .font(.adaptive(size: 12, weight: .bold))
+                        .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
                         .padding(7)
                         .background(Color.white.opacity(0.12))

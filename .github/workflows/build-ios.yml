@@ -24,10 +24,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-deploy:
     name: Build & Sign (${{ github.event.inputs.build_target || 'development' }})
-    runs-on: macos-15
+    # runner 标签写死在 YAML 里无法从本地验证真伪：标签不存在时 GitHub 不会报错，
+    # 只会让 job 无限排队。这里留一个仓库变量覆盖口（Settings → Variables →
+    # IOS_RUNNER_LABEL），标签一旦变更或不存在，改变量即可，不必改代码。
+    runs-on: ${{ vars.IOS_RUNNER_LABEL || 'xcode-27' }}
+    timeout-minutes: 60
 
     defaults:
       run:
@@ -40,7 +48,6 @@ jobs:
       SCHEME_NAME: TiandiLuopan
       CONFIGURATION: Release
       BUILD_TARGET: ${{ github.event.inputs.build_target || 'development' }}
-      UPLOAD_TO_APPSTORE: ${{ github.event.inputs.upload_to_appstore != false }}
 
     steps:
       # --------------------------------------------------
@@ -52,19 +59,40 @@ jobs:
       # --------------------------------------------------
       # 2. 选择最新 Xcode 并检查构建环境
       # --------------------------------------------------
-      - name: Select Latest Xcode & Show Environment
+      - name: Select Xcode 27 & Require iOS 27.1 SDK
         run: |
           set -euo pipefail
 
           echo "===== Available Xcode Versions on Runner ====="
           ls -d /Applications/Xcode*.app 2>/dev/null || true
 
-          # 自动选取并切换到 runner 上安装的最高版本 Xcode
-          LATEST_XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1)
-          if [ -n "$LATEST_XCODE" ]; then
-            echo "Switching to highest Xcode version: $LATEST_XCODE"
-            sudo xcode-select -s "$LATEST_XCODE"
+          # 必须用 iOS 27.1 SDK 编译：低版本 SDK 构建的包在 iPhone Duo 内屏上
+          # 会以兼容模式显示（缩小的 iPhone 画面 + 黑边），布局与商店包均不合格。
+          XCODE_APP=""
+          for cand in /Applications/Xcode_27.1.app /Applications/Xcode_27*.app; do
+            if [ -d "$cand" ]; then XCODE_APP="$cand"; break; fi
+          done
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
+          if [ -z "$XCODE_APP" ]; then
+            echo "::error::No Xcode installation found on runner"
+            exit 1
+          fi
+          echo "Switching to Xcode: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo missing)"
+          SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || echo missing)"
+          echo "Device SDK: $IOS_SDK | Simulator SDK: $SIM_SDK"
+          for sdk in "$IOS_SDK" "$SIM_SDK"; do
+            if ! awk -v v="$sdk" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+              echo "::error::iOS SDK 27.1+ required (got $sdk). Older SDK builds run in iPhone Duo compatibility mode."
+              exit 1
+            fi
+          done
+          echo "SDK check passed: iOS $IOS_SDK / Simulator $SIM_SDK"
 
           echo "===== Target Mode: $BUILD_TARGET ====="
           echo "===== macOS ====="
@@ -80,16 +108,8 @@ jobs:
           xcodebuild -list -project "$PROJECT_PATH"
 
       # --------------------------------------------------
-      # 3. 动态递增构建版本号 (苹果商店每次上传 Build 号必须递增)
-      # --------------------------------------------------
-      - name: Set Build Number
-        run: |
-          set -euo pipefail
-          BUILD_NUM="${{ github.run_number }}"
-          echo "Setting project CFBundleVersion to: $BUILD_NUM"
-          # 在 Xcode 工程内统一设置 CURRENT_PROJECT_VERSION
-          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $BUILD_NUM/g" "$PROJECT_PATH/project.pbxproj" || true
-
+      # 3. (已并入 Build Archive) build number 通过 CURRENT_PROJECT_VERSION 命令行参数传入，
+      #    不再用 sed 改 pbxproj —— 原写法匹配不到时会被 || true 静默吞掉。
       # --------------------------------------------------
       # 4. 根据模式导入证书和描述文件
       # --------------------------------------------------
@@ -125,14 +145,12 @@ jobs:
             P12_PASSWORD="$DIST_P12_PWD"
             PROV_RAW="$DIST_PROV"
             CERT_SEARCH_PATTERN="(Apple Distribution|iPhone Distribution)"
-            EXPECTED_TASK_ALLOW="false"
           else
             echo "==== Configuring for Developer Device Test (Development) ===="
             P12_RAW="$DEV_P12"
             P12_PASSWORD="$DEV_P12_PWD"
             PROV_RAW="$DEV_PROV"
             CERT_SEARCH_PATTERN="(Apple Development|iPhone Developer)"
-            EXPECTED_TASK_ALLOW="true"
           fi
 
           test -n "$P12_RAW" || {
@@ -220,6 +238,14 @@ jobs:
           echo "App ID: $PROFILE_APP_ID"
           echo "get-task-allow: $GET_TASK_ALLOW"
 
+          # 描述文件必须覆盖本 App 的 Bundle ID（右侧按通配符匹配，兼容通配描述文件）
+          EXPECTED_APP_ID="$TEAM_ID.$APP_BUNDLE_ID"
+          # shellcheck disable=SC2053
+          if [[ "$EXPECTED_APP_ID" != $PROFILE_APP_ID ]]; then
+            echo "ERROR: Profile App ID ($PROFILE_APP_ID) does not cover $EXPECTED_APP_ID"
+            exit 1
+          fi
+
           # 模式与描述文件校验
           if [ "$BUILD_TARGET" = "development" ]; then
             if [ "$GET_TASK_ALLOW" != "true" ]; then
@@ -230,14 +256,14 @@ jobs:
               echo "ERROR: Development profile must contain registered device UDIDs."
               exit 1
             fi
-            METHOD="development"
+            METHOD="debugging"
             CERT_TYPE="Apple Development"
           else
             if [ "$GET_TASK_ALLOW" = "true" ]; then
               echo "ERROR: App Store mode requires get-task-allow to be false (Release distribution profile)."
               exit 1
             fi
-            METHOD="app-store"
+            METHOD="app-store-connect"
             CERT_TYPE="Apple Distribution"
           fi
 
@@ -271,6 +297,7 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SIGNING_IDENTITY: ${{ steps.setup_signing.outputs.signing_identity }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
+          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
 
@@ -286,9 +313,30 @@ jobs:
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             2>&1 | tee build/xcodebuild-archive.log
 
           test -d build/TiandiLuopan.xcarchive
+
+          # 归档产物必须确实链接 iOS 27.1 SDK（DTSDKName 由构建时 SDK 写入）
+          ARCHIVED_APP="build/TiandiLuopan.xcarchive/Products/Applications/TiandiLuopan.app"
+          test -d "$ARCHIVED_APP" || { echo "::error::Archived app not found at $ARCHIVED_APP"; exit 1; }
+          DTSDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$ARCHIVED_APP/Info.plist" 2>/dev/null || true)"
+          echo "Archived DTSDKName = $DTSDK"
+          case "$DTSDK" in
+            *27.1*) : ;;
+            *)
+              echo "::error::Archive not built against iOS 27.1 SDK (DTSDKName=$DTSDK); Duo inner display would run in compatibility mode."
+              exit 1
+              ;;
+          esac
+
+          # build number 是否真的写进了产物（Info.plist 若写死了 CFBundleVersion 则不会生效）
+          ACTUAL_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ARCHIVED_APP/Info.plist" 2>/dev/null || true)"
+          echo "Archived CFBundleVersion = $ACTUAL_BUILD (expected $BUILD_NUMBER)"
+          if [ "$ACTUAL_BUILD" != "$BUILD_NUMBER" ]; then
+            echo "::warning::CFBundleVersion ($ACTUAL_BUILD) != run_number ($BUILD_NUMBER); TestFlight may reject a duplicate/lower build number."
+          fi
 
       # --------------------------------------------------
       # 6. 配置导出选项 ExportOptions.plist
@@ -382,7 +430,7 @@ jobs:
           echo "===== Code Signature Info ====="
           codesign -dv --verbose=4 "$APP_PATH" 2>&1 | tee build/codesign-info.log
 
-          codesign --verify --verbose=2 "$APP_PATH" || true
+          codesign --verify --verbose=2 "$APP_PATH"
 
           echo "===== Embedded Provisioning Profile ====="
           EMBEDDED_PROFILE="$APP_PATH/embedded.mobileprovision"
@@ -399,18 +447,22 @@ jobs:
         run: |
           set -euo pipefail
           cd dist-ios
-          shasum -a 256 *.ipa > SHA256SUMS.txt
+          shasum -a 256 ./*.ipa > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       # --------------------------------------------------
       # 10. 上传至苹果商店 App Store Connect / TestFlight (仅 app-store 模式生效)
       # --------------------------------------------------
       - name: Upload to App Store Connect (TestFlight)
-        if: ${{ env.BUILD_TARGET == 'app-store' && (github.event.inputs.upload_to_appstore == true || github.event.inputs.upload_to_appstore == 'true' || github.event_name == 'push') }}
+        # 注意：push 触发时 BUILD_TARGET 恒为 development，所以 push 永远不会上传；上传只在手动选 app-store 且勾选 upload_to_appstore 时发生。
+        if: ${{ env.BUILD_TARGET == 'app-store' && inputs.upload_to_appstore }}
         env:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           API_KEY_RAW: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          # 可选：App Store Connect 里该 App 的数字 Apple ID。Xcode 26 的 altool 在
+          # Bundle ID 前缀相近的多个 App 间可能传错目标，设置后会显式指定。
+          APP_APPLE_ID: ${{ secrets.APPSTORE_APPLE_ID }}
         run: |
           set -euo pipefail
 
@@ -425,6 +477,7 @@ jobs:
           KEY_DIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$KEY_DIR"
           KEY_FILE="$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
+          trap 'rm -f "$KEY_FILE"' EXIT
 
           # 智能兼容：无论用户 Secret 存的是 PEM 原文还是 Base64，均能正确处理
           if echo "$API_KEY_RAW" | grep -q "BEGIN PRIVATE KEY"; then
@@ -444,12 +497,26 @@ jobs:
           echo "Target IPA for upload: $UPLOAD_IPA"
           echo "Uploading to App Store Connect using API Key: $API_KEY_ID..."
 
+          APPLE_ID_ARGS=()
+          if [ -n "${APP_APPLE_ID:-}" ]; then
+            APPLE_ID_ARGS=(--apple-id "$APP_APPLE_ID")
+          fi
+
+          # --upload-app 已被 Apple 标记为 deprecated（官方建议 --upload-package），目前仍可用。
+          UPLOAD_LOG="build/altool-upload.log"
           xcrun altool --upload-app \
             -f "$UPLOAD_IPA" \
             -t ios \
             --apiKey "$API_KEY_ID" \
             --apiIssuer "$ISSUER_ID" \
-            --verbose
+            ${APPLE_ID_ARGS[@]+"${APPLE_ID_ARGS[@]}"} \
+            --verbose 2>&1 | tee "$UPLOAD_LOG"
+
+          # 部分 Xcode 版本的 altool 上传失败时也返回 0，所以额外解析输出，避免“假成功”
+          if grep -Eq 'UPLOAD FAILED|Validation failed|ERROR:' "$UPLOAD_LOG"; then
+            echo "::error::altool reported an upload failure (see build/altool-upload.log)"
+            exit 1
+          fi
 
           echo "🎉 Successfully uploaded to App Store Connect! TestFlight build will appear in 5-15 minutes."
 

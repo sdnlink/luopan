@@ -277,7 +277,7 @@ public struct FenjinItem: Identifiable {
         case .vi:
             return "Nguồn: khẩu quyết La Bàn Phân Kim 120 truyền thống (các bản truyền có dị văn). Nguyên văn của tuyến này: ‘\(original)’. Giải thích: các từ về bệnh tật, sinh lực, gia đình và tài lộc là biểu tượng phong thủy truyền thống, không phải dự đoán y tế, an toàn hay tài chính."
         case .th:
-            return "ที่มา: คำ诀แบ่ง金 120 ของเข็มทิศแบบดั้งเดิม (แต่ละฉบับอาจมีถ้อยคำต่างกัน) ข้อความต้นฉบับของเส้นนี้: ‘\(original)’ คำอธิบาย: ถ้อยคำเรื่องความเจ็บป่วย พลังชีวิต ครอบครัว และทรัพย์สินเป็นสัญลักษณ์ทางฮวงจุ้ย ไม่ใช่การพยากรณ์ทางการแพทย์ ความปลอดภัย หรือการเงิน"
+            return "ที่มา: เคล็ดวิชา 120 เฟินจินของเข็มทิศแบบดั้งเดิม (แต่ละฉบับอาจมีถ้อยคำต่างกัน) ข้อความต้นฉบับของเส้นนี้: ‘\(original)’ คำอธิบาย: ถ้อยคำเรื่องความเจ็บป่วย พลังชีวิต ครอบครัว และทรัพย์สินเป็นสัญลักษณ์ทางฮวงจุ้ย ไม่ใช่การพยากรณ์ทางการแพทย์ ความปลอดภัย หรือการเงิน"
         case .id:
             return "Sumber: rumus kompas Fenjin 120 tradisional (redaksi berbeda menurut naskah). Teks asli untuk garis ini: ‘\(original)’. Penjelasan: istilah penyakit, vitalitas, keluarga, dan rezeki adalah simbolisme geomansi tradisional, bukan prediksi medis, keselamatan, atau keuangan."
         case .auto, .zhHans:

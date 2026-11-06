@@ -422,7 +422,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
             switch id {
             case "tianzhan": return "① บัง (ทำก่อน·ฟรี): วางต้นไม้ใบกว้างสูงกว่าขอบหน้าต่าง (มอนสเตอรา ต้นเงิน) หรือติดม่านทึบที่หน้าต่าง/ระเบียงที่หันเข้าช่องตึก → ผล: ลดลมและแรงกดทางสายตาจากช่องว่าง ครอบคลุมหน้าต่าง/ระเบียงที่หันเข้าช่อง\n② กั้น (ต้นทุนต่ำ): ถ้าประตูหน้าตรงกับหน้าต่างที่หันเข้าช่อง วางตู้ครึ่งสูงหรือฉากโปร่งที่โถงทางเข้า อย่าให้มองทะลุถึงสุด → ผล: ตัดลมทะลุตรง ทำลมในบ้านให้คงที่\n③ สะกด (ทางเลือก): แขวนกระจกนูนแปดทิศหรือซานไห่เจิ้นหันเข้าช่อง เอียงลง 3-5 องศา อย่าชี้ไปที่หน้าต่างเพื่อนบ้าน → ผล: มีผลเฉพาะทิศที่ปะทะนั้น ดูแลไมตรีกับเพื่อนบ้าน\n→ ผลต่อครอบครัว: หลักคือสุขภาพผู้ใหญ่และคนที่เข้าออกบ่อย (ศรีษะ กระดูกไม่สบาย เสี่ยงอุบัติเหตุ) กับเสียทรัพย์ กระทบทิศที่หันเข้าช่องและคนในบ้านที่อยู่ตรงนั้น"
             case "luchong": return "① บัง (ทำก่อน·ฟรี): วางหินธรณีประตูหรือพรมที่ประตูและม่านด้านใน วางต้นไม้สูงที่หน้าต่างหันทางถนน → ผล: ลดแรงกดของถนนตรงที่พุ่งเข้าประตู ครอบคลุมประตูหลักและหน้าต่างที่หันตรง\n② กั้น (ต้นทุนต่ำ): วางรั้วเตี้ยหรือฉากนอกประตูให้ทางเข้าอ้อมมุม → ผล: เปลี่ยนกระแสตรงเป็นทางอ้อม เจริญทั้งบ้าน\n③ สะกด (ทางเลือก): แขวนซานไห่เจิ้นหรือกระจกแปดทิศเหนือประตู เอียงลงทางถนนเล็กน้อย อย่าชี้เพื่อนบ้าน → ผล: มีผลเฉพาะทิศที่ปะทะ\n→ ผลต่อครอบครัว: คนที่เข้าออกบ่อย (ผู้เดินทางทุกวัน) เสี่ยงอุบัติเหตุ บาดเจ็บและเสียเงิน วาสนาบ้านสั่นคลอน กระทบทิศที่ถนนพุ่งตรงและคนที่ผ่านไปมา"
-            case "fangong": return "① บัง (ทำก่อน·ฟรี): จัดต้นไม้หรือกระถางโค้งตามทิศโค้งน้ำ/ถนนเพื่อเป็นเกราะครึ่งวงกลม → ผล: ลดแรงกดของส่วนโค้งที่หันเข้าบ้าน ครอบคลุมหน้าต่าง/ระเบียงด้านโค้ง\n② กั้น (ต้นทุนต่ำ): วางโต๊ะกลม พรมกลม หรือโซฟาโค้งในทิศโค้งแทนเฟอร์นิเจอร์มุมแหลม → ผล: ทำให้นิวเคลียสแรงเหวี่ยงนุ่มลง ทำให้พื้นที่นั้นคงที่\n③ สะกด (ทางเลือก): วางหินออบซิเดียน ศิลากั้นตัง หรือเหรียญห้าจักรพรรดิที่ทิศโค้ง หันออกนอก → ผล: มีผลเฉพาะทิศนั้น เสริมได้ตามต้องการ\n→ ผลต่อครอบครัว: ความสัมพันธ์คู่สามีภรรยาเย็นลง ทะเลาะและเสียทรัพย์ (ภรรยาและความสัมพันธ์คู่เห็นชัดที่สุด) บ้านยากที่จะเก็บพลัง กระทบทิศโค้งที่ยื่นออกและคนในบ้านที่อยู่ตรงนั้น"
+            case "fangong": return "① บัง (ทำก่อน·ฟรี): จัดต้นไม้หรือกระถางโค้งตามทิศโค้งน้ำ/ถนนเพื่อเป็นเกราะครึ่งวงกลม → ผล: ลดแรงกดของส่วนโค้งที่หันเข้าบ้าน ครอบคลุมหน้าต่าง/ระเบียงด้านโค้ง\n② กั้น (ต้นทุนต่ำ): วางโต๊ะกลม พรมกลม หรือโซฟาโค้งในทิศโค้งแทนเฟอร์นิเจอร์มุมแหลม → ผล: ทำให้กระแสพลังเหวี่ยงออกนุ่มนวลขึ้น ทำให้พื้นที่นั้นมั่นคง\n③ สะกด (ทางเลือก): วางหินออบซิเดียน ศิลากั้นตัง หรือเหรียญห้าจักรพรรดิที่ทิศโค้ง หันออกนอก → ผล: มีผลเฉพาะทิศนั้น เสริมได้ตามต้องการ\n→ ผลต่อครอบครัว: ความสัมพันธ์คู่สามีภรรยาเย็นลง ทะเลาะและเสียทรัพย์ (ภรรยาและความสัมพันธ์คู่เห็นชัดที่สุด) บ้านยากที่จะเก็บพลัง กระทบทิศโค้งที่ยื่นออกและคนในบ้านที่อยู่ตรงนั้น"
             case "tantou": return "① บัง (ทำก่อน·ฟรี): ปิดม่านบางหรือมู่ลี่ตอนกลางวันที่หน้าต่างหันมุมตึกที่โผล่ → ผล: กั้นสายตา ครอบคลุมหน้าต่างนั้น\n② กั้น (ต้นทุนต่ำ): วางต้นไม้สูง (ไม้เลื้อย โพทอส) บนขอบหน้าต่างบังมุม → ผล: แยกสายตา ลดความรู้สึกถูกจ้อง\n③ สะกด (ทางเลือก): แขวนกระจกนูนแปดทิศไปทางตึกที่โผล่ อย่าชี้หน้าต่างเพื่อนบ้าน → ผล: มีผลเฉพาะทิศนั้น\n→ ผลต่อครอบครัว: คนมองจ้อง ขโมย และเรื่องทะเลาะกับหน่วยงาน (ความเป็นส่วนตัวและความปลอดภัยถูกรบกวน) กระทบทิศที่สิ่งก่อสร้างโผล่และคนในบ้านที่อยู่ตรงนั้น"
             case "chuanxin": return "① กั้น (ทำก่อน·ฟรี): ถ้าประตูหน้าตรงกับหน้าต่างหลัง วางตู้ ฉาก หรือม่านหนากลางทางเดิน → ผล: ตัดลมทะลุตรง ทำให้กระแสลมคงที่\n② บัง (ต้นทุนต่ำ): ปูพรม วางต้นไม้ที่ขอบหน้าต่าง และเฟอร์นิเจอร์หนักชิดผนังเพื่อชะลอกระแสลม → ผล: ชะลอความเร็วลม ปรับอุณหภูมิและความมั่นคงในบ้าน\n③ สะกด (ทางเลือก): วางเหรียญห้าจักรพรรดิหรือศิลากั้นตังเล็กในธรณีประตู → ผล: บริเวณประตูเข้า เสริมได้ตามต้องการ\n→ ผลต่อครอบครัว: คนในบ้านสุขภาพไม่สบาย นอนไม่หลับ (คนที่นอนอยู่บนแนวทะลุได้รับผลมากที่สุด) พลังบ้านถูกทะลุ กระทบทิศทางเดินทะลุและคนในบ้านที่อยู่ตรงนั้น"
             case "huoxing": return "① บัง (ทำก่อน·ฟรี): ติดม่านบางหรือมู่ลี่ที่หน้าต่างหันมุมแหลม → ผล: เกราะทางสายตา ครอบคลุมหน้าต่างนั้น\n② กั้น (ต้นทุนต่ำ): วางต้นไม้น้ำ (โพทอส ไม้เลื้อย) บนขอบหน้าต่างลดความแห้ง → ผล: ลดความร้อนแห้งของธาตุไฟในบริเวณนั้น\n③ สะกด (ทางเลือก): ใช้หินออบซิเดียน ผลึก หรือของตกแต่งสีน้ำเงินสะกดไฟ ทิศนี้ห้ามสีแดง → ผล: มีผลเฉพาะทิศนั้น ห้ามใช้สีแดง\n→ ผลต่อครอบครัว: คนในบ้านหงุดหงิด ทะเลาะ กลัวอัคคีภัย (อารมณ์ สมองและหัวใจ สายตา) กระทบทิศที่มุมแหลม/ปล่องไฟชี้และคนในบ้านที่อยู่ตรงนั้น"
@@ -450,7 +450,7 @@ public struct ExteriorShaItem: Identifiable, Codable {
     /// Localized explanation shown in the AR result card.
     public var localizedMetaphysicsHarm: String {
         let citation = localizedClassicalText
-        let traditionalHarm = metaphysicsHarm
+        let traditionalHarm = localizedTraditionalHarm
         switch LocalizationManager.shared.effectiveLanguage {
         case .en:
             return "Traditional model wording: \(traditionalHarm)\nClassical source: \(citation) Explanation: this quoted text is the traditional interpretation of the observed form. Verify the structure and actual impact on site; it is not a medical, financial or professional diagnosis."
@@ -468,6 +468,98 @@ public struct ExteriorShaItem: Identifiable, Codable {
             return "Prinsip tradisional: \(traditionalHarm)\nSumber klasik: \(citation) Penjelasan: kutipan tersebut adalah tafsir tradisional atas bentuk ini. Periksa struktur dan dampak nyata di lokasi; jangan gunakan sebagai diagnosis medis, keuangan, atau profesional."
         case .auto, .zhHans:
             return "传统原理：\(traditionalHarm)\n古籍出处：\(citation) 解释：以上引文是传统文化对该形态的原文解读。请现场核对结构及实际影响；不构成医疗、财务或其他专业诊断。"
+        }
+    }
+
+    public var localizedTraditionalHarm: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en:
+            switch id {
+            case "tianzhan": return "Airflow accelerates through the narrow canyon (Venturi effect) like a wind blade; traditionally linked to sudden accidents, legal/financial loss, and cardiovascular strain."
+            case "luchong":  return "A straight road acts like a spear of rushing traffic momentum striking the house qi; traditionally associated with financial drain, accidents, and household restlessness."
+            case "fangong":  return "Centrifugal flow pulls auspicious qi and benefactor luck away from the property; traditionally associated with discord, major financial loss, and disputes."
+            case "tantou":   return "A peering structure behind the front building symbolizes hidden scrutiny; traditionally linked to scheming, theft/fraud risk, and reputational trouble."
+            case "chuanxin": return "Hollowed underpass or straight-through draft disperses earth qi rapidly; traditionally linked to wealth leakage, digestive weakness, and restless sleep."
+            case "huoxing":  return "Sharp Fire-shaped corners clash with Metal and stir dry heat; traditionally linked to quarrels, eye/skin irritation, and short temper."
+            case "baihu":    return "When the right-side White Tiger towers over the left-side Azure Dragon, Yin overrides Yang; traditionally linked to imbalance in authority, disputes, and career obstacles."
+            case "gejiao":   return "Fast water or traffic brushing against the foundation strips away ground qi; traditionally linked to volatile wealth and unstable long-term fortune."
+            default: return metaphysicsHarm
+            }
+        case .zhHant:
+            switch id {
+            case "tianzhan": return "氣流受文丘里效應加速形成高速風刃，主血光之災、官非破財、心腦血管突發疾厄"
+            case "luchong":  return "一條直路一條槍，車流動能化作無形猛獸直衝宅氣，主破耗連連、意外傷災、人丁不安"
+            case "fangong":  return "離心力將財氣與貴人運向外甩離，形成無情衝撞，主子孫叛逆、破大財、官訟纏身"
+            case "tantou":   return "暗中窺測，主招引暗室小人、遭盜竊欺詐、婚外暗昧之情或突發名譽受損"
+            case "chuanxin": return "地氣空洞不穩定，洩氣極速，主財氣不聚、腸胃脾胃虛寒、居者缺乏安全感"
+            case "huoxing":  return "火金相剋，火燥生煞，主口舌官非、視力疾厄、皮膚炎腫、脾氣暴躁易燃"
+            case "baihu":    return "青龍委靡，白虎張狂，主陰盛陽衰、婦人專權暴烈、男丁運勢受壓抑阻滯"
+            case "gejiao":   return "氣流疾走拔除地氣，財運大起大落，根基虛浮，青年得志但晚運易傾頹"
+            default: return metaphysicsHarm
+            }
+        case .ja:
+            switch id {
+            case "tianzhan": return "ビル間の狭隙で気流が加速して風の刃となり、突発的な怪我・訴訟・出費や循環器の不調を招くとされます。"
+            case "luchong":  return "直線道路の動勢が槍のように宅気を直撃し、度重なる出費や不慮の事故、家庭の不安を招くとされます。"
+            case "fangong":  return "遠心力で財気や貴人運が外へ離散し、財産の流出や対人・訴訟トラブルを招くとされます。"
+            case "tantou":   return "背後から覗き込む形相が陰口や小人、盗難・詐欺、名誉の毀損を招くとされます。"
+            case "chuanxin": return "地気が空洞化して急速に抜け、財が集まりにくく、胃腸の冷えや安心感の欠如を招くとされます。"
+            case "huoxing":  return "鋭角の火気が金を剋して燥気を帯び、口論・訴訟、目や肌の不調、短気を招くとされます。"
+            case "baihu":    return "青龍が弱く白虎が高ぶることで陰陽が偏り、家庭内の不和や運勢の停滞を招くとされます。"
+            case "gejiao":   return "足元をかすめる急流や車道が地気を奪い、財運の乱高下や基盤の不安定を招くとされます。"
+            default: return metaphysicsHarm
+            }
+        case .ko:
+            switch id {
+            case "tianzhan": return "좁은 빌딩 틈으로 기류가 가속되어 바람 칼날을 형성하며, 불의의 사고·관재·파재 및 심혈관 질환을 유발한다고 봅니다."
+            case "luchong":  return "곧게 뻗은 도로의 차량 동력이 창처럼 택기를 직충하여, 지속적인 손재와 사고·불안을 초래한다고 봅니다."
+            case "fangong":  return "원심력이 재기와 귀인운을 밖으로 밀어내어 큰 재물 손실과 송사·불화를 부른다고 봅니다."
+            case "tantou":   return "건물 뒤에서 엿보는 형상으로 인해 암투, 도난·사기 위험 및 명예 손상을 겪기 쉽다고 봅니다."
+            case "chuanxin": return "지기가 비어 빠르게 설기되므로 재물이 모이지 않고 위장 허약과 수면 불안을 겪기 쉽다고 봅니다."
+            case "huoxing":  return "뾰족한 화기가 금을 극하고 조열을 일으켜 구설·관재, 시력 및 피부 질환, 급한 성미를 부른다고 봅니다."
+            case "baihu":    return "청룡이 위축되고 백호가 기세를 부려 음양 균형이 깨지고 다툼과 운세 정체를 부른다고 봅니다."
+            case "gejiao":   return "건물 밑동을 스치는 급류나 차도가 지기를 앗아가 재물운의 기복과 기반 약화를 초래한다고 봅니다."
+            default: return metaphysicsHarm
+            }
+        case .vi:
+            switch id {
+            case "tianzhan": return "Luồng gió qua khe hẹp tăng tốc như lưỡi đao gió; theo truyền thống chủ về tai nạn bất ngờ, hao tài quan phi và áp lực tim mạch."
+            case "luchong":  return "Đường thẳng như mũi thương dẫn động năng xe cộ xung thẳng vào trạch khí; chủ về hao tán, va chạm và gia đạo bất an."
+            case "fangong":  return "Lực ly tâm đẩy tài khí và vận quý nhân ra ngoài; chủ về bất hòa, thất thoát tài lộc lớn và kiện tụng."
+            case "tantou":   return "Thế nhà lấp ló dòm ngó từ phía sau chủ về tiểu nhân ám toán, nguy cơ trộm cắp lừa gạt và tổn hại danh dự."
+            case "chuanxin": return "Địa khí rỗng và thoát nhanh khiến tài lộc khó tụ, tỳ vị hư hàn, người ở thiếu cảm giác an tâm."
+            case "huoxing":  return "Góc nhọn Hỏa khắc Kim sinh táo sát; chủ về khẩu thiệt quan phi, mỏi mắt, kích ứng da và nóng nảy."
+            case "baihu":    return "Thanh Long suy yếu mà Bạch Hổ lấn át làm mất cân bằng âm dương; chủ về bất hòa và cản trở vận thế."
+            case "gejiao":   return "Dòng nước hoặc xe cộ chảy xiết sát chân tường cuốn trôi địa khí; chủ về tài vận lên xuống thất thường, nền tảng kém vững."
+            default: return metaphysicsHarm
+            }
+        case .th:
+            switch id {
+            case "tianzhan": return "กระแสลมถูกบีบเร่งความเร็วผ่านช่องตึกแคบดั่งคมมีดลม ตามตำราว่าจะส่งผลต่ออุบัติเหตุ คดีความ เสียทรัพย์ และระบบไหลเวียนโลหิต"
+            case "luchong":  return "ถนนสายตรงเปรียบเสมือนหอกที่นำแรงปะทะพุ่งชนชี่ของบ้าน ส่งผลให้เก็บทรัพย์ไม่อยู่ เสี่ยงอุบัติเหตุ และคนในบ้านไม่สงบ"
+            case "fangong":  return "แรงเหวี่ยงพัดพาโชคลาภและผู้อุปถัมภ์ออกห่างตัวบ้าน ส่งผลให้เกิดความขัดแย้ง เสียทรัพย์ก้อนใหญ่ หรือมีคดีความ"
+            case "tantou":   return "ลักษณะอาคารแอบชะเง้อมองจากด้านหลัง สื่อถึงคนคิดร้ายลับหลัง การโจรกรรมหลอกลวง หรือเรื่องเสื่อมเสียชื่อเสียง"
+            case "chuanxin": return "ชี่ดินกลวงและรั่วไหลอย่างรวดเร็ว ทำให้เก็บเงินไม่อยู่ ระบบย่อยอาหารอ่อนแอ และผู้อยู่อาศัยขาดความรู้สึกมั่นคง"
+            case "huoxing":  return "มุมแหลมธาตุไฟพิฆาตธาตุทองเกิดความร้อนแห้ง ส่งผลให้เกิดปากเสียง ปัญหาสายตา ผิวหนัง และอารมณ์ฉุนเฉียวง่าย"
+            case "baihu":    return "มังกรเขียวอ่อนแอแต่เสือขาวผงาดทำให้หยินหยางเสียสมดุล เกิดความขัดแย้งในบ้านและหน้าที่การงานติดขัด"
+            case "gejiao":   return "กระแสน้ำหรือรถที่วิ่งประชิดฐานอาคารพัดพาชี่ดินออกไป ทำให้การเงินผันผวนและรากฐานไม่มั่นคงในระยะยาว"
+            default: return metaphysicsHarm
+            }
+        case .id:
+            switch id {
+            case "tianzhan": return "Aliran udara dipercepat melalui celah sempit (efek Venturi) bagaikan bilah angin; secara tradisional dikaitkan dengan risiko cedera, kerugian finansial, dan beban kardiovaskular."
+            case "luchong":  return "Jalan lurus bekerja seperti tombak arus lalu lintas yang menerjang qi rumah; dikaitkan dengan kebocoran rezeki, risiko kecelakaan, dan kegelisahan penghuni."
+            case "fangong":  return "Gaya sentrifugal melontarkan qi rezeki dan dukungan penolong menjauh dari rumah; dikaitkan dengan perselisihan dan kerugian besar."
+            case "tantou":   return "Struktur yang mengintip dari balik bangunan depan melambangkan pengawasan tersembunyi; dikaitkan dengan intrik, risiko pencurian, dan gangguan reputasi."
+            case "chuanxin": return "Rongga di bawah bangunan atau angin tembus menguras qi tanah dengan cepat; dikaitkan dengan sulitnya mengumpulkan rezeki dan tidur kurang nyenyak."
+            case "huoxing":  return "Sudut tajam berelemen Api berbenturan dengan Logam dan memicu panas kering; dikaitkan dengan pertengkaran, iritasi mata/kulit, serta emosi mudah tersulut."
+            case "baihu":    return "Sisi Macan Putih di kanan yang jauh lebih tinggi menekan Naga Hijau di kiri; dikaitkan dengan ketimpangan harmoni rumah tangga dan hambatan karier."
+            case "gejiao":   return "Arus cepat yang menyapu tepat di kaki bangunan mengikis qi fondasi; dikaitkan dengan fluktuasi keuangan dan kurang stabilnya fondasi jangka panjang."
+            default: return metaphysicsHarm
+            }
+        case .auto, .zhHans:
+            return metaphysicsHarm
         }
     }
 

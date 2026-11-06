@@ -32,6 +32,19 @@ public struct SolarTermItem: Identifiable {
         }
     }
 
+    /// Compact solar-term label for the 24-term compass ring (15° per sector).
+    public var localizedDialName: String {
+        let language = LocalizationManager.shared.effectiveLanguage
+        switch language {
+        case .en:
+            return ["冬至": "Winter Sol.", "小寒": "Minor Cold", "大寒": "Major Cold", "立春": "Spring Beg.", "雨水": "Rain Water", "惊蛰": "Insects Awk.", "春分": "Spring Eq.", "清明": "Clear Bright", "谷雨": "Grain Rain", "立夏": "Summer Beg.", "小满": "Grain Buds", "芒种": "Grain in Ear", "夏至": "Summer Sol.", "小暑": "Minor Heat", "大暑": "Major Heat", "立秋": "Autumn Beg.", "处暑": "End of Heat", "白露": "White Dew", "秋分": "Autumn Eq.", "寒露": "Cold Dew", "霜降": "Frost Desc.", "立冬": "Winter Beg.", "小雪": "Minor Snow", "大雪": "Major Snow"][name] ?? localizedName
+        case .id:
+            return ["冬至": "Sol. Dingin", "小寒": "Dingin Kecil", "大寒": "Dingin Hebat", "立春": "Awal Semi", "雨水": "Air Hujan", "惊蛰": "Serangga", "春分": "Ek. Semi", "清明": "Cerah", "谷雨": "Hujan Padi", "立夏": "Awal Panas", "小满": "Tunas Padi", "芒种": "Padi Berbulir", "夏至": "Sol. Panas", "小暑": "Panas Kecil", "大暑": "Panas Hebat", "立秋": "Awal Gugur", "处暑": "Akhir Panas", "白露": "Embun Putih", "秋分": "Ek. Gugur", "寒露": "Embun Dingin", "霜降": "Embun Beku", "立冬": "Awal Dingin", "小雪": "Salju Kecil", "大雪": "Salju Lebat"][name] ?? localizedName
+        default:
+            return localizedName
+        }
+    }
+
     /// Short label used inside the compact compass ring.
     public var localizedHexagramLabel: String? {
         guard let hexagramName = hexagramName else { return nil }

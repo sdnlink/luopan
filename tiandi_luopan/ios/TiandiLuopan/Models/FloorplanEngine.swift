@@ -205,6 +205,13 @@ public struct FloorplanAuditItem: Identifiable {
     public var isWarning: Bool {
         severity.contains("预警") || severity.localizedCaseInsensitiveContains("warning")
     }
+    public var localizedSeverity: String {
+        let lang = LocalizationManager.shared
+        if isSevere { return lang.t("floorplan_level_severe") }
+        if isGood { return lang.t("floorplan_level_auspicious") }
+        if isWarning { return lang.t("floorplan_level_warning") }
+        return lang.t("floorplan_level_neutral")
+    }
 }
 
 /// Latest in-session floorplan audit consumed by the TianJi export. The
@@ -475,6 +482,7 @@ public class FloorplanEngine {
             
             if r.type == .missingCorner {
                 let content = missingCornerContent(gua: palace.gua)
+                r.name = r.type.localizedName
                 r.inspectionTitle = content.title
                 r.inspectionLevel = "预警"
                 let lore = missingCornerLoreWithSource(gua: palace.gua, lore: content.lore)
@@ -483,7 +491,7 @@ public class FloorplanEngine {
                 updatedRooms.append(r)
                 auditReport.append(FloorplanAuditItem(
                     id: "manual-missing-corner-\(room.id)",
-                    title: "\(r.name) · \(content.title)",
+                    title: "\(r.type.localizedName) · \(content.title)",
                     palace: r.palaceName,
                     severity: "预警",
                     lore: lore,
@@ -494,6 +502,7 @@ public class FloorplanEngine {
 
             // 风水动态研判
             let audit = evaluateRoom(type: r.type, palaceGua: palace.gua, palaceDir: palace.dir)
+            r.name = r.type.localizedName
             r.inspectionTitle = audit.title
             r.inspectionLevel = audit.level
             r.inspectionLore = audit.lore
@@ -507,7 +516,7 @@ public class FloorplanEngine {
             // previous warning-only filter silently dropped those remedies.
             auditReport.append(FloorplanAuditItem(
                 id: "room-\(room.id)",
-                title: "\(r.name) · \(audit.title)",
+                title: "\(r.type.localizedName) · \(audit.title)",
                 palace: r.palaceName,
                 severity: audit.level,
                 lore: audit.lore,
@@ -1212,7 +1221,7 @@ public class FloorplanEngine {
                     "艮坤屬土為鬼門，烈火燥土，易致家人口腔上火、脾胃虛熱及皮膚過敏。出處：《陽宅十書》相關火土論。解釋：艮坤是傳統方位稱謂，以上為古籍象徵，請核對通風、熱源距離和消防安全。",
                     "The Yang Zhai Ten Books says, “Dry Fire scorches Earth and may bring oral heat, digestive heat and skin sensitivity.” Gen and Kun are traditional direction names; this is a historical text reference. Verify ventilation, heat clearance and fire safety.",
                     "艮・坤は土に属し鬼門とされます。火気が土を焼き、胃腸の不調や肌トラブルを招きやすくなります。",
-                    "『陽宅十書』は「烈火が土を乾かし、口腔、胃腸、皮膚に影響する」と記します。艮・坤は伝統方位名であり、古典の引用として換気、熱源距離、火災安全を確認してください。",
+                    "《양택십서》는 ‘열화가 토를 건조하게 하여 구강·비위·피부에 영향을 준다’고 기록합니다. 간·곤은 전통 귀문 방위 명칭이며, 환기·열원 거리·화재 안전을 현장에서 확인하세요.",
                     "Cấn Khôn thuộc Thổ là Quỷ môn; hỏa nhiệt làm khô đất, dễ khiến tỳ vị suy yếu, nóng trong và dị ứng da.",
                     "เกิ่นและคุนเป็นธาตุดินและทิศประตูปิศาจ ไฟที่รุนแรงทำให้ดินแห้งผาก กระทบระบบย่อยอาหารและผิวหนัง",
                     "Gen dan Kun adalah Gerbang Tanah; api yang kering memicu gangguan pencernaan dan sensitivitas kulit."
@@ -1240,7 +1249,7 @@ public class FloorplanEngine {
                     "Bathrooms in the northeast or southwest pollute Earth qi and may affect digestion and family wellbeing.",
                     "北東は表鬼門、南西は裏鬼門。水回りと空間配置についての伝統文化上の参考提示です。防水と換気を現場で確認してください。",
                     "동북과 서남은 전통 방위 명칭입니다. 욕실 배치에 대해 방수·환기·건조·사용 안전을 현장에서 확인하세요.",
-                    "Cổ thư ghi “hỏa mạnh làm khô Thổ, dễ ảnh hưởng miệng, tỳ vị và da”. Đông Bắc và Tây Nam là tên phương vị truyền thống; hãy kiểm tra thông gió, khoảng cách nhiệt và an toàn cháy nổ tại chỗ.",
+                    "Đông Bắc Cấn là biểu Quỷ môn, Tây Nam Khôn là lý Quỷ môn; nhà vệ sinh ẩm ướt làm ô uế địa khí, theo truyền thống ảnh hưởng đến tỳ vị và sức khỏe gia đình. Hãy kiểm tra chống thấm, thông gió và độ khô ráo tại hiện trường.",
                     "ทิศตะวันออกเฉียงเหนือและตะวันตกเฉียงใต้เป็นประตูปิศาจ ห้องน้ำที่ชื้นแฉะทำลายพลังดิน กระทบระบบย่อยอาหาร",
                     "Kamar mandi di timur laut atau barat daya adalah referensi tata ruang budaya tradisional; periksa kedap air, ventilasi, kekeringan, dan keselamatan penggunaan di lokasi."
                 ),

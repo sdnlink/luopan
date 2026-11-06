@@ -1915,25 +1915,58 @@ public struct ARVisionView: View {
             let timeStr = dateFormatter.string(from: auditDate)
             let distSuffix = sampledDist.map { String(format: " · %@ %.2fm", isLidar ? "LiDAR" : "AR", $0) } ?? ""
             
-            let isEn = language == .en
-            let isHant = language == .zhHant
-            
             let infoText: String
-            if isEn {
+            switch language {
+            case .en:
                 infoText = """
                 Facing Orientation: Mountain \(facingPinyin) (Measured \(String(format: "%.1f", currentHeading))°)\(distSuffix)
                 Identified Sha: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
                 Coordinates: \(coordsStr) · Solar: \(solarTimeStr)
                 Audit Time: \(timeStr) · SN: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
-            } else if isHant {
+            case .zhHant:
                 infoText = """
                 向首方位: \(facingName)山向首 (實測 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
                 識別形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
                 現場經緯: \(coordsStr) · 真太陽時: \(solarTimeStr)
                 勘察時間: \(timeStr) · 防偽鑒真: YX-AR-\(Int(auditDate.timeIntervalSince1970))
                 """
-            } else {
+            case .ja:
+                infoText = """
+                向首方位: \(facingName)山向首 (実測 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
+                識別形殺: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
+                現場経度緯度: \(coordsStr) · 真太陽時: \(solarTimeStr)
+                調査日時: \(timeStr) · 証明番号: YX-AR-\(Int(auditDate.timeIntervalSince1970))
+                """
+            case .ko:
+                infoText = """
+                향수 방위: \(facingName)산 향수 (실측 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
+                식별 형살: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)
+                현장 좌표: \(coordsStr) · 진태양시: \(solarTimeStr)
+                감정 일시: \(timeStr) · 인증 번호: YX-AR-\(Int(auditDate.timeIntervalSince1970))
+                """
+            case .vi:
+                infoText = """
+                Hướng đo: Sơn \(facingName) (Thực đo \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
+                Hình sát nhận diện: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
+                Tọa độ: \(coordsStr) · Giờ Mặt Trời: \(solarTimeStr)
+                Thời gian khảo sát: \(timeStr) · Mã xác thực: YX-AR-\(Int(auditDate.timeIntervalSince1970))
+                """
+            case .th:
+                infoText = """
+                ทิศทางที่หัน: ขุนเขา \(facingName) (วัดจริง \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
+                ลักษณะปะทะที่พบ: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
+                พิกัดพื้นที่: \(coordsStr) · เวลาสุริยะจริง: \(solarTimeStr)
+                เวลาสำรวจ: \(timeStr) · รหัสรับรอง: YX-AR-\(Int(auditDate.timeIntervalSince1970))
+                """
+            case .id:
+                infoText = """
+                Arah Hadap: Gunung \(facingName) (Terukur \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
+                Bentuk Sha Terdeteksi: [\(shaName)] (\(shaAliases)) · \(shaSeverity)
+                Koordinat: \(coordsStr) · Waktu Surya: \(solarTimeStr)
+                Waktu Survei: \(timeStr) · Kode Bukti: YX-AR-\(Int(auditDate.timeIntervalSince1970))
+                """
+            case .zhHans, .auto:
                 infoText = """
                 向首方位: \(facingName)山向首 (实测 \(String(format: "%.1f", currentHeading))°) · \(facingPalace)\(distSuffix)
                 识别形煞: 【\(shaName)】(\(shaAliases)) · \(shaSeverity)

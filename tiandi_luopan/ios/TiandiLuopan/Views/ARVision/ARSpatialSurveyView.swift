@@ -42,8 +42,32 @@ public struct LubanRulerEvaluation: Equatable {
         Self.yangNamesHans[yangGateIndex]
     }
 
+    public var localizedYangSegmentName: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans, .auto: return Self.yangNamesHans[yangGateIndex]
+        case .zhHant, .ja: return Self.yangNamesHant[yangGateIndex]
+        case .en: return Self.yangNamesEn[yangGateIndex]
+        case .vi: return Self.yangNamesVi[yangGateIndex]
+        case .th: return Self.yangNamesTh[yangGateIndex]
+        case .id: return Self.yangNamesId[yangGateIndex]
+        case .ko: return Self.yangNamesKo[yangGateIndex]
+        }
+    }
+
     public var yinSegmentName: String {
         Self.yinNamesHans[yinIndex]
+    }
+
+    public var localizedYinSegmentName: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans, .auto: return Self.yinNamesHans[yinIndex]
+        case .zhHant, .ja: return Self.yinNamesHant[yinIndex]
+        case .en: return Self.yinNamesEn[yinIndex]
+        case .vi: return Self.yinNamesVi[yinIndex]
+        case .th: return Self.yinNamesTh[yinIndex]
+        case .id: return Self.yinNamesId[yinIndex]
+        case .ko: return Self.yinNamesKo[yinIndex]
+        }
     }
 
     public static func evaluate(meters: Double) -> LubanRulerEvaluation {
@@ -677,23 +701,63 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             // Row 0 (North): NW(一白乾), N(五黄坎), NE(三碧艮)
             // Row 1 (Center): W(二黑兑), Center(九紫中), E(七赤震)
             // Row 2 (South): SW(六白坤), S(四绿离), SE(八白巽)
-            let cells: [[(title: String, sub: String, color: UIColor)]] = [
-                [
-                    ("乾 · 一白", "西北生旺", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
-                    ("坎 · 五黄", "正北廉贞", UIColor(red: 1.0, green: 0.45, blue: 0.40, alpha: 0.95)),
-                    ("艮 · 三碧", "东北禄存", UIColor(red: 0.95, green: 0.75, blue: 0.35, alpha: 0.95))
-                ],
-                [
-                    ("兑 · 二黑", "正西病符（《紫白诀》象征）", UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)),
-                    ("中宫 · 九紫", "天心太极", UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1.0)),
-                    ("震 · 七赤", "正东破军", UIColor(red: 0.85, green: 0.85, blue: 0.92, alpha: 0.95))
-                ],
-                [
-                    ("坤 · 六白", "西南武曲", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
-                    ("离 · 四绿", "正南文昌", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)),
-                    ("巽 · 八白", "东南左辅", UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95))
+            let cGreen = UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)
+            let cRed = UIColor(red: 1.0, green: 0.45, blue: 0.40, alpha: 0.95)
+            let cAmber = UIColor(red: 0.95, green: 0.75, blue: 0.35, alpha: 0.95)
+            let cOrange = UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)
+            let cGold = UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1.0)
+            let cSilver = UIColor(red: 0.85, green: 0.85, blue: 0.92, alpha: 0.95)
+            let cells: [[(title: String, sub: String, color: UIColor)]]
+            switch LocalizationManager.shared.effectiveLanguage {
+            case .zhHans, .auto:
+                cells = [
+                    [("乾 · 一白", "西北生旺", cGreen), ("坎 · 五黄", "正北廉贞", cRed), ("艮 · 三碧", "东北禄存", cAmber)],
+                    [("兑 · 二黑", "正西病符", cOrange), ("中宫 · 九紫", "天心太极", cGold), ("震 · 七赤", "正东破军", cSilver)],
+                    [("坤 · 六白", "西南武曲", cGreen), ("离 · 四绿", "正南文昌", cGreen), ("巽 · 八白", "东南左辅", cGreen)]
                 ]
-            ]
+            case .zhHant:
+                cells = [
+                    [("乾 · 一白", "西北生旺", cGreen), ("坎 · 五黃", "正北廉貞", cRed), ("艮 · 三碧", "東北祿存", cAmber)],
+                    [("兌 · 二黑", "正西病符", cOrange), ("中宮 · 九紫", "天心太極", cGold), ("震 · 七赤", "正東破軍", cSilver)],
+                    [("坤 · 六白", "西南武曲", cGreen), ("離 · 四綠", "正南文昌", cGreen), ("巽 · 八白", "東南左輔", cGreen)]
+                ]
+            case .en:
+                cells = [
+                    [("Qian · 1W", "NW Future Qi", cGreen), ("Kan · 5Y", "N 5-Yellow", cRed), ("Gen · 3J", "NE 3-Jade", cAmber)],
+                    [("Dui · 2B", "W 2-Black", cOrange), ("Center · 9P", "Taiji Heart", cGold), ("Zhen · 7R", "E 7-Red", cSilver)],
+                    [("Kun · 6W", "SW 6-White", cGreen), ("Li · 4G", "S Wenchang", cGreen), ("Xun · 8W", "SE Wealth", cGreen)]
+                ]
+            case .ja:
+                cells = [
+                    [("乾・一白", "北西生旺", cGreen), ("坎・五黄", "正北廉貞", cRed), ("艮・三碧", "北東禄存", cAmber)],
+                    [("兌・二黒", "正西病符", cOrange), ("中宮・九紫", "天心太極", cGold), ("震・七赤", "正東破軍", cSilver)],
+                    [("坤・六白", "南西武曲", cGreen), ("離・四緑", "正南文昌", cGreen), ("巽・八白", "南東左輔", cGreen)]
+                ]
+            case .ko:
+                cells = [
+                    [("건 · 일백", "서북 생왕", cGreen), ("감 · 오황", "정북 염정", cRed), ("간 · 삼벽", "동북 녹존", cAmber)],
+                    [("태 · 이흑", "정서 병부", cOrange), ("중궁 · 구자", "천심 태극", cGold), ("진 · 칠적", "정동 파군", cSilver)],
+                    [("곤 · 육백", "서남 무곡", cGreen), ("리 · 사록", "정남 문창", cGreen), ("손 · 팔백", "동남 좌보", cGreen)]
+                ]
+            case .vi:
+                cells = [
+                    [("Càn · 1 Bạch", "Tây Bắc Sinh Khí", cGreen), ("Khảm · 5 Hoàng", "Chính Bắc Ngũ Hoàng", cRed), ("Cấn · 3 Bích", "Đông Bắc Lộc Tồn", cAmber)],
+                    [("Đoài · 2 Hắc", "Chính Tây Nhị Hắc", cOrange), ("Trung Cung · 9 Tử", "Thiên Tâm Thái Cực", cGold), ("Chấn · 7 Xích", "Chính Đông Phá Quân", cSilver)],
+                    [("Khôn · 6 Bạch", "Tây Nam Vũ Khúc", cGreen), ("Ly · 4 Lục", "Chính Nam Văn Xương", cGreen), ("Tốn · 8 Bạch", "Đông Nam Tả Phụ", cGreen)]
+                ]
+            case .th:
+                cells = [
+                    [("เฉียน · 1 ขาว", "พายัพเจริญ", cGreen), ("ข่าน · 5 เหลือง", "เหนือเบญจเหลือง", cRed), ("เกิ้น · 3 เขียว", "อีสานลู่ฉุน", cAmber)],
+                    [("ตุ้ย · 2 ดำ", "ตะวันตกดาวสองดำ", cOrange), ("กลาง · 9 ม่วง", "ศูนย์กลางไท่จี๋", cGold), ("เจิ้น · 7 แดง", "ตะวันออกโพ่จวิน", cSilver)],
+                    [("คุน · 6 ขาว", "หรดีอู่ชวี", cGreen), ("หลี · 4 เขียว", "ใต้เหวินชาง", cGreen), ("ซวิ่น · 8 ขาว", "อาคเนย์โชคลาภ", cGreen)]
+                ]
+            case .id:
+                cells = [
+                    [("Qian · 1-Putih", "BL Energi Maju", cGreen), ("Kan · 5-Kuning", "U 5-Kuning", cRed), ("Gen · 3-Giok", "TL 3-Giok", cAmber)],
+                    [("Dui · 2-Hitam", "B 2-Hitam", cOrange), ("Pusat · 9-Ungu", "Jantung Taiji", cGold), ("Zhen · 7-Merah", "T 7-Merah", cSilver)],
+                    [("Kun · 6-Putih", "BD 6-Putih", cGreen), ("Li · 4-Hijau", "S Wenchang", cGreen), ("Xun · 8-Putih", "TG Rezeki", cGreen)]
+                ]
+            }
 
             for r in 0..<3 {
                 for c in 0..<3 {
@@ -872,8 +936,19 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         // 合并手动角落打点生成的精准房间（Corner-pin Polygon）
         rooms3D.append(contentsOf: cornerRooms)
 
+        let scanMethodTitle: String
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans, .auto: scanMethodTitle = "AR 平面测绘（基础）"
+        case .zhHant: scanMethodTitle = "AR 平面測繪（基礎）"
+        case .en:     scanMethodTitle = "AR Plane Survey (Basic)"
+        case .ja:     scanMethodTitle = "AR 平面測距（基本）"
+        case .ko:     scanMethodTitle = "AR 평면 측량 (기본)"
+        case .vi:     scanMethodTitle = "Khảo sát mặt phẳng AR"
+        case .th:     scanMethodTitle = "สำรวจระนาบ AR (พื้นฐาน)"
+        case .id:     scanMethodTitle = "Survei Bidang AR (Dasar)"
+        }
         let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(
-            scanMethod: "AR 平面测绘（基础）",
+            scanMethod: scanMethodTitle,
             walls: walls3D,
             openings: openings3D,
             beams: beams3D,
@@ -1039,7 +1114,19 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             border.lineWidth = 2.5
             border.stroke()
 
-            "演象 · AR 三维全息空间与 LiDAR 勘舆存证".draw(
+            let curLang = lang.effectiveLanguage
+            let imgTitle: String
+            switch curLang {
+            case .zhHans, .auto: imgTitle = "演象 · AR 三维全息空间与 LiDAR 勘舆存证"
+            case .zhHant: imgTitle = "演象 · AR 三維全息空間與 LiDAR 勘輿存證"
+            case .en:     imgTitle = "TianJi · 3D AR & LiDAR Spatial Survey Certificate"
+            case .ja:     imgTitle = "天機演象・AR 3D空間＆LiDAR風水計測証憑"
+            case .ko:     imgTitle = "천기연상 · AR 3D 공간 및 LiDAR 풍수 측량 증빙"
+            case .vi:     imgTitle = "Thiên Cơ · Chứng Thực Đo Đạc Không Gian 3D AR & LiDAR"
+            case .th:     imgTitle = "เทียนจี · หลักฐานการสำรวจมิติ 3D AR & LiDAR"
+            case .id:     imgTitle = "TianJi · Bukti Survei Ruang 3D AR & LiDAR"
+            }
+            imgTitle.draw(
                 at: CGPoint(x: 70, y: size.height - 392),
                 withAttributes: [
                     .font: UIFont.boldSystemFont(ofSize: 32),
@@ -1048,21 +1135,91 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             )
 
             var lines: [String] = []
-            lines.append("坐向山度: \(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) (\(String(format: "%.1f°", state.facingAngle))) · \(state.kongWangLevel.localizedTitle)")
+            let sitM = state.sittingMountain.localizedName
+            let facM = state.facingMountain.localizedName
+            let degS = String(format: "%.1f°", state.facingAngle)
+            let kwS = state.kongWangLevel.localizedTitle
+            switch curLang {
+            case .zhHans, .auto:
+                lines.append("坐向山度: \(sitM)\(lang.t("mountain_suffix"))\(facM)\(lang.t("facing_suffix")) (\(degS)) · \(kwS)")
+            case .zhHant:
+                lines.append("坐向山度: \(sitM)\(lang.t("mountain_suffix"))\(facM)\(lang.t("facing_suffix")) (\(degS)) · \(kwS)")
+            case .en:
+                lines.append("Orientation: Sit \(sitM) Face \(facM) (\(degS)) · \(kwS)")
+            case .ja:
+                lines.append("座向角度: \(sitM)山\(facM)向 (\(degS)) ・ \(kwS)")
+            case .ko:
+                lines.append("좌향 각도: \(sitM)산 \(facM)향 (\(degS)) · \(kwS)")
+            case .vi:
+                lines.append("Tọa hướng: Tọa \(sitM) Hướng \(facM) (\(degS)) · \(kwS)")
+            case .th:
+                lines.append("ทิศนั่ง-หัน: พิง\(sitM) หัน\(facM) (\(degS)) · \(kwS)")
+            case .id:
+                lines.append("Orientasi: Duduk \(sitM) Hadap \(facM) (\(degS)) · \(kwS)")
+            }
             if let d = distance {
-                lines.append("天心测距: \(lidarAvailable ? "LiDAR" : "AR") \(String(format: "%.2f m", d)) · 识别平面: \(planeCount) 处 (网格 \(meshAnchorCount))")
+                let sensorTag = lidarAvailable ? "LiDAR" : "AR"
+                let dStr = String(format: "%.2f m", d)
+                switch curLang {
+                case .zhHans, .auto: lines.append("天心测距: \(sensorTag) \(dStr) · 识别平面: \(planeCount) 处 (网格 \(meshAnchorCount))")
+                case .zhHant: lines.append("天心測距: \(sensorTag) \(dStr) · 識別平面: \(planeCount) 處 (網格 \(meshAnchorCount))")
+                case .en:     lines.append("Center Range: \(sensorTag) \(dStr) · Planes: \(planeCount) (Mesh \(meshAnchorCount))")
+                case .ja:     lines.append("天心測距: \(sensorTag) \(dStr) ・ 検出平面: \(planeCount)箇所 (メッシュ \(meshAnchorCount))")
+                case .ko:     lines.append("천심 거리: \(sensorTag) \(dStr) · 감지 평면: \(planeCount)곳 (메시 \(meshAnchorCount))")
+                case .vi:     lines.append("Đo tâm: \(sensorTag) \(dStr) · Mặt phẳng: \(planeCount) (Lưới \(meshAnchorCount))")
+                case .th:     lines.append("ระยะจุดกลาง: \(sensorTag) \(dStr) · ระนาบ: \(planeCount) จุด (เมช \(meshAnchorCount))")
+                case .id:     lines.append("Jarak Pusat: \(sensorTag) \(dStr) · Bidang: \(planeCount) (Mesh \(meshAnchorCount))")
+                }
             }
             if let standing = currentStandingPalace {
-                lines.append("九宫踏勘: \(standing)")
+                switch curLang {
+                case .zhHans, .auto: lines.append("九宫踏勘: \(standing)")
+                case .zhHant: lines.append("九宮踏勘: \(standing)")
+                case .en:     lines.append("9-Palace Sector: \(standing)")
+                case .ja:     lines.append("九宮踏査: \(standing)")
+                case .ko:     lines.append("구궁 답사: \(standing)")
+                case .vi:     lines.append("Cửu cung hiện tại: \(standing)")
+                case .th:     lines.append("ตำแหน่งเก้าเรือน: \(standing)")
+                case .id:     lines.append("Sektor 9-Istana: \(standing)")
+                }
             }
             if let eval = lubanEvaluation {
-                lines.append("三维鲁班: \(eval.localizedSummary(for: lang.effectiveLanguage))")
+                let evalStr = eval.localizedSummary(for: lang.effectiveLanguage)
+                switch curLang {
+                case .zhHans, .auto: lines.append("三维鲁班: \(evalStr)")
+                case .zhHant: lines.append("三維魯班: \(evalStr)")
+                case .en:     lines.append("3D Lu Ban: \(evalStr)")
+                case .ja:     lines.append("3D魯班尺: \(evalStr)")
+                case .ko:     lines.append("3D 노반척: \(evalStr)")
+                case .vi:     lines.append("Lỗ Ban 3D: \(evalStr)")
+                case .th:     lines.append("หลู่ปาน 3D: \(evalStr)")
+                case .id:     lines.append("Lu Ban 3D: \(evalStr)")
+                }
             }
             if let h = estimatedRoomHeightMeters {
-                let beamTag = hasLowBeamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"
-                lines.append(String(format: "空间净高: %.2f m (%@)", h, beamTag))
+                let beamTag = hasLowBeamWarning ? lang.t("ar_spatial_beam_warning") : lang.t("ar_spatial_ceiling_good")
+                let hStr = String(format: "%.2f m", h)
+                switch curLang {
+                case .zhHans, .auto: lines.append("空间净高: \(hStr) (\(beamTag))")
+                case .zhHant: lines.append("空間淨高: \(hStr) (\(beamTag))")
+                case .en:     lines.append("Clear Height: \(hStr) (\(beamTag))")
+                case .ja:     lines.append("有効天井高: \(hStr) (\(beamTag))")
+                case .ko:     lines.append("실내 유효 층고: \(hStr) (\(beamTag))")
+                case .vi:     lines.append("Cao thông thủy: \(hStr) (\(beamTag))")
+                case .th:     lines.append("ความสูงเพดาน: \(hStr) (\(beamTag))")
+                case .id:     lines.append("Tinggi Plafon: \(hStr) (\(beamTag))")
+                }
             }
-            lines.append("定位与真太阳时: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            switch curLang {
+            case .zhHans, .auto: lines.append("定位与真太阳时: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .zhHant: lines.append("定位與真太陽時: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .en:     lines.append("GPS & True Solar Time: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .ja:     lines.append("測位・真太陽時: \(motion.coordsDesc) ・ \(motion.trueSolarTimeStr)")
+            case .ko:     lines.append("위치 및 진태양시: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .vi:     lines.append("Tọa độ & Giờ Mặt Trời: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .th:     lines.append("พิกัดและเวลาสุริยะจริง: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            case .id:     lines.append("GPS & Waktu Surya Sejati: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
+            }
 
             let bodyText = lines.joined(separator: "\n")
             bodyText.draw(
@@ -2459,7 +2616,7 @@ public struct ARSpatialSurveyView: View {
                         .background(Color.yanGold)
                         .cornerRadius(14)
                     }
-                    .accessibilityLabel("查看当前实测全屋3D空间布局与形煞")
+                    .accessibilityLabel(lang.t("ar_spatial_3d_btn"))
                     Button(action: {
                         if !iap.hasUnlockedVIP {
                             showPaywall = true
@@ -2514,7 +2671,7 @@ public struct ARSpatialSurveyView: View {
                             .background(model.cornerPinActive ? Color.orange : Color.black.opacity(0.55))
                             .clipShape(Circle())
                     }
-                    .accessibilityLabel("手动角落打点测绘（Corner-pin Polygon）")
+                    .accessibilityLabel(lang.t("ar_spatial_measure"))
                     if model.cornerPinActive {
                         Button(action: { _ = model.pinCornerPoint() }) {
                             VStack(spacing: 1) {
@@ -2528,7 +2685,7 @@ public struct ARSpatialSurveyView: View {
                             .background(Color.orange.opacity(0.85))
                             .clipShape(Circle())
                         }
-                        .accessibilityLabel("落一个墙角点")
+                        .accessibilityLabel(lang.t("ar_luban_point_a"))
                         Button(action: { _ = model.finishCornerRoom() }) {
                             Text(lang.t("done"))
                                 .adaptiveFont(size: 10, weight: .bold)
@@ -2540,7 +2697,7 @@ public struct ARSpatialSurveyView: View {
                         }
                         .disabled(model.cornerPoints.count < 3)
                         .opacity(model.cornerPoints.count < 3 ? 0.4 : 1.0)
-                        .accessibilityLabel("完成当前打点房间")
+                        .accessibilityLabel(lang.t("done"))
                         Button(action: { model.clearCornerPins() }) {
                             Image(systemName: "trash")
                                 .adaptiveFont(size: 11, weight: .bold)
@@ -2549,7 +2706,7 @@ public struct ARSpatialSurveyView: View {
                                 .background(Color.red.opacity(0.75))
                                 .clipShape(Circle())
                         }
-                        .accessibilityLabel("清空当前打点")
+                        .accessibilityLabel(lang.t("ar_panorama_clear"))
                     }
                     Button(action: {
                         model.toggleMeshVisibility()
@@ -2795,7 +2952,7 @@ public struct ARSpatialSurveyView: View {
         .sheet(isPresented: $show3DSpaceViewer) {
             if let survey = currentSurveyReport {
                 VStack(spacing: 0) {
-                    if survey.scanMethod.contains("基础") {
+                    if survey.scanMethod.contains("基础") || survey.scanMethod.contains("基礎") || survey.scanMethod.contains("基本") || survey.scanMethod.contains("기본") || survey.scanMethod.localizedCaseInsensitiveContains("Basic") || survey.scanMethod.localizedCaseInsensitiveContains("Dasar") || survey.scanMethod.localizedCaseInsensitiveContains("พื้นฐาน") || survey.scanMethod.localizedCaseInsensitiveContains("mặt phẳng") {
                         Text(lang.t("ar_spatial_basic_notice"))
                             .adaptiveFont(size: 10, weight: .semibold)
                             .foregroundColor(.orange)

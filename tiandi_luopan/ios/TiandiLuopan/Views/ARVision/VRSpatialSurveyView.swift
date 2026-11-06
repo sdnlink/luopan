@@ -602,8 +602,19 @@ public struct VRSpatialSurveyView: View {
         }
 
         let heading = initialSurveyHeading ?? CompassMotionManager.shared.headingState.facingAngle
+        let scanMethodTitle: String
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans, .auto: scanMethodTitle = "VR 仿真测绘"
+        case .zhHant: scanMethodTitle = "VR 仿真測繪"
+        case .en:     scanMethodTitle = "VR Spatial Simulation"
+        case .ja:     scanMethodTitle = "VR 空間シミュレーション"
+        case .ko:     scanMethodTitle = "VR 공간 시뮬레이션"
+        case .vi:     scanMethodTitle = "Mô phỏng không gian VR"
+        case .th:     scanMethodTitle = "จำลองพื้นที่ VR"
+        case .id:     scanMethodTitle = "Simulasi Ruang VR"
+        }
         let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(
-            scanMethod: "VR 仿真测绘",
+            scanMethod: scanMethodTitle,
             walls: walls3D,
             openings: openings3D,
             beams: [],

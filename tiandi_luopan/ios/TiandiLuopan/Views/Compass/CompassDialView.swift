@@ -216,17 +216,22 @@ public struct CompassDialView: View {
 
             ForEach(SolarTermsData.shared.terms) { term in
                 VStack(spacing: 0) {
-                    Text(term.localizedName)
+                    Text(term.localizedDialName)
                         .adaptiveFont(size: 7 * grow, weight: term.isMajorTerm ? .bold : .regular)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
                         .foregroundColor(term.name == motion.currentSolarTermName
                             ? Color.black
                             : (term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65)))
                     if let hex = term.localizedHexagramLabel {
                         Text(hex)
                             .adaptiveFont(size: 6 * grow, weight: .bold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
                             .foregroundColor(term.name == motion.currentSolarTermName ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
                     }
                 }
+                .frame(width: radius * 0.24)
                 .offset(y: -radius + 6 * grow)
                 .rotationEffect(.degrees(term.angleCenter))
             }
@@ -289,9 +294,12 @@ public struct CompassDialView: View {
     // MARK: - 六十四卦分金环
     private func hexagramsLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(hexagrams) { hex in
-            Text(hex.localizedName.prefix(2))
+            Text(hex.localizedDialLabel)
                 .adaptiveFont(size: 7 * grow, weight: .semibold, design: .serif)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
+                .frame(width: radius * 0.092)
                 .offset(y: -radius + 8 * grow)
                 .rotationEffect(.degrees(hex.angleCenter))
         }
@@ -371,7 +379,10 @@ public struct CompassDialView: View {
         return ForEach(guas) { item in
             Text(lang.t(item.key))
                 .adaptiveFont(size: 14 * grow, weight: .black, design: .serif)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
                 .foregroundColor(Color(red: 0.85, green: 0.72, blue: 0.35))
+                .frame(width: radius * 0.42)
                 .offset(y: -radius + 12 * grow)
                 .rotationEffect(.degrees(item.angle))
         }

@@ -153,24 +153,29 @@ public final class ZeRiEngine {
         var suiPo: String? = nil
         var yuePo: String? = nil
         var sittingClash: String? = nil
+
+        let enBranches = ["子": "Zi", "丑": "Chou", "寅": "Yin", "卯": "Mao", "辰": "Chen", "巳": "Si", "午": "Wu", "未": "Wei", "申": "Shen", "酉": "You", "戌": "Xu", "亥": "Hai"]
+        let koBranchesMap = ["子": "자", "丑": "축", "寅": "인", "卯": "묘", "辰": "진", "巳": "사", "午": "오", "未": "미", "申": "신", "酉": "유", "戌": "술", "亥": "해"]
+        let viBranchesMap = ["子": "Tý", "丑": "Sửu", "寅": "Dần", "卯": "Mão", "辰": "Thìn", "巳": "Tỵ", "午": "Ngọ", "未": "Mùi", "申": "Thân", "酉": "Dậu", "戌": "Tuất", "亥": "Hợi"]
+        let thBranchesMap = ["子": "จื่อ", "丑": "โฉ่ว", "寅": "หยิน", "卯": "เหมา", "辰": "เฉิน", "巳": "ซื่อ", "午": "อู่", "未": "เว่ย", "申": "เซิน", "酉": "โหย่ว", "戌": "ซวี", "亥": "ฮ่าย"]
         
         // 岁破冲煞：日支冲太岁年支
         if clashMap[dayBranch] == yearBranch {
             switch lang {
             case .en:
-                suiPo = "Day branch clashes with Year Grand Duke (\(yearBranch)); Year Clash Taboo."
+                suiPo = "Day branch (\(enBranches[dayBranch] ?? dayBranch)) clashes with Year Grand Duke (\(enBranches[yearBranch] ?? yearBranch)); Year Clash Taboo."
             case .zhHant:
                 suiPo = "今日【\(dayBranch)日】直衝年支太歲【\(yearBranch)位】，犯【歲破大煞】，主百事不利。"
             case .ja:
                 suiPo = "本日【\(dayBranch)日】が太歳【\(yearBranch)位】と直衝し、【歳破大煞】となります。"
             case .ko:
-                suiPo = "오늘【\(dayBranch)일】이 세차 태세【\(yearBranch)위】와 직충하여 【세파대살】을 범합니다."
+                suiPo = "오늘【\(koBranchesMap[dayBranch] ?? dayBranch)일】이 세차 태세【\(koBranchesMap[yearBranch] ?? yearBranch)위】와 직충하여 【세파대살】을 범합니다."
             case .vi:
-                suiPo = "Hôm nay ngày 【\(dayBranch)】 trực xung Thái Tuế năm 【\(yearBranch)】 phạm 【Tuế Phá Đại Sát】."
+                suiPo = "Hôm nay ngày 【\(viBranchesMap[dayBranch] ?? dayBranch)】 trực xung Thái Tuế năm 【\(viBranchesMap[yearBranch] ?? yearBranch)】, phạm 【Tuế Phá Đại Sát】."
             case .th:
-                suiPo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะไท่ส่วยประจำปี 【\(yearBranch)】 ติดขัดเคราะห์【ส่วยพั่ว】"
+                suiPo = "วันนี้กิ่งดินวัน【\(thBranchesMap[dayBranch] ?? dayBranch)】ปะทะไท่ส่วยประจำปี【\(thBranchesMap[yearBranch] ?? yearBranch)】 ติดขัดเคราะห์【ส่วยพั่ว】"
             case .id:
-                suiPo = "Cabang hari bentrok dengan Tai Sui tahunan (\(yearBranch)); Tabu Benturan Tahun."
+                suiPo = "Cabang hari (\(enBranches[dayBranch] ?? dayBranch)) bentrok dengan Tai Sui tahunan (\(enBranches[yearBranch] ?? yearBranch)); Tabu Benturan Tahun."
             case .auto, .zhHans:
                 suiPo = "今日【\(dayBranch)日】直冲年支太岁【\(yearBranch)位】，犯【岁破大煞】，主百事不利。"
             }
@@ -181,19 +186,19 @@ public final class ZeRiEngine {
         if clashMap[dayBranch] == mBranch {
             switch lang {
             case .en:
-                yuePo = "Day branch clashes with Month Commander (\(mBranch)); Month Clash Taboo."
+                yuePo = "Day branch (\(enBranches[dayBranch] ?? dayBranch)) clashes with Month Commander (\(enBranches[mBranch] ?? mBranch)); Month Clash Taboo."
             case .zhHant:
                 yuePo = "今日【\(dayBranch)日】直衝月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
             case .ja:
                 yuePo = "本日【\(dayBranch)日】が月建【\(mBranch)位】と直衝し、【月破大耗】となります。"
             case .ko:
-                yuePo = "오늘【\(dayBranch)일】이 월령 월건【\(mBranch)위】과 직충하여 【월파대모】를 범합니다."
+                yuePo = "오늘【\(koBranchesMap[dayBranch] ?? dayBranch)일】이 월령 월건【\(koBranchesMap[mBranch] ?? mBranch)위】과 직충하여 【월파대모】를 범합니다."
             case .vi:
-                yuePo = "Hôm nay ngày 【\(dayBranch)】 trực xung Nguyệt Lệnh 【\(mBranch)】 phạm 【Nguyệt Phá Đại Hao】."
+                yuePo = "Hôm nay ngày 【\(viBranchesMap[dayBranch] ?? dayBranch)】 trực xung Nguyệt Lệnh 【\(viBranchesMap[mBranch] ?? mBranch)】, phạm 【Nguyệt Phá Đại Hao】."
             case .th:
-                yuePo = "วันนี้กิ่งดินวัน 【\(dayBranch)】 ปะทะประจำเดือน 【\(mBranch)】 ติดขัดเคราะห์【เยว่พั่ว】"
+                yuePo = "วันนี้กิ่งดินวัน【\(thBranchesMap[dayBranch] ?? dayBranch)】ปะทะประจำเดือน【\(thBranchesMap[mBranch] ?? mBranch)】 ติดขัดเคราะห์【เยว่พั่ว】"
             case .id:
-                yuePo = "Cabang hari bentrok dengan Penguasa Bulan (\(mBranch)); Tabu Benturan Bulan."
+                yuePo = "Cabang hari (\(enBranches[dayBranch] ?? dayBranch)) bentrok dengan Penguasa Bulan (\(enBranches[mBranch] ?? mBranch)); Tabu Benturan Bulan."
             case .auto, .zhHans:
                 yuePo = "今日【\(dayBranch)日】直冲月令月建【\(mBranch)位】，犯【月破大耗】，凡事避忌。"
             }
@@ -217,19 +222,19 @@ public final class ZeRiEngine {
         if let sClash = clashMap[sittingBranch], sClash == dayBranch {
             switch lang {
             case .en:
-                sittingClash = "Day branch clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
+                sittingClash = "Day branch (\(enBranches[dayBranch] ?? dayBranch)) clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
             case .zhHant:
                 sittingClash = "今日日支【\(dayBranch)】直衝本宅坐山【\(sitting.localizedName)山】，犯【衝山大忌】，切勿動土安門！"
             case .ja:
                 sittingClash = "本日の日支【\(dayBranch)】が坐山【\(sitting.localizedName)山】と直衝し、【衝山大忌】に該当します。"
             case .ko:
-                sittingClash = "오늘 일진【\(dayBranch)】이 좌산【\(sitting.localizedName)산】과 직충하여 【충산대기】를 범하니 동토와 안문을 피하세요!"
+                sittingClash = "오늘 일진【\(koBranchesMap[dayBranch] ?? dayBranch)】이 좌산【\(sitting.localizedName)산】과 직충하여 【충산대기】를 범하니 동토와 안문을 피하세요!"
             case .vi:
-                sittingClash = "Hôm nay chi ngày 【\(dayBranch)】 trực xung Tọa sơn 【\(sitting.localizedName)】 phạm 【Xung Sơn Đại Kỵ】!"
+                sittingClash = "Hôm nay chi ngày 【\(viBranchesMap[dayBranch] ?? dayBranch)】 trực xung Tọa sơn 【\(sitting.localizedName)】 phạm 【Xung Sơn Đại Kỵ】!"
             case .th:
-                sittingClash = "กิ่งดินวัน 【\(dayBranch)】 ปะทะทิศพิงบ้าน 【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
+                sittingClash = "กิ่งดินวัน【\(thBranchesMap[dayBranch] ?? dayBranch)】ปะทะทิศพิงบ้าน【\(sitting.localizedName)】 ต้องห้ามการลงเสาเอกตั้งประตูเด็ดขาด!"
             case .id:
-                sittingClash = "Cabang hari bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
+                sittingClash = "Cabang hari (\(enBranches[dayBranch] ?? dayBranch)) bentrok dengan Gunung Sandaran (\(sitting.localizedName)); Hindari renovasi dan pasang pintu!"
             case .auto, .zhHans:
                 sittingClash = "今日日支【\(dayBranch)】直冲本宅坐山【\(sitting.name)山】，犯【冲山大忌】，切勿动土安门！"
             }

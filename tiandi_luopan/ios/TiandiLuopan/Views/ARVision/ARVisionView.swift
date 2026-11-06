@@ -1052,12 +1052,12 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角、二十四山与目标点 LiDAR 距离)
-    private func targetBoundingBoxLayer() -> some View {
-        guard shaList.indices.contains(activeShaIndex) else { return EmptyView() }
+    private func targetBoundingBoxLayer() -> AnyView {
+        guard shaList.indices.contains(activeShaIndex) else { return AnyView(EmptyView()) }
         let currentSha = shaList[activeShaIndex]
         let m = targetMountain
         
-        return GeometryReader { proxy in
+        return AnyView(GeometryReader { proxy in
             let detectedOffset = CGSize(
                 width: (targetNormalizedPoint.x - 0.5) * proxy.size.width,
                 height: (targetNormalizedPoint.y - 0.5) * proxy.size.height
@@ -1162,6 +1162,7 @@ public struct ARVisionView: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        )
     }
     
     // MARK: - 顶栏信息与镜头翻转控制
@@ -1377,12 +1378,12 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 底部形煞研判卡 (支持朝向智能跟随与手动点选)
-    private func bottomShaControlPanel() -> some View {
-        guard shaList.indices.contains(activeShaIndex) else { return EmptyView() }
+    private func bottomShaControlPanel() -> AnyView {
+        guard shaList.indices.contains(activeShaIndex) else { return AnyView(EmptyView()) }
         let currentIdx = activeShaIndex
         let sha = shaList[currentIdx]
         
-        return VStack(spacing: 8) {
+        return AnyView(VStack(spacing: 8) {
             HStack {
                 Button(action: {
                     isAutoFollowingDirection.toggle()
@@ -1534,6 +1535,7 @@ public struct ARVisionView: View {
             }
             .padding(.horizontal, 4)
         }
+        )
     }
 
     private func runAIScan() {

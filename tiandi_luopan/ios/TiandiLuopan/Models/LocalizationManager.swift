@@ -166,7 +166,9 @@ public class LocalizationManager: ObservableObject {
     }
     
     // MARK: - 字符串本地化快速查询
-    /// 记录启动后已报警的缺失 key，避免重复刷屏日志
+    /// 记录启动后已报警的缺失 key，避免重复刷屏日志。
+    /// t() 会被主线程 UI 与后台长卷渲染同时调用，Set 非线程安全，需加锁保护。
+    private let missingKeysLock = NSLock()
     private var loggedMissingKeys: Set<String> = []
 
     public func t(_ key: String) -> String {
@@ -178,7 +180,10 @@ public class LocalizationManager: ObservableObject {
         }
         // 漏译兜底：仍返回原始 key（不崩溃），但每个缺失 key 仅记录一次，
         // 便于在设备控制台 / 崩溃上报中捕获，后续补全翻译。
-        if loggedMissingKeys.insert(key).inserted {
+        missingKeysLock.lock()
+        let shouldLog = loggedMissingKeys.insert(key).inserted
+        missingKeysLock.unlock()
+        if shouldLog {
             NSLog("[i18n] missing key: \(key) (lang=\(effectiveLanguage))")
         }
         return key

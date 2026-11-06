@@ -297,7 +297,7 @@ public struct CompassDialView: View {
             Text(hex.localizedDialLabel)
                 .adaptiveFont(size: 9 * grow, weight: .semibold, design: .serif)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.5)
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
                 .frame(width: radius * 0.092)
                 .offset(y: -radius + 8 * grow)
@@ -334,12 +334,12 @@ public struct CompassDialView: View {
                     Text(m.localizedName)
                         .adaptiveFont(size: (isMainBranch ? 16 : 13) * grow, weight: .bold, design: .serif)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.65)
                         .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
                     Text(m.localizedElement)
                         .adaptiveFont(size: 9 * grow, weight: .medium)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.65)
                         .foregroundColor(Color.white.opacity(0.8))
                 }
                 // 24 山标签是"山名 + 五行"两行：高度随系统字号与盘径放大。
@@ -348,7 +348,7 @@ public struct CompassDialView: View {
                 // 标签宽度必须小于圆周上每个标签的节距：
                 // 24 个标签均分 2π·radius，节距 ≈ 0.262·radius，留 15% 间隙取 0.222。
                 // 旧值 radius*0.25 叠加旋转后相邻标签必然互相压叠。
-                .frame(width: min(max(28, radius * 0.24), radius * 0.25),
+                .frame(width: min(max(24 * grow, radius * 0.25), radius * 0.222),
                        height: labelHeight)
                 .offset(y: -radius + 14 * grow + (labelHeight - scaledBaseHeight) / 2)
                 .rotationEffect(.degrees(m.angleCenter))

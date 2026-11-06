@@ -1044,6 +1044,16 @@ public struct FloorplanView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .adaptiveFont(size: 12)
                 .frame(width: 64)
+                .toolbar {
+                    ToolbarItem(placement: .keyboard) {
+                        HStack {
+                            Spacer()
+                            Button(lang.t("done")) {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                        }
+                    }
+                }
             Text("×")
                 .adaptiveFont(size: 10)
                 .foregroundColor(.white.opacity(0.5))
@@ -1052,6 +1062,16 @@ public struct FloorplanView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .adaptiveFont(size: 12)
                 .frame(width: 64)
+                .toolbar {
+                    ToolbarItem(placement: .keyboard) {
+                        HStack {
+                            Spacer()
+                            Button(lang.t("done")) {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                        }
+                    }
+                }
             if let area = estimatedAreaSqm {
                 Text(String(format: "≈ %.1f ㎡", area))
                     .adaptiveFont(size: 10, weight: .bold)

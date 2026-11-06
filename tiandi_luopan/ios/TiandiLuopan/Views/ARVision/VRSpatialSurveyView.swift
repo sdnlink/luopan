@@ -445,6 +445,16 @@ public struct VRSpatialSurveyView: View {
                 .adaptiveFont(size: 11, design: .monospaced)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.trailing)
+                .toolbar {
+                    ToolbarItem(placement: .keyboard) {
+                        HStack {
+                            Spacer()
+                            Button(lang.t("done")) {
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                        }
+                    }
+                }
                 .frame(width: 42)
         }
         .padding(.horizontal, 5)

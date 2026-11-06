@@ -340,7 +340,7 @@ public struct CompassDialView: View {
                         .adaptiveFont(size: 9 * grow, weight: .medium)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
-                        .foregroundColor(Color.white.opacity(0.5))
+                        .foregroundColor(Color.white.opacity(0.8))
                 }
                 // 24 山标签是"山名 + 五行"两行：高度随系统字号与盘径放大。
                 // 外沿固定：标签变高时中心向盘心方向补偿一半增量，

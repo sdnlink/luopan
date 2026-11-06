@@ -1104,7 +1104,7 @@ public class TianJiShuEngine {
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
             }) { success, error in
                 DispatchQueue.main.async {
-                    completion(success, success ? message : (error?.localizedDescription ?? failure))
+                    completion(success, success ? message : failure)
                 }
             }
         }

@@ -90,10 +90,10 @@ public struct CompassMainView: View {
                         }
                     } else {
                         // 单列宽屏（iPad 竖屏 / Duo 折叠外屏）下底部卡片会被拉得很宽，
-                        // 收在 720pt（与户型/设置同一套内容宽度口径）后居中；
+                        // 收在 900pt（与户型/设置同一套内容宽度口径）后居中；
                         // iPad 横屏走上面的右栏工作台分支，不会到这里。
                         bottomStatusCard()
-                            .frame(maxWidth: 720)
+                            .frame(maxWidth: 900)
                             .padding(.horizontal, 16)
                             .frame(maxWidth: .infinity)
                             .padding(.bottom, 8)

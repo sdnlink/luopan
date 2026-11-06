@@ -212,7 +212,9 @@ public struct FloorplanView: View {
                         auditListSection(report: auditResult.report)
                             .frame(maxWidth: contentMax)
                     }
-                    .padding(.horizontal, isLargeLayout ? 16 : 0)
+                    .frame(maxWidth: .infinity)
+                    // 内块 auditListSection 已自带 .padding(.horizontal, 16)，
+                    // 外层不再加横向 padding，避免 iPad 右栏双层 16pt 把卡片内容压窄。
                     .padding(.bottom, 16)
 
                     if isSplitLayout {
@@ -221,6 +223,7 @@ public struct FloorplanView: View {
                             ScrollView { mainColumn }
                         } analysis: {
                             ScrollView { auditColumn }
+                                .frame(maxWidth: .infinity)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
@@ -232,8 +235,10 @@ public struct FloorplanView: View {
                                 mainColumn
                                 auditColumn
                             }
+                            .frame(maxWidth: .infinity)
                             .padding(.top, 8)
                         }
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -2315,6 +2320,7 @@ public struct FloorplanView: View {
                         targetProductId: .floorplanSingle,
                         onUnlockTap: { showPaywall = true }
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
                     // 免费展示首条体检概览
                     if let firstItem = report.first {
@@ -2326,9 +2332,11 @@ public struct FloorplanView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private func auditItemRow(item: FloorplanAuditItem) -> some View {
@@ -2345,6 +2353,7 @@ public struct FloorplanView: View {
                         .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text(item.isSevere ? lang.t("floorplan_severe_sha") : (item.isGood ? lang.t("grade_auspicious") : lang.t("floorplan_warn_sha")))
                         .adaptiveFont(size: 10, weight: .bold)
                         .fixedSize(horizontal: false, vertical: true)
@@ -2354,15 +2363,24 @@ public struct FloorplanView: View {
                         .foregroundColor(item.isSevere ? .red : (item.isGood ? .green : .orange))
                         .cornerRadius(4)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 Text(item.lore)
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.75))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
                 Text("\(lang.t("floorplan_solution_prefix")) \(item.solution)")
                     .adaptiveFont(size: 10)
                     .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
         .cornerRadius(8)
     }

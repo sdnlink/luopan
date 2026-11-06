@@ -143,28 +143,32 @@ public struct CompassMainView: View {
                     Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
                 }
                 .adaptiveFont(size: 11, weight: .bold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .background(motion.isLocked ? Color.red.opacity(0.2) : Color.white.opacity(0.1))
                 .foregroundColor(motion.isLocked ? .red : .white)
                 .cornerRadius(6)
             }
-            
+            .accessibilityLabel(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
+
             // 空亡全景诊断
             Button(action: {
                 showKongwangSheet = true
             }) {
                 HStack(spacing: 3) {
-                    Circle().fill(kwColor).frame(width: 5, height: 5)
+                    Circle().fill(kwColor).frame(width: 6, height: 6)
                     Text(kwStatus)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
                 }
                 .adaptiveFont(size: 11, weight: .bold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .background(kwColor.opacity(0.15))
                 .foregroundColor(kwColor)
                 .cornerRadius(6)
             }
+            .accessibilityLabel(kwStatus)
             
             Spacer()
             
@@ -177,13 +181,13 @@ public struct CompassMainView: View {
                     Text(lang.t("btn_calib"))
                 }
                 .adaptiveFont(size: 11, weight: .medium)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
                 .background(Color.white.opacity(0.08))
                 .foregroundColor(motion.isDistorted ? Color.orange : Color(red: 0.95, green: 0.82, blue: 0.4))
                 .cornerRadius(6)
             }
-            
+
             // 图层设置
             Button(action: {
                 showLayerSheet = true
@@ -193,8 +197,8 @@ public struct CompassMainView: View {
                     Text(lang.t("btn_layers"))
                 }
                 .adaptiveFont(size: 11, weight: .medium)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
                 .background(Color.white.opacity(0.08))
                 .foregroundColor(Color.yanCyan)
                 .cornerRadius(6)
@@ -288,7 +292,7 @@ public struct CompassMainView: View {
                     Text("\(lang.t("roll_label")) \(String(format: "%.1f°", motion.roll))")
                     Text(String(format: "%.0f μT", motion.magneticStrengthUT))
                 }
-                .adaptiveFont(size: 10)
+                .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.6))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -312,7 +316,7 @@ public struct CompassMainView: View {
                             .minimumScaleFactor(0.7)
                         Spacer(minLength: 4)
                         Text(fenjin.localizedGrade)
-                            .adaptiveFont(size: 9, weight: .bold)
+                            .adaptiveFont(size: 10, weight: .bold)
                             .fixedSize(horizontal: false, vertical: true)
                             .minimumScaleFactor(0.8)
                             .padding(.horizontal, 5)
@@ -363,7 +367,7 @@ public struct CompassMainView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 4)
                         Text(hex.localizedLuckDegree)
-                            .adaptiveFont(size: 9, weight: .bold)
+                            .adaptiveFont(size: 10, weight: .bold)
                             .fixedSize(horizontal: false, vertical: true)
                             .minimumScaleFactor(0.8)
                             .padding(.horizontal, 5)
@@ -393,7 +397,7 @@ public struct CompassMainView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 6) {
                         Text(lang.t(kwGradeKey))
-                            .adaptiveFont(size: 9, weight: .bold)
+                            .adaptiveFont(size: 10, weight: .bold)
                             .fixedSize(horizontal: false, vertical: true)
                             .minimumScaleFactor(0.8)
                             .fixedSize(horizontal: false, vertical: true)

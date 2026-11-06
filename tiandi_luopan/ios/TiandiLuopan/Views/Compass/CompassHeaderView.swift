@@ -109,23 +109,25 @@ public struct CompassHeaderView: View {
                 motion.resetManualOffset()
             }) {
                 Image(systemName: "arrow.triangle.2.circlepath")
-                    .adaptiveFont(size: 13, weight: .bold)
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
                     .background(Color.white.opacity(0.12))
                     .clipShape(Circle())
             }
+            .accessibilityLabel(lang.t("btn_reset_heading"))
 
             Button(action: {
                 motion.toggleLock()
             }) {
                 Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
-                    .adaptiveFont(size: 13, weight: .bold)
+                    .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(motion.isLocked ? Color.yellow : Color.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 44, height: 44)
                     .background(motion.isLocked ? Color.yellow.opacity(0.25) : Color.white.opacity(0.12))
                     .clipShape(Circle())
             }
+            .accessibilityLabel(lang.t(motion.isLocked ? "locked_heading" : "lock_heading"))
         }
     }
 

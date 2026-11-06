@@ -1052,6 +1052,13 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角、二十四山与目标点 LiDAR 距离)
+    /// 锁定框尺寸：宽度 200~260pt 并保证左右各留 12pt；高度 132~150pt（长译文两行换行时留余量）。
+    private static func targetBoxSize(in container: CGSize) -> CGSize {
+        let width = max(160, min(260, container.width - 24))
+        let height = max(110, min(150, container.height - 24))
+        return CGSize(width: width, height: height)
+    }
+
     private func targetBoundingBoxLayer() -> AnyView {
         guard shaList.indices.contains(activeShaIndex) else { return AnyView(EmptyView()) }
         let currentSha = shaList[activeShaIndex]
@@ -1066,10 +1073,13 @@ public struct ARVisionView: View {
                 width: detectedOffset.width + targetOffset.width,
                 height: detectedOffset.height + targetOffset.height
             )
+            // 锁定框尺寸按取景区可用宽度确定（窄屏不超出、宽屏不过大），
+            // 限位、文字换行宽度与拖拽限位共用同一组尺寸，避免框体越出取景区。
+            let boxSize = Self.targetBoxSize(in: proxy.size)
             // Keep the target card inside the camera viewport on every
             // iPhone/iPad aspect ratio, including split-screen layouts.
-            let maxX = max(0, proxy.size.width / 2 - 92)
-            let maxY = max(0, proxy.size.height / 2 - 62)
+            let maxX = max(0, proxy.size.width / 2 - boxSize.width / 2)
+            let maxY = max(0, proxy.size.height / 2 - boxSize.height / 2)
             let clampedOffset = CGSize(
                 width: min(max(rawOffset.width, -maxX), maxX),
                 height: min(max(rawOffset.height, -maxY), maxY)
@@ -1086,9 +1096,8 @@ public struct ARVisionView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke((hitBaSha || waterItem?.isHuangQuanSha == true) ? Color.red : Color.yellow, lineWidth: 2)
-                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 320, minHeight: 110, idealHeight: 132, maxHeight: 160)
+                    .frame(width: boxSize.width, height: boxSize.height)
                     .background(Color.yellow.opacity(0.12))
-                    .padding(.horizontal, 16)
 
                 VStack(spacing: 2) {
                     HStack(spacing: 4) {
@@ -1131,7 +1140,11 @@ public struct ARVisionView: View {
                         .foregroundColor(.white.opacity(0.7))
                         .lineLimit(1)
                 }
+                .padding(.horizontal, 8)
+                .frame(width: boxSize.width, height: boxSize.height)
+                .minimumScaleFactor(0.6)
             }
+            .frame(width: boxSize.width, height: boxSize.height)
             .position(
                 x: proxy.size.width / 2 + clampedOffset.width,
                 y: proxy.size.height / 2 + clampedOffset.height
@@ -1145,8 +1158,8 @@ public struct ARVisionView: View {
                         let start = targetDragStart ?? .zero
                         let proposed = CGSize(width: start.width + gesture.translation.width,
                                               height: start.height + gesture.translation.height)
-                        let maxX = max(0, proxy.size.width / 2 - 92)
-                        let maxY = max(0, proxy.size.height / 2 - 62)
+                        let maxX = max(0, proxy.size.width / 2 - boxSize.width / 2)
+                        let maxY = max(0, proxy.size.height / 2 - boxSize.height / 2)
                         let clamped = CGSize(
                             width: min(max(proposed.width, -maxX), maxX),
                             height: min(max(proposed.height, -maxY), maxY)

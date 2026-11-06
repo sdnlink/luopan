@@ -64,6 +64,7 @@ public struct FloorplanView: View {
     @State private var roomDetectionMessage: String?
     @State private var calibratedWidthText: String = ""
     @State private var calibratedDepthText: String = ""
+    @FocusState private var isCalibrationFieldFocused: Bool
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
     @State private var showNewRoomTypePicker = false
@@ -1043,17 +1044,8 @@ public struct FloorplanView: View {
                 .keyboardType(.decimalPad)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .adaptiveFont(size: 12)
+                .focused($isCalibrationFieldFocused)
                 .frame(width: 64)
-                .toolbar {
-                    ToolbarItem(placement: .keyboard) {
-                        HStack {
-                            Spacer()
-                            Button(lang.t("done")) {
-                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            }
-                        }
-                    }
-                }
             Text("×")
                 .adaptiveFont(size: 10)
                 .foregroundColor(.white.opacity(0.5))
@@ -1061,17 +1053,15 @@ public struct FloorplanView: View {
                 .keyboardType(.decimalPad)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .adaptiveFont(size: 12)
+                .focused($isCalibrationFieldFocused)
                 .frame(width: 64)
-                .toolbar {
-                    ToolbarItem(placement: .keyboard) {
-                        HStack {
-                            Spacer()
-                            Button(lang.t("done")) {
-                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            }
-                        }
-                    }
+            if isCalibrationFieldFocused {
+                Button(lang.t("done")) {
+                    isCalibrationFieldFocused = false
                 }
+                .adaptiveFont(size: 11, weight: .bold)
+                .foregroundColor(.yanCyan)
+            }
             if let area = estimatedAreaSqm {
                 Text(String(format: "≈ %.1f ㎡", area))
                     .adaptiveFont(size: 10, weight: .bold)

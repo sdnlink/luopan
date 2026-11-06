@@ -949,20 +949,22 @@ public struct ARVisionView: View {
     }
 
     private func simulationCanvasLayer() -> some View {
-        ZStack {
-            Color(red: 0.08, green: 0.09, blue: 0.12)
-            
-            // 仿真网格与室外建筑剪影
-            VStack {
-                Spacer()
-                HStack(alignment: .bottom, spacing: 20) {
-                    Rectangle().fill(Color.white.opacity(0.06)).frame(width: 80, height: 260)
-                    Rectangle().fill(Color.white.opacity(0.08)).frame(width: 120, height: 380)
-                    Rectangle().fill(Color.white.opacity(0.05)).frame(width: 90, height: 310)
+        GeometryReader { geo in
+            let scale = min(max(geo.size.height / 480.0, 0.5), 1.0)
+            ZStack {
+                Color(red: 0.08, green: 0.09, blue: 0.12)
+                
+                // 仿真网格与室外建筑剪影（按可用高度等比缩放，避免横屏/矮屏溢出）
+                VStack {
+                    Spacer()
+                    HStack(alignment: .bottom, spacing: 20 * scale) {
+                        Rectangle().fill(Color.white.opacity(0.06)).frame(width: 80 * scale, height: 260 * scale)
+                        Rectangle().fill(Color.white.opacity(0.08)).frame(width: 120 * scale, height: 380 * scale)
+                        Rectangle().fill(Color.white.opacity(0.05)).frame(width: 90 * scale, height: 310 * scale)
+                    }
+                    .padding(.bottom, 80 * scale)
                 }
-                .padding(.bottom, 80)
-            }
-            
+                
             VStack(spacing: 8) {
                 Image(systemName: "viewfinder")
                     .adaptiveFont(size: 40)
@@ -991,6 +993,7 @@ public struct ARVisionView: View {
                         .foregroundColor(.white.opacity(0.4))
                 }
             }
+        }
         }
 
     }

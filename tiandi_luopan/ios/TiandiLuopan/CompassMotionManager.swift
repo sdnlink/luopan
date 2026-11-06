@@ -115,10 +115,16 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         longitude = 0.0
         currentSolarTermName = SolarTimeCalculator.shared.solarTermName(for: Date())
         LocalizationManager.shared.$effectiveLanguage
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self = self, !self.hasLocationFix else { return }
-                self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
-                self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+                guard let self = self else { return }
+                if self.hasLocationFix {
+                    self.updateCoordsDesc(latitude: self.latitude, longitude: self.longitude, altitude: self.altitude)
+                } else {
+                    self.coordsDesc = LocalizationManager.shared.t("location_unavailable")
+                    self.solarTimeDesc = LocalizationManager.shared.t("location_unavailable")
+                }
+                self.updateResolvedState(force: true)
             }
             .store(in: &cancellables)
         hapticTick.prepare()
@@ -740,15 +746,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                     .truncatingRemainder(dividingBy: 360.0)
             }
             
-            let isEn = LocalizationManager.shared.effectiveLanguage == .en
-            let latLabel = loc.coordinate.latitude >= 0 ? LocalizationManager.shared.t("lat_north") : LocalizationManager.shared.t("lat_south")
-            let lonLabel = loc.coordinate.longitude >= 0 ? LocalizationManager.shared.t("lon_east") : LocalizationManager.shared.t("lon_west")
-            let altUnit = LocalizationManager.shared.t("altitude_unit")
-            
-            let latStr = isEn ? "\(String(format: "%.5f°", abs(loc.coordinate.latitude)))\(latLabel)" : "\(latLabel) \(String(format: "%.5f°", abs(loc.coordinate.latitude)))"
-            let lonStr = isEn ? "\(String(format: "%.5f°", abs(loc.coordinate.longitude)))\(lonLabel)" : "\(lonLabel) \(String(format: "%.5f°", abs(loc.coordinate.longitude)))"
-            let altStr = " · " + LocalizationManager.shared.t("altitude_label") + " " + String(format: "%.0f\(altUnit)", loc.altitude)
-            self.coordsDesc = "\(latStr), \(lonStr)\(altStr)"
+            self.updateCoordsDesc(
+                latitude: loc.coordinate.latitude,
+                longitude: loc.coordinate.longitude,
+                altitude: loc.altitude
+            )
             
             if loc.speed >= 0 {
                 self.speedKmH = loc.speed * 3.6
@@ -769,5 +771,27 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             // Keep location updates alive: speed and the live coordinate shown
             // by the compass must continue to refresh after the first fix.
         }
+    }
+
+    private func updateCoordsDesc(latitude: Double, longitude: Double, altitude: Double) {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let suffixHemisphere: Bool
+        switch lang {
+        case .en, .id, .vi, .th:
+            suffixHemisphere = true
+        case .zhHans, .zhHant, .ja, .ko, .auto:
+            suffixHemisphere = false
+        }
+        let latLabel = (latitude >= 0 ? LocalizationManager.shared.t("lat_north") : LocalizationManager.shared.t("lat_south"))
+            .trimmingCharacters(in: .whitespaces)
+        let lonLabel = (longitude >= 0 ? LocalizationManager.shared.t("lon_east") : LocalizationManager.shared.t("lon_west"))
+            .trimmingCharacters(in: .whitespaces)
+        let altUnit = LocalizationManager.shared.t("altitude_unit")
+        let latDeg = String(format: "%.5f°", abs(latitude))
+        let lonDeg = String(format: "%.5f°", abs(longitude))
+        let latStr = suffixHemisphere ? "\(latDeg) \(latLabel)" : "\(latLabel) \(latDeg)"
+        let lonStr = suffixHemisphere ? "\(lonDeg) \(lonLabel)" : "\(lonLabel) \(lonDeg)"
+        let altStr = " · " + LocalizationManager.shared.t("altitude_label") + " " + String(format: "%.0f\(altUnit)", altitude)
+        self.coordsDesc = "\(latStr), \(lonStr)\(altStr)"
     }
 }

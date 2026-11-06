@@ -197,17 +197,29 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
      * 发起 Google Play 安全支付
      */
     fun launchPurchaseFlow(activity: Activity, productId: String, onLaunched: ((Boolean, String?) -> Unit)? = null) {
+        val lang = com.example.yiijingcompass.model.LocalizationManager.instance.effectiveLanguage
         val client = billingClient
         if (client == null || !client.isReady) {
             startConnection()
-            onLaunched?.invoke(false, "Google Play 商店连接中，请稍候重试")
+            val msg = when (lang) {
+                com.example.yiijingcompass.model.AppLanguage.EN -> "Connecting to Google Play Store, please try again shortly"
+                com.example.yiijingcompass.model.AppLanguage.ZH_HANT -> "Google Play 商店連線中，請稍候重試"
+                com.example.yiijingcompass.model.AppLanguage.JA -> "Google Play ストアに接続中です。しばらくしてから再試行してください"
+                com.example.yiijingcompass.model.AppLanguage.KO -> "Google Play 스토어에 연결 중입니다. 잠시 후 다시 시도해 주세요"
+                com.example.yiijingcompass.model.AppLanguage.VI -> "Đang kết nối Google Play Store, vui lòng thử lại sau"
+                com.example.yiijingcompass.model.AppLanguage.TH -> "กำลังเชื่อมต่อ Google Play Store โปรดลองอีกครั้งในภายหลัง"
+                com.example.yiijingcompass.model.AppLanguage.ID -> "Menghubungkan ke Google Play Store, silakan coba lagi"
+                else -> "Google Play 商店连接中，请稍候重试"
+            }
+            onLaunched?.invoke(false, msg)
             return
         }
 
         val details = productDetailsCache[productId]
         if (details == null) {
             queryAllProductDetails()
-            onLaunched?.invoke(false, "商品信息载入中，请稍候点击重试")
+            val msg = com.example.yiijingcompass.model.LocalizationManager.instance.t("iap_product_loading")
+            onLaunched?.invoke(false, msg)
             return
         }
 
@@ -216,7 +228,17 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
         if (details.productType == BillingClient.ProductType.SUBS) {
             val offerDetails = details.subscriptionOfferDetails?.firstOrNull()
             if (offerDetails == null) {
-                onLaunched?.invoke(false, "未找到该订阅方案的定价信息")
+                val msg = when (lang) {
+                    com.example.yiijingcompass.model.AppLanguage.EN -> "Subscription pricing details not found"
+                    com.example.yiijingcompass.model.AppLanguage.ZH_HANT -> "未找到該訂閱方案的定價資訊"
+                    com.example.yiijingcompass.model.AppLanguage.JA -> "このサブスクリプションの価格情報が見つかりません"
+                    com.example.yiijingcompass.model.AppLanguage.KO -> "구독 요금제 가격 정보를 찾을 수 없습니다"
+                    com.example.yiijingcompass.model.AppLanguage.VI -> "Không tìm thấy thông tin giá gói đăng ký"
+                    com.example.yiijingcompass.model.AppLanguage.TH -> "ไม่พบข้อมูลราคาของแผนการสมัครสมาชิกนี้"
+                    com.example.yiijingcompass.model.AppLanguage.ID -> "Informasi harga langganan tidak ditemukan"
+                    else -> "未找到该订阅方案的定价信息"
+                }
+                onLaunched?.invoke(false, msg)
                 return
             }
             productDetailsParamsList.add(

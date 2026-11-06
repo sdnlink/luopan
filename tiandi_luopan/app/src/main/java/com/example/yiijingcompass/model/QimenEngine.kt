@@ -125,6 +125,13 @@ data class QimenPalaceCell(
     val tianStem: String get() = tianPanGan
     val diStem: String get() = diPanGan
     val doorLuck: String get() = luckType
+
+    val localizedTianStem: String
+        get() = QimenEngine.instance.localizedStemName(tianPanGan)
+
+    val localizedDiStem: String
+        get() = QimenEngine.instance.localizedStemName(diPanGan)
+
     val localizedDoorName: String
         get() {
             val d = QimenEngine.instance.resolveDoor(doorName)
@@ -481,26 +488,58 @@ class QimenEngine private constructor() {
         }
 
         val bestPalace = cells.filter { !it.isCenter && it.isAuspicious }.maxByOrNull {
-            if (it.luckType == "大吉") 3 else if (it.luckType == "吉") 2 else 1
+            if (it.doorName == "休门" || it.doorName == "生门" || it.doorName == "开门") 3 else 2
         } ?: cells.first { !it.isCenter }
 
         val worstPalace = cells.filter { !it.isCenter && !it.isAuspicious }.minByOrNull {
-            if (it.luckType == "大凶") 0 else if (it.luckType == "凶") 1 else 2
+            if (it.doorName == "死门" || it.doorName == "惊门") 0 else if (it.doorName == "伤门") 1 else 2
         } ?: cells.last { !it.isCenter }
+
+        val lang = LocalizationManager.shared.effectiveLanguage
+        val bestReasonStr = when (lang) {
+            AppLanguage.EN -> "Three Auspicious Gates sector; favorable for business, negotiation and travel"
+            AppLanguage.ZH_HANT -> "三吉門生旺之方，利於開拓洽商、求財出行"
+            AppLanguage.JA -> "三吉門生旺の方位、商談・開拓・出行に吉"
+            AppLanguage.KO -> "삼길문 생왕 방위, 개척·상담·구재·출행에 길함"
+            AppLanguage.VI -> "Phương Tam Cát Môn sinh vượng, lợi đàm phán, cầu tài và xuất hành"
+            AppLanguage.TH -> "ทิศสามประตูมงคล เหมาะแก่การเจรจาธุรกิจ แสวงหาโชคลาภ และเดินทาง"
+            AppLanguage.ID -> "Sektor Tiga Gerbang Baik; mendukung negosiasi bisnis, rezeki, dan perjalanan"
+            AppLanguage.AUTO, AppLanguage.ZH_HANS -> "三吉门生旺之方，利于开拓洽商、求财出行"
+        }
+        val worstReasonStr = when (lang) {
+            AppLanguage.EN -> "Inauspicious gate sector; avoid major travel or construction, keep still"
+            AppLanguage.ZH_HANT -> "落入凶門閉塞，不利遠行修造，宜靜守避忌"
+            AppLanguage.JA -> "凶門閉塞の方位、遠出や動土・改装は控え静守が吉"
+            AppLanguage.KO -> "흉문 폐색 방위, 원행·수조에 불리하며 정수가 마땅함"
+            AppLanguage.VI -> "Rơi vào hung môn bế tắc, bất lợi đi xa và tu tạo, nên tĩnh thủ"
+            AppLanguage.TH -> "ตกตำแหน่งประตูอัปมงคล ไม่เหมาะเดินทางไกลหรือก่อสร้าง ควรสงบนิ่ง"
+            AppLanguage.ID -> "Sektor gerbang buruk; hindari perjalanan jauh atau renovasi, jaga ketenangan"
+            AppLanguage.AUTO, AppLanguage.ZH_HANS -> "落入凶门闭塞，不利远行修造，宜静守避忌"
+        }
 
         return QimenChart(
             title = title,
             dunType = dunType,
             juNumber = juNumber,
             shichen = shichenStr,
-            bestDirection = "${bestPalace.direction} (${bestPalace.doorName})",
+            bestDirection = "${bestPalace.localizedPalaceName} (${bestPalace.localizedDoorName})",
             bestBearing = bestPalace.angleCenter,
-            bestReason = "三吉门生旺之方，利于开拓洽商、求财出行",
-            worstDirection = "${worstPalace.direction} (${worstPalace.doorName})",
+            bestReason = bestReasonStr,
+            worstDirection = "${worstPalace.localizedPalaceName} (${worstPalace.localizedDoorName})",
             worstBearing = worstPalace.angleCenter,
-            worstReason = "落入凶门闭塞，不利远行修造，宜静守避忌",
+            worstReason = worstReasonStr,
             cells = cells
         )
+    }
+
+    fun localizedStemName(stem: String): String {
+        return when (LocalizationManager.shared.effectiveLanguage) {
+            AppLanguage.EN, AppLanguage.ID -> mapOf("甲" to "Jia", "乙" to "Yi", "丙" to "Bing", "丁" to "Ding", "戊" to "Wu", "己" to "Ji", "庚" to "Geng", "辛" to "Xin", "壬" to "Ren", "癸" to "Gui")[stem] ?: stem
+            AppLanguage.KO -> mapOf("甲" to "갑", "乙" to "을", "丙" to "병", "丁" to "정", "戊" to "무", "己" to "기", "庚" to "경", "辛" to "신", "壬" to "임", "癸" to "계")[stem] ?: stem
+            AppLanguage.VI -> mapOf("甲" to "Giáp", "乙" to "Ất", "丙" to "Bính", "丁" to "Đinh", "戊" to "Mậu", "己" to "Kỷ", "庚" to "Canh", "辛" to "Tân", "壬" to "Nhâm", "癸" to "Quý")[stem] ?: stem
+            AppLanguage.TH -> mapOf("甲" to "เจี่ย", "乙" to "อี่", "丙" to "ปิ่ง", "丁" to "ติง", "戊" to "อู้", "己" to "จี่", "庚" to "เกิง", "辛" to "ซิน", "壬" to "เหริน", "癸" to "กุ่ย")[stem] ?: stem
+            AppLanguage.ZH_HANT, AppLanguage.JA, AppLanguage.AUTO, AppLanguage.ZH_HANS -> stem
+        }
     }
 }
 

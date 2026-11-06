@@ -298,6 +298,10 @@ public struct SpatialRoom3D: Identifiable, Codable {
     public var center: SIMD3<Float> { SIMD3<Float>(centerX, centerY, centerZ) }
     public var size: SIMD3<Float> { SIMD3<Float>(sizeX, sizeY, sizeZ) }
 
+    /// Localized room label. `name` is normally derived from the room type's
+    /// localized name, so the type provides the authoritative localization.
+    public var localizedName: String { type.localizedName }
+
     public init(
         id: UUID = UUID(),
         name: String,

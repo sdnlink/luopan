@@ -254,7 +254,25 @@ public struct BaZhaiPalaceItem: Identifiable {
     public var localizedSuggestion: String {
         star.localizedSuggestion
     }
-    
+
+    public var localizedGuaName: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en, .id:
+            return ["坎": "Kan", "坤": "Kun", "震": "Zhen", "巽": "Xun", "乾": "Qian", "兑": "Dui", "艮": "Gen", "离": "Li"][guaName] ?? guaName
+        case .ja, .zhHant:
+            return ["坎": "坎", "坤": "坤", "震": "震", "巽": "巽", "乾": "乾", "兑": "兌", "艮": "艮", "离": "離"][guaName] ?? guaName
+        case .ko:
+            return ["坎": "감", "坤": "곤", "震": "진", "巽": "손", "乾": "건", "兑": "태", "艮": "간", "离": "이"][guaName] ?? guaName
+        case .vi:
+            return ["坎": "Khảm", "坤": "Khôn", "震": "Chấn", "巽": "Tốn", "乾": "Càn", "兑": "Đoài", "艮": "Cấn", "离": "Ly"][guaName] ?? guaName
+        case .th:
+            return ["坎": "ข่าน", "坤": "คุน", "震": "เจิ้น", "巽": "ซวิ่น", "乾": "เฉียน", "兑": "ตุ้ย", "艮": "เกิ้น", "离": "หลี"][guaName] ?? guaName
+        case .zhHans, .auto:
+            return guaName
+        }
+    }
+
     public var localizedDirection: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let enDirs = ["North (Kan)", "Southwest (Kun)", "East (Zhen)", "Southeast (Xun)", "Northwest (Qian)", "West (Dui)", "Northeast (Gen)", "South (Li)"]

@@ -714,7 +714,7 @@ class TianJiShuEngine private constructor() {
         drawSectionHeader(canvas, title, curY, vermilion)
         var y = curY + 62f
         for (item in report) {
-            val line = "【${item.severity}】${item.title} · ${item.palace}\n${item.lore}\n→ ${item.solution}"
+            val line = "【${item.localizedSeverity}】${item.title} · ${item.palace}\n${item.lore}\n→ ${item.solution}"
             y += drawMeasuredTextDirect(canvas, line, y, paint) + 14f
         }
         return y + 10f
@@ -742,10 +742,15 @@ class TianJiShuEngine private constructor() {
         drawSectionHeader(canvas, title, curY, vermilion)
         var y = curY + 62f
         for (cell in chart.palaces) {
-            val line = "【${cell.localizedPalaceName}】 · 山星 ${cell.mountainStar} · 向星 ${cell.facingStar} · ${cell.localizedEvaluation}"
+            val mLabel = tr8("山星", "山星", "Mountain", "山星", "산성", "Sơn tinh", "ดาวภูเขา", "Gunung", renderLanguage)
+            val fLabel = tr8("向星", "向星", "Facing", "向星", "향성", "Hướng tinh", "ดาวหัน", "Hadap", renderLanguage)
+            val line = "【${cell.localizedPalaceName}】 · $mLabel ${cell.mountainStar} · $fLabel ${cell.facingStar} · ${cell.localizedEvaluation}"
             var displayLine = line
             if (cell.isShaWuHuang || cell.isShaErHei) {
-                displayLine += " · " + if (cell.isShaWuHuang) "五黄" else "二黑"
+                displayLine += " · " + if (cell.isShaWuHuang)
+                    tr8("五黄", "五黃", "5-Yellow", "五黄", "오황", "Ngũ Hoàng", "5 เหลือง", "5-Kuning", renderLanguage)
+                else
+                    tr8("二黑", "二黑", "2-Black", "二黒", "이흑", "Nhị Hắc", "2 ดำ", "2-Hitam", renderLanguage)
             }
             y += drawMeasuredTextDirect(canvas, displayLine, y, paint) + 12f
         }
@@ -774,7 +779,9 @@ class TianJiShuEngine private constructor() {
         drawSectionHeader(canvas, title, curY, vermilion)
         var y = curY + 62f
         for (cell in chart.cells) {
-            val line = "【${cell.localizedPalaceName}】${cell.localizedDoorName} · ${cell.localizedStarName} · ${cell.localizedGodName} · 天${cell.tianStem}/地${cell.diStem} · ${cell.doorLuck}"
+            val tLabel = tr8("天", "天", "Heaven ", "天", "천 ", "Thiên ", "ฟ้า ", "Langit ", renderLanguage)
+            val dLabel = tr8("地", "地", "Earth ", "地", "지 ", "Địa ", "ดิน ", "Bumi ", renderLanguage)
+            val line = "【${cell.localizedPalaceName}】${cell.localizedDoorName} · ${cell.localizedStarName} · ${cell.localizedGodName} · $tLabel${cell.localizedTianStem}/$dLabel${cell.localizedDiStem} · ${cell.doorLuck}"
             y += drawMeasuredTextDirect(canvas, line, y, paint) + 12f
         }
         val guidance = tr8(
@@ -955,7 +962,7 @@ class TianJiShuEngine private constructor() {
                 y += drawMeasuredTextDirect(canvas, interiorSummary, y, paint) + 14f
 
                 for (item in interior.shaItems) {
-                    val line = "【${item.title} · ${item.severity.rawValue}】${item.solution}"
+                    val line = "【${item.title} · ${item.severity.localizedTitle}】${item.solution}"
                     y += drawMeasuredTextDirect(canvas, line, y, paint) + 14f
                 }
             }

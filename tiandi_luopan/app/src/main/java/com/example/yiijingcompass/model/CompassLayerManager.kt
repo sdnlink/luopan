@@ -11,10 +11,10 @@ enum class CompassPreset(val rawValue: String) {
 
     val localizedTitle: String
         get() = when (this) {
-            COMPREHENSIVE -> LocalizationManager.instance.t("layers.preset.comprehensive")
-            SAN_YUAN -> LocalizationManager.instance.t("layers.preset.sanyuan")
-            SAN_HE -> LocalizationManager.instance.t("layers.preset.sanhe")
-            MINIMALIST -> LocalizationManager.instance.t("layers.preset.minimalist")
+            COMPREHENSIVE -> LocalizationManager.instance.t("preset_comprehensive")
+            SAN_YUAN -> LocalizationManager.instance.t("preset_sanyuan")
+            SAN_HE -> LocalizationManager.instance.t("preset_sanhe")
+            MINIMALIST -> LocalizationManager.instance.t("preset_minimalist")
         }
 }
 

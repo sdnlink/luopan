@@ -352,7 +352,15 @@ class QimenEngine private constructor() {
 
         val isYangDun = solarTermIndex < 11 || solarTermIndex >= 23
         val forward = isYangDun
-        val dunType = if (isYangDun) "阳遁" else "阴遁"
+        val qmLang = LocalizationManager.instance.effectiveLanguage
+        val dunType = when (qmLang) {
+            AppLanguage.EN, AppLanguage.ID -> if (isYangDun) "Yang Dun" else "Yin Dun"
+            AppLanguage.ZH_HANT, AppLanguage.JA -> if (isYangDun) "陽遁" else "陰遁"
+            AppLanguage.KO -> if (isYangDun) "양둔" else "음둔"
+            AppLanguage.VI -> if (isYangDun) "Dương Độn" else "Âm Độn"
+            AppLanguage.TH -> if (isYangDun) "หยางตุ้น" else "อินตุ้น"
+            AppLanguage.ZH_HANS, AppLanguage.AUTO -> if (isYangDun) "阳遁" else "阴遁"
+        }
 
         val dayGz = dayGanZhiIndex(date)
         val fuHead = dayGz - (dayGz % 5)
@@ -377,8 +385,23 @@ class QimenEngine private constructor() {
         )
         val bureauTable = if (isYangDun) yangBureaus else yinBureaus
         val juNumber = bureauTable[solarTermIndex]?.get(yuanIndex) ?: 1
-        val yuanName = listOf("上元", "中元", "下元")[yuanIndex]
-        val title = "【${dunType}${juNumber}局 · 拆补${yuanName}】"
+        val yuanName = when (qmLang) {
+            AppLanguage.EN -> listOf("Upper Yuan", "Middle Yuan", "Lower Yuan")[yuanIndex]
+            AppLanguage.KO -> listOf("상원", "중원", "하원")[yuanIndex]
+            AppLanguage.VI -> listOf("Thượng Nguyên", "Trung Nguyên", "Hạ Nguyên")[yuanIndex]
+            AppLanguage.TH -> listOf("ง้วนบน", "ง้วนกลาง", "ง้วนล่าง")[yuanIndex]
+            AppLanguage.ID -> listOf("Yuan Atas", "Yuan Tengah", "Yuan Bawah")[yuanIndex]
+            AppLanguage.ZH_HANT, AppLanguage.JA, AppLanguage.ZH_HANS, AppLanguage.AUTO -> listOf("上元", "中元", "下元")[yuanIndex]
+        }
+        val title = when (qmLang) {
+            AppLanguage.EN -> "【$dunType Bureau $juNumber · $yuanName】"
+            AppLanguage.ZH_HANT, AppLanguage.JA -> "【${dunType}${juNumber}局 · 拆補${yuanName}】"
+            AppLanguage.KO -> "【$dunType ${juNumber}국 · $yuanName】"
+            AppLanguage.VI -> "【$dunType Cục $juNumber · $yuanName】"
+            AppLanguage.TH -> "【$dunType สำนัก $juNumber · $yuanName】"
+            AppLanguage.ID -> "【$dunType Pola $juNumber · $yuanName】"
+            AppLanguage.ZH_HANS, AppLanguage.AUTO -> "【${dunType}${juNumber}局 · 拆补${yuanName}】"
+        }
 
         val dayRef = Date(date.time + 3600000L)
         val effDayGz = dayGanZhiIndex(dayRef)

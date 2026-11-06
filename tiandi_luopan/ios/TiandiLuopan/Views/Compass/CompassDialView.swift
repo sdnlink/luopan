@@ -32,10 +32,10 @@ public struct CompassDialView: View {
             let radius = max(0, size * 0.5 - 18)
             let dialCanvasSize = radius * 2 + 32
             // 盘径自适应：以 iPhone 参考半径 175pt 为 1.0x。
-            // 分栏左栏 / Duo 内屏的盘径明显小于整屏，各环的径向间距也随之变窄；
-            // 文字若放大或保持不变，24 山 / 64 卦 / 节气环必然互相压叠。
-            // iPad 12.9 竖屏盘径 ~500pt，文字必须同比放大才可读：上限放到 1.7x。
-            let dialGrow = min(max(radius / 175.0, 0.55), 1.7)
+            // 分栏左栏 / Duo 内屏的盘径明显小于整屏，各环的径向间距也随之变窄。
+            // 下限 0.75（不是 0.55）：保证 64 卦/五行最小仍有 5pt 以上可读。
+            // iPad 12.9 竖屏盘径 ~500pt，文字同比放大，上限 1.7x。
+            let dialGrow = min(max(radius / 175.0, 0.75), 1.7)
             
             ZStack {
                 // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)
@@ -295,9 +295,9 @@ public struct CompassDialView: View {
     private func hexagramsLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(hexagrams) { hex in
             Text(hex.localizedDialLabel)
-                .adaptiveFont(size: 7 * grow, weight: .semibold, design: .serif)
+                .adaptiveFont(size: 9 * grow, weight: .semibold, design: .serif)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.8)
                 .foregroundColor(hex.isGreatAuspicious ? Color(red: 0.95, green: 0.75, blue: 0.3) : Color.white.opacity(0.65))
                 .frame(width: radius * 0.092)
                 .offset(y: -radius + 8 * grow)
@@ -309,7 +309,7 @@ public struct CompassDialView: View {
     private func fenjinLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
         ForEach(Fenjin120Data.shared.allFenjin) { f in
             Rectangle()
-                .fill(f.isAuspicious ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.2))
+                .fill(f.isAuspicious ? Color(red: 0.95, green: 0.8, blue: 0.3) : Color.white.opacity(0.4))
                 .frame(width: 1.0 * grow, height: (f.isAuspicious ? 6.0 : 4.0) * grow)
                 .offset(y: -radius)
                 .rotationEffect(.degrees(f.centerAngle))
@@ -332,14 +332,14 @@ public struct CompassDialView: View {
 
                 VStack(spacing: 1) {
                     Text(m.localizedName)
-                        .adaptiveFont(size: (isMainBranch ? 15 : 12) * grow, weight: .bold, design: .serif)
+                        .adaptiveFont(size: (isMainBranch ? 16 : 13) * grow, weight: .bold, design: .serif)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.65)
+                        .minimumScaleFactor(0.8)
                         .foregroundColor(isMainBranch ? Color(red: 0.96, green: 0.35, blue: 0.3) : Color(red: 0.95, green: 0.82, blue: 0.4))
                     Text(m.localizedElement)
-                        .adaptiveFont(size: 7 * grow, weight: .medium)
+                        .adaptiveFont(size: 9 * grow, weight: .medium)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.65)
+                        .minimumScaleFactor(0.8)
                         .foregroundColor(Color.white.opacity(0.5))
                 }
                 // 24 山标签是"山名 + 五行"两行：高度随系统字号与盘径放大。
@@ -348,7 +348,7 @@ public struct CompassDialView: View {
                 // 标签宽度必须小于圆周上每个标签的节距：
                 // 24 个标签均分 2π·radius，节距 ≈ 0.262·radius，留 15% 间隙取 0.222。
                 // 旧值 radius*0.25 叠加旋转后相邻标签必然互相压叠。
-                .frame(width: min(max(24 * grow, radius * 0.25), radius * 0.222),
+                .frame(width: min(max(28, radius * 0.24), radius * 0.25),
                        height: labelHeight)
                 .offset(y: -radius + 14 * grow + (labelHeight - scaledBaseHeight) / 2)
                 .rotationEffect(.degrees(m.angleCenter))

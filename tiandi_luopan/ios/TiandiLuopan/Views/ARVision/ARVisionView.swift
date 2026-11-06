@@ -585,10 +585,11 @@ public struct ARVisionView: View {
     }
     
     private var activeShaIndex: Int {
-        if isAutoFollowingDirection {
-            return resolvedShaIndex(for: targetCalculatedHeading)
-        }
-        return min(max(selectedShaIndex, 0), shaList.count - 1)
+        guard !shaList.isEmpty else { return -1 }
+        let idx = isAutoFollowingDirection
+            ? resolvedShaIndex(for: targetCalculatedHeading)
+            : min(max(selectedShaIndex, 0), shaList.count - 1)
+        return shaList.indices.contains(idx) ? idx : -1
     }
     
     // 布局形态：Duo 内屏 / iPad 横屏启用“取景 + 研判”双栏（见 AdaptiveLayout）；
@@ -724,7 +725,9 @@ public struct ARVisionView: View {
             checkCameraPermission()
         }
         .sheet(isPresented: $showRemedySheet) {
-            ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
+            if shaList.indices.contains(activeShaIndex) {
+                ShaRemedyDetailSheet(sha: shaList[activeShaIndex])
+            }
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
@@ -1047,6 +1050,7 @@ public struct ARVisionView: View {
     
     // MARK: - 可拖拽形煞目标锁定框 (动态解算偏角、二十四山与目标点 LiDAR 距离)
     private func targetBoundingBoxLayer() -> some View {
+        guard shaList.indices.contains(activeShaIndex) else { return EmptyView() }
         let currentSha = shaList[activeShaIndex]
         let m = targetMountain
         
@@ -1079,8 +1083,9 @@ public struct ARVisionView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke((hitBaSha || waterItem?.isHuangQuanSha == true) ? Color.red : Color.yellow, lineWidth: 2)
-                    .frame(width: 192, height: 132)
+                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 320, minHeight: 110, idealHeight: 132, maxHeight: 160)
                     .background(Color.yellow.opacity(0.12))
+                    .padding(.horizontal, 16)
 
                 VStack(spacing: 2) {
                     HStack(spacing: 4) {
@@ -1089,7 +1094,11 @@ public struct ARVisionView: View {
                             .frame(width: 6, height: 6)
                         Text("\(lang.t("ar_target_center")) · \(m.localizedName)\(lang.t("mountain_suffix"))")
                             .adaptiveFont(size: 10, weight: .bold)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                             .foregroundColor(.yellow)
+                            .multilineTextAlignment(.center)
                     }
                     Text(currentSha.localizedName)
                         .adaptiveFont(size: 15, weight: .bold, design: .serif)
@@ -1097,8 +1106,9 @@ public struct ARVisionView: View {
                     Text("\(lang.t("ar_target_bearing")): \(String(format: "%.1f", targetCalculatedHeading))° (\(m.localizedPalace))")
                         .adaptiveFont(size: 10, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.6)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let water = waterItem {
                         let statusTag = hitBaSha
                             ? lang.t("ar_status_basha")
@@ -1365,6 +1375,7 @@ public struct ARVisionView: View {
     
     // MARK: - 底部形煞研判卡 (支持朝向智能跟随与手动点选)
     private func bottomShaControlPanel() -> some View {
+        guard shaList.indices.contains(activeShaIndex) else { return EmptyView() }
         let currentIdx = activeShaIndex
         let sha = shaList[currentIdx]
         
@@ -1752,6 +1763,7 @@ public struct ARVisionView: View {
 
     /// 把当前目标锁定框记入全景形煞档案（手动/AI 统一入口）
     private func markCurrentSha() {
+        guard shaList.indices.contains(activeShaIndex) else { return }
         let sha = shaList[activeShaIndex]
         let sample = currentTargetSamplePoint
         let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
@@ -1791,6 +1803,7 @@ public struct ARVisionView: View {
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
         
+        guard shaList.indices.contains(activeShaIndex) else { return }
         let currentSha = shaList[activeShaIndex]
         let currentHeading = motion.headingState.facingAngle
         let mFacing = motion.headingState.facingMountain

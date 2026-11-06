@@ -76,7 +76,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastHeadingTime: TimeInterval = 0
     private var lastPublishedMotionTime: TimeInterval = 0
     private var lastPublishedMagneticTime: TimeInterval = 0
-    private var lastPublishedHeadingTime: TimeInterval = 0
+    private var lastPublishedTrueHeadingTime: TimeInterval = 0
+    private var lastPublishedMagneticHeadingTime: TimeInterval = 0
     private var filteredPitch: Double = 0.0
     private var filteredRoll: Double = 0.0
     private var lastMountainIndex: Int = -1
@@ -380,13 +381,13 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             filteredContinuousHeading = newHeading
             continuousHeading = newHeading
             heading = (newHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
-            lastPublishedHeadingTime = CACurrentMediaTime()
+            lastPublishedTrueHeadingTime = CACurrentMediaTime()
             return
         }
-        
+
         let delta = Self.shortestAngleDelta(from: filteredContinuousHeading, to: newHeading)
         let absDelta = abs(delta)
-        
+
         // 高性能自适应响应滤波：大动作零延迟即时跟从，微动精密平滑抗抖动，且无死区截断
         let alpha: Double
         if absDelta > 3.0 {
@@ -398,13 +399,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         } else {
             alpha = 0.35
         }
-        
-        // 每样本仍更新内部滤波值以保证平滑，但仅按 0.05s 门限（与 tilt 一致）发布到 @Published，
+
+        // 每样本仍更新内部滤波值以保证平滑，但仅按 0.05s 门限发布到 @Published，
         // 避免 20~30Hz 下整棵罗盘视图树每样本重建导致老设备掉帧。
+        // 真北针与磁北针各用独立计时器，避免互相饿死。
         filteredContinuousHeading += delta * alpha
         let now = CACurrentMediaTime()
-        guard now - lastPublishedHeadingTime >= 0.05 else { return }
-        lastPublishedHeadingTime = now
+        guard now - lastPublishedTrueHeadingTime >= 0.05 else { return }
+        lastPublishedTrueHeadingTime = now
         continuousHeading = filteredContinuousHeading
         let normalized = (filteredContinuousHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
         heading = normalized
@@ -417,7 +419,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             filteredContinuousMagneticHeading = newHeading
             continuousMagneticHeading = newHeading
             magneticHeading = (newHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
-            lastPublishedHeadingTime = CACurrentMediaTime()
+            lastPublishedMagneticHeadingTime = CACurrentMediaTime()
             return
         }
 
@@ -433,11 +435,11 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         } else {
             alpha = 0.35
         }
-        // 与 updateContinuousHeading 共用 0.05s 发布门限，保证磁针与真北针同步节流。
+        // 磁北针独立 0.05s 发布门限，与真北针互不干扰。
         filteredContinuousMagneticHeading += delta * alpha
         let now = CACurrentMediaTime()
-        guard now - lastPublishedHeadingTime >= 0.05 else { return }
-        lastPublishedHeadingTime = now
+        guard now - lastPublishedMagneticHeadingTime >= 0.05 else { return }
+        lastPublishedMagneticHeadingTime = now
         continuousMagneticHeading = filteredContinuousMagneticHeading
         magneticHeading = (filteredContinuousMagneticHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
     }

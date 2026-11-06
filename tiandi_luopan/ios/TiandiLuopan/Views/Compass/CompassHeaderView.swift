@@ -13,80 +13,66 @@ public struct CompassHeaderView: View {
     
     public var body: some View {
         let state = motion.headingState
-        
+        let sitFacingText = "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix"))"
+        let palaceText = state.facingMountain.localizedPalace + lang.t("palace_suffix")
+
         VStack(spacing: 8) {
             // 顶栏 1: 核心度数与坐向徽章
-            HStack(alignment: .lastTextBaseline, spacing: 12) {
-                // 实时度数 (大字体)
-                HStack(alignment: .top, spacing: 2) {
-                    Text(String(format: "%.1f", state.facingAngle))
-                        .adaptiveFont(size: 34, weight: .black, design: .rounded)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .fixedSize(horizontal: true, vertical: false)
-                    Text("°")
-                        .adaptiveFont(size: 17, weight: .bold)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.8))
-                }
-                
-                // 坐向与二十四山
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                    Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix"))")
-                            .adaptiveFont(size: 18, weight: .bold, design: .serif)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.65)
-                        
-                        Text(state.facingMountain.localizedPalace + lang.t("palace_suffix"))
-                            .adaptiveFont(size: 11, weight: .semibold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.25))
-                            .foregroundColor(Color(red: 0.95, green: 0.82, blue: 0.4))
-                            .cornerRadius(4)
+            // 窄屏 (iPhone / Duo 外屏)：英/印尼/泰/越译文字比中文长很多，
+            // 尤其泰语词间无空格不会主动断行，度数行、坐向标题、宫位徽章和
+            // 两个圆按钮挤在同一 HStack 里会互相穿插重叠。改为两行堆叠：
+            // 第一行只放度数 + 按钮，第二行整行放坐向标题 + 宫位徽章。
+            // 宽屏 (iPad / Duo 内屏分栏) 仍保持原来的一行横排。
+            Group {
+                if horizontalSizeClass == .compact {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .center) {
+                            degreeBlock(state: state)
+                            Spacer()
+                            lockButtons
+                        }
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(sitFacingText)
+                                .adaptiveFont(size: 18, weight: .bold, design: .serif)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.6)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
+                            palaceBadge(text: palaceText)
+                        }
+                        fenjinDescLine(state: state)
                     }
-                    
-                    Text(state.fenJinDesc)
-                        .adaptiveFont(size: 12, weight: .medium)
-                        .foregroundColor(state.isJianXiang ? Color.orange : Color(red: 0.8, green: 0.8, blue: 0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                
-                Spacer()
-                
-                // 锁盘与回正快捷按键
-                HStack(spacing: 8) {
-                    Button(action: {
-                        motion.resetManualOffset()
-                    }) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .adaptiveFont(size: 13, weight: .bold)
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(Color.white.opacity(0.12))
-                            .clipShape(Circle())
-                    }
-                    
-                    Button(action: {
-                        motion.toggleLock()
-                    }) {
-                        Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
-                            .adaptiveFont(size: 13, weight: .bold)
-                            .foregroundColor(motion.isLocked ? Color.yellow : Color.white)
-                            .frame(width: 32, height: 32)
-                            .background(motion.isLocked ? Color.yellow.opacity(0.25) : Color.white.opacity(0.12))
-                            .clipShape(Circle())
+                } else {
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        degreeBlock(state: state)
+
+                        // 坐向与二十四山
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(sitFacingText)
+                                    .adaptiveFont(size: 18, weight: .bold, design: .serif)
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.6)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                palaceBadge(text: palaceText)
+                            }
+                            fenjinDescLine(state: state)
+                        }
+
+                        Spacer()
+                        lockButtons
                     }
                 }
             }
             .padding(.horizontal, 16)
             
             // 顶栏 2: 真太阳时、经纬度与双轴倾角
-            HStack(spacing: 12) {
-                // 真太阳时
+            // 窄左栏里真太阳时与倾角横排 + Spacer 会把两段长文案压成截断；
+            // 改为纵向堆叠，各占整行完整显示。
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     Image(systemName: "sun.max.fill")
                         .adaptiveFont(size: 11)
@@ -94,12 +80,8 @@ public struct CompassHeaderView: View {
                     Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
                         .adaptiveFont(size: 11, weight: .medium)
                         .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                Spacer()
-                
                 // 水平倾角状态
                 HStack(spacing: 5) {
                     Circle()
@@ -108,8 +90,7 @@ public struct CompassHeaderView: View {
                     Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
                         .adaptiveFont(size: 11, weight: .regular, design: .monospaced)
                         .foregroundColor(.white.opacity(0.75))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, 16)
@@ -126,5 +107,66 @@ public struct CompassHeaderView: View {
             form: layoutForm) ? .infinity : 720)
         .frame(maxWidth: .infinity)
         .padding(.top, 6)
+    }
+
+    // MARK: - 顶栏复用块（窄屏两行堆叠 / 宽屏一行横排共用）
+    private func degreeBlock(state: CompassHeadingState) -> some View {
+        HStack(alignment: .top, spacing: 2) {
+            Text(String(format: "%.1f", state.facingAngle))
+                .adaptiveFont(size: 34, weight: .black, design: .rounded)
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: true, vertical: false)
+            Text("°")
+                .adaptiveFont(size: 17, weight: .bold)
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.8))
+        }
+    }
+
+    private var lockButtons: some View {
+        HStack(spacing: 8) {
+            Button(action: {
+                motion.resetManualOffset()
+            }) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .adaptiveFont(size: 13, weight: .bold)
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Circle())
+            }
+
+            Button(action: {
+                motion.toggleLock()
+            }) {
+                Image(systemName: motion.isLocked ? "lock.fill" : "lock.open")
+                    .adaptiveFont(size: 13, weight: .bold)
+                    .foregroundColor(motion.isLocked ? Color.yellow : Color.white)
+                    .frame(width: 32, height: 32)
+                    .background(motion.isLocked ? Color.yellow.opacity(0.25) : Color.white.opacity(0.12))
+                    .clipShape(Circle())
+            }
+        }
+    }
+
+    private func palaceBadge(text: String) -> some View {
+        Text(text)
+            .adaptiveFont(size: 11, weight: .semibold)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.25))
+            .foregroundColor(Color(red: 0.95, green: 0.82, blue: 0.4))
+            .cornerRadius(4)
+    }
+
+    private func fenjinDescLine(state: CompassHeadingState) -> some View {
+        Text(state.fenJinDesc)
+            .adaptiveFont(size: 12, weight: .medium)
+            .foregroundColor(state.isJianXiang ? Color.orange : Color(red: 0.8, green: 0.8, blue: 0.85))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
     }
 }

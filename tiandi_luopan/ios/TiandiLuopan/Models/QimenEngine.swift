@@ -512,16 +512,16 @@ public class QimenEngine {
         case .en: centerGod = "Center"
         case .ko: centerGod = "원극"
         case .vi: centerGod = "Nguyên Cực"
+        case .th: centerGod = "ไท่จี๋"
         case .zhHant: centerGod = "太極"
         case .ja: centerGod = "太極"
         case .id: centerGod = "Titik Pusat"
         case .auto, .zhHans: centerGod = "元极"
-        default: centerGod = "元极"
         }
         var byPalace = [Int: (door: String, luck: String, ausp: Bool, star: String, god: String, tian: String, di: String)]()
         for p in 1...9 {
             if p == 5 {
-                byPalace[5] = (door: centerName, luck: lang == .en ? "Fair" : "平", ausp: false,
+                byPalace[5] = (door: centerName, luck: LocalizationManager.shared.t("floorplan_level_neutral"), ausp: false,
                                star: tianStar[5] ?? "天禽", god: tianGod[5] ?? centerGod,
                                tian: tianStem[5] ?? "戊", di: diPanStem[5] ?? "壬")
             } else {

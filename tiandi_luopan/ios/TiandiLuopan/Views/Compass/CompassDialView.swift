@@ -31,10 +31,11 @@ public struct CompassDialView: View {
             // points of breathing room on compact devices.
             let radius = max(0, size * 0.5 - 18)
             let dialCanvasSize = radius * 2 + 32
-            // 盘径自适应：iPhone 参考半径约 175pt；iPad 上盘径放到 ~470pt，
-            // 盘面文字（节气/六十四卦/24山/八卦环）原本还是手机字号，显得极小。
-            // 这里让盘面文字与刻度随盘径同比放大，封顶 1.8x 避免密环互相挤压。
-            let dialGrow = max(1.0, min(radius / 175.0, 1.8))
+            // 盘径自适应：以 iPhone 参考半径 175pt 为 1.0x。
+            // 分栏左栏 / Duo 内屏的盘径明显小于整屏，各环的径向间距也随之变窄；
+            // 文字若放大或保持不变，24 山 / 64 卦 / 节气环必然互相压叠。
+            // 这里只缩小不放大（上限 1.0），并保证最小字号仍可读。
+            let dialGrow = min(max(radius / 175.0, 0.55), 1.0)
             
             ZStack {
                 // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)
@@ -315,8 +316,11 @@ public struct CompassDialView: View {
                 // 标签高度跟随系统字号（1.0 ... 1.3x）与盘径放大（grow），
                 // 取自当前窗口的 Environment，多窗口下各窗口各取各的。
                 let baseLabelHeight: CGFloat = horizontalSizeClass == .regular ? 36.0 : 30.0
-                let labelHeight = baseLabelHeight
-                    * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize) * grow
+                // 基准高度也要随盘径缩放：否则 grow < 1 时
+                // (labelHeight - baseLabelHeight) 为负，会把标签推到盘外。
+                let scaledBaseHeight = baseLabelHeight * grow
+                let labelHeight = scaledBaseHeight
+                    * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize)
 
                 VStack(spacing: 1) {
                     Text(m.localizedName)
@@ -333,8 +337,12 @@ public struct CompassDialView: View {
                 // 24 山标签是"山名 + 五行"两行：高度随系统字号与盘径放大。
                 // 外沿固定：标签变高时中心向盘心方向补偿一半增量，
                 // 避免放大后外沿压到度数环、内沿继续挤 64 卦环。
-                .frame(width: max(24 * grow, radius * 0.25), height: labelHeight)
-                .offset(y: -radius + 14 * grow + (labelHeight - baseLabelHeight) / 2)
+                // 标签宽度必须小于圆周上每个标签的节距：
+                // 24 个标签均分 2π·radius，节距 ≈ 0.262·radius，留 15% 间隙取 0.222。
+                // 旧值 radius*0.25 叠加旋转后相邻标签必然互相压叠。
+                .frame(width: min(max(24 * grow, radius * 0.25), radius * 0.222),
+                       height: labelHeight)
+                .offset(y: -radius + 14 * grow + (labelHeight - scaledBaseHeight) / 2)
                 .rotationEffect(.degrees(m.angleCenter))
             }
         }

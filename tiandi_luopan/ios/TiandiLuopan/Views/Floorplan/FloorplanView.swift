@@ -706,20 +706,19 @@ public struct FloorplanView: View {
     
     // MARK: - 顶栏控制
     private func topControlBar() -> some View {
-        HStack {
+        // 横向按钮组理想宽度很大，与标题同层 HStack 时会把标题压成竖排单字。
+        // 改为纵向：标题 / 副标题 / 按钮组各占整行，按钮组仍可横向滚动。
+        VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(lang.t("floorplan_title"))
                     .adaptiveFont(size: 15, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text("\(lang.t("floorplan_current_facing"))\(String(format: "%.1f", effectiveHeading))° (\(floorplanHeadingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(floorplanHeadingState.facingMountain.localizedName)\(lang.t("facing_suffix")))")
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
-                    .layoutPriority(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            
-            Spacer(minLength: 6)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -1958,9 +1957,14 @@ public struct FloorplanView: View {
                     Text(room.name)
                         .adaptiveFont(size: 10, weight: .bold)
                         .foregroundColor(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(room.palaceName)
                         .adaptiveFont(size: 8)
                         .foregroundColor(.white.opacity(0.65))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
                 }
                 .padding(isLargeLayout ? 4 : 2)
             }
@@ -2174,14 +2178,18 @@ public struct FloorplanView: View {
     // MARK: - 底部体检报告
     private func auditListSection(report: [FloorplanAuditItem]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            // 分栏右栏只有约 270~360pt，标题 / 提示 / 分享按钮三段横排会把
+            // 越南语「Danh mục kiểm tra cực diện phong thủy toàn nhà」压成竖排单字。
+            // 改为纵向堆叠：标题与提示各占整行，按钮单独一行靠前。
+            VStack(alignment: .leading, spacing: 6) {
                 Text("🏠 \(lang.t("audit_checklist")) (\(report.count))")
                     .adaptiveFont(size: 13, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(lang.t("drag_center_hint"))
                     .adaptiveFont(size: 10)
                     .foregroundColor(.white.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
                 Button(action: {
                     if acquireFloorplanAccess() {
                         exportFloorplanReport(report: report)
@@ -2190,6 +2198,7 @@ public struct FloorplanView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "square.and.arrow.up")
                         Text(lang.t("ar_roomplan_share"))
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .adaptiveFont(size: 10, weight: .bold)
                     .padding(.horizontal, 7)
@@ -2199,6 +2208,7 @@ public struct FloorplanView: View {
                     .cornerRadius(6)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 16)
             
             VStack(spacing: 8) {
@@ -2234,13 +2244,15 @@ public struct FloorplanView: View {
                 .padding(.top, 4)
             
             VStack(alignment: .leading, spacing: isLargeLayout ? 4 : 3) {
-                HStack {
+                // 标题与判级徽章不再横排：窄右栏里长标题会被徽章压成竖排单字。
+                VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
                         .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(item.isSevere ? lang.t("floorplan_severe_sha") : (item.isGood ? lang.t("grade_auspicious") : lang.t("floorplan_warn_sha")))
                         .adaptiveFont(size: 10, weight: .bold)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(item.isSevere ? Color.red.opacity(0.2) : (item.isGood ? Color.green.opacity(0.2) : Color.orange.opacity(0.2)))

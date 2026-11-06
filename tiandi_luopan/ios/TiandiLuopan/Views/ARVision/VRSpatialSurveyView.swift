@@ -131,7 +131,7 @@ public struct VRSpatialSurveyView: View {
                 Text(lang.t("vr_survey_hint"))
                     .adaptiveFont(size: 10, weight: .medium)
                     .foregroundColor(.orange)
-                Text("仿真模型：请先填写实测开间、进深和层高；画布仅用于按比例重建")
+                Text(lang.t("vr_survey_model_note"))
                     .adaptiveFont(size: 9)
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -324,12 +324,12 @@ public struct VRSpatialSurveyView: View {
     private var toolbar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
-                Text("实测尺寸(m)")
+                Text(lang.t("vr_survey_dimensions_m"))
                     .adaptiveFont(size: 10, weight: .semibold)
                     .foregroundColor(.white.opacity(0.8))
-                dimensionField(title: "开间", text: $widthMetersText)
-                dimensionField(title: "进深", text: $depthMetersText)
-                dimensionField(title: "层高", text: $ceilingMetersText)
+                dimensionField(title: lang.t("floorplan_width_hint"), text: $widthMetersText)
+                dimensionField(title: lang.t("floorplan_depth_hint"), text: $depthMetersText)
+                dimensionField(title: lang.t("vr_survey_ceiling_hint"), text: $ceilingMetersText)
             }
             if let validationMessage {
                 Text(validationMessage)
@@ -471,7 +471,7 @@ public struct VRSpatialSurveyView: View {
         }
         validationMessage = nil
         guard !rooms.isEmpty else {
-            validationMessage = "请至少添加一个房间后再生成测绘报告"
+            validationMessage = lang.t("vr_err_no_room")
             return
         }
         let width = metersW
@@ -485,12 +485,12 @@ public struct VRSpatialSurveyView: View {
         guard enteredDimensionsValid,
               width.isFinite, depth.isFinite, roomH.isFinite,
               width >= 1.0, depth >= 1.0, roomH >= 2.0 else {
-            validationMessage = "开间、进深、层高需填写 2–50 m 的有效数值"
+            validationMessage = lang.t("vr_err_invalid_dim")
             return
         }
         let drawableRooms = rooms.filter { $0.type != .door }
         guard !drawableRooms.isEmpty else {
-            validationMessage = "请至少添加一个非门类房间"
+            validationMessage = lang.t("vr_err_only_door")
             return
         }
         let overlapPairs = drawableRooms.indices.reduce(into: 0) { count, i in
@@ -503,7 +503,7 @@ public struct VRSpatialSurveyView: View {
         // overlaps mean the canvas no longer describes disjoint rooms and the
         // area/九宫 calculations would double count the same floor.
         guard overlapPairs == 0 else {
-            validationMessage = "房间区域存在重叠，请拖动或缩放后再生成"
+            validationMessage = lang.t("vr_err_overlap")
             return
         }
 

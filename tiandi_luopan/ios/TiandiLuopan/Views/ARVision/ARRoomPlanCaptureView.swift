@@ -1166,7 +1166,7 @@ public struct ARRoomPlanSurveyView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
-                        Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : "\(lang.t("ar_roomplan_finished")) (\(max(1, model.scannedRoomCount)) 室)")
+                        Text(model.isCapturing ? lang.t("ar_roomplan_scanning") : "\(lang.t("ar_roomplan_finished")) (\(max(1, model.scannedRoomCount))\(lang.t("ar_roomplan_room_unit")))")
                             .adaptiveFont(size: 10, weight: .medium)
                             .foregroundColor(model.isCapturing ? .green : .orange)
                             .lineLimit(1)
@@ -1199,7 +1199,7 @@ public struct ARRoomPlanSurveyView: View {
                                         .background(Color.green.opacity(0.9))
                                         .clipShape(Circle())
                                 }
-                                .accessibilityLabel("继续加扫下一间")
+                                .accessibilityLabel(lang.t("ar_roomplan_next_room"))
                                 if model.currentSpatialSurvey != nil {
                                     Button(action: { show3DViewer = true }) {
                                         HStack(spacing: 4) {
@@ -1214,11 +1214,11 @@ public struct ARRoomPlanSurveyView: View {
                                         .background(Color.yanGold)
                                         .cornerRadius(14)
                                     }
-                                    .accessibilityLabel("查看全屋3D空间布局与形煞")
+                                    .accessibilityLabel(lang.t("ar_3d_model_title"))
                                 }
                                 // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
                                 VStack(spacing: 2) {
-                                    Text(String(format: "大门朝向 %.1f°", model.effectiveHeadingForDisplay))
+                                    Text("\(lang.t("ar_roomplan_door_heading")) \(String(format: "%.1f°", model.effectiveHeadingForDisplay))")
                                         .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                                         .foregroundColor(.white)
                                     HStack(spacing: 3) {

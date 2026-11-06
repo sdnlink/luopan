@@ -28,25 +28,27 @@ public struct VIPLockCardView: View {
     
     public var body: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "lock.shield.fill")
-                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    .adaptiveFont(size: 20)
+            // 窄分栏右栏里标题、徽章与图标横排会互相穿插；标题独占一行，
+            // 图标与徽章另起一行，长词语言也能完整换行。
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .adaptiveFont(size: 15, weight: .bold)
                     .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Spacer()
-                Text(badge)
-                    .adaptiveFont(size: 10, weight: .bold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.yellow.opacity(0.2))
-                    .foregroundColor(Color.yellow)
-                    .cornerRadius(4)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield.fill")
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        .adaptiveFont(size: 20)
+                    Text(badge)
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow.opacity(0.2))
+                        .foregroundColor(Color.yellow)
+                        .cornerRadius(4)
+                    Spacer(minLength: 0)
+                }
             }
             
             Text(featureDesc)
@@ -55,13 +57,12 @@ public struct VIPLockCardView: View {
                 .lineSpacing(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            HStack(spacing: 10) {
+            VStack(spacing: 8) {
                 Button(action: onUnlockTap) {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
                         Text("\(purchaseActionTitle) (\(iap.localizedPrice(for: targetProductId)))")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .adaptiveFont(size: 12, weight: .bold)
                     .frame(maxWidth: .infinity)
@@ -82,6 +83,7 @@ public struct VIPLockCardView: View {
                 }) {
                     Text(LocalizationManager.shared.t("restore_purchases_btn"))
                         .adaptiveFont(size: 11)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(Color.white.opacity(0.08))

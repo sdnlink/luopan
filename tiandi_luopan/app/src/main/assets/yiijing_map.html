@@ -2599,11 +2599,16 @@
                 <span id="lbl-lang-title">🌐 语言偏好 / Language</span>
                 <span id="lbl-lang-curr-hint" style="font-size:10.5px; color:#64b5f6;">📱 跟随系统</span>
             </div>
-            <div class="layer-preset-bar" id="lang-switch-bar" style="margin-bottom:12px;">
-                <button class="layer-preset-btn active" id="lang-opt-auto" onclick="setAppLanguage('auto')">📱 跟随系统</button>
+            <div class="layer-preset-bar" id="lang-switch-bar" style="margin-bottom:12px; flex-wrap:wrap;">
+                <button class="layer-preset-btn active" id="lang-opt-auto" onclick="setAppLanguage('auto')">📱 Auto</button>
                 <button class="layer-preset-btn" id="lang-opt-hans" onclick="setAppLanguage('zh-Hans')">🇨🇳 简体中文</button>
                 <button class="layer-preset-btn" id="lang-opt-hant" onclick="setAppLanguage('zh-Hant')">🇭🇰 繁體中文</button>
                 <button class="layer-preset-btn" id="lang-opt-en" onclick="setAppLanguage('en')">🇬🇧 English</button>
+                <button class="layer-preset-btn" id="lang-opt-vi" onclick="setAppLanguage('vi')">🇻🇳 Tiếng Việt</button>
+                <button class="layer-preset-btn" id="lang-opt-th" onclick="setAppLanguage('th')">🇹🇭 ภาษาไทย</button>
+                <button class="layer-preset-btn" id="lang-opt-id" onclick="setAppLanguage('id')">🇮🇩 Indonesia</button>
+                <button class="layer-preset-btn" id="lang-opt-ja" onclick="setAppLanguage('ja')">🇯🇵 日本語</button>
+                <button class="layer-preset-btn" id="lang-opt-ko" onclick="setAppLanguage('ko')">🇰🇷 한국어</button>
             </div>
             <div style="font-size:12px; font-weight:bold; color:#aaa; margin:4px 0 6px 0;" id="lbl-layer-preset-title">⚙️ 罗盘圈层预设</div>
             <div class="layer-preset-bar">
@@ -4547,6 +4552,938 @@
             closeIAPModal();
             localizedAlert('已打开外部支付应用。支付完成后请返回，并等待服务端验证订单；在验证完成前不会开通权益。','已開啟外部支付應用。支付完成後請返回，並等待服務端驗證訂單；驗證完成前不會開通權益。','The payment app was opened. Return after paying and wait for server verification; entitlements remain locked until verification.');
         };
+
+        // 挂载至全局
+        window.selectPayChannel = selectPayChannel;
+        window.executeUnifiedCheckout = executeUnifiedCheckout;
+        window.closeQrPayModal = closeQrPayModal;
+        window.simulateQrPaymentSuccess = simulateQrPaymentSuccess;
+        window.handleCardNumberInput = handleCardNumberInput;
+        window.handleCardNameInput = handleCardNameInput;
+        window.handleCardExpInput = handleCardExpInput;
+
+        
+        // ==============================================================
+        // 国际化 (i18n) 核心多语言字典与系统语言监听引擎
+        // 支持：zh-Hans (简体中文), zh-Hant (繁體中文), en (English)
+        // 模式：跟随系统 (auto / 默认), 手动切换锁定
+        // ==============================================================
+
+        const I18N_RESOURCES = {
+            'zh-Hans': {
+                langName: '简体中文',
+                title: '天机演象',
+                crosshairHint: '🎯 十字天心瞄准 · 坐向同论 (正前▲向 · 正后▼坐)',
+                tabPost: '后天八卦',
+                tabPre: '先天八卦',
+                rotFollow: '🔄 随向转',
+                rotLock: '🔒 锁定盘',
+                hdRealtime: '🔓 实时',
+                hdLocked: '🔒 锁定',
+                tabLayer: '⚙️ 图层',
+                tabTianji: '📜 天机书',
+                tabFengshui: '🏡 风水详解',
+                tabVip: '👑 会员中心',
+                tabLang: '语言',
+                navCompass: '时空罗盘',
+                navAr: '全景形煞',
+                navFloorplan: '户型立极',
+                navFengshui: '玄空理气',
+                btnArScan: '⚡ AI扫描',
+                btnArDial: '🌐 罗盘环',
+                btnArSim: '🏙️ 实景演练',
+                btnArFlip: '🔄 翻转',
+                btnArCenter: '🎯 准星居中',
+                btnArShaAudit: '🔍 形煞深度研判',
+                btnArSnapshot: '📸 存证快照',
+                arPointerXiang: '▲ 向 (正前)',
+                arPointerZuo: '▼ 坐 (正后)',
+                sitZuo: '坐',
+                sitFace: '向',
+                sitZhengZhen: '正针',
+                pureTrue: '正针纯清',
+                pureSub: '兼山兼向',
+                pureSmallVoid: '差错小空亡',
+                pureBigVoid: '出卦大空亡',
+                goldJewel: '旺相珠宝',
+                goldFire: '孤虚火坑',
+                labelSitFace: '立向格局',
+                labelKongWang: '空亡诊断',
+                labelFenJin: '一百二十分金',
+                labelFsSummary: '风水方位详解',
+                labelHuangQuan: '八路黄泉水法',
+                labelQiMen: '时空客星与奇门',
+                labelLevel: '电子水准倾角',
+                labelGanZhi: '四柱天干地支',
+                labelSolarTime: '真太阳时 ☀️',
+                labelDir: '地理方位',
+                labelCoords: '经纬坐标 ⟳',
+                labelSpeed: '移动速度',
+                labelPostGua: '后天八卦',
+                labelPreGua: '先天八卦',
+                labelElem: '五行属性',
+                labelMountain: '对应山向',
+                labelSolar: '当令节气',
+                labelGua: '主应消息卦',
+                dirs: {
+                    N: '正北', S: '正南', E: '正东', W: '正西',
+                    NE: '东北', SE: '东南', NW: '西北', SW: '西南'
+                },
+                elements: {
+                    '水': '水', '木': '木', '火': '火', '土': '土', '金': '金'
+                },
+                levelGood: '水平良好 ✓',
+                levelTilt: '调平中…',
+                xkCard1: '下元九运 · 玄空九宫飞星盘',
+                xkCard2: '紫白飞星 · 流年流月动态气运布防',
+                xkCard3: '杨公形气 · 八路黄泉与坐山曜煞',
+                xkCard4: '三式绝学 · 时家奇门遁甲全息排盘',
+                xkCard5: '📜 演象 · 福宅天机堪舆全案长图',
+                fpTitle: '🏡 全屋功能区合规体检看板',
+                fpBtnSample: '标准三居户型',
+                fpBtnUpload: '上传户型图',
+                fpBtnRecenter: '重新标定重心',
+                vipTitle: '演象 · 尊享堪舆会员中心',
+                vipSub: '时空合一核心绝学 · 专业实勘与长卷导出',
+                vipPayTitle: '💳 选择安全支付方式',
+                vipPayHint: '支持全球卡与国内主流通道',
+                payWechat: '微信支付',
+                payAlipay: '支付宝',
+                payCard: '国际信用卡',
+                payUnion: '银联云闪付',
+                btnPayNow: '立即安全支付',
+                btnRestore: '恢复购买',
+                langFollowSys: '📱 跟随系统',
+                langSwitched: '语言已切换为：'
+            },
+            'zh-Hant': {
+                langName: '繁體中文',
+                title: '天機演象',
+                crosshairHint: '🎯 十字天心瞄準 · 坐向同論 (正前▲向 · 正後▼坐)',
+                tabPost: '後天八卦',
+                tabPre: '先天八卦',
+                rotFollow: '🔄 隨向轉',
+                rotLock: '🔒 鎖定盤',
+                hdRealtime: '🔓 實時',
+                hdLocked: '🔒 鎖定',
+                tabLayer: '⚙️ 圖層',
+                tabTianji: '📜 天機書',
+                tabFengshui: '🏡 風水詳解',
+                tabVip: '👑 會員中心',
+                tabLang: '語言',
+                navCompass: '時空羅盤',
+                navAr: '全景形煞',
+                navFloorplan: '戶型立極',
+                navFengshui: '玄空理氣',
+                btnArScan: '⚡ AI掃描',
+                btnArDial: '🌐 羅盤環',
+                btnArSim: '🏙️ 實景演練',
+                btnArFlip: '🔄 翻轉',
+                btnArCenter: '🎯 準星居中',
+                btnArShaAudit: '🔍 形煞深度研判',
+                btnArSnapshot: '📸 存證快照',
+                arPointerXiang: '▲ 向 (正前)',
+                arPointerZuo: '▼ 坐 (正後)',
+                sitZuo: '坐',
+                sitFace: '向',
+                sitZhengZhen: '正針',
+                pureTrue: '正針純清',
+                pureSub: '兼山兼向',
+                pureSmallVoid: '差錯小空亡',
+                pureBigVoid: '出卦大空亡',
+                goldJewel: '旺相珠寶',
+                goldFire: '孤虛火坑',
+                labelSitFace: '立向格局',
+                labelKongWang: '空亡診斷',
+                labelFenJin: '一百二十分金',
+                labelFsSummary: '風水方位詳解',
+                labelHuangQuan: '八路黃泉水法',
+                labelQiMen: '時空客星與奇門',
+                labelLevel: '電子水準傾角',
+                labelGanZhi: '四柱天干地支',
+                labelSolarTime: '真太陽時 ☀️',
+                labelDir: '地理方位',
+                labelCoords: '經緯坐標 ⟳',
+                labelSpeed: '移動速度',
+                labelPostGua: '後天八卦',
+                labelPreGua: '先天八卦',
+                labelElem: '五行屬性',
+                labelMountain: '對應山向',
+                labelSolar: '當令節氣',
+                labelGua: '主應消息卦',
+                dirs: {
+                    N: '正北', S: '正南', E: '正東', W: '正西',
+                    NE: '東北', SE: '東南', NW: '西北', SW: '西南'
+                },
+                elements: {
+                    '水': '水', '木': '木', '火': '火', '土': '土', '金': '金'
+                },
+                levelGood: '水準良好 ✓',
+                levelTilt: '調平中…',
+                xkCard1: '下元九運 · 玄空九宮飛星盤',
+                xkCard2: '紫白飛星 · 流年流月動態氣運布防',
+                xkCard3: '楊公形氣 · 八路黃泉與坐山曜煞',
+                xkCard4: '三式絕學 · 時家奇門遁甲全息排盤',
+                xkCard5: '📜 演象 · 福宅天機堪輿全案長圖',
+                fpTitle: '🏡 全屋功能區合規體檢看板',
+                fpBtnSample: '標準三居戶型',
+                fpBtnUpload: '上傳戶型圖',
+                fpBtnRecenter: '重新標定重心',
+                vipTitle: '演象 · 尊享堪輿會員中心',
+                vipSub: '時空合一核心絕學 · 專業實勘與長卷導出',
+                vipPayTitle: '💳 選擇安全支付方式',
+                vipPayHint: '支持全球卡與國內主流通道',
+                payWechat: '微信支付',
+                payAlipay: '支付寶',
+                payCard: '國際信用卡',
+                payUnion: '銀聯雲閃付',
+                btnPayNow: '立即安全支付',
+                btnRestore: '恢復購買',
+                langFollowSys: '📱 跟隨系統',
+                langSwitched: '語言已切換為：'
+            },
+            'en': {
+                langName: 'English',
+                title: 'TianJi Compass',
+                crosshairHint: '🎯 Center Alignment · Front▲ Facing · Back▼ Sitting',
+                tabPost: 'Later Bagua',
+                tabPre: 'Early Bagua',
+                rotFollow: '🔄 Auto Rotate',
+                rotLock: '🔒 Lock Dial',
+                hdRealtime: '🔓 Live',
+                hdLocked: '🔒 Locked',
+                tabLayer: '⚙️ Layers',
+                tabTianji: '📜 Scroll',
+                tabFengshui: '🏡 Sectors',
+                tabVip: '👑 VIP',
+                tabLang: 'Lang',
+                navCompass: 'Compass',
+                navAr: 'AR Scan',
+                navFloorplan: 'Floor Plan',
+                navFengshui: 'Feng Shui',
+                btnArScan: '⚡ AI Scan',
+                btnArDial: '🌐 Dial Ring',
+                btnArSim: '🏙️ Demo Scene',
+                btnArFlip: '🔄 Flip',
+                btnArCenter: '🎯 Center Aim',
+                btnArShaAudit: '🔍 Sha Analysis',
+                btnArSnapshot: '📸 Snapshot',
+                arPointerXiang: '▲ Facing (Front)',
+                arPointerZuo: '▼ Sitting (Back)',
+                sitZuo: 'Sit',
+                sitFace: 'Face',
+                sitZhengZhen: 'True Needle',
+                pureTrue: 'Pure Alignment',
+                pureSub: 'Replacement Chart',
+                pureSmallVoid: 'Minor Void Line',
+                pureBigVoid: 'Major Void Line',
+                goldJewel: 'Auspicious Line',
+                goldFire: 'Inauspicious Line',
+                labelSitFace: 'Sitting & Facing',
+                labelKongWang: 'Alignment Status',
+                labelFenJin: '120 Fenjin',
+                labelFsSummary: '8-Sector Guide',
+                labelHuangQuan: 'Yang Gong Water',
+                labelQiMen: 'Qi Men & Stars',
+                labelLevel: 'Digital Level',
+                labelGanZhi: 'Four Pillars',
+                labelSolarTime: 'True Solar Time ☀️',
+                labelDir: 'Heading',
+                labelCoords: 'GPS Coords ⟳',
+                labelSpeed: 'Speed',
+                labelPostGua: 'Later Bagua',
+                labelPreGua: 'Early Bagua',
+                labelElem: 'Five Elements',
+                labelMountain: '24 Mountains',
+                labelSolar: 'Solar Term',
+                labelGua: 'Sovereign Gua',
+                dirs: {
+                    N: 'North', S: 'South', E: 'East', W: 'West',
+                    NE: 'Northeast', SE: 'Southeast', NW: 'Northwest', SW: 'Southwest'
+                },
+                elements: {
+                    '水': 'Water', '木': 'Wood', '火': 'Fire', '土': 'Earth', '金': 'Metal'
+                },
+                levelGood: 'Level ✓',
+                levelTilt: 'Leveling…',
+                xkCard1: 'Period 9 Flying Stars Chart',
+                xkCard2: 'Annual & Monthly Purple-White Stars',
+                xkCard3: 'Yang Gong Water & Mountain Sha',
+                xkCard4: 'Qi Men Dun Jia Chart',
+                xkCard5: '📜 Master Feng Shui Scroll Export',
+                fpTitle: '🏡 Floor Plan Center & Full Audit',
+                fpBtnSample: 'Sample Plan',
+                fpBtnUpload: 'Import Plan',
+                fpBtnRecenter: 'Auto-Center',
+                vipTitle: 'TianJi VIP Member Center',
+                vipSub: 'Full-House Audits, Qi Men & HD Scroll Exports',
+                vipPayTitle: '💳 Select Payment Method',
+                vipPayHint: 'Secure global and local payment channels',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: 'Credit Card',
+                payUnion: 'UnionPay',
+                btnPayNow: 'Unlock VIP Now',
+                btnRestore: 'Restore Purchases',
+                langFollowSys: '📱 Follow System',
+                langSwitched: 'Language: '
+            },
+            'vi': {
+                langName: 'Tiếng Việt',
+                title: 'La Bàn Thiên Cơ',
+                crosshairHint: '🎯 Ngắm tâm chữ thập · Trước▲ Hướng · Sau▼ Tọa',
+                tabPost: 'Hậu Thiên',
+                tabPre: 'Tiên Thiên',
+                rotFollow: '🔄 Tự xoay',
+                rotLock: '🔒 Khóa đĩa',
+                hdRealtime: '🔓 Trực tiếp',
+                hdLocked: '🔒 Đã khóa',
+                tabLayer: '⚙️ Lớp đĩa',
+                tabTianji: '📜 Thiên Cơ',
+                tabFengshui: '🏡 Bát phương',
+                tabVip: '👑 Hội viên',
+                tabLang: 'Ngôn ngữ',
+                navCompass: 'La bàn',
+                navAr: 'Thực cảnh AR',
+                navFloorplan: 'Mặt bằng',
+                navFengshui: 'Huyền Không',
+                btnArScan: '⚡ Quét AI',
+                btnArDial: '🌐 Vòng la bàn',
+                btnArSim: '🏙️ Mô phỏng',
+                btnArFlip: '🔄 Đổi camera',
+                btnArCenter: '🎯 Giữa tâm',
+                btnArShaAudit: '🔍 Luận giải sát khí',
+                btnArSnapshot: '📸 Chụp lưu chứng',
+                arPointerXiang: '▲ Hướng (Trước)',
+                arPointerZuo: '▼ Tọa (Sau)',
+                sitZuo: 'Tọa',
+                sitFace: 'Hướng',
+                sitZhengZhen: 'Chính châm',
+                pureTrue: 'Chính hướng thuần',
+                pureSub: 'Kiêm hướng thế quái',
+                pureSmallVoid: 'Tiểu không vong',
+                pureBigVoid: 'Đại không vong',
+                goldJewel: 'Tuyến vượng tài',
+                goldFire: 'Tuyến cô hư',
+                labelSitFace: 'Cục diện Tọa Hướng',
+                labelKongWang: 'Chẩn đoán Không Vong',
+                labelFenJin: '120 Phân Kim',
+                labelFsSummary: 'Chi tiết Bát phương',
+                labelHuangQuan: 'Thủy pháp Hoàng Tuyền',
+                labelQiMen: 'Kỳ Môn & Khách tinh',
+                labelLevel: 'Thước thủy điện tử',
+                labelGanZhi: 'Tứ trụ Can Chi',
+                labelSolarTime: 'Giờ mặt trời thật ☀️',
+                labelDir: 'Phương vị',
+                labelCoords: 'Tọa độ GPS ⟳',
+                labelSpeed: 'Tốc độ',
+                labelPostGua: 'Hậu Thiên Bát Quái',
+                labelPreGua: 'Tiên Thiên Bát Quái',
+                labelElem: 'Ngũ hành',
+                labelMountain: 'Sơn hướng',
+                labelSolar: 'Tiết khí',
+                labelGua: 'Quẻ đương lệnh',
+                dirs: {
+                    N: 'Chính Bắc', S: 'Chính Nam', E: 'Chính Đông', W: 'Chính Tây',
+                    NE: 'Đông Bắc', SE: 'Đông Nam', NW: 'Tây Bắc', SW: 'Tây Nam'
+                },
+                elements: {
+                    '水': 'Thủy', '木': 'Mộc', '火': 'Hỏa', '土': 'Thổ', '金': 'Kim'
+                },
+                levelGood: 'Cân bằng ✓',
+                levelTilt: 'Đang cân chỉnh…',
+                xkCard1: 'Cửu Tinh Huyền Không Vận 9',
+                xkCard2: 'Tử Bạch Lưu Niên & Thái Tuế',
+                xkCard3: 'Thủy Pháp Dương Công & Hoàng Tuyền',
+                xkCard4: 'Lập Bàn Kỳ Môn Độn Giáp',
+                xkCard5: '📜 Xuất Cuộn Tranh Thiên Cơ HD',
+                fpTitle: '🏡 Lập Cực Mặt Bằng · Khám Toàn Nhà',
+                fpBtnSample: 'Mẫu mặc định',
+                fpBtnUpload: 'Nhập bản vẽ',
+                fpBtnRecenter: 'Tự định Trung cung',
+                vipTitle: 'Trung Tâm Hội Viên VIP',
+                vipSub: 'Mở khóa Kỳ Môn, Khám mặt bằng & Xuất cuộn tranh HD',
+                vipPayTitle: '💳 Chọn phương thức thanh toán',
+                vipPayHint: 'Hỗ trợ thẻ quốc tế và ví điện tử',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: 'Thẻ quốc tế',
+                payUnion: 'UnionPay',
+                btnPayNow: 'Mở khóa VIP ngay',
+                btnRestore: 'Khôi phục giao dịch',
+                langFollowSys: '📱 Theo hệ thống',
+                langSwitched: 'Đã chuyển ngôn ngữ: '
+            },
+            'th': {
+                langName: 'ภาษาไทย',
+                title: 'เข็มทิศเทียนจี',
+                crosshairHint: '🎯 เล็งจุดกึ่งกลาง · หน้า▲หัน · หลัง▼พิง',
+                tabPost: 'โฮ่วเทียน',
+                tabPre: 'เซียนเทียน',
+                rotFollow: '🔄 หมุนตามทิศ',
+                rotLock: '🔒 ล็อกจาน',
+                hdRealtime: '🔓 เรียลไทม์',
+                hdLocked: '🔒 ล็อกทิศ',
+                tabLayer: '⚙️ เลเยอร์',
+                tabTianji: '📜 คัมภีร์',
+                tabFengshui: '🏡 ผัง 8 ทิศ',
+                tabVip: '👑 สมาชิก VIP',
+                tabLang: 'ภาษา',
+                navCompass: 'เข็มทิศ',
+                navAr: 'สแกน AR',
+                navFloorplan: 'ผังบ้าน',
+                navFengshui: 'ฮวงจุ้ย',
+                btnArScan: '⚡ สแกน AI',
+                btnArDial: '🌐 วงเข็มทิศ',
+                btnArSim: '🏙️ โหมดจำลอง',
+                btnArFlip: '🔄 สลับกล้อง',
+                btnArCenter: '🎯 รีเซ็ตเป้า',
+                btnArShaAudit: '🔍 วิเคราะห์จุดเสีย',
+                btnArSnapshot: '📸 ถ่ายภาพบันทึก',
+                arPointerXiang: '▲ ทิศหัน (ด้านหน้า)',
+                arPointerZuo: '▼ ทิศพิง (ด้านหลัง)',
+                sitZuo: 'พิง',
+                sitFace: 'หัน',
+                sitZhengZhen: 'เข็มหลัก',
+                pureTrue: 'แนวเข็มหลักบริสุทธิ์',
+                pureSub: 'ทิศผสม (ผังแทน)',
+                pureSmallVoid: 'แนวสูญยตาเล็ก',
+                pureBigVoid: 'แนวสูญยตาใหญ่',
+                goldJewel: 'องศามงคล',
+                goldFire: 'องศาควรเลี่ยง',
+                labelSitFace: 'ทิศพิงและทิศหัน',
+                labelKongWang: 'สถานะแนวทิศ',
+                labelFenJin: '120 เฟินจิน',
+                labelFsSummary: 'ฮวงจุ้ย 8 ทิศ',
+                labelHuangQuan: 'วิธิน้ำหยางกง',
+                labelQiMen: 'ฉีเหมินและดาวจร',
+                labelLevel: 'ระดับน้ำดิจิทัล',
+                labelGanZhi: 'ดวงสี่เสา (ปาจื้อ)',
+                labelSolarTime: 'เวลาสุริยะจริง ☀️',
+                labelDir: 'ทิศทาง',
+                labelCoords: 'พิกัด GPS ⟳',
+                labelSpeed: 'ความเร็ว',
+                labelPostGua: 'ปากั้วโฮ่วเทียน',
+                labelPreGua: 'ปากั้วเซียนเทียน',
+                labelElem: 'ธาตุทั้งห้า',
+                labelMountain: '24 ขุนเขา',
+                labelSolar: 'สารทฤดูกาล',
+                labelGua: 'ขาลประจำฤดู',
+                dirs: {
+                    N: 'เหนือ', S: 'ใต้', E: 'ตะวันออก', W: 'ตะวันตก',
+                    NE: 'ตะวันออกเฉียงเหนือ', SE: 'ตะวันออกเฉียงใต้', NW: 'ตะวันตกเฉียงเหนือ', SW: 'ตะวันตกเฉียงใต้'
+                },
+                elements: {
+                    '水': 'น้ำ', '木': 'ไม้', '火': 'ไฟ', '土': 'ดิน', '金': 'ทอง'
+                },
+                levelGood: 'ได้ระดับ ✓',
+                levelTilt: 'กำลังปรับระดับ…',
+                xkCard1: 'ผังดาวเหิน 9 ยุค (ยุค 9)',
+                xkCard2: 'ดาวจรประจำปีและไท่สุ่ย',
+                xkCard3: 'วิธิน้ำหยางกงและจุดต้องห้าม',
+                xkCard4: 'ผังฉีเหมินตุ้นเจี่ยรายชั่วโมง',
+                xkCard5: '📜 ส่งออกม้วนคัมภีร์ฮวงจุ้ย HD',
+                fpTitle: '🏡 ตั้งจุดศูนย์กลาง · ตรวจฮวงจุ้ยทั้งหลัง',
+                fpBtnSample: 'แปลนตัวอย่าง',
+                fpBtnUpload: 'นำเข้าแปลน',
+                fpBtnRecenter: 'ตั้งจุดกึ่งกลางอัตโนมัติ',
+                vipTitle: 'ศูนย์สมาชิก VIP เทียนจี',
+                vipSub: 'ปลดล็อกผังฉีเหมิน ตรวจผังบ้าน และส่งออกคัมภีร์ HD',
+                vipPayTitle: '💳 เลือกช่องทางชำระเงิน',
+                vipPayHint: 'รองรับบัตรเครดิตและช่องทางหลัก',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: 'บัตรเครดิต',
+                payUnion: 'UnionPay',
+                btnPayNow: 'ปลดล็อก VIP ทันที',
+                btnRestore: 'กู้คืนการซื้อ',
+                langFollowSys: '📱 ตามระบบ',
+                langSwitched: 'เปลี่ยนภาษาเป็น: '
+            },
+            'id': {
+                langName: 'Bahasa Indonesia',
+                title: 'Kompas TianJi',
+                crosshairHint: '🎯 Bidik Titik Tengah · Depan▲ Hadap · Belakang▼ Duduk',
+                tabPost: 'Bagua Akhir',
+                tabPre: 'Bagua Awal',
+                rotFollow: '🔄 Putar Otomatis',
+                rotLock: '🔒 Kunci Piringan',
+                hdRealtime: '🔓 Langsung',
+                hdLocked: '🔒 Terkunci',
+                tabLayer: '⚙️ Lapisan',
+                tabTianji: '📜 Gulungan',
+                tabFengshui: '🏡 8 Arah',
+                tabVip: '👑 VIP',
+                tabLang: 'Bahasa',
+                navCompass: 'Kompas',
+                navAr: 'Lensa AR',
+                navFloorplan: 'Denah',
+                navFengshui: 'Feng Shui',
+                btnArScan: '⚡ Pindai AI',
+                btnArDial: '🌐 Lingkar Kompas',
+                btnArSim: '🏙️ Mode Simulasi',
+                btnArFlip: '🔄 Balik Kamera',
+                btnArCenter: '🎯 Reset Bidikan',
+                btnArShaAudit: '🔍 Analisis Sha',
+                btnArSnapshot: '📸 Foto Bukti',
+                arPointerXiang: '▲ Hadap (Depan)',
+                arPointerZuo: '▼ Duduk (Belakang)',
+                sitZuo: 'Duduk',
+                sitFace: 'Hadap',
+                sitZhengZhen: 'Jarum Utama',
+                pureTrue: 'Poros Murni',
+                pureSub: 'Arah Campuran',
+                pureSmallVoid: 'Garis Kosong Kecil',
+                pureBigVoid: 'Garis Kosong Besar',
+                goldJewel: 'Garis Mujur',
+                goldFire: 'Garis Pantang',
+                labelSitFace: 'Posisi Duduk & Hadap',
+                labelKongWang: 'Status Garis Poros',
+                labelFenJin: '120 Fenjin',
+                labelFsSummary: 'Panduan 8 Arah',
+                labelHuangQuan: 'Metode Air Yang Gong',
+                labelQiMen: 'Qi Men & Bintang',
+                labelLevel: 'Waterpas Digital',
+                labelGanZhi: 'Empat Pilar (BaZi)',
+                labelSolarTime: 'Waktu Surya Sejati ☀️',
+                labelDir: 'Arah Mata Angin',
+                labelCoords: 'Koordinat GPS ⟳',
+                labelSpeed: 'Kecepatan',
+                labelPostGua: 'Bagua Houtian',
+                labelPreGua: 'Bagua Xiantian',
+                labelElem: 'Lima Elemen',
+                labelMountain: '24 Gunung',
+                labelSolar: 'Musim Surya',
+                labelGua: 'Heksagram Musim',
+                dirs: {
+                    N: 'Utara', S: 'Selatan', E: 'Timur', W: 'Barat',
+                    NE: 'Timur Laut', SE: 'Tenggara', NW: 'Barat Laut', SW: 'Barat Daya'
+                },
+                elements: {
+                    '水': 'Air', '木': 'Kayu', '火': 'Api', '土': 'Tanah', '金': 'Logam'
+                },
+                levelGood: 'Seimbang ✓',
+                levelTilt: 'Menyeimbangkan…',
+                xkCard1: 'Bintang Terbang Periode 9',
+                xkCard2: 'Bintang Tahunan & Tai Sui',
+                xkCard3: 'Metode Air Yang Gong & Sha',
+                xkCard4: 'Bagan Lengkap Qi Men Dun Jia',
+                xkCard5: '📜 Ekspor Gulungan Master HD',
+                fpTitle: '🏡 Titik Pusat Denah · Audit Rumah',
+                fpBtnSample: 'Reset Contoh',
+                fpBtnUpload: 'Impor Denah',
+                fpBtnRecenter: 'Pusatkan Otomatis',
+                vipTitle: 'Pusat Anggota VIP TianJi',
+                vipSub: 'Akses Penuh Audit Denah, Qi Men & Ekspor Gulungan HD',
+                vipPayTitle: '💳 Pilih Metode Pembayaran',
+                vipPayHint: 'Mendukung kartu global dan pembayaran lokal',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: 'Kartu Kredit',
+                payUnion: 'UnionPay',
+                btnPayNow: 'Buka VIP Sekarang',
+                btnRestore: 'Pulihkan Pembelian',
+                langFollowSys: '📱 Ikuti Sistem',
+                langSwitched: 'Bahasa diubah ke: '
+            },
+            'ja': {
+                langName: '日本語',
+                title: '天機演象',
+                crosshairHint: '🎯 天心十字照準・前▲向 / 後▼坐',
+                tabPost: '後天八卦',
+                tabPre: '先天八卦',
+                rotFollow: '🔄 自動回転',
+                rotLock: '🔒 盤面固定',
+                hdRealtime: '🔓 リアルタイム',
+                hdLocked: '🔒 方位固定中',
+                tabLayer: '⚙️ レイヤー',
+                tabTianji: '📜 鑑定書',
+                tabFengshui: '🏡 八方吉凶',
+                tabVip: '👑 会員・VIP',
+                tabLang: '言語',
+                navCompass: '羅盤',
+                navAr: 'AR実景',
+                navFloorplan: '間取り',
+                navFengshui: '玄空風水',
+                btnArScan: '⚡ AIスキャン',
+                btnArDial: '🌐 羅盤リング',
+                btnArSim: '🏙️ デモ演習',
+                btnArFlip: '🔄 カメラ切替',
+                btnArCenter: '🎯 照準リセット',
+                btnArShaAudit: '🔍 形煞詳細診断',
+                btnArSnapshot: '📸 証拠スナップ',
+                arPointerXiang: '▲ 向（正面）',
+                arPointerZuo: '▼ 坐（背面）',
+                sitZuo: '坐',
+                sitFace: '向',
+                sitZhengZhen: '正針',
+                pureTrue: '正針純清',
+                pureSub: '兼針替卦',
+                pureSmallVoid: '差錯小空亡',
+                pureBigVoid: '出卦大空亡',
+                goldJewel: '旺相珠宝',
+                goldFire: '孤虚火坑',
+                labelSitFace: '坐向格局',
+                labelKongWang: '空亡診断',
+                labelFenJin: '百二十分金',
+                labelFsSummary: '八方風水詳細',
+                labelHuangQuan: '八路黄泉水法',
+                labelQiMen: '紫白・奇門遁甲',
+                labelLevel: '電子水準器',
+                labelGanZhi: '四柱干支',
+                labelSolarTime: '真太陽時 ☀️',
+                labelDir: '方位',
+                labelCoords: '経緯度座標 ⟳',
+                labelSpeed: '移動速度',
+                labelPostGua: '後天八卦',
+                labelPreGua: '先天八卦',
+                labelElem: '五行属性',
+                labelMountain: '二十四山向',
+                labelSolar: '当令節気',
+                labelGua: '十二消息卦',
+                dirs: {
+                    N: '正北', S: '正南', E: '正東', W: '正西',
+                    NE: '北東', SE: '南東', NW: '北西', SW: '南西'
+                },
+                elements: {
+                    '水': '水', '木': '木', '火': '火', '土': '土', '金': '金'
+                },
+                levelGood: '水平良好 ✓',
+                levelTilt: '水平調整中…',
+                xkCard1: '下元九運・玄空九宮飛星盤',
+                xkCard2: '年運・月運の紫白九星と太歳三煞',
+                xkCard3: '楊公水法・八路黄泉と坐山曜煞',
+                xkCard4: '時家奇門遁甲の精密作盤',
+                xkCard5: '📜 高精細・天機風水鑑定長巻',
+                fpTitle: '🏡 間取り中心設定・家相診断',
+                fpBtnSample: 'サンプルに戻す',
+                fpBtnUpload: '図面を読込',
+                fpBtnRecenter: '中宮を自動設定',
+                vipTitle: '天機演象 VIP会員センター',
+                vipSub: '奇門遁甲・家相診断・高精細鑑定長巻の書き出しを全開放',
+                vipPayTitle: '💳 お支払い方法の選択',
+                vipPayHint: '各種カード・主要決済に対応',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: 'クレジットカード',
+                payUnion: 'UnionPay',
+                btnPayNow: '今すぐVIPをアンロック',
+                btnRestore: '購入を復元',
+                langFollowSys: '📱 システム設定に従う',
+                langSwitched: '表示言語：'
+            },
+            'ko': {
+                langName: '한국어',
+                title: '천기연상',
+                crosshairHint: '🎯 천심 십자 조준 · 전면▲향 / 후면▼좌',
+                tabPost: '후천팔괘',
+                tabPre: '선천팔괘',
+                rotFollow: '🔄 자동 회전',
+                rotLock: '🔒 나침반 고정',
+                hdRealtime: '🔓 실시간',
+                hdLocked: '🔒 방위 고정됨',
+                tabLayer: '⚙️ 레이어',
+                tabTianji: '📜 감정서',
+                tabFengshui: '🏡 8방위 길흉',
+                tabVip: '👑 멤버십',
+                tabLang: '언어',
+                navCompass: '나침반',
+                navAr: 'AR 실경',
+                navFloorplan: '평면도',
+                navFengshui: '현공풍수',
+                btnArScan: '⚡ AI 스캔',
+                btnArDial: '🌐 나침반 링',
+                btnArSim: '🏙️ 시뮬레이션',
+                btnArFlip: '🔄 카메라 전환',
+                btnArCenter: '🎯 조준선 중앙',
+                btnArShaAudit: '🔍 형살 정밀 진단',
+                btnArSnapshot: '📸 인증 스냅샷',
+                arPointerXiang: '▲ 향 (정면)',
+                arPointerZuo: '▼ 좌 (후면)',
+                sitZuo: '좌',
+                sitFace: '향',
+                sitZhengZhen: '정침',
+                pureTrue: '정침 순청',
+                pureSub: '겸침 체괘',
+                pureSmallVoid: '소공망',
+                pureBigVoid: '대공망',
+                goldJewel: '왕상 주보선',
+                goldFire: '고허 화갱선',
+                labelSitFace: '좌향 격국',
+                labelKongWang: '공망 진단',
+                labelFenJin: '120분금',
+                labelFsSummary: '8방위 풍수 해설',
+                labelHuangQuan: '팔로황천 수법',
+                labelQiMen: '자백객성·기문둔갑',
+                labelLevel: '전자 수평계',
+                labelGanZhi: '사주 간지',
+                labelSolarTime: '진태양시 ☀️',
+                labelDir: '방위',
+                labelCoords: 'GPS 좌표 ⟳',
+                labelSpeed: '이동 속도',
+                labelPostGua: '후천팔괘',
+                labelPreGua: '선천팔괘',
+                labelElem: '오행 속성',
+                labelMountain: '24산향',
+                labelSolar: '절기',
+                labelGua: '12소식괘',
+                dirs: {
+                    N: '정북', S: '정남', E: '정동', W: '정서',
+                    NE: '북동', SE: '남동', NW: '북서', SW: '남서'
+                },
+                elements: {
+                    '水': '수(水)', '木': '목(木)', '火': '화(火)', '土': '토(土)', '金': '금(金)'
+                },
+                levelGood: '수평 양호 ✓',
+                levelTilt: '수평 맞추는 중…',
+                xkCard1: '하원 9운 · 현공구궁비성반',
+                xkCard2: '연운·월운 자백객성과 태세삼살',
+                xkCard3: '양공수법·팔로황천 및 좌산요살',
+                xkCard4: '시가기문둔갑 정밀 포국',
+                xkCard5: '📜 고화질 천기 풍수 감정 두루마리',
+                fpTitle: '🏡 평면도 중심 설정 · 집 전체 진단',
+                fpBtnSample: '샘플 초기화',
+                fpBtnUpload: '도면 불러오기',
+                fpBtnRecenter: '중궁 자동 설정',
+                vipTitle: '천기연상 VIP 멤버십 센터',
+                vipSub: '기문둔갑 · 평면도 정밀 진단 · 고화질 감정서 내보내기',
+                vipPayTitle: '💳 결제 수단 선택',
+                vipPayHint: '해외 카드 및 주요 간편결제 지원',
+                payWechat: 'WeChat Pay',
+                payAlipay: 'Alipay',
+                payCard: '신용/체크카드',
+                payUnion: 'UnionPay',
+                btnPayNow: '지금 VIP 잠금 해제',
+                btnRestore: '구매 내역 복원',
+                langFollowSys: '📱 시스템 설정 따름',
+                langSwitched: '언어 변경됨: '
+            }
+        };
+
+        // 当前应用语言配置
+        let appLanguageSetting = 'auto';
+        let currentEffectiveLang = 'zh-Hans';
+
+        function localizedAlert(zhHans, zhHant, en) {
+            const lang = typeof currentEffectiveLang === 'string' ? currentEffectiveLang : 'zh-Hans';
+            if (lang === 'zh-Hans') { alert(zhHans); return; }
+            if (lang === 'zh-Hant') { alert(zhHant); return; }
+            alert(en);
+        }
+        window.__nativeSystemLanguage = '';
+
+        try {
+            appLanguageSetting = localStorage.getItem('yx_user_lang') || 'auto';
+        } catch(e) {}
+
+        // 检测系统当前语言
+        function detectSystemLanguage() {
+            let candidate = window.__nativeSystemLanguage || '';
+            if (!candidate && typeof navigator !== 'undefined') {
+                const navLangs = navigator.languages || [navigator.language || 'zh-CN'];
+                candidate = navLangs[0] || 'zh-CN';
+            }
+            candidate = String(candidate).toLowerCase();
+
+            if (candidate.startsWith('zh-tw') || candidate.startsWith('zh-hk') || candidate.startsWith('zh-mo') || candidate.includes('hant')) {
+                return 'zh-Hant';
+            }
+            if (candidate.startsWith('zh')) return 'zh-Hans';
+            if (candidate.startsWith('vi')) return 'vi';
+            if (candidate.startsWith('th')) return 'th';
+            if (candidate.startsWith('id') || candidate.startsWith('in')) return 'id';
+            if (candidate.startsWith('ja')) return 'ja';
+            if (candidate.startsWith('ko')) return 'ko';
+            if (candidate.startsWith('en')) return 'en';
+            return 'en';
+        }
+
+        // 计算当前生效语言
+        function resolveEffectiveLanguage() {
+            if (appLanguageSetting === 'auto') {
+                return detectSystemLanguage();
+            }
+            return I18N_RESOURCES[appLanguageSetting] ? appLanguageSetting : 'en';
+        }
+
+        // 获取当前语言字典
+        function t(key) {
+            const dict = I18N_RESOURCES[currentEffectiveLang] || I18N_RESOURCES['zh-Hans'];
+            return dict[key] !== undefined ? dict[key] : (I18N_RESOURCES['en'][key] || I18N_RESOURCES['zh-Hans'][key] || key);
+        }
+
+        // 应用语言至全站所有 DOM 元素
+        function applyLanguage(langSetting, showToastFlag = false) {
+            appLanguageSetting = langSetting;
+            try {
+                localStorage.setItem('yx_user_lang', langSetting);
+            } catch(e) {}
+
+            currentEffectiveLang = resolveEffectiveLanguage();
+            document.documentElement.lang = currentEffectiveLang === 'zh-Hant' ? 'zh-TW' : (currentEffectiveLang === 'zh-Hans' ? 'zh-CN' : currentEffectiveLang);
+
+            const dict = I18N_RESOURCES[currentEffectiveLang] || I18N_RESOURCES['zh-Hans'];
+
+            // 1. 顶部主标题与状态
+            const titleEl = document.querySelector('.main-title');
+            if (titleEl) titleEl.innerText = dict.title;
+
+            const crosshairHintEl = document.getElementById('direction-mark');
+            if (crosshairHintEl) crosshairHintEl.innerText = dict.crosshairHint;
+
+            // 2. 顶部 Tab 按钮
+            const tabPostEl = document.getElementById('tab-post');
+            if (tabPostEl) tabPostEl.innerText = dict.tabPost;
+
+            const tabPreEl = document.getElementById('tab-pre');
+            if (tabPreEl) tabPreEl.innerText = dict.tabPre;
+
+            const tabRotModeEl = document.getElementById('tab-rot-mode');
+            if (tabRotModeEl) {
+                tabRotModeEl.innerText = (typeof isFreeRotation !== 'undefined' && isFreeRotation) ? dict.rotLock : dict.rotFollow;
+            }
+
+            const btnLockEl = document.getElementById('btn-lock-heading');
+            if (btnLockEl) {
+                btnLockEl.innerText = (typeof isHeadingLocked !== 'undefined' && isHeadingLocked) ? dict.hdLocked : dict.hdRealtime;
+            }
+
+            const btnLayerEl = document.getElementById('btn-layer-settings');
+            if (btnLayerEl) btnLayerEl.innerText = dict.tabLayer;
+
+            const btnTianjiEl = document.getElementById('btn-tianji-top');
+            if (btnTianjiEl) btnTianjiEl.innerHTML = `${dict.tabTianji} <span class="tab-vip-tag">VIP</span>`;
+
+            const btnFsGuideEl = document.getElementById('btn-fengshui-guide');
+            if (btnFsGuideEl) btnFsGuideEl.innerText = dict.tabFengshui;
+
+            const btnVipEl = document.getElementById('btn-vip-center');
+            if (btnVipEl) btnVipEl.innerText = dict.tabVip;
+
+            const langLabelEl = document.getElementById('current-lang-label');
+            if (langLabelEl) langLabelEl.innerText = dict.tabLang;
+
+            // 3. 底部导航栏
+            const navLabels = document.querySelectorAll('.nav-label');
+            if (navLabels && navLabels.length >= 4) {
+                navLabels[0].innerText = dict.navCompass;
+                navLabels[1].innerText = dict.navAr;
+                navLabels[2].innerText = dict.navFloorplan;
+                navLabels[3].innerText = dict.navFengshui;
+            }
+
+            // 4. 信息面板标签
+            const infoItems = document.querySelectorAll('.info-item');
+            infoItems.forEach((item, idx) => {
+                const labelEl = item.querySelector('.info-label');
+                if (!labelEl) return;
+                const text = labelEl.innerText.trim();
+                if (idx === 0 || text.includes('立向格局')) labelEl.innerText = dict.labelSitFace;
+                else if (idx === 1 || text.includes('空亡诊断')) labelEl.innerHTML = `${dict.labelKongWang}<span class="info-hint-icon">?</span>`;
+                else if (idx === 2 || text.includes('一百二十分金')) labelEl.innerHTML = `${dict.labelFenJin}<span class="info-hint-icon">?</span>`;
+                else if (idx === 3 || text.includes('风水方位详解')) labelEl.innerHTML = `${dict.labelFsSummary}<span class="info-hint-icon">?</span>`;
+                else if (idx === 4 || text.includes('八路黄泉水法')) labelEl.innerHTML = `${dict.labelHuangQuan}<span class="vip-tag-inline">VIP</span><span class="info-hint-icon">?</span>`;
+                else if (idx === 5 || text.includes('时空客星与奇门')) labelEl.innerHTML = `${dict.labelQiMen}<span class="vip-tag-inline">VIP</span><span class="info-hint-icon">?</span>`;
+                else if (idx === 6 || text.includes('电子水准倾角')) labelEl.innerText = dict.labelLevel;
+                else if (idx === 7 || text.includes('四柱天干地支')) labelEl.innerText = dict.labelGanZhi;
+                else if (idx === 8 || text.includes('真太阳时')) labelEl.innerText = dict.labelSolarTime;
+                else if (idx === 9 || text.includes('地理方位')) labelEl.innerText = dict.labelDir;
+                else if (idx === 10 || text.includes('经纬坐标')) labelEl.innerText = dict.labelCoords;
+                else if (idx === 11 || text.includes('移动速度')) labelEl.innerText = dict.labelSpeed;
+                else if (idx === 12 || text.includes('后天八卦')) labelEl.innerText = dict.labelPostGua;
+                else if (idx === 13 || text.includes('先天八卦')) labelEl.innerText = dict.labelPreGua;
+                else if (idx === 14 || text.includes('五行属性')) labelEl.innerText = dict.labelElem;
+                else if (idx === 15 || text.includes('对应山向')) labelEl.innerText = dict.labelMountain;
+                else if (idx === 16 || text.includes('当令节气')) labelEl.innerText = dict.labelSolar;
+                else if (idx === 17 || text.includes('主应消息卦')) labelEl.innerText = dict.labelGua;
+            });
+
+            // 5. 语言设置弹窗栏按钮高亮
+            const langBtnMap = {
+                'auto': 'lang-opt-auto',
+                'zh-Hans': 'lang-opt-hans',
+                'zh-Hant': 'lang-opt-hant',
+                'en': 'lang-opt-en',
+                'vi': 'lang-opt-vi',
+                'th': 'lang-opt-th',
+                'id': 'lang-opt-id',
+                'ja': 'lang-opt-ja',
+                'ko': 'lang-opt-ko'
+            };
+            Object.entries(langBtnMap).forEach(([code, id]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (langSetting === code) el.classList.add('active');
+                    else el.classList.remove('active');
+                }
+            });
+
+            const currHint = document.getElementById('lbl-lang-curr-hint');
+            if (currHint) {
+                currHint.innerText = langSetting === 'auto' ? `${dict.langFollowSys} (${dict.langName})` : `🔒 ${dict.langName}`;
+            }
+
+            // 6. 玄空理气与户型立极核心卡片
+            const xkTitles = document.querySelectorAll('.xk-title');
+            if (xkTitles && xkTitles.length >= 4) {
+                xkTitles[0].innerHTML = `${dict.xkCard1} <span class="badge-vip-pill">👑 VIP</span>`;
+                xkTitles[1].innerHTML = `${dict.xkCard2} <span class="badge-vip-pill">👑 VIP</span>`;
+                xkTitles[2].innerHTML = `${dict.xkCard3} <span class="badge-vip-pill">👑 VIP</span>`;
+                xkTitles[3].innerHTML = `${dict.xkCard4} <span class="badge-vip-pill">👑 VIP</span>`;
+            }
+
+            // 7. 会员中心与收银台
+            const vipTitleEl = document.querySelector('.calib-title[style*="#ffd700"]');
+            if (vipTitleEl) vipTitleEl.innerText = dict.vipTitle;
+            const vipChTitle = document.querySelector('.pay-channels-title span');
+            if (vipChTitle) vipChTitle.innerText = dict.vipPayTitle;
+
+            // 8. 触发罗盘刷新重绘
+            if (typeof updateInfoPanel === 'function') {
+                updateInfoPanel();
+            }
+
+            // 9. 弹出 Toast 提示
+            if (showToastFlag) {
+                const toast = document.getElementById('i18n-toast');
+                if (toast) {
+                    toast.innerText = `🌐 ${dict.langSwitched}${dict.langName}`;
+                    toast.classList.add('show');
+                    setTimeout(() => toast.classList.remove('show'), 2000);
+                }
+            }
+        }
+
+        // 手动设置语言
+        function setAppLanguage(lang) {
+            applyLanguage(lang, true);
+        }
+
+        // 循环快捷切换语言
+        function cycleLanguage() {
+            const order = ['auto', 'zh-Hans', 'zh-Hant', 'en', 'vi', 'th', 'id', 'ja', 'ko'];
+            const nextIdx = (order.indexOf(appLanguageSetting) + 1) % order.length;
+            setAppLanguage(order[nextIdx]);
+        }
+
+        // Native 原生系统语言变动广播对接 (Android onConfigurationChanged / iOS preferredLanguages)
+        window.onSystemLanguageUpdate = function(sysLangTag) {
+            console.log('[i18n] Received native system language update:', sysLangTag);
+            window.__nativeSystemLanguage = sysLangTag;
+            if (appLanguageSetting === 'auto') {
+                applyLanguage('auto', false);
+            }
+        };
+
+        // 监听浏览器系统的 languagechange 事件
+        if (typeof window !== 'undefined') {
+            window.addEventListener('languagechange', function() {
+                console.log('[i18n] Browser languagechange detected:', navigator.language);
+                if (appLanguageSetting === 'auto') {
+                    applyLanguage('auto', false);
+                }
+            });
+        }
 
         // 挂载至全局
         window.selectPayChannel = selectPayChannel;

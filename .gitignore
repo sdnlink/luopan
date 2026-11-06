@@ -16,3 +16,6 @@ project.private.config.json
 *.log
 .codebuddy/
 .codebuddy
+
+# 临时脚本与导出文件（工作辅助，不应入库）
+.tmp_scripts/

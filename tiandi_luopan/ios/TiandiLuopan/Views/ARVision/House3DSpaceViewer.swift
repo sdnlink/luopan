@@ -29,6 +29,15 @@ public struct House3DSpaceViewer: View {
         case perspective = "3D透视"
         case topDown = "正顶俯视"
         case frontEntrance = "大门内视"
+
+        public var localizedTitle: String {
+            let lang = LocalizationManager.shared
+            switch self {
+            case .perspective: return lang.t("3d_view_perspective")
+            case .topDown: return lang.t("3d_view_topdown")
+            case .frontEntrance: return lang.t("3d_view_entrance")
+            }
+        }
     }
 
     public enum PalaceGridMode: String, CaseIterable {
@@ -74,7 +83,7 @@ public struct House3DSpaceViewer: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .adaptiveFont(size: 12, weight: .bold)
                             .foregroundColor(.orange)
-                        Text("立极点落空警示：户型凹凸缺角严重（面积比 < 75%），立极中宫已回退至主功能区重心，请以主厅立极为准")
+                        Text(lang.t("3d_centroid_warning"))
                             .adaptiveFont(size: 10, weight: .semibold)
                             .foregroundColor(.orange)
                         Spacer()
@@ -134,10 +143,10 @@ public struct House3DSpaceViewer: View {
                     HStack(spacing: 8) {
                         // 传统文化参考评分徽章
                         HStack(spacing: 4) {
-                            Text("传统文化参考")
+                            Text(lang.t("3d_score_label"))
                                 .adaptiveFont(size: 11, weight: .medium)
                                 .foregroundColor(.white.opacity(0.7))
-                            Text("\(survey.fengshuiScore)分")
+                            Text("\(survey.fengshuiScore)")
                                 .adaptiveFont(size: 14, weight: .bold, design: .monospaced)
                                 .foregroundColor(scoreColor(survey.fengshuiScore))
                         }
@@ -160,14 +169,14 @@ public struct House3DSpaceViewer: View {
                             .background(Color.yanCyan)
                             .cornerRadius(12)
                         }
-                        .accessibilityLabel("导出空间测绘 DXF 参考图")
+                        .accessibilityLabel("CAD")
 
                         // 毛坯房房间类型设定（一键切换类型即时刷新形煞报告）
                         Button(action: { showRoomTypePanel.toggle() }) {
                             HStack(spacing: 3) {
                                 Image(systemName: "door.sliding.left.hand.closed")
                                     .adaptiveFont(size: 11, weight: .bold)
-                                Text("房间")
+                                Text(lang.t("3d_btn_rooms"))
                                     .adaptiveFont(size: 10, weight: .bold)
                             }
                             .foregroundColor(.black)
@@ -176,7 +185,7 @@ public struct House3DSpaceViewer: View {
                             .background(showRoomTypePanel ? Color.orange : Color.white.opacity(0.85))
                             .cornerRadius(12)
                         }
-                        .accessibilityLabel("毛坯房房间类型设定")
+                        .accessibilityLabel(lang.t("3d_room_type_panel_title"))
 
                         // 导出与分享长图存证
                         Button(action: exportAndShareReport) {
@@ -187,7 +196,7 @@ public struct House3DSpaceViewer: View {
                                 .background(Color.blue.opacity(0.75))
                                 .clipShape(Circle())
                         }
-                        .accessibilityLabel("导出全屋测绘与形煞报告")
+                        .accessibilityLabel(lang.t("ar_roomplan_share"))
                     }
                     .padding(.vertical, 2)
                 }
@@ -205,23 +214,23 @@ public struct House3DSpaceViewer: View {
             // 测绘核心参数横幅
             HStack(spacing: 12) {
                 metricCell(
-                    title: "进深 × 开间",
+                    title: lang.t("3d_metric_depth_width"),
                     value: String(format: "%.2f × %.2f m", survey.dimensions.totalDepth, survey.dimensions.totalWidth)
                 )
                 Divider().frame(height: 18).background(Color.white.opacity(0.2))
                 metricCell(
-                    title: "室内净高",
+                    title: lang.t("3d_metric_ceiling"),
                     value: String(format: "%.2f m", survey.dimensions.ceilingHeight)
                 )
                 Divider().frame(height: 18).background(Color.white.opacity(0.2))
                 metricCell(
-                    title: "套内实测",
+                    title: lang.t("3d_metric_area"),
                     value: String(format: "%.1f m²", survey.dimensions.usableFloorArea)
                 )
                 Divider().frame(height: 18).background(Color.white.opacity(0.2))
                 metricCell(
-                    title: "结构开孔",
-                    value: "\(survey.openings.count) 处"
+                    title: lang.t("3d_metric_openings"),
+                    value: "\(survey.openings.count)"
                 )
             }
             .padding(.vertical, 6)
@@ -231,7 +240,7 @@ public struct House3DSpaceViewer: View {
 
             HStack(spacing: 5) {
                 Image(systemName: survey.scanMethod.contains("VR") ? "wand.and.stars" : "location.magnifyingglass")
-                Text("数据来源：\(survey.scanMethod)")
+                Text("\(lang.t("3d_data_source_prefix"))\(survey.scanMethod)")
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
@@ -301,7 +310,7 @@ public struct House3DSpaceViewer: View {
     private var roomTypePanel: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("房间类型设定（毛坯房/空置房）")
+                Text(lang.t("3d_room_type_panel_title"))
                     .adaptiveFont(size: 12, weight: .bold)
                     .foregroundColor(.white)
                 Spacer()
@@ -316,7 +325,7 @@ public struct House3DSpaceViewer: View {
                 }
             }
             if survey.rooms.isEmpty {
-                Text("暂无可设定房间，请先完成测绘")
+                Text(lang.t("3d_room_type_empty"))
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.7))
             } else {
@@ -356,7 +365,7 @@ public struct House3DSpaceViewer: View {
                 }
                 .frame(maxHeight: 190)
             }
-            Text("切换类型后形煞报告即时重算（毛坯房默认按面积启发式预判）")
+            Text(lang.t("3d_room_type_hint"))
                 .adaptiveFont(size: 9)
                 .foregroundColor(.white.opacity(0.55))
         }
@@ -476,7 +485,7 @@ public struct House3DSpaceViewer: View {
                             .adaptiveFont(size: 10, weight: .regular)
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(2)
-                        Text("💡 化解方案：\(item.solution)")
+                        Text("\(lang.t("floorplan_solution_prefix")) \(item.solution)")
                             .adaptiveFont(size: 10, weight: .medium)
                             .foregroundColor(.yanGold)
                             .lineLimit(2)
@@ -497,7 +506,7 @@ public struct House3DSpaceViewer: View {
                 HStack(spacing: 4) {
                     ForEach(ViewAngleMode.allCases, id: \.self) { mode in
                         Button(action: { viewMode = mode }) {
-                            Text(mode.rawValue)
+                            Text(mode.localizedTitle)
                                 .adaptiveFont(size: 10, weight: .medium)
                                 .foregroundColor(viewMode == mode ? .black : .white)
                                 .padding(.horizontal, 8)
@@ -520,7 +529,7 @@ public struct House3DSpaceViewer: View {
                 }) {
                     HStack(spacing: 2) {
                         Image(systemName: "square.grid.3x3.fill")
-                        Text(palaceGridMode == .baZhai ? "八宅" : (palaceGridMode == .xuanKong ? "玄空" : "理气关"))
+                        Text(palaceGridMode == .baZhai ? lang.t("3d_grid_bazhai") : (palaceGridMode == .xuanKong ? lang.t("3d_grid_xuankong") : lang.t("3d_grid_off")))
                     }
                     .adaptiveFont(size: 10, weight: .bold)
                     .foregroundColor(palaceGridMode != .off ? .yanGold : .white.opacity(0.6))
@@ -529,7 +538,7 @@ public struct House3DSpaceViewer: View {
                     .background(Color.white.opacity(0.12))
                     .cornerRadius(8)
                 }
-                .accessibilityLabel("切换八宅或玄空理气投影")
+                .accessibilityLabel(lang.t("3d_grid_bazhai"))
 
                 // 尺寸标注开关
                 Button(action: { showDimensions.toggle() }) {
@@ -540,7 +549,7 @@ public struct House3DSpaceViewer: View {
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
-                .accessibilityLabel("切换尺寸标尺")
+                .accessibilityLabel(lang.t("3d_metric_depth_width"))
 
                 // 形煞警示标注开关
                 Button(action: { showShaAlerts.toggle() }) {
@@ -551,7 +560,7 @@ public struct House3DSpaceViewer: View {
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
-                .accessibilityLabel("切换形煞警示")
+                .accessibilityLabel(lang.t("ar_sha_analysis_prefix"))
 
                 // 重置视角
                 Button(action: {
@@ -564,7 +573,7 @@ public struct House3DSpaceViewer: View {
                         .background(Color.white.opacity(0.12))
                         .clipShape(Circle())
                 }
-                .accessibilityLabel("重置视角")
+                .accessibilityLabel(lang.t("3d_reset_camera"))
             }
             .padding(8)
             .background(Color.black.opacity(0.85))

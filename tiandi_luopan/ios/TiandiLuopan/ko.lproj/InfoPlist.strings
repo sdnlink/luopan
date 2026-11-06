@@ -3,9 +3,9 @@
 "CFBundleName" = "천기연상";
 
 /* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "천기연상은 좌표, 높이, 진태양시를 계산하려고 위치를 사용합니다.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "천기연상은 좌표, 높이, 진태양시를 계산하려고 위치를 사용합니다.";
-"NSMotionUsageDescription" = "천기연상은 기울기와 방향을 재려고 동작 센서를 사용합니다.";
-"NSCameraUsageDescription" = "천기연상은 현장에서 방향을 보려고 카메라를 사용합니다.";
-"NSPhotoLibraryAddUsageDescription" = "천기연상은 요약 그림을 사진에 저장합니다.";
-"NSPhotoLibraryUsageDescription" = "천기연상은 평면도 사진을 열고, 조사 사진을 저장합니다.";
+"NSLocationWhenInUseUsageDescription" = "천기연상은 현지 정밀 경위도, 해발고도, 자기 편각 및 진태양시를 계산하기 위해 위치 정보를 사용합니다.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "천기연상은 현지 정밀 경위도, 해발고도, 자기 편각 및 진태양시를 계산하기 위해 위치 정보를 사용합니다.";
+"NSMotionUsageDescription" = "천기연상은 2축 수평계와 고정밀 나침반을 구동하기 위해 모션 센서를 사용합니다.";
+"NSCameraUsageDescription" = "천기연상은 AR 실경 방위 측정, 공간 측량 및 형살 분석 기능을 제공하기 위해 카메라를 사용합니다.";
+"NSPhotoLibraryAddUsageDescription" = "천기연상은 현장 측량 스냅샷과 선지 장권 이미지를 사진 보관함에 저장하기 위해 권한이 필요합니다.";
+"NSPhotoLibraryUsageDescription" = "천기연상은 평면도를 불러오고 현장 측량 장권 및 스냅샷을 저장하기 위해 사진 보관함 접근 권한이 필요합니다.";

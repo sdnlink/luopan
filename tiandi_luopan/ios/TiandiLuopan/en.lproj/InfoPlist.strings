@@ -3,9 +3,9 @@
 "CFBundleName" = "TianJi YanXiang";
 
 /* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "TianJi YanXiang requires location access to calculate exact GPS coordinates, elevation, and true solar time.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi YanXiang requires location access to calculate exact GPS coordinates, elevation, and true solar time.";
-"NSMotionUsageDescription" = "TianJi YanXiang requires motion sensors to drive the 3D digital bubble level and precision compass.";
-"NSCameraUsageDescription" = "TianJi YanXiang requires camera access for AR vision feng shui analysis and on-site orientation.";
-"NSPhotoLibraryAddUsageDescription" = "TianJi YanXiang needs permission to save high-resolution classical feng shui scrolls to your photo library.";
+"NSLocationWhenInUseUsageDescription" = "TianJi YanXiang uses your location to calculate precise coordinates, elevation, magnetic declination, and true solar time.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi YanXiang uses your location to calculate precise coordinates, elevation, magnetic declination, and true solar time.";
+"NSMotionUsageDescription" = "TianJi YanXiang uses motion sensors to drive the dual-axis digital level and precision compass.";
+"NSCameraUsageDescription" = "TianJi YanXiang uses the camera for AR orientation, spatial surveying, and on-site Sha analysis.";
+"NSPhotoLibraryAddUsageDescription" = "TianJi YanXiang needs permission to save survey snapshots and cultural reference scrolls to your photo library.";
 "NSPhotoLibraryUsageDescription" = "TianJi YanXiang needs photo library access to import floor plans and save survey scrolls and snapshots.";

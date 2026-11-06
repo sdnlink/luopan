@@ -84,6 +84,9 @@ public struct CompassMainView: View {
                         ScrollView {
                             unfoldedCompassAnalysisPanel()
                                 .padding(16)
+                                // iOS 27 浮动 TabBar 不占 safe area，会盖住右栏末尾卡片；
+                                // 直接给可滚动内容留底部余量，保证最后一张卡能完整滚出。
+                                .padding(.bottom, 80)
                         }
                     } else {
                         // 单列宽屏（iPad 竖屏 / Duo 折叠外屏）下底部卡片会被拉得很宽，
@@ -259,17 +262,26 @@ public struct CompassMainView: View {
         return VStack(alignment: .leading, spacing: 12) {
             // 1. 向首总览：实时度数 / 二十四山 / 俯仰横滚 / 磁场强度
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
+                // 窄右栏（Duo 内屏 / iPad 分栏）里横向 HStack 会把泰语/印尼语
+                // 无空格长词与数值、徽章挤成互相穿插；改为纵向堆叠，各占整行。
+                VStack(alignment: .leading, spacing: 4) {
                     Text(lang.t("kw_heading_prefix"))
                         .adaptiveFont(size: 11, weight: .bold)
                         .foregroundColor(.white.opacity(0.6))
-                    Text(String(format: "%.1f°", heading.facingAngle))
-                        .adaptiveFont(size: 24, weight: .bold, design: .monospaced)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Spacer()
-                    Text(fenjin.localizedMountainName)
-                        .adaptiveFont(size: 12, weight: .bold)
-                        .foregroundColor(Color.yanCyan)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 8) {
+                        Text(String(format: "%.1f°", heading.facingAngle))
+                            .adaptiveFont(size: 24, weight: .bold, design: .monospaced)
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        Text(fenjin.localizedMountainName)
+                            .adaptiveFont(size: 12, weight: .bold)
+                            .foregroundColor(Color.yanCyan)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: 0)
+                    }
                 }
                 HStack(spacing: 12) {
                     Text("\(lang.t("pitch_label")) \(String(format: "%.1f°", motion.pitch))")
@@ -287,21 +299,28 @@ public struct CompassMainView: View {
 
             // 2. 一百二十分金：度数跨度 + 孤虚旺相秘传断语 + 立向指引
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(lang.t("fenjin_range_section"))
                         .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
-                    Spacer()
-                    Text(fenjin.localizedJiaziName)
-                        .adaptiveFont(size: 13, weight: .bold, design: .serif)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text(fenjin.localizedGrade)
-                        .adaptiveFont(size: 9, weight: .bold)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
-                        .foregroundColor(fenjin.isAuspicious ? Color.green : Color.red)
-                        .cornerRadius(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(fenjin.localizedJiaziName)
+                            .adaptiveFont(size: 13, weight: .bold, design: .serif)
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                        Spacer(minLength: 4)
+                        Text(fenjin.localizedGrade)
+                            .adaptiveFont(size: 9, weight: .bold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(fenjin.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                            .foregroundColor(fenjin.isAuspicious ? Color.green : Color.red)
+                            .cornerRadius(4)
+                    }
                 }
                 Text("\(String(format: "%.1f", fenjin.startAngle))° \(lang.t("fenjin_to")) \(String(format: "%.1f", fenjin.endAngle))° · \(lang.t("fenjin_center_deg")) \(String(format: "%.1f", fenjin.centerAngle))°")
                     .adaptiveFont(size: 11, design: .monospaced)
@@ -315,10 +334,14 @@ public struct CompassMainView: View {
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.85))
                     .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.85)
                 Text(fenjin.isAuspicious ? lang.t("fenjin_auspicious_advice") : lang.t("fenjin_inauspicious_advice"))
                     .adaptiveFont(size: 10)
                     .foregroundColor(.white.opacity(0.6))
                     .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.85)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -326,26 +349,36 @@ public struct CompassMainView: View {
 
             // 3. 六十四卦：卦名 / 上下卦 / 卦气吉凶 / 穿山透地分金描述
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(hex.localizedName)
                         .adaptiveFont(size: 18, weight: .bold, design: .serif)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text("\(hex.localizedUpperTrigram) · \(hex.localizedLowerTrigram)")
-                        .adaptiveFont(size: 11)
-                        .foregroundColor(.white.opacity(0.6))
-                    Spacer()
-                    Text(hex.localizedLuckDegree)
-                        .adaptiveFont(size: 9, weight: .bold)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(hex.isGreatAuspicious ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
-                        .foregroundColor(hex.isGreatAuspicious ? Color.green : .white.opacity(0.85))
-                        .cornerRadius(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("\(hex.localizedUpperTrigram) · \(hex.localizedLowerTrigram)")
+                            .adaptiveFont(size: 11)
+                            .foregroundColor(.white.opacity(0.6))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        Text(hex.localizedLuckDegree)
+                            .adaptiveFont(size: 9, weight: .bold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(hex.isGreatAuspicious ? Color.green.opacity(0.2) : Color.white.opacity(0.08))
+                            .foregroundColor(hex.isGreatAuspicious ? Color.green : .white.opacity(0.85))
+                            .cornerRadius(4)
+                    }
                 }
                 Text(hex.localizedFenJinDetail)
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.8))
                     .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.85)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -353,18 +386,24 @@ public struct CompassMainView: View {
 
             // 4. 空亡判级与化解指引
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(lang.t("kw_sheet_title"))
                         .adaptiveFont(size: 12, weight: .bold)
                         .foregroundColor(.white)
-                    Spacer()
-                    Text(lang.t(kwGradeKey))
-                        .adaptiveFont(size: 9, weight: .bold)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(kwColor.opacity(0.2))
-                        .foregroundColor(kwColor)
-                        .cornerRadius(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 6) {
+                        Text(lang.t(kwGradeKey))
+                            .adaptiveFont(size: 9, weight: .bold)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .minimumScaleFactor(0.8)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(kwColor.opacity(0.2))
+                            .foregroundColor(kwColor)
+                            .cornerRadius(4)
+                        Spacer(minLength: 0)
+                    }
                 }
                 Text(kwLevel.localizedTitle)
                     .adaptiveFont(size: 11, weight: .bold)
@@ -373,10 +412,14 @@ public struct CompassMainView: View {
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.8))
                     .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.85)
                 Text("\(lang.t("kw_master_remedy_section"))\(lang.t(kwRemedyKey))")
                     .adaptiveFont(size: 10)
                     .foregroundColor(.white.opacity(0.6))
                     .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .minimumScaleFactor(0.85)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -3,9 +3,9 @@
 "CFBundleName" = "TianJi";
 
 /* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "TianJi memakai lokasi untuk menghitung koordinat, ketinggian, dan waktu matahari.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi memakai lokasi untuk menghitung koordinat, ketinggian, dan waktu matahari.";
-"NSMotionUsageDescription" = "TianJi memakai sensor untuk mengukur kemiringan dan arah.";
-"NSCameraUsageDescription" = "TianJi memakai kamera untuk melihat arah di lokasi.";
-"NSPhotoLibraryAddUsageDescription" = "TianJi menyimpan gambar ringkasan ke galeri foto.";
-"NSPhotoLibraryUsageDescription" = "TianJi membuka foto denah dan menyimpan foto survei.";
+"NSLocationWhenInUseUsageDescription" = "TianJi YanXiang memerlukan akses lokasi untuk menghitung koordinat, ketinggian, deklinasi magnetik, dan waktu surya sejati.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi YanXiang memerlukan akses lokasi untuk menghitung koordinat, ketinggian, deklinasi magnetik, dan waktu surya sejati.";
+"NSMotionUsageDescription" = "TianJi YanXiang menggunakan sensor gerak presisi tinggi untuk menggerakkan waterpas dua sumbu dan kompas.";
+"NSCameraUsageDescription" = "TianJi YanXiang memerlukan akses kamera untuk orientasi AR, survei spasial, dan analisis bentuk Sha di lokasi.";
+"NSPhotoLibraryAddUsageDescription" = "TianJi YanXiang memerlukan izin untuk menyimpan foto bukti survei dan gulungan referensi ke galeri Anda.";
+"NSPhotoLibraryUsageDescription" = "TianJi YanXiang memerlukan akses galeri foto untuk mengimpor denah rumah dan menyimpan hasil survei.";

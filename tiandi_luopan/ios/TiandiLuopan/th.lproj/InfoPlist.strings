@@ -3,9 +3,9 @@
 "CFBundleName" = "เทียนจี";
 
 /* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "เทียนจีใช้ตำแหน่งเพื่อคำนวณพิกัด ความสูง และเวลาพระอาทิตย์จริง";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "เทียนจีใช้ตำแหน่งเพื่อคำนวณพิกัด ความสูง และเวลาพระอาทิตย์จริง";
-"NSMotionUsageDescription" = "เทียนจีใช้เซนเซอร์เพื่อวัดความเอียงและทิศ";
-"NSCameraUsageDescription" = "เทียนจีใช้กล้องเพื่อดูทิศในสถานที่จริง";
-"NSPhotoLibraryAddUsageDescription" = "เทียนจีจะบันทึกภาพสรุปลงคลังรูปภาพ";
-"NSPhotoLibraryUsageDescription" = "เทียนจีจะเปิดรูปผังบ้าน และบันทึกภาพสำรวจ";
+"NSLocationWhenInUseUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้ข้อมูลตำแหน่งเพื่อคำนวณพิกัด ความสูง มุมเบี่ยงแม่เหล็กโลก และเวลาสุริยะจริงอย่างแม่นยำ";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้ข้อมูลตำแหน่งเพื่อคำนวณพิกัด ความสูง มุมเบี่ยงแม่เหล็กโลก และเวลาสุริยะจริงอย่างแม่นยำ";
+"NSMotionUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้เซ็นเซอร์การเคลื่อนไหวความแม่นยำสูงสำหรับระดับน้ำสองแกนและเข็มทิศ";
+"NSCameraUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้กล้องสำหรับมุมมอง AR สำรวจพื้นที่ และวิเคราะห์ทิศทางหน้างาน";
+"NSPhotoLibraryAddUsageDescription" = "เทียนจีเหยียนเซี่ยงต้องการสิทธิ์บันทึกภาพถ่ายสำรวจหน้างานและม้วนภาพอ้างอิงลงในอัลบั้มรูปของคุณ";
+"NSPhotoLibraryUsageDescription" = "เทียนจีเหยียนเซี่ยงต้องการเข้าถึงคลังรูปภาพเพื่อนำเข้าผังบ้านและบันทึกภาพรายงานสำรวจ";

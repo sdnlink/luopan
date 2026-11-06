@@ -642,6 +642,12 @@ public struct ARVisionView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(red: 0.07, green: 0.07, blue: 0.09))
                 }
+                // AR 页不经过 FoldableTwoPane，需单独抵消 regular 宽屏字号放大，
+                // 否则窄栏里国际化长标题与徽章会互相穿插。
+                .environment(\.paneTypographyScale, AdaptivePaneTypography.scaleInSplitPane)
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: 72)
+                }
             } else {
             // 1. 真机摄像头实时预览 / ARKit+LiDAR融合流 / 模拟器仿真画板 (仅在 AR Tab 激活时工作，后台休眠避免发烫)
             cameraLayer()
@@ -1095,8 +1101,8 @@ public struct ARVisionView: View {
                         .minimumScaleFactor(0.6)
                     if let water = waterItem {
                         let statusTag = hitBaSha
-                            ? "⚠️ 犯坐山八煞"
-                            : (water.isHuangQuanSha ? "⚠️ 犯八路黄泉" : "水法: \(water.stage)")
+                            ? lang.t("ar_status_basha")
+                            : (water.isHuangQuanSha ? lang.t("ar_status_huangquan") : "\(lang.t("ar_status_water_prefix")): \(water.stage)")
                         Text(statusTag)
                             .adaptiveFont(size: 9, weight: .bold)
                             .foregroundColor((hitBaSha || water.isHuangQuanSha) ? .red : (water.isAuspicious ? .green : .yanCyan))
@@ -1331,6 +1337,8 @@ public struct ARVisionView: View {
                     Text("\(m.localizedName)\(isCenter ? "▲" : "")")
                         .adaptiveFont(size: isCenter ? 11 : 10, weight: .bold)
                         .foregroundColor(isCenter ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     if let water = water {
                         Text((isBaSha || isHQ) ? "\(shaPrefix)\(water.stage)" : water.stage)
                             .adaptiveFont(size: 8, weight: .semibold)
@@ -2078,7 +2086,7 @@ public struct ShaRemedyDetailSheet: View {
                     .adaptiveFont(size: 13, weight: .semibold)
                     .foregroundColor(Color.yanCyan)
                 Spacer()
-                Text("8大经典形煞锦囊库")
+                Text(lang.t("ar_sha_lib_subtitle"))
                     .adaptiveFont(size: 11)
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -2155,7 +2163,7 @@ public struct ShaRemedyDetailSheet: View {
             
             // 玄学危害机理
             VStack(alignment: .leading, spacing: 4) {
-                Label("⚡ 玄学危害机理剖析", systemImage: "bolt.trianglebranch.fill")
+                Label(lang.t("ar_sha_harm_title"), systemImage: "bolt.trianglebranch.fill")
                     .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(Color.orange)
                 Text(currentSha.localizedMetaphysicsHarm)
@@ -2189,11 +2197,11 @@ public struct ShaRemedyDetailSheet: View {
     private var remedyStepsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("🛠 化解三步走 · 直接可做", systemImage: "checkmark.circle.fill")
+                Label(lang.t("ar_sha_steps_title"), systemImage: "checkmark.circle.fill")
                     .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(.green)
                 Spacer()
-                Text("先做① → 再②③")
+                Text(lang.t("ar_sha_steps_badge"))
                     .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -2202,7 +2210,7 @@ public struct ShaRemedyDetailSheet: View {
                     .cornerRadius(6)
             }
             
-            Text("① 立即可做（免费）→ ② 低成本改造 → ③ 可选强化。每一步都标明影响范围，按需执行即可。")
+            Text(lang.t("ar_sha_steps_desc"))
                 .adaptiveFont(size: 11)
                 .foregroundColor(.white.opacity(0.7))
             
@@ -2226,11 +2234,11 @@ public struct ShaRemedyDetailSheet: View {
     private var advancedTipsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("📋 进阶调理参考", systemImage: "text.book.closed.fill")
+                Label(lang.t("ar_sha_adv_title"), systemImage: "text.book.closed.fill")
                     .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.0, green: 1.0, blue: 1.0))
                 Spacer()
-                Text("免费")
+                Text(lang.t("ar_sha_free_badge"))
                     .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -2241,16 +2249,16 @@ public struct ShaRemedyDetailSheet: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 timingPointRow(
-                    tag: "玄空避忌",
-                    content: "冲煞方若逢二黑病符或五黄廉贞位，忌动土、忌红色暖光；可挂铜葫芦或六帝钱泄土气。出处：《紫白诀》有‘五黄重叠，灾疾并临；二五交加，罹疾病’。解释：这是古籍中的健康象征与调理建议，供传统文化参考，不是医疗诊断；现场应以通风、采光、结构安全和专业意见为准。"
+                    tag: lang.t("ar_sha_adv_xuankong_tag"),
+                    content: lang.t("ar_sha_adv_xuankong_desc")
                 )
                 timingPointRow(
-                    tag: "择日建议",
-                    content: "安放法物选天德、月德、天赦吉日，避开岁破、月破日；上午7-13点（辰巳午时）为佳。"
+                    tag: lang.t("ar_sha_adv_zeri_tag"),
+                    content: lang.t("ar_sha_adv_zeri_desc")
                 )
                 timingPointRow(
-                    tag: "安放要点",
-                    content: "净手后安置于指定方位；镜面朝外、微下倾3-5度，勿照邻家门窗。"
+                    tag: lang.t("ar_sha_adv_place_tag"),
+                    content: lang.t("ar_sha_adv_place_desc")
                 )
             }
         }
@@ -2264,11 +2272,11 @@ public struct ShaRemedyDetailSheet: View {
     private var vipRemedyCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label("🛡 进阶法物参考", systemImage: "shield.checkered")
+                Label(lang.t("ar_sha_talisman_section"), systemImage: "shield.checkered")
                     .adaptiveFont(size: 14, weight: .bold)
                     .foregroundColor(Color(red: 0.95, green: 0.8, blue: 0.3))
                 Spacer()
-                Text("VIP 可选")
+                Text(lang.t("ar_sha_vip_optional"))
                     .adaptiveFont(size: 10, weight: .medium)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -2280,7 +2288,7 @@ public struct ShaRemedyDetailSheet: View {
             if !iap.hasUnlockedVIP {
                 VIPLockCardView(
                     title: lang.t("ar_vip_remedy_title"),
-                    featureDesc: "常用化煞法物的材质、规格与悬挂要领，配合方位实操细节，解锁 VIP 查看完整参考。",
+                    featureDesc: lang.t("ar_sha_vip_lock_desc"),
                     badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
                     onUnlockTap: { showPaywall = true }
@@ -2288,18 +2296,18 @@ public struct ShaRemedyDetailSheet: View {
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     talismanItemRow(
-                        title: "常用法物与挂法",
+                        title: lang.t("ar_sha_talisman_usage_title"),
                         content: currentSha.localizedRemedySolution
                     )
                     
                     talismanItemRow(
-                        title: "材质参考",
-                        content: "优先选用纯铜、天然黑曜石、黄玉等天然材质器物；避免塑料电镀仿品。"
+                        title: lang.t("ar_sha_talisman_material_title"),
+                        content: lang.t("ar_sha_talisman_material_desc")
                     )
                     
                     talismanItemRow(
-                        title: "悬挂要领",
-                        content: "镜面朝外、微下倾3-5度；八卦镜、山海镇等避免直照邻家门窗，保持邻里和睦。"
+                        title: lang.t("ar_sha_talisman_hang_title"),
+                        content: lang.t("ar_sha_talisman_hang_desc")
                     )
                 }
             }

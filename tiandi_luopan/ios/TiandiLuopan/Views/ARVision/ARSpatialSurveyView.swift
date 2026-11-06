@@ -53,11 +53,19 @@ public struct LubanRulerEvaluation: Equatable {
     private static let yangNamesHans = ["财", "病", "离", "义", "官", "劫", "害", "本"]
     private static let yangNamesHant = ["財", "病", "離", "義", "官", "劫", "害", "本"]
     private static let yangNamesEn = ["Wealth", "Illness", "Separation", "Righteous", "Official", "Robbery", "Harm", "Origin"]
+    private static let yangNamesVi = ["Tài", "Bệnh", "Ly", "Nghĩa", "Quan", "Kiếp", "Hại", "Bổn"]
+    private static let yangNamesTh = ["ทรัพย์", "โรค", "พลัดพราก", "คุณธรรม", "ยศ", "สูญเสีย", "ภัย", "รากฐาน"]
+    private static let yangNamesId = ["Rezeki", "Sakit", "Pisah", "Kebenaran", "Jabatan", "Rugi", "Bahaya", "Pokok"]
+    private static let yangNamesKo = ["재(財)", "병(病)", "리(離)", "의(義)", "관(官)", "겁(劫)", "해(害)", "본(本)"]
     private static let yangAuspiciousFlags = [true, false, false, true, true, false, false, true]
 
     private static let yinNamesHans = ["财", "失", "兴", "死", "官", "义", "苦", "旺", "害", "丁"]
     private static let yinNamesHant = ["財", "失", "興", "死", "官", "義", "苦", "旺", "害", "丁"]
     private static let yinNamesEn = ["Wealth", "Loss", "Prosper", "Decline", "Official", "Righteous", "Sorrow", "Flourish", "Harm", "Descendant"]
+    private static let yinNamesVi = ["Tài", "Thất", "Hưng", "Tử", "Quan", "Nghĩa", "Khổ", "Vượng", "Hại", "Đinh"]
+    private static let yinNamesTh = ["ทรัพย์", "เสีย", "รุ่งเรือง", "เสื่อม", "ยศ", "คุณธรรม", "ทุกข์", "เจริญ", "ภัย", "ทายาท"]
+    private static let yinNamesId = ["Rezeki", "Hilang", "Makmur", "Surut", "Jabatan", "Kebenaran", "Duka", "Jaya", "Bahaya", "Keturunan"]
+    private static let yinNamesKo = ["재(財)", "실(失)", "흥(興)", "사(死)", "관(官)", "의(義)", "고(苦)", "왕(旺)", "해(害)", "정(丁)"]
     private static let yinAuspiciousFlags = [true, false, true, false, true, true, false, true, false, true]
 
     public static func evaluate(meters: Float) -> LubanRulerEvaluation {
@@ -87,9 +95,19 @@ public struct LubanRulerEvaluation: Equatable {
         switch language {
         case .en:
             sourceNote = "Classical source: the Lu Ban ruler formula, ‘Wealth, Righteousness, Official and Origin are auspicious; Illness, Separation, Robbery and Harm are inauspicious.’ ‘Illness’, ‘loss’ and ‘wealth’ are symbolic ruler labels, not medical, safety or financial conclusions."
+        case .vi:
+            sourceNote = "Nguồn cổ tịch: khẩu quyết thước Lỗ Ban («Tài, Nghĩa, Quan, Bổn là cát; Bệnh, Ly, Kiếp, Hại là hung») kết hợp thước Đinh Lan; các nhãn chỉ mang tính biểu tượng văn hóa, không phải kết luận y tế, an toàn hay tài chính."
+        case .th:
+            sourceNote = "อ้างอิงตำราหลู่ปานจิง («ทรัพย์ คุณธรรม ยศ รากฐาน เป็นมงคล; โรค พลัดพราก สูญเสีย ภัย เป็นอัปมงคล») ร่วมกับบรรทัดติงหลาน เป็นสัญลักษณ์ทางวัฒนธรรม ไม่ใช่คำวินิจฉัยทางการแพทย์ ความปลอดภัย หรือการเงิน"
+        case .id:
+            sourceNote = "Sumber klasik: kaidah mistar Lu Ban & Ding Lan; label seperti ‘sakit’, ‘rugi’, dan ‘rezeki’ adalah simbol budaya tradisional, bukan kesimpulan medis, keselamatan, atau keuangan."
+        case .ja:
+            sourceNote = "出典：『魯班経』尺法訣「財・義・官・本を吉とし、病・離・劫・害を凶とす」および『丁蘭尺』伝統尺法（「病・失・財・旺」は文化象徴であり、医療・安全・財務上の判断ではありません）。"
+        case .ko:
+            sourceNote = "출전: 『노반경』 척법결(재·의·관·본은 길, 병·리·겁·해는 흉) 및 『정란척』 전통 척법(‘병·실·재·왕’은 문화적 상징이며 의료·안전·재무 판단이 아닙니다)."
         case .zhHant:
             sourceNote = "出处：《鲁班经》尺法诀：「财、义、官、本为吉，病、离、劫、害为凶。」兼参《丁兰尺》传统尺法；‘病、失、财、旺’是文化象征标签，不是医疗、安全或财务判断。"
-        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
+        case .auto, .zhHans:
             sourceNote = "出处：《鲁班经》尺法诀：“财、义、官、本为吉，病、离、劫、害为凶。”兼参《丁兰尺》传统尺法；‘病、失、财、旺’是文化象征标签，不是医疗、安全或财务判断。"
         }
         switch language {
@@ -99,13 +117,43 @@ public struct LubanRulerEvaluation: Equatable {
             let nName = Self.yinNamesEn[yinIndex]
             let nLuck = yinIsAuspicious ? "Auspicious" : "Inauspicious"
             return String(format: "%.1f cm · LuBan: %@ (%@) · DingLan: %@ (%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
+        case .vi:
+            let yName = Self.yangNamesVi[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "Cát" : "Hung"
+            let nName = Self.yinNamesVi[yinIndex]
+            let nLuck = yinIsAuspicious ? "Cát" : "Hung"
+            return String(format: "%.1f cm · Lỗ Ban: 【%@】(%@) · Đinh Lan: 【%@】(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
+        case .th:
+            let yName = Self.yangNamesTh[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "มงคล" : "อัปมงคล"
+            let nName = Self.yinNamesTh[yinIndex]
+            let nLuck = yinIsAuspicious ? "มงคล" : "อัปมงคล"
+            return String(format: "%.1f cm · หลู่ปาน: 【%@】(%@) · ติงหลาน: 【%@】(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
+        case .id:
+            let yName = Self.yangNamesId[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "Baik" : "Buruk"
+            let nName = Self.yinNamesId[yinIndex]
+            let nLuck = yinIsAuspicious ? "Baik" : "Buruk"
+            return String(format: "%.1f cm · LuBan: [%@] (%@) · DingLan: [%@] (%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
+        case .ja:
+            let yName = Self.yangNamesHant[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "吉" : "凶"
+            let nName = Self.yinNamesHant[yinIndex]
+            let nLuck = yinIsAuspicious ? "吉" : "凶"
+            return String(format: "%.1f cm · 魯班門光尺：【%@】(%@) · 丁蘭尺：【%@】(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
+        case .ko:
+            let yName = Self.yangNamesKo[yangGateIndex]
+            let yLuck = yangIsAuspicious ? "길" : "흉"
+            let nName = Self.yinNamesKo[yinIndex]
+            let nLuck = yinIsAuspicious ? "길" : "흉"
+            return String(format: "%.1f cm · 노반자: [%@](%@) · 정란척: [%@](%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
         case .zhHant:
             let yName = Self.yangNamesHant[yangGateIndex]
             let yLuck = yangIsAuspicious ? "吉" : "凶"
             let nName = Self.yinNamesHant[yinIndex]
             let nLuck = yinIsAuspicious ? "吉" : "凶"
             return String(format: "%.1f cm · 魯班門光尺：【%@】字門(%@) · 丁蘭尺：【%@】字(%@)", centimeters, yName, yLuck, nName, nLuck) + " · " + sourceNote
-        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
+        case .auto, .zhHans:
             let yName = Self.yangNamesHans[yangGateIndex]
             let yLuck = yangIsAuspicious ? "吉" : "凶"
             let nName = Self.yinNamesHans[yinIndex]
@@ -480,8 +528,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         if abs(normX) <= 0.33 && abs(normZ) <= 0.33 {
             switch lang {
             case .en: currentStandingPalace = "Center Palace · 9 Purple (Auspicious)"
+            case .vi: currentStandingPalace = "Trung Cung Lập Cực · Cửu Tử Đương Lệnh (Đại Cát)"
+            case .th: currentStandingPalace = "จงกง (จุดศูนย์กลาง) · ดาว 9 ม่วงประจำยุค (มงคลยิ่ง)"
+            case .id: currentStandingPalace = "Istana Pusat · 9 Ungu Berkuasa (Sangat Baik)"
+            case .ja: currentStandingPalace = "中宮立極 · 九紫右弼当令（大吉）"
+            case .ko: currentStandingPalace = "중궁 입극 · 구자우필 당령 (대길)"
             case .zhHant: currentStandingPalace = "中宮立極 · 九紫右弼當令（大吉）"
-            case .auto, .zhHans, .ja, .ko, .vi, .th, .id: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
+            case .auto, .zhHans: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
             }
             return
         }
@@ -519,11 +572,66 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             "West (Dui) · 2 Black (classical illness symbol · Zi Bai Jue)",
             "Northwest (Qian) · 1 White (Noble)"
         ]
+        let labelsVi = [
+            "Chính Bắc (Khảm) · Ngũ Hoàng Liêm Trinh (Nên tĩnh)",
+            "Đông Bắc (Cấn) · Tam Bích Lộc Tồn (Thị phi)",
+            "Chính Đông (Chấn) · Thất Xích Phá Quân (Thoái khí)",
+            "Đông Nam (Tốn) · Bát Bạch Tả Phù (Tài vị · Cát)",
+            "Chính Nam (Ly) · Tứ Lục Văn Xương (Công danh · Cát)",
+            "Tây Nam (Khôn) · Lục Bạch Vũ Khúc (Quyền ấn · Cát)",
+            "Chính Tây (Đoài) · Nhị Hắc Cự Môn (Biểu tượng bệnh phù)",
+            "Tây Bắc (Càn) · Nhất Bạch Tham Lang (Sinh khí · Đại Cát)"
+        ]
+        let labelsTh = [
+            "ทิศเหนือ (ข่าน) · ดาว 5 เหลือง (ควรสงบนิ่ง)",
+            "ทิศตะวันออกเฉียงเหนือ (เกิ้น) · ดาว 3 เขียว (ระวังปากเสียง)",
+            "ทิศตะวันออก (เจิ้น) · ดาว 7 แดง (พลังถดถอย)",
+            "ทิศตะวันออกเฉียงใต้ (ซวิ่น) · ดาว 8 ขาว (โชคลาภ · มงคล)",
+            "ทิศใต้ (หลี) · ดาว 4 เขียวเหวินชาง (การเรียน/ชื่อเสียง · มงคล)",
+            "ทิศตะวันตกเฉียงใต้ (คุน) · ดาว 6 ขาว (บารมี/การงาน · มงคล)",
+            "ทิศตะวันตก (ตุ้ย) · ดาว 2 ดำ (สัญลักษณ์สุขภาพตามตำรา)",
+            "ทิศตะวันตกเฉียงเหนือ (เฉียน) · ดาว 1 ขาว (พลังรุ่งเรือง · มงคลยิ่ง)"
+        ]
+        let labelsId = [
+            "Utara (Kan) · 5 Kuning (Jaga Ketenangan)",
+            "Timur Laut (Gen) · 3 Giok (Rawan Selisih)",
+            "Timur (Zhen) · 7 Merah (Energi Surut)",
+            "Tenggara (Xun) · 8 Putih (Rezeki · Baik)",
+            "Selatan (Li) · 4 Hijau WenChang (Akademik · Baik)",
+            "Barat Daya (Kun) · 6 Putih (Karier/Wibawa · Baik)",
+            "Barat (Dui) · 2 Hitam (Simbol klasik Zi Bai Jue)",
+            "Barat Laut (Qian) · 1 Putih (Energi Maju · Sangat Baik)"
+        ]
+        let labelsJa = [
+            "正北坎宮 · 五黄廉貞（静を宜しとす）",
+            "北東艮宮 · 三碧禄存（是非位）",
+            "正東震宮 · 七赤破軍（退気位）",
+            "南東巽宮 · 八白左輔（次財位・吉）",
+            "正南離宮 · 四緑文昌（功名位・吉）",
+            "南西坤宮 · 六白武曲（偏財権印・吉）",
+            "正西兌宮 · 二黒巨門（病符象徴・『紫白訣』）",
+            "北西乾宮 · 一白貪狼（未来生気・大吉）"
+        ]
+        let labelsKo = [
+            "정북 감궁 · 오황염정 (정숙 권장)",
+            "북동 간궁 · 삼벽록존 (시비위)",
+            "정동 진궁 · 칠적파군 (퇴기위)",
+            "남동 손궁 · 팔백좌보 (차재위·길)",
+            "정남 리궁 · 사록문창 (공명위·길)",
+            "남서 곤궁 · 육백무곡 (편재권인·길)",
+            "정서 태궁 · 이흑거문 (병부 상징·『자백결』)",
+            "북서 건궁 · 일백탐랑 (미래생기·대길)"
+        ]
         let safeIdx = min(7, max(0, index))
         switch lang {
         case .en: currentStandingPalace = labelsEn[safeIdx]
+        case .vi: currentStandingPalace = labelsVi[safeIdx]
+        case .th: currentStandingPalace = labelsTh[safeIdx]
+        case .id: currentStandingPalace = labelsId[safeIdx]
+        case .ja: currentStandingPalace = labelsJa[safeIdx]
+        case .ko: currentStandingPalace = labelsKo[safeIdx]
         case .zhHant: currentStandingPalace = labelsHant[safeIdx]
-        case .auto, .zhHans, .ja, .ko, .vi, .th, .id: currentStandingPalace = labelsHans[safeIdx]
+        case .auto, .zhHans: currentStandingPalace = labelsHans[safeIdx]
         }
     }
 
@@ -2534,7 +2642,7 @@ public struct ARSpatialSurveyView: View {
                 Label(mappingText, systemImage: "map")
                 if false, let h = model.estimatedRoomHeightMeters {
                 let beamWarning = model.hasLowBeamWarning
-                Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
+                Text(String(format: "%@: %.2f m · %@", lang.t("3d_metric_ceiling"), h, beamWarning ? lang.t("ar_spatial_beam_warning") : lang.t("ar_spatial_ceiling_good")))
                     .adaptiveFont(size: 10, weight: .bold, design: .monospaced)
                     .foregroundColor(beamWarning ? .orange : .green)
             }
@@ -2646,7 +2754,7 @@ public struct ARSpatialSurveyView: View {
 
             if let h = model.estimatedRoomHeightMeters {
                 let beamWarning = model.hasLowBeamWarning
-                Text(String(format: "空间净高: %.2f m · %@", h, beamWarning ? "⚠️ 横梁/低顶压迫预警" : "层高开阔舒展"))
+                Text(String(format: "%@: %.2f m · %@", lang.t("3d_metric_ceiling"), h, beamWarning ? lang.t("ar_spatial_beam_warning") : lang.t("ar_spatial_ceiling_good")))
                     .adaptiveFont(size: 10, weight: .bold, design: .monospaced)
                     .foregroundColor(beamWarning ? .orange : .green)
             }
@@ -2746,25 +2854,11 @@ public struct ARSpatialSurveyView: View {
 
     private var lubanActionTitle: String {
         let isWaitingSecond = (model.lubanPointA != nil && model.lubanPointB == nil)
-        switch lang.effectiveLanguage {
-        case .en:
-            return isWaitingSecond ? "Set Point B" : "LuBan Ruler (Point A)"
-        case .zhHant:
-            return isWaitingSecond ? "標定終點 B" : "魯班尺打點 A"
-        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
-            return isWaitingSecond ? "标定终点 B" : "鲁班尺打点 A"
-        }
+        return isWaitingSecond ? lang.t("ar_luban_point_b") : lang.t("ar_luban_point_a")
     }
 
     private var lubanPendingHint: String {
-        switch lang.effectiveLanguage {
-        case .en:
-            return "Point A locked — aim reticle at endpoint B and tap Set Point B"
-        case .zhHant:
-            return "已鎖定起點 A · 請將準星對準終點 B 點擊「標定終點 B」測算魯班尺吉凶"
-        case .auto, .zhHans, .ja, .ko, .vi, .th, .id:
-            return "已锁定起点 A · 请将准星对准终点 B 点击「标定终点 B」测算鲁班尺吉凶"
-        }
+        return lang.t("ar_luban_pending_hint")
     }
 
     private var trackingText: String {

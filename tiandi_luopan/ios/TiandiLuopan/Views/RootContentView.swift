@@ -134,9 +134,31 @@ public enum AdaptiveFontMetrics {
     }
 }
 
+/// 分栏两栏内的字号系数。默认是 1.0（单列态）。
+/// 展开态左右栏各自只有整屏的一部分，若仍套用 regular 的 1.35x 宽屏放大，
+/// 泰语/越南语/印尼语长词会被逐字折断、HStack 里的标题与徽章互相穿插。
+/// 由 FoldableTwoPane 注入 1/regularWidthScale 抵消放大，符合「内屏用多出的
+/// 空间显示更多内容，而不是简单放大字号和卡片」。
+private struct PaneTypographyScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1.0
+}
+
+public extension EnvironmentValues {
+    var paneTypographyScale: CGFloat {
+        get { self[PaneTypographyScaleKey.self] }
+        set { self[PaneTypographyScaleKey.self] = newValue }
+    }
+}
+
+/// 分栏容器内抵消 regular 宽屏字号放大的系数（对外只读）。
+public enum AdaptivePaneTypography {
+    public static let scaleInSplitPane: CGFloat = 1.0 / AdaptiveFontMetrics.regularWidthScale
+}
+
 public struct AdaptiveFontModifier: ViewModifier {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.paneTypographyScale) private var paneTypographyScale
 
     private let size: CGFloat
     private let weight: Font.Weight
@@ -152,7 +174,8 @@ public struct AdaptiveFontModifier: ViewModifier {
         let scaled = AdaptiveFontMetrics.scaledSize(size,
                                                     sizeClass: horizontalSizeClass,
                                                     dynamicType: dynamicTypeSize)
-        return content.font(.system(size: scaled, weight: weight, design: design))
+        let paneScaled = (scaled * paneTypographyScale).rounded()
+        return content.font(.system(size: paneScaled, weight: weight, design: design))
     }
 }
 
@@ -184,14 +207,23 @@ public extension View {
 //   · `userInterfaceIdiom` 只用于区分设备族（iPad 与 iPhone Duo），不决定任何尺寸；
 //     iPad 的接口方向沿用既有产品口径，Duo 一律用 Size Class 判定。
 public enum AdaptiveLayout {
-    /// iPad 并排两块内容所需的最小有效宽度：用于排除分屏 / 侧拉窄窗。
-    /// 只作用于 iPad；iPhone Duo 的展开与否完全由 Size Class 表达，
-    /// 不叠加机型式宽度常量（文章：应表达「空间是否足以双列」，而非设备型号）。
-    public static let iPadTwoPaneMinimumWidth: CGFloat = 900
-    /// 左栏占比插值基准（仅用于连续调节比例，不作为分栏开关）。
-    private static let ratioInterpolationBase: CGFloat = 900
+    /// 左栏画板保持可读的最小宽度（pt）。低于此值时 24 山/64 卦/节气环的文字会互相压叠。
+    public static let minimumMainPaneWidth: CGFloat = 420
+    /// 右栏解释文本保持可读的最小宽度（pt）。低于此值时印尼语/泰语长词会被逐字折断，
+    /// HStack 里的标题与徽章会挤成一团。
+    public static let minimumAnalysisPaneWidth: CGFloat = 360
+    /// 并排两栏所需的最小有效宽度 = 两栏各自可读下限 + 1pt 分隔线。
+    /// 这不是机型尺寸常量，而是「当前空间是否足以并排两块内容」的可读性表达
+    ///（Apple Tech Talks：应表达空间是否足以展示双列，而非设备型号/开合布尔）。
+    public static var twoPaneReadableWidth: CGFloat {
+        minimumMainPaneWidth + minimumAnalysisPaneWidth + 1
+    }
+    /// iPad 沿用既有的 900pt 口径（排除分屏 / 侧拉窄窗），取两者较大值。
+    private static var twoPaneMinimumWidth: CGFloat {
+        max(900, twoPaneReadableWidth)
+    }
 
-    /// 左右双栏：iPhone Duo 仅展开内屏（regular/regular）成立；iPad 横屏且够宽成立。
+    /// 左右双栏：展开态且「有效宽度足以让两栏各自可读」时才成立。
     public static func isTwoPane(horizontal: UserInterfaceSizeClass?,
                                 vertical: UserInterfaceSizeClass?,
                                 form: AdaptiveLayoutForm) -> Bool {
@@ -199,14 +231,16 @@ public enum AdaptiveLayout {
         // 此时各页 isWide(sizeClass:) 同为 false，画布、控件、字号全部走普通 iPhone 口径，
         // 不会变成「手机放大版」——这正是「合上时与普通 iPhone 一样」的保证。
         guard horizontal == .regular else { return false }
+        // 展开形态成立，但可用宽度不足以并排两块可读内容时仍回退单列。
+        // 竖持的展开内屏、部分折叠、Split View 窄窗都会走这里，避免文字重叠。
+        guard form.size.width >= twoPaneMinimumWidth else { return false }
         if form.isPhoneIdiom {
             // iPhone Duo：展开内屏是 regular/regular；合上外屏或普通大屏 iPhone 横屏
-            // 的垂直尺寸类是 compact，必须回退单列。不依赖 interfaceOrientation、
-            // 不依赖设备宽度常量，展开态完全由当前 Scene 的 Size Class 表达。
+            // 的垂直尺寸类是 compact，必须回退单列。不依赖 interfaceOrientation。
             return vertical == .regular
         }
         // iPad：保留「界面横屏才分栏」的产品口径；竖屏 / 分屏窄窗不分栏。
-        return form.isLandscape && form.size.width >= iPadTwoPaneMinimumWidth
+        return form.isLandscape
     }
 
     /// 便捷重载：垂直尺寸类取布局快照中由根视图实时注入的值。
@@ -221,9 +255,13 @@ public enum AdaptiveLayout {
 
     /// 左栏占比随有效宽度自适应：窄展开屏把更多空间留给画布，宽屏收敛让右栏解释够宽。
     /// 各页不再各自硬编码 0.55/0.56/0.58/0.60，画布才能按左栏实际占比铺满。
+    /// 同时硬性保证右栏不小于 minimumAnalysisPaneWidth，避免长词被逐字折断。
     public static func mainColumnRatio(forWidth width: CGFloat) -> CGFloat {
-        let t = min(max((width - ratioInterpolationBase) / 500, 0), 1)
-        return 0.62 - 0.07 * t
+        guard width > 0 else { return 0.6 }
+        let t = min(max((width - 900) / 500, 0), 1)
+        let curved = 0.62 - 0.07 * t
+        let analysisFloor = (minimumAnalysisPaneWidth + 1) / width
+        return min(max(curved, 0.5), max(0.5, 1 - analysisFloor))
     }
 
     /// 当前有效宽度下左栏的真实可用宽度（扣掉 1pt 分隔线）。
@@ -275,11 +313,13 @@ public struct AdaptiveLayoutForm: Equatable {
                             || $0.activationState == .foregroundInactive }),
            let window = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
             if windowSize == .zero { windowSize = window.bounds.size }
-            let orientation = scene.interfaceOrientation
-            isLandscape = orientation.isLandscape
-            if orientation == .unknown {
-                // 启动瞬间方向尚未上报：用宽高比兜底
-                isLandscape = windowSize.width > windowSize.height
+            // iPhone Duo / 可缩放窗口下，窗口的形状由当前 bounds 宽高比决定，
+            // scene.interfaceOrientation 在折叠/展开瞬间会滞后甚至上报旧值；
+            // 按 Apple「Prepare for iPhone Duo」指南：布局只看当前空间的宽高比，
+            // interfaceOrientation 仅作 windowSize 尚未就绪时的兜底。
+            isLandscape = windowSize.width > windowSize.height
+            if windowSize == .zero {
+                isLandscape = scene.interfaceOrientation.isLandscape
             }
             isPhoneIdiom = window.traitCollection.userInterfaceIdiom == .phone
         } else {
@@ -375,11 +415,16 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
 
     public var body: some View {
         if isSplitHere {
-            if independentScroll {
-                independentScrollPanes
-            } else {
-                standardPanes
+            // 两栏各自只占整屏一部分：抵消 regular 的 1.35x 字号放大，
+            // 避免国际化长词被逐字折断、标题与徽章互相穿插。所有页面共用一个系数。
+            Group {
+                if independentScroll {
+                    independentScrollPanes
+                } else {
+                    standardPanes
+                }
             }
+            .environment(\.paneTypographyScale, AdaptivePaneTypography.scaleInSplitPane)
         } else {
             // 合上外屏 / 常规 iPhone / 窄窗：与普通 iPhone 完全一致的单列纵排。
             VStack(spacing: compactSpacing) {
@@ -394,6 +439,10 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
         ProportionalTwoPaneLayout(mainRatio: mainColumnRatio) {
             main
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaInset(edge: .bottom) {
+                    // iOS 27 浮动 TabBar 不占用 safe area，会盖住两栏底部内容
+                    Color.clear.frame(height: 72)
+                }
 
             Rectangle()
                 .fill(Color.white.opacity(0.10))
@@ -402,6 +451,9 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
             analysis
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: analysisAlignment)
                 .background(analysisBackground)
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: 72)
+                }
         }
     }
 
@@ -425,6 +477,8 @@ public struct FoldableTwoPane<Main: View, Analysis: View>: View {
             ScrollView {
                 analysis
                     .frame(maxWidth: .infinity)
+                    // 浮动 TabBar 会盖住右栏末尾；留出可滚到底的余量
+                    .padding(.bottom, 72)
             }
             .frame(maxWidth: .infinity)
             .frame(height: paneHeight)

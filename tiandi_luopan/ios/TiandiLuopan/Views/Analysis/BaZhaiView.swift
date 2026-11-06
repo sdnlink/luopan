@@ -192,23 +192,25 @@ public struct BaZhaiView: View {
             // 八方游年星列表
             VStack(spacing: 8) {
                 ForEach(bz.items) { item in
-                    HStack(alignment: .top, spacing: 10) {
-                        VStack(alignment: .leading, spacing: 2) {
+                    // 固定 120pt 的方向列会把建议文字挤成竖排单字；改为纵向堆叠，
+                    // 方向/星名一行、建议说明整行，所有语言都能完整换行。
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
                             Text(item.localizedDirection)
                                 .adaptiveFont(size: 14, weight: .bold)
                                 .foregroundColor(.white)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text(item.star.localizedName)
                                 .adaptiveFont(size: 12, weight: .semibold)
                                 .foregroundColor(item.star.isAuspicious ? Color(red: 0.4, green: 0.85, blue: 0.4) : Color(red: 0.95, green: 0.4, blue: 0.4))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
                         }
-                        .frame(width: 120, alignment: .leading)
-                        
                         Text(item.star.localizedSuggestion)
                             .adaptiveFont(size: 12)
                             .foregroundColor(.white.opacity(0.85))
                             .lineSpacing(2)
-                        
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(10)
                     .background(Color(red: 0.11, green: 0.11, blue: 0.14))

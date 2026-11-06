@@ -283,13 +283,21 @@ public struct XuanKongGridView: View {
                         }) {
                             HStack(spacing: 2) {
                                 Text("\(p)\(lang.t("xuankong_period_unit"))")
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                    .fixedSize(horizontal: true, vertical: false)
                                 if isLocked {
                                     Image(systemName: "lock.fill")
                                         .adaptiveFont(size: 8)
                                 }
                             }
                             .adaptiveFont(size: 13, weight: isSelected ? .bold : .medium)
-                            .frame(width: isLocked ? (isRoomyLayout ? 62 : 52) : (isRoomyLayout ? 52 : 44), height: isRoomyLayout ? 36 : 32)
+                            // 用最小宽度 + 横向 padding 代替钉死的 44/52/62pt：
+                            // 泰语「ยุค」、越南语「vận」等长单位不再被裁成竖排。
+                            .frame(minWidth: isLocked ? 62 : 52,
+                                   minHeight: isRoomyLayout ? 36 : 32)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
                             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.white.opacity(0.1))
                             .foregroundColor(isSelected ? .black : .white)
                             .cornerRadius(8)

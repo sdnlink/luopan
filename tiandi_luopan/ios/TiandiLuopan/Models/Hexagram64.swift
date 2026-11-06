@@ -195,6 +195,153 @@ public struct HexagramItem: Identifiable, Codable {
         }
     }
 
+    /// Short hexagram core label for the 64-hexagram compass ring (5.625° per sector).
+    public var localizedDialLabel: String {
+        let language = LocalizationManager.shared.effectiveLanguage
+        let coreHans: String
+        if let weIdx = name.range(of: "为") {
+            coreHans = String(name.prefix(upTo: weIdx.lowerBound))
+        } else if name.count >= 3 {
+            coreHans = String(name.dropFirst(2))
+        } else {
+            coreHans = name
+        }
+        switch language {
+        case .auto, .zhHans:
+            return coreHans
+        case .zhHant:
+            return coreHans
+                .replacingOccurrences(of: "剥", with: "剝")
+                .replacingOccurrences(of: "观", with: "觀")
+                .replacingOccurrences(of: "晋", with: "晉")
+                .replacingOccurrences(of: "谦", with: "謙")
+                .replacingOccurrences(of: "渐", with: "漸")
+                .replacingOccurrences(of: "过", with: "過")
+                .replacingOccurrences(of: "遁", with: "遯")
+                .replacingOccurrences(of: "师", with: "師")
+                .replacingOccurrences(of: "涣", with: "渙")
+                .replacingOccurrences(of: "济", with: "濟")
+                .replacingOccurrences(of: "讼", with: "訟")
+                .replacingOccurrences(of: "蛊", with: "蠱")
+                .replacingOccurrences(of: "恒", with: "恆")
+                .replacingOccurrences(of: "复", with: "復")
+                .replacingOccurrences(of: "颐", with: "頤")
+                .replacingOccurrences(of: "随", with: "隨")
+                .replacingOccurrences(of: "无", with: "無")
+                .replacingOccurrences(of: "贲", with: "賁")
+                .replacingOccurrences(of: "丰", with: "豐")
+                .replacingOccurrences(of: "离", with: "離")
+                .replacingOccurrences(of: "临", with: "臨")
+                .replacingOccurrences(of: "损", with: "損")
+                .replacingOccurrences(of: "节", with: "節")
+                .replacingOccurrences(of: "归", with: "歸")
+                .replacingOccurrences(of: "兑", with: "兌")
+                .replacingOccurrences(of: "壮", with: "壯")
+        case .ja:
+            return coreHans
+                .replacingOccurrences(of: "观", with: "観")
+                .replacingOccurrences(of: "谦", with: "謙")
+                .replacingOccurrences(of: "渐", with: "漸")
+                .replacingOccurrences(of: "过", with: "過")
+                .replacingOccurrences(of: "遁", with: "遯")
+                .replacingOccurrences(of: "师", with: "師")
+                .replacingOccurrences(of: "涣", with: "渙")
+                .replacingOccurrences(of: "济", with: "済")
+                .replacingOccurrences(of: "讼", with: "訟")
+                .replacingOccurrences(of: "蛊", with: "蠱")
+                .replacingOccurrences(of: "复", with: "復")
+                .replacingOccurrences(of: "颐", with: "頤")
+                .replacingOccurrences(of: "无", with: "無")
+                .replacingOccurrences(of: "贲", with: "賁")
+                .replacingOccurrences(of: "离", with: "離")
+                .replacingOccurrences(of: "临", with: "臨")
+                .replacingOccurrences(of: "损", with: "損")
+                .replacingOccurrences(of: "节", with: "節")
+                .replacingOccurrences(of: "归", with: "帰")
+                .replacingOccurrences(of: "兑", with: "兌")
+        case .ko:
+            let koCore: [String: String] = [
+                "坤为地": "곤", "山地剥": "박", "水地比": "비", "风地观": "관",
+                "雷地豫": "예", "火地晋": "진", "泽地萃": "췌", "天地否": "비",
+                "地山谦": "겸", "艮为山": "간", "水山蹇": "건", "风山渐": "점",
+                "雷山小过": "소과", "火山旅": "려", "泽山咸": "함", "天山遁": "둔",
+                "地水师": "사", "山水蒙": "몽", "坎为水": "감", "风水涣": "환",
+                "雷水解": "해", "火水未济": "미제", "泽水困": "곤", "天水讼": "송",
+                "地风升": "승", "山风蛊": "고", "水风井": "정", "巽为风": "손",
+                "雷风恒": "항", "火风鼎": "정", "泽风大过": "대과", "天风姤": "구",
+                "地雷复": "복", "山雷颐": "이", "水雷屯": "둔", "风雷益": "익",
+                "震为雷": "진", "火雷噬嗑": "서합", "泽雷随": "수", "天雷无妄": "무망",
+                "地火明夷": "명이", "山火贲": "비", "水火既济": "기제", "风火家人": "가인",
+                "雷火丰": "풍", "离为火": "리", "泽火革": "혁", "天火同人": "동인",
+                "地泽临": "림", "山泽损": "손", "水泽节": "절", "风泽中孚": "중부",
+                "雷泽归妹": "귀매", "火泽睽": "규", "兑为泽": "태", "天泽履": "리",
+                "地天泰": "태", "山天大畜": "대축", "水天需": "수", "风天小畜": "소축",
+                "雷天大壮": "대장", "火天大有": "대유", "泽天夬": "쾌", "乾为天": "건"
+            ]
+            return koCore[name] ?? coreHans
+        case .vi:
+            let viCore: [String: String] = [
+                "坤为地": "Khôn", "山地剥": "Bác", "水地比": "Tỷ", "风地观": "Quán",
+                "雷地豫": "Dự", "火地晋": "Tấn", "泽地萃": "Tụy", "天地否": "Bĩ",
+                "地山谦": "Khiêm", "艮为山": "Cấn", "水山蹇": "Kiển", "风山渐": "Tiệm",
+                "雷山小过": "T.Quá", "火山旅": "Lữ", "泽山咸": "Hàm", "天山遁": "Độn",
+                "地水师": "Sư", "山水蒙": "Mông", "坎为水": "Khảm", "风水涣": "Hoán",
+                "雷水解": "Giải", "火水未济": "V.Tế", "泽水困": "Khốn", "天水讼": "Tụng",
+                "地风升": "Thăng", "山风蛊": "Cổ", "水风井": "Tỉnh", "巽为风": "Tốn",
+                "雷风恒": "Hằng", "火风鼎": "Đỉnh", "泽风大过": "Đ.Quá", "天风姤": "Cấu",
+                "地雷复": "Phục", "山雷颐": "Di", "水雷屯": "Truân", "风雷益": "Ích",
+                "震为雷": "Chấn", "火雷噬嗑": "P.Hạp", "泽雷随": "Tùy", "天雷无妄": "V.Vọng",
+                "地火明夷": "M.Di", "山火贲": "Bí", "水火既济": "K.Tế", "风火家人": "G.Nhân",
+                "雷火丰": "Phong", "离为火": "Ly", "泽火革": "Cách", "天火同人": "Đ.Nhân",
+                "地泽临": "Lâm", "山泽损": "Tổn", "水泽节": "Tiết", "风泽中孚": "T.Phu",
+                "雷泽归妹": "Q.Muội", "火泽睽": "Khuê", "兑为泽": "Đoài", "天泽履": "Lý",
+                "地天泰": "Thái", "山天大畜": "Đ.Súc", "水天需": "Nhu", "风天小畜": "T.Súc",
+                "雷天大壮": "Đ.Tráng", "火天大有": "Đ.Hữu", "泽天夬": "Quái", "乾为天": "Càn"
+            ]
+            return viCore[name] ?? coreHans
+        case .th:
+            let thCore: [String: String] = [
+                "坤为地": "คุน", "山地剥": "โป", "水地比": "ปี่", "风地观": "กวาน",
+                "雷地豫": "ยวี่", "火地晋": "จิ้น", "泽地萃": "ชุ่ย", "天地否": "พี",
+                "地山谦": "เชียน", "艮为山": "เกิ้น", "水山蹇": "เจี่ยน", "风山渐": "เจี้ยน",
+                "雷山小过": "เสี่ยวกั้ว", "火山旅": "ลวี่", "泽山咸": "เสียน", "天山遁": "ตุ้น",
+                "地水师": "ซือ", "山水蒙": "เหมิง", "坎为水": "ข่าน", "风水涣": "ฮ่วน",
+                "雷水解": "เซี่ย", "火水未济": "เว่ยจี้", "泽水困": "คุ่น", "天水讼": "ซ่ง",
+                "地风升": "เซิง", "山风蛊": "กู่", "水风井": "จิ่ง", "巽为风": "ซวิ่น",
+                "雷风恒": "เหิง", "火风鼎": "ติ่ง", "泽风大过": "ต้ากั้ว", "天风姤": "โก้ว",
+                "地雷复": "ฟู่", "山雷颐": "อี๋", "水雷屯": "ถุน", "风雷益": "อี้",
+                "震为雷": "เจิ้น", "火雷噬嗑": "ซื่อเค่อ", "泽雷随": "สุย", "天雷无妄": "อู๋ว่าง",
+                "地火明夷": "หมิงอี๋", "山火贲": "ปี้", "水火既济": "จี้จี้", "风火家人": "เจียเหริน",
+                "雷火丰": "เฟิง", "离为火": "หลี", "泽火革": "เก๋อ", "天火同人": "ถงเหริน",
+                "地泽临": "หลิน", "山泽损": "สุ่น", "水泽节": "เจี๋ย", "风泽中孚": "จงฝู",
+                "雷泽归妹": "กุยเม่ย", "火泽睽": "ขุย", "兑为泽": "ตุ้ย", "天泽履": "ลวี่",
+                "地天泰": "ไท่", "山天大畜": "ต้าซู่", "水天需": "ซวี", "风天小畜": "เสี่ยวซู่",
+                "雷天大壮": "ต้าจ้วง", "火天大有": "ต้าโหย่ว", "泽天夬": "ไกว้", "乾为天": "เฉียน"
+            ]
+            return thCore[name] ?? coreHans
+        case .en, .id:
+            let enCore: [String: String] = [
+                "坤为地": "Kun", "山地剥": "Bo", "水地比": "Bi", "风地观": "Guan",
+                "雷地豫": "Yu", "火地晋": "Jin", "泽地萃": "Cui", "天地否": "Pi",
+                "地山谦": "Qian", "艮为山": "Gen", "水山蹇": "Jian", "风山渐": "Jian",
+                "雷山小过": "X.Guo", "火山旅": "Lv", "泽山咸": "Xian", "天山遁": "Dun",
+                "地水师": "Shi", "山水蒙": "Meng", "坎为水": "Kan", "风水涣": "Huan",
+                "雷水解": "Xie", "火水未济": "W.Ji", "泽水困": "Kun", "天水讼": "Song",
+                "地风升": "Sheng", "山风蛊": "Gu", "水风井": "Jing", "巽为风": "Xun",
+                "雷风恒": "Heng", "火风鼎": "Ding", "泽风大过": "D.Guo", "天风姤": "Gou",
+                "地雷复": "Fu", "山雷颐": "Yi", "水雷屯": "Zhun", "风雷益": "Yi",
+                "震为雷": "Zhen", "火雷噬嗑": "S.He", "泽雷随": "Sui", "天雷无妄": "W.Wang",
+                "地火明夷": "M.Yi", "山火贲": "Bi", "水火既济": "J.Ji", "风火家人": "J.Ren",
+                "雷火丰": "Feng", "离为火": "Li", "泽火革": "Ge", "天火同人": "T.Ren",
+                "地泽临": "Lin", "山泽损": "Sun", "水泽节": "Jie", "风泽中孚": "Z.Fu",
+                "雷泽归妹": "G.Mei", "火泽睽": "Kui", "兑为泽": "Dui", "天泽履": "Lv",
+                "地天泰": "Tai", "山天大畜": "D.Chu", "水天需": "Xu", "风天小畜": "X.Chu",
+                "雷天大壮": "D.Zhuang", "火天大有": "D.You", "泽天夬": "Guai", "乾为天": "Qian"
+            ]
+            return enCore[name] ?? coreHans
+        }
+    }
+
     public var localizedLuckDegree: String {
         switch LocalizationManager.shared.effectiveLanguage {
         case .auto, .zhHans:

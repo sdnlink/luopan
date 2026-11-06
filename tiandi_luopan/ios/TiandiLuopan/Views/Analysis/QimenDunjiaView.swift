@@ -249,7 +249,7 @@ public struct QimenDunjiaView: View {
                     .adaptiveFont(size: 8)
                     .foregroundColor(.white.opacity(0.6))
                 Spacer()
-                Text("\(cell.tianStem)/\(cell.diStem)")
+                Text("\(cell.localizedTianStem)/\(cell.localizedDiStem)")
                     .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }

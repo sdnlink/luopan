@@ -738,11 +738,30 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 return lhs.dimensions.x > rhs.dimensions.x
             }
         }()
+        let lang = LocalizationManager.shared.effectiveLanguage
         if let mainDoor, Float(mainDoor.dimensions.x) > 0.45 {
             let doorWidth = Float(mainDoor.dimensions.x)
             let eval = LubanRulerEvaluation.evaluate(meters: doorWidth)
-            let badge = eval.yangIsAuspicious ? "吉门" : "失度"
-            findings.append(String(format: "门宽 %.2fm · 鲁班尺【%@】(%@)", Double(doorWidth), eval.yangSegmentName, badge))
+            let seg = eval.localizedYangSegmentName
+            let wStr = String(format: "%.2f", Double(doorWidth))
+            switch lang {
+            case .zhHans, .auto:
+                findings.append("门宽 \(wStr)m · 鲁班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉门" : "失度"))")
+            case .zhHant:
+                findings.append("門寬 \(wStr)m · 魯班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉門" : "失度"))")
+            case .en:
+                findings.append("Door \(wStr)m · Lu Ban [\(seg)] (\(eval.yangIsAuspicious ? "Auspicious" : "Check"))")
+            case .ja:
+                findings.append("門幅 \(wStr)m・魯班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉門" : "要注意"))")
+            case .ko:
+                findings.append("문폭 \(wStr)m · 노반척【\(seg)】(\(eval.yangIsAuspicious ? "길문" : "주의"))")
+            case .vi:
+                findings.append("Rộng cửa \(wStr)m · Lỗ Ban [\(seg)] (\(eval.yangIsAuspicious ? "Cát" : "Lưu ý"))")
+            case .th:
+                findings.append("ประตู \(wStr)m · หลู่ปาน [\(seg)] (\(eval.yangIsAuspicious ? "มงคล" : "ควรตรวจ"))")
+            case .id:
+                findings.append("Pintu \(wStr)m · Lu Ban [\(seg)] (\(eval.yangIsAuspicious ? "Baik" : "Periksa"))")
+            }
         }
 
         // 2. 穿堂风煞检测 (门对窗 / 门对门一箭穿心)
@@ -762,7 +781,17 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let alignment = abs(simd_dot(dNorm, dir))
                 let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
                 if alignment >= 0.88 && lateral <= 0.65 {
-                    findings.append(String(format: "⚠️ 穿堂煞：门窗对冲直通 (间距 %.1fm)", dist))
+                    let dStr = String(format: "%.1f", dist)
+                    switch lang {
+                    case .zhHans, .auto: findings.append("⚠️ 穿堂煞：门窗对冲直通 (间距 \(dStr)m)")
+                    case .zhHant: findings.append("⚠️ 穿堂煞：門窗對衝直通 (間距 \(dStr)m)")
+                    case .en:     findings.append("⚠️ Through-Draft: Door aligns with window (\(dStr)m)")
+                    case .ja:     findings.append("⚠️ 穿堂風殺：扉と窓が一直線（距離 \(dStr)m）")
+                    case .ko:     findings.append("⚠️ 천당풍살: 문·창문 직통 맞바람 (\(dStr)m)")
+                    case .vi:     findings.append("⚠️ Xuyên Đường Sát: Cửa-cửa sổ thông thẳng (\(dStr)m)")
+                    case .th:     findings.append("⚠️ ลมทะลุกลางบ้าน: ประตูตรงหน้าต่าง (\(dStr)m)")
+                    case .id:     findings.append("⚠️ Angin Tembus: Pintu segaris jendela (\(dStr)m)")
+                    }
                     break
                 }
             }
@@ -785,7 +814,17 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let alignment = abs(simd_dot(dNorm, delta / dist))
                 let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
                 if alignment >= 0.85 && lateral <= 0.70 {
-                    findings.append(String(format: "⚠️ 门冲床：房门直对卧床 (%.1fm)", dist))
+                    let dStr = String(format: "%.1f", dist)
+                    switch lang {
+                    case .zhHans, .auto: findings.append("⚠️ 门冲床：房门直对卧床 (\(dStr)m)")
+                    case .zhHant: findings.append("⚠️ 門衝床：房門直對臥床 (\(dStr)m)")
+                    case .en:     findings.append("⚠️ Door-to-Bed: Door faces bed (\(dStr)m)")
+                    case .ja:     findings.append("⚠️ 門衝床：室内扉がベッドに正対（\(dStr)m）")
+                    case .ko:     findings.append("⚠️ 문충침: 방문이 침대와 직대 (\(dStr)m)")
+                    case .vi:     findings.append("⚠️ Môn Xung Sàng: Cửa chiếu thẳng giường (\(dStr)m)")
+                    case .th:     findings.append("⚠️ ประตูชนเตียง: ประตูตรงกับเตียงนอน (\(dStr)m)")
+                    case .id:     findings.append("⚠️ Pintu-ke-Ranjang: Pintu menghadap ranjang (\(dStr)m)")
+                    }
                     break
                 }
             }
@@ -800,7 +839,17 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 let tPos = SIMD2<Float>(toilet.transform.columns.3.x, toilet.transform.columns.3.z)
                 let dist = simd_distance(sPos, tPos)
                 if dist <= 2.1 {
-                    findings.append(String(format: "⚠️ 水火冲：厨灶与卫浴紧邻 (%.1fm)", dist))
+                    let dStr = String(format: "%.1f", dist)
+                    switch lang {
+                    case .zhHans, .auto: findings.append("⚠️ 水火冲：厨灶与卫浴紧邻 (\(dStr)m)")
+                    case .zhHant: findings.append("⚠️ 水火衝：廚灶與衛浴緊鄰 (\(dStr)m)")
+                    case .en:     findings.append("⚠️ Water-Fire Clash: Stove near bath (\(dStr)m)")
+                    case .ja:     findings.append("⚠️ 水火衝：コンロと水回りが近接（\(dStr)m）")
+                    case .ko:     findings.append("⚠️ 수화상충: 조리대와 욕실 인접 (\(dStr)m)")
+                    case .vi:     findings.append("⚠️ Thủy Hỏa Xung: Bếp gần phòng tắm (\(dStr)m)")
+                    case .th:     findings.append("⚠️ น้ำไฟปะทะ: เตาครัวใกล้ห้องน้ำ (\(dStr)m)")
+                    case .id:     findings.append("⚠️ Air-Api Bentrok: Kompor dekat kamar mandi (\(dStr)m)")
+                    }
                     break
                 }
             }
@@ -980,8 +1029,20 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             ))
         }
 
+        let scanMethodTitle: String
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .zhHans, .auto: scanMethodTitle = "LiDAR RoomPlan 测绘"
+        case .zhHant: scanMethodTitle = "LiDAR RoomPlan 測繪"
+        case .en:     scanMethodTitle = "LiDAR RoomPlan Scan"
+        case .ja:     scanMethodTitle = "LiDAR RoomPlan 空間測距"
+        case .ko:     scanMethodTitle = "LiDAR RoomPlan 공간 측량"
+        case .vi:     scanMethodTitle = "Quét LiDAR RoomPlan"
+        case .th:     scanMethodTitle = "สแกน LiDAR RoomPlan"
+        case .id:     scanMethodTitle = "Survei LiDAR RoomPlan"
+        }
+
         return HouseSpatialSurveyEngine.analyzeSpatialHouse(
-            scanMethod: "LiDAR RoomPlan 测绘",
+            scanMethod: scanMethodTitle,
             walls: walls3D,
             openings: openings3D,
             beams: beams3D,
@@ -1260,7 +1321,7 @@ public struct ARRoomPlanSurveyView: View {
                                         }
                                     }
                                 }
-                                .accessibilityLabel("大门朝向罗盘校准旋钮")
+                                .accessibilityLabel(lang.t("ar_roomplan_door_heading"))
                                 Button(action: syncToFloorplan) {
                                     Image(systemName: "scope")
                                         .adaptiveFont(size: 13, weight: .bold)

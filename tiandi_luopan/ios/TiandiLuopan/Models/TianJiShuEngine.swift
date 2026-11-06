@@ -722,7 +722,7 @@ public class TianJiShuEngine {
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
         for item in report {
-            let line = "【\(item.severity)】\(item.title) · \(item.palace)\n\(item.lore)\n→ \(item.solution)"
+            let line = "【\(item.localizedSeverity)】\(item.title) · \(item.palace)\n\(item.lore)\n→ \(item.solution)"
             let measured = (line as NSString).boundingRect(
                 with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -759,11 +759,15 @@ public class TianJiShuEngine {
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        let mStarLabel = tr8("山星", "山星", "Mountain", "山星", "산성", "Sơn tinh", "ดาวภูเขา", "Bintang Gunung", renderLanguage: renderLanguage)
+        let fStarLabel = tr8("向星", "向星", "Facing", "向星", "향성", "Hướng tinh", "ดาวทิศหัน", "Bintang Hadap", renderLanguage: renderLanguage)
+        let wuHuangLabel = tr8("五黄", "五黃", "5-Yellow", "五黄", "오황", "Ngũ Hoàng", "5 เหลือง", "5-Kuning", renderLanguage: renderLanguage)
+        let erHeiLabel = tr8("二黑", "二黑", "2-Black", "二黒", "이흑", "Nhị Hắc", "2 ดำ", "2-Hitam", renderLanguage: renderLanguage)
         for cell in chart.palaces {
-            let line = "【\(cell.localizedPalaceName)】 · 山星 \(cell.mountainStar) · 向星 \(cell.facingStar) · \(cell.localizedEvaluation)"
+            let line = "【\(cell.localizedPalaceName)】 · \(mStarLabel) \(cell.mountainStar) · \(fStarLabel) \(cell.facingStar) · \(cell.localizedEvaluation)"
             var displayLine = line
             if cell.isShaWuHuang || cell.isShaErHei {
-                displayLine += " · \(cell.isShaWuHuang ? "五黄" : "二黑")"
+                displayLine += " · \(cell.isShaWuHuang ? wuHuangLabel : erHeiLabel)"
             }
             let measured = (displayLine as NSString).boundingRect(
                 with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
@@ -801,8 +805,10 @@ public class TianJiShuEngine {
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: ink]
+        let tianPrefix = tr8("天", "天", "Heaven ", "天", "천", "Thiên ", "ฟ้า ", "Langit ", renderLanguage: renderLanguage)
+        let diPrefix = tr8("地", "地", "Earth ", "地", "지", "Địa ", "ดิน ", "Bumi ", renderLanguage: renderLanguage)
         for cell in chart.cells {
-            let line = "【\(cell.localizedPalaceName)】\(cell.localizedDoorName) · \(cell.localizedStarName) · \(cell.localizedGodName) · 天\(cell.tianStem)/地\(cell.diStem) · \(cell.doorLuck)"
+            let line = "【\(cell.localizedPalaceName)】\(cell.localizedDoorName) · \(cell.localizedStarName) · \(cell.localizedGodName) · \(tianPrefix)\(cell.localizedTianStem)/\(diPrefix)\(cell.localizedDiStem) · \(cell.doorLuck)"
             let measured = (line as NSString).boundingRect(
                 with: CGSize(width: 880, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -1003,15 +1009,17 @@ public class TianJiShuEngine {
                 let sha = ExteriorShaEngine.shared.database.first(where: { $0.id == record.shaID })
                 let name = sha?.localizedName ?? record.shaID
                 let remedy = sha?.localizedRemedySolution ?? ""
+                let elevLabel = tr8("仰角", "仰角", "Elev.", "仰角", "앙각", "Góc ngẩng", "มุมเงย", "Elevasi", renderLanguage: renderLanguage)
+                let manualLabel = tr8("手动", "手動", "Manual", "手動", "수동", "Thủ công", "กำหนดเอง", "Manual", renderLanguage: renderLanguage)
                 var metadata = String(format: "%.1f°", record.bearingDegrees)
-                metadata += String(format: " · 仰角 %.1f°", record.elevationDegrees)
+                metadata += String(format: " · \(elevLabel) %.1f°", record.elevationDegrees)
                 if let distance = record.distanceMeters {
                     metadata += String(format: " · %.1f m", distance)
                 }
                 if let confidence = record.confidence {
                     metadata += String(format: " · %.0f%%", confidence * 100)
                 }
-                metadata += record.source == .ai ? " · AI" : " · 手动"
+                metadata += record.source == .ai ? " · AI" : " · \(manualLabel)"
                 if let note = record.note, !note.isEmpty {
                     metadata += " · " + note
                 }
@@ -1032,7 +1040,7 @@ public class TianJiShuEngine {
                 let interiorSummary = interiorSummaryText + String(format: " · %.1f°", archive.compassHeading)
                 drawLine(interiorSummary)
                 for item in interior.shaItems {
-                    drawLine("【\(item.title) · \(item.severity.rawValue)】\(item.solution)")
+                    drawLine("【\(item.title) · \(item.severity.localizedTitle)】\(item.solution)")
                 }
             }
             if archive.exterior.isEmpty && archive.interior?.shaItems.isEmpty != false {

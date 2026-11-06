@@ -346,13 +346,17 @@ public struct XuanKongChart {
             let wcNote = wcName.map { "また【\($0)】は文昌吉星が会聚し書斎に吉。" } ?? ""
             return "• 催財旺位：当令\(period)運の向星が【\(wangName)】（山向\(wangCombo)）に飛臨し、生気\(nextStar)星が【\(sqName)】（山向\(sqCombo)）に到ります。採光や動水を設けて財気を催旺してください。\(wcNote)"
         case .ko:
-            return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오."
+            let wcNote = wcName.map { " 또한 【\($0)】에 문창 길성이 모여 서재·기획 공간에 길합니다." } ?? ""
+            return "• 재물 발복 방위: 당령 \(period)운 향성이 【\(wangName)】(산향 \(wangCombo))에 비림하고 생기 \(nextStar)성이 【\(sqName)】(산향 \(sqCombo))에 이르니, 채광을 밝히고 동수(물)를 배치하여 재원을 활성화하십시오.\(wcNote)"
         case .vi:
-            return "• Cung kích tài: Hướng tinh đương vận \(period) bay tới 【\(wangName)】 (Sơn Hướng \(wangCombo)), sinh khí tinh \(nextStar) đáo 【\(sqName)】 (Sơn Hướng \(sqCombo)), nên mở thoáng, tăng ánh sáng hoặc đặt thủy động kích hoạt tài lộc."
+            let wcNote = wcName.map { " Ngoài ra 【\($0)】 hội tụ sao Văn Xương, rất lợi cho phòng đọc sách và hoạch định." } ?? ""
+            return "• Cung kích tài: Hướng tinh đương vận \(period) bay tới 【\(wangName)】 (Sơn Hướng \(wangCombo)), sinh khí tinh \(nextStar) đáo 【\(sqName)】 (Sơn Hướng \(sqCombo)), nên mở thoáng, tăng ánh sáng hoặc đặt thủy động kích hoạt tài lộc.\(wcNote)"
         case .th:
-            return "• ตำแหน่งเรียกทรัพย์: ดาวหันประจำยุค \(period) สถิตที่ 【\(wangName)】 (ดาว \(wangCombo)) และดาวพลัง生气 \(nextStar) อยู่ที่ 【\(sqName)】 (ดาว \(sqCombo)) ควรเปิดโล่งรับแสงหรือตั้งน้ำพุกระตุ้นโชคลาภ"
+            let wcNote = wcName.map { " ส่วนทิศ【\($0)】มีดาวเหวินชางชุมนุม เหมาะจัดเป็นห้องทำงานหรือห้องหนังสือ" } ?? ""
+            return "• ตำแหน่งเรียกทรัพย์: ดาวหันประจำยุค \(period) สถิตที่ 【\(wangName)】 (ดาว \(wangCombo)) และดาวพลังเซิงชี่ \(nextStar) อยู่ที่ 【\(sqName)】 (ดาว \(sqCombo)) ควรเปิดโล่งรับแสงหรือตั้งน้ำพุกระตุ้นโชคลาภ\(wcNote)"
         case .id:
-            return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki."
+            let wcNote = wcName.map { " Sektor [\($0)] juga dinaungi bintang Wenchang, baik untuk ruang kerja atau belajar." } ?? ""
+            return "• Sektor Rezeki: Bintang hadap periode \(period) berada di [\(wangName)] (Bintang \(wangCombo)) & bintang Sheng-Qi \(nextStar) di [\(sqName)] (Bintang \(sqCombo)); buka sirkulasi cahaya atau letakkan air mengalir untuk mengaktifkan rezeki.\(wcNote)"
         case .auto, .zhHans:
             let wcNote = wcName.map { "另【\($0)】逢文昌吉星会聚，利书房策划。" } ?? ""
             return "• 催财旺位：当令\(period)运向星飞临【\(wangName)】（山向\(wangCombo)），生气\(nextStar)星到【\(sqName)】（山向\(sqCombo)），宜在此保持明堂开阔、安设动水或长明灯催旺财源。\(wcNote)"
@@ -392,12 +396,24 @@ public struct XuanKongChart {
             }
             return "• 病符防煞：五黄廉貞煞が【\(wuName)】（山向\(wuCombo)）、二黒病符星が【\(erName)】（山向\(erCombo)）に飛臨。静寂を保ち、銅瓢箪や金属置物で凶気を化泄すると吉。"
         case .ko:
+            if let clash = clash25Palace {
+                return "• 병부 방살: 【\(clash.localizedPalaceName)】에 산향 \(clash.mountainStar)-\(clash.facingStar) 이오교가/오황중살이 모입니다(오황 【\(wuName)】, 이흑 【\(erName)】). 공사와 붉은색 배치를 삼가고 동호리병이나 육제전으로 토살을 설기하십시오."
+            }
             return "• 병부 방살: 오황살이 【\(wuName)】(산향 \(wuCombo))에, 이흑 병부성이 【\(erName)】(산향 \(erCombo))에 위치합니다. 공사와 붉은색 배치를 피하고 동호리병이나 육제전(금속)으로 토살을 설기하십시오."
         case .vi:
-            return "• Phòng bệnh hóa sát: Ngũ Hoàng sát临 【\(wuName)】 (Sơn Hướng \(wuCombo)), Nhị Hắc bệnh phù đáo 【\(erName)】 (Sơn Hướng \(erCombo)). Kỵ động thổ và vật màu đỏ, nên treo hồ lô đồng hoặc lục đế tiền để tiết thổ hóa sát."
+            if let clash = clash25Palace {
+                return "• Phòng bệnh hóa sát: 【\(clash.localizedPalaceName)】 gặp Sơn Hướng \(clash.mountainStar)-\(clash.facingStar) Nhị Ngũ giao gia / Ngũ Hoàng trùng sát (Ngũ Hoàng tại 【\(wuName)】, Nhị Hắc tại 【\(erName)】). Tuyệt đối kỵ động thổ và sắc đỏ, nên đặt hồ lô đồng hoặc tiền Lục Đế để tiết Thổ hóa sát."
+            }
+            return "• Phòng bệnh hóa sát: Ngũ Hoàng sát lâm 【\(wuName)】 (Sơn Hướng \(wuCombo)), Nhị Hắc bệnh phù đáo 【\(erName)】 (Sơn Hướng \(erCombo)). Kỵ động thổ và vật màu đỏ, nên treo hồ lô đồng hoặc lục đế tiền để tiết thổ hóa sát."
         case .th:
+            if let clash = clash25Palace {
+                return "• ป้องกันโรคและเคราะห์: ทิศ【\(clash.localizedPalaceName)】เกิดเกณฑ์ดาว \(clash.mountainStar)-\(clash.facingStar) สองห้าปะทะ/ห้าเหลืองซ้อนทับ (ห้าเหลืองที่【\(wuName)】 สองดำที่【\(erName)】) งดการเจาะทุบและของสีแดง แนะนำวางน้ำเต้าทองเหลืองหรือเหรียญหกจักรพรรดิเพื่อสลายพลังดินร้าย"
+            }
             return "• ป้องกันโรคและเคราะห์: ดาวห้าเหลืองอยู่ที่ 【\(wuName)】 (ดาว \(wuCombo)) และดาวสองดำโรคภัยอยู่ที่ 【\(erName)】 (ดาว \(erCombo)) หลีกเลี่ยงการต่อเติมและสีแดง แนะนำแขวนน้ำเต้าทองเหลืองหรือเหรียญจีน 6 เหรียญแก้เคล็ด"
         case .id:
+            if let clash = clash25Palace {
+                return "• Kesehatan & Penangkal Sha: Kombinasi berat 2–5 / 5-Ganda berkumpul di [\(clash.localizedPalaceName)] (Bintang \(clash.mountainStar)-\(clash.facingStar); 5-Kuning di [\(wuName)], 2-Hitam di [\(erName)]). Hindari renovasi dan unsur merah; letakkan labu tembaga atau 6 koin logam untuk meredam Sha Tanah."
+            }
             return "• Kesehatan & Penangkal Sha: Bintang 5-Kuning berada di [\(wuName)] (Bintang \(wuCombo)) & 2-Hitam di [\(erName)] (Bintang \(erCombo)); hindari renovasi atau warna merah menyala, gunakan labu tembaga/logam untuk menetralkan."
         case .auto, .zhHans:
             if let clash = clash25Palace {
@@ -432,9 +448,9 @@ public struct XuanKongChart {
                 extra = " At [\(c79.localizedPalaceName)] (7–9 Fire-Metal clash), place ceramic/earth decor to balance."
             }
             if samePalace {
-                return "Plain: The Period-\(period) wealth & health stars both land at [\(caiName)]. What to do: Keep water (aquarium/water feature) in front to gather wealth, and a solid cabinet or stone behind to steady health. → Effect: Manages the family's steady income & career (breadwinner & business members) plus everyone's health and the children's constitution, both at [\(caiName)].\(extra)"
+                return "• Spatial Remedy: Both Period-\(period) Mountain & Facing stars converge at [\(caiName)]. Place an aquarium or water feature in front to activate wealth, and set a solid tall cabinet or decorative stone behind to anchor family health. → Scope: Supports household income, career momentum, and family vitality across [\(caiName)].\(extra)"
             }
-            return "Plain: The Period-\(period) wealth star sits at [\(caiName)]. What to do: Keep this sector open, bright and water-visible (aquarium, mirror, water feature) to gather wealth; the health star at [\(dingName)] benefits from a tall cabinet or stone ornament. → Effect: The wealth sector manages the family's income & career (breadwinner), the health sector manages family health and the children's constitution; covers [\(caiName)] and [\(dingName)].\(extra)"
+            return "• Spatial Remedy: The Period-\(period) Facing wealth star resides at [\(caiName)]—keep it bright, open, and paired with water or mirror accents to gather prosperity. The Mountain vitality star at [\(dingName)] favors a tall cabinet or stone ornament for calm stability. → Scope: [\(caiName)] governs career and income; [\(dingName)] supports family health and children's constitution.\(extra)"
         case .zhHant:
             var extra = ""
             if let c37 = clash37Palace {
@@ -454,29 +470,53 @@ public struct XuanKongChart {
                 extra = "【\(c79.localizedPalaceName)】の七九火金相克には陶器・土器で調和。"
             }
             if samePalace {
-                return "わかりやすく：当運の山向双\(period)星が【\(caiName)】に同聚。前方に水（水槽・水景）を置いて財を集め、後方に高家具か山石で家族を固めます。→ 効果：一家の収入と働き手の仕事、全員の健康と子供の体質に作用。【\(caiName)】の領域に効果。\(extra)"
+                return "• 空間配置の要点：当運の山向双\(period)星が【\(caiName)】に同聚しています。前方に水槽や水景を置いて財気を集め、後方に背の高い家具や山石を据えて人丁を固めます。→ 作用範囲：一家の収入・事業運および家族の健康・子供の体質を支え、【\(caiName)】全域に作用します。\(extra)"
             }
-            return "わかりやすく：当運の財星は【\(caiName)】にあります。この方位は明るく開け、水（水槽・水景・鏡）を置くと財を集めます。当運の丁星【\(dingName)】は背の高い家具や山石で健康・人丁を固めます。→ 効果：財位は一家の収入・仕事（働き手）、丁位は家族の健康と子供の体質に作用し、【\(caiName)】【\(dingName)】の領域に効果。\(extra)"
+            return "• 空間配置の要点：当運の財星が宿る【\(caiName)】は明るく開放し、水槽・水景・鏡を配して財気を集めます。当運の丁星が宿る【\(dingName)】は背の高い家具や山石で健康・人丁を安定させます。→ 作用範囲：財位【\(caiName)】は収入と仕事運、丁位【\(dingName)】は家族の健康と子供の体質を司ります。\(extra)"
         case .ko:
-            if samePalace {
-                return "쉽게: 당운 산향 쌍\(period)성이 【\(caiName)】에 모입니다. 앞에 물(어항·수경)을 두어 재물을 모으고, 뒤에 높은 가구나 산석으로 가족을 굳힙니다. → 효과: 한 집안의 수입·일(생계를 책임지는 사람)과 온 가족의 건강·아이 체질에 작용, 【\(caiName)】 영역."
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = " 【\(c37.localizedPalaceName)】의 3·7 교검살은 정수(물)를 두어 금목 상전을 통관하세요."
+            } else if let c79 = clash79Palace {
+                extra = " 【\(c79.localizedPalaceName)】의 7·9 화금 상전은 도자기나 황옥 소품으로 화기를 설기하세요."
             }
-            return "쉽게: 당운 재성이 【\(caiName)】에 있습니다. 이 방위는 밝고 트이게 두고 물(어항·수경·거울)을 두어 재물을 모읍니다. 당운 정성 【\(dingName)】은 높은 가구나 산석으로 건강과 가족을 굳힙니다. → 효과: 재위는 집안의 수입·일(가장), 정위는 가족 건강과 아이 체질에 작용하며 【\(caiName)】【\(dingName)】 영역에 효과."
+            if samePalace {
+                return "• 공간 비보 요점: 당운 산향 쌍\(period)성이 【\(caiName)】에 함께 모입니다. 앞쪽에는 어항·수경을 두어 재물을 모으고, 뒤쪽에는 높은 수납장이나 산석을 배치해 인정을 굳히세요. → 작용 범위: 가계의 정재·사업운과 온 가족의 건강·자녀 체질을 함께 관장하며 【\(caiName)】 구역에 작용합니다.\(extra)"
+            }
+            return "• 공간 비보 요점: 당운 재성이 자리한 【\(caiName)】은 밝고 트이게 두고 어항·수경·거울로 재기를 모으고, 당운 정성이 자리한 【\(dingName)】은 높은 가구나 산석으로 건강과 인정을 안정시키세요. → 작용 범위: 재위 【\(caiName)】은 수입과 사업운을, 정위 【\(dingName)】은 가족 건강과 자녀 체질을 관장합니다.\(extra)"
         case .vi:
-            if samePalace {
-                return "Giải thích đơn giản: Song tinh \(period) tụ tại 【\(caiName)】. Trước đặt nước (bể cá, thủy cảnh) tụ tài, sau đặt tủ cao hoặc đá vững nhân khẩu. → Ảnh hưởng: Quản thu nhập, công việc của trụ cột gia đình và sức khỏe mọi người, thể chất trẻ em; phủ 【\(caiName)】."
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = " Tại 【\(c37.localizedPalaceName)】 gặp Tam Thất giao kiếm sát, nên đặt nước tĩnh để thông quan Kim Mộc."
+            } else if let c79 = clash79Palace {
+                extra = " Tại 【\(c79.localizedPalaceName)】 gặp Thất Cửu Hỏa Kim tương chiến, nên đặt đồ gốm sứ vàng để tiết Hỏa sinh Kim."
             }
-            return "Giải thích đơn giản: Sao tài vận \(period) đáo 【\(caiName)】. Nơi này nên thoáng sáng và thấy nước (bể cá, thủy cảnh, gương) để tụ tài; sao đinh 【\(dingName)】 nên đặt tủ cao hoặc đá để vững sức khỏe và nhân khẩu. → Ảnh hưởng: Vị trí tài quản thu nhập và công danh của gia đình (trụ cột), vị trí đinh quản sức khỏe gia đình và thể chất trẻ; phủ 【\(caiName)】【\(dingName)】."
+            if samePalace {
+                return "• Bố cục hóa giải: Song tinh Sơn Hướng vận \(period) cùng tụ tại 【\(caiName)】. Phía trước nên đặt bể cá hoặc thủy cảnh để nạp tài, phía sau kê tủ cao hoặc đá phong thủy để vững nhân đinh. → Phạm vi: Quản lý đồng thời tài lộc, sự nghiệp của trụ cột và sức khỏe cả gia đình tại khu vực 【\(caiName)】.\(extra)"
+            }
+            return "• Bố cục hóa giải: Sao Tài đương vận ở 【\(caiName)】 nên giữ sáng thoáng, kết hợp bể cá, thủy cảnh hoặc gương để tụ tài; sao Đinh đương vận ở 【\(dingName)】 nên kê tủ cao hoặc đá phong thủy để dưỡng sức khỏe và nhân khẩu. → Phạm vi: Cung Tài 【\(caiName)】 chủ về thu nhập và sự nghiệp, cung Đinh 【\(dingName)】 chủ về sức khỏe gia đạo và thể chất trẻ nhỏ.\(extra)"
         case .th:
-            if samePalace {
-                return "อธิบายง่ายๆ: ดาวคู่ยุค \(period) รวมที่【\(caiName)】 วางน้ำด้านหน้าทรัพย์ ตั้งตู้สูงหรือหินด้านหลังเสริมคน → ผล: ดูแลรายได้และงานของผู้หาเลี้ยงครอบครัว และสุขภาพทุกคน กับร่างกายของเด็ก ครอบคลุม【\(caiName)】"
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = " ส่วนทิศ【\(c37.localizedPalaceName)】มีเกณฑ์ 3–7 ทองปะทะไม้ ควรวางน้ำนิ่งเพื่อเชื่อมสมดุลธาตุ"
+            } else if let c79 = clash79Palace {
+                extra = " ส่วนทิศ【\(c79.localizedPalaceName)】มีเกณฑ์ 7–9 ไฟปะทะทอง ควรวางเครื่องปั้นดินเผาหรือเซรามิกเพื่อลดไฟหนุนทอง"
             }
-            return "อธิบายง่ายๆ: ดาวทรัพย์ยุค \(period) อยู่ที่【\(caiName)】 ควรเปิดโล่งสว่างและเห็นน้ำ (ตู้ปลา น้ำตกจำลอง กระจก) เพื่อเรียกทรัพย์ ดาวคน【\(dingName)】 ตั้งตู้สูงหรือหินเสริมสุขภาพและคนในบ้าน → ผล: ตำแหน่งทรัพย์ดูแลรายได้และงานของผู้หาเลี้ยง ตำแหน่งคนดูแลสุขภาพครอบครัวและร่างกายเด็ก ครอบคลุม【\(caiName)】【\(dingName)】"
+            if samePalace {
+                return "• การจัดวางเสริมมงคล: ดาวคู่ภูเขาและทิศหันประจำยุค \(period) รวมอยู่ที่【\(caiName)】 ด้านหน้าควรตั้งตู้ปลาหรือน้ำพุเพื่อรับทรัพย์ ด้านหลังวางตู้สูงหรือหินประดับเพื่อเสริมความมั่นคงของคนในบ้าน → ขอบเขตผลลัพธ์: ดูแลทั้งรายได้ การงานของผู้นำครอบครัว และสุขภาพของสมาชิกทุกคนในบริเวณ【\(caiName)】\(extra)"
+            }
+            return "• การจัดวางเสริมมงคล: ดาวโชคลาภประจำยุค \(period) อยู่ที่【\(caiName)】 ควรจัดให้โปร่งสว่างและมีตู้ปลา น้ำพุ หรือกระจกเพื่อรวมทรัพย์ ส่วนดาวสุขภาพและบริวารที่【\(dingName)】 ควรตั้งตู้สูงหรือหินประดับเพื่อความมั่นคง → ขอบเขตผลลัพธ์: ทิศ【\(caiName)】ส่งเสริมรายได้และการงาน ทิศ【\(dingName)】ดูแลสุขภาพครอบครัวและบุตรหลาน\(extra)"
         case .id:
-            if samePalace {
-                return "Ringkas: Bintang kembar periode \(period) berkumpul di [\(caiName)]. Letakkan air di depan (akuarium/fitur air) untuk rezeki dan kabinet kokoh/batu di belakang untuk kesehatan. → Efek: Mengelola pendapatan & karier pencari nafkah serta kesehatan semua dan tubuh anak; mencakup [\(caiName)]."
+            var extra = ""
+            if let c37 = clash37Palace {
+                extra = " Di [\(c37.localizedPalaceName)] (benturan 3–7 Logam-Kayu), letakkan air tenang untuk menyelaraskan elemen."
+            } else if let c79 = clash79Palace {
+                extra = " Di [\(c79.localizedPalaceName)] (benturan 7–9 Api-Logam), letakkan keramik atau unsur tanah sebagai penyeimbang."
             }
-            return "Ringkas: Bintang rezeki periode \(period) berada di [\(caiName)]. Biarkan sektor ini terang, terbuka dan terlihat air (akuarium, fitur air, cermin) untuk mengumpulkan rezeki; bintang kesehatan [\(dingName)] diperkuat dengan lemari tinggi atau batu. → Efek: Sektor rezeki mengelola pendapatan & karier keluarga (pencari nafkah), sektor kesehatan mengelola kesehatan keluarga dan tubuh anak; mencakup [\(caiName)] & [\(dingName)]."
+            if samePalace {
+                return "• Penataan Ruang: Bintang Gunung & Hadap periode \(period) berkumpul di [\(caiName)]. Tempatkan akuarium atau fitur air di bagian depan untuk menghimpun rezeki, serta lemari tinggi atau batu hias di bagian belakang untuk menopang kesehatan keluarga. → Cakupan: Menunjang pendapatan, karier, dan kebugaran seluruh anggota keluarga di area [\(caiName)].\(extra)"
+            }
+            return "• Penataan Ruang: Bintang rezeki periode \(period) berada di [\(caiName)]—biarkan terang, lapang, dan tambahkan elemen air atau cermin untuk menarik kemakmuran; bintang kesehatan di [\(dingName)] diperkuat dengan lemari tinggi atau ornamen batu. → Cakupan: Sektor [\(caiName)] mendukung pendapatan & karier, sedangkan [\(dingName)] menjaga kesehatan keluarga dan daya tahan anak.\(extra)"
         case .auto, .zhHans:
             var extra = ""
             if let c37 = clash37Palace {
@@ -519,7 +559,26 @@ public struct XuanKongChart {
     }
 
     private var healthSourceNote: String {
-        traditionalSourceNote + "\n解释：请结合通风、采光、噪音、排水和结构安全现场复核；涉及健康或财务事项应咨询相应专业人士。"
+        let note: String
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            note = "Interpretation: Please verify ventilation, daylight, noise, drainage, and structural safety on site; consult qualified professionals for medical or financial matters."
+        case .zhHant:
+            note = "解釋：請結合通風、採光、噪音、排水和結構安全現場複核；涉及健康或財務事項應諮詢相應專業人士。"
+        case .ja:
+            note = "解釈：換気・採光・騒音・排水・構造安全を現地で確認してください。健康や財務に関する事項は専門家にご相談ください。"
+        case .ko:
+            note = "해석: 통풍, 채광, 소음, 배수 및 구조 안전을 현장에서 함께 점검하시고, 건강이나 재무 관련 사항은 전문가와 상담하십시오."
+        case .vi:
+            note = "Giải thích: Vui lòng kết hợp kiểm tra thông gió, ánh sáng, tiếng ồn, thoát nước và an toàn kết cấu tại hiện trường; các vấn đề sức khỏe hoặc tài chính nên tham khảo chuyên gia."
+        case .th:
+            note = "คำอธิบาย: โปรดตรวจสอบการระบายอากาศ แสงสว่าง เสียงรบกวน การระบายน้ำ และความปลอดภัยของโครงสร้างหน้างาน สำหรับเรื่องสุขภาพหรือการเงินควรปรึกษาผู้เชี่ยวชาญ"
+        case .id:
+            note = "Penjelasan: Harap periksa ventilasi, pencahayaan, kebisingan, drainase, dan keamanan struktur di lokasi; konsultasikan masalah kesehatan atau keuangan dengan profesional terkait."
+        case .auto, .zhHans:
+            note = "解释：请结合通风、采光、噪音、排水和结构安全现场复核；涉及健康或财务事项应咨询相应专业人士。"
+        }
+        return traditionalSourceNote + "\n" + note
     }
 
 }

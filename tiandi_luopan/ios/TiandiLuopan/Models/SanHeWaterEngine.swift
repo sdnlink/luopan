@@ -337,9 +337,11 @@ public struct BaShaResult {
             let z = zhiTh[shaZhi] ?? shaZhi
             return "\(d) (ทิศ\(z))"
         case .id:
+            let zhiId = ["辰": "Chen", "卯": "Mao", "申": "Shen", "酉": "You", "午": "Wu", "巳": "Si", "寅": "Yin", "亥": "Hai"]
             let dirId = ["东南": "Tenggara", "正东": "Timur", "西南": "Barat Daya", "正西": "Barat", "正南": "Selatan", "东北": "Timur Laut", "西北": "Barat Laut"]
             let d = dirId[shaDir] ?? shaDir
-            return "\(d) (\(shaZhi))"
+            let z = zhiId[shaZhi] ?? shaZhi
+            return "\(d) (\(z))"
         case .auto, .zhHans:
             return "\(shaDir)\(shaZhi)"
         }
@@ -744,7 +746,17 @@ public final class SanHeWaterEngine {
         switch lang {
         case .en:
             remedy = "Sha Neutralization: If power towers or sharp wall edges appear in this direction, hang a Mountain-Sea Mirror or Five Sacred Mountains Talisman to shield."
-            lore = "Sitting Mountain Sha in \(info.dir) (\(info.zhi)). Strictly avoid high-voltage towers, sharp rocks, or stagnant water in this sector."
+            let enLore: [String: String] = [
+                "坎": "Kan Trigram Sitting (Ren / Zi / Gui) has its Eight-Sha in Chen (Southeast). Avoid high-voltage towers, jagged rocks, or stagnant water in the Southeast; traditionally linked to kidney vitality and family fortune.",
+                "坤": "Kun Trigram Sitting (Wei / Kun / Shen) has its Eight-Sha in Mao (East). Avoid sharp road or corner clashes from due East; traditionally linked to digestive balance and the matriarch's wellbeing.",
+                "震": "Zhen Trigram Sitting (Jia / Mao / Yi) has its Eight-Sha in Shen (Southwest). Avoid abrupt jagged peaks or structures in the Southwest; traditionally linked to the eldest branch, limb safety, and legal harmony.",
+                "巽": "Xun Trigram Sitting (Chen / Xun / Si) has its Eight-Sha in You (West). Avoid direct Metal clashes from due West; traditionally linked to maternal wellbeing and household peace.",
+                "乾": "Qian Trigram Sitting (Xu / Qian / Hai) has its Eight-Sha in Wu (South). Avoid intense Fire forms in due South overcoming Heaven Gate Metal; traditionally linked to cardiovascular strain and the patriarch.",
+                "兑": "Dui Trigram Sitting (Geng / You / Xin) has its Eight-Sha in Si (Southeast). Avoid Fire-shaped Sha in the Southeast overcoming Dui Metal; traditionally linked to respiratory health and the youngest daughter.",
+                "艮": "Gen Trigram Sitting (Chou / Gen / Yin) has its Eight-Sha in Yin (Northeast). Avoid broken ridges or sharp clashes in the Northeast; traditionally linked to the youngest son and junior family members.",
+                "离": "Li Trigram Sitting (Bing / Wu / Ding) has its Eight-Sha in Hai (Northwest). Avoid rushing water or sharp clashes from the Northwest; traditionally linked to eye comfort and the middle branch."
+            ]
+            lore = enLore[palace] ?? "Sitting Mountain Sha in Southeast (Chen). Strictly avoid high-voltage towers, sharp rocks, or stagnant water in this sector."
         case .zhHant:
             remedy = "消砂法則：該方若見高壓電線塔、壁刀尖角，急需懸掛山海鎮或五嶽真形圖予以遮擋化解。"
             let hantLore: [String: String] = [
@@ -760,19 +772,69 @@ public final class SanHeWaterEngine {
             lore = hantLore[palace] ?? info.lore
         case .ja:
             remedy = "消砂の法：該当方向に高圧電線塔や尖角がある場合、山海鎮鏡や五岳真形図を掲げて化解します。"
-            lore = "\(palace)卦の坐山八煞は\(info.dir)(\(info.zhi))方位にあります。高圧電線塔や怪石、死水を厳禁とします。"
+            let jaLore: [String: String] = [
+                "坎": "坎卦三山（壬・子・癸）の八煞は辰位（南東）にあります。南東の高圧鉄塔や尖角・怪石・死水を忌み、腎気や家運の損耗に留意します。",
+                "坤": "坤卦三山（未・坤・申）の八煞は卯位（正東）にあります。正東からの直衝を忌み、胃腸の不調や年長女性の健康に留意します。",
+                "震": "震卦三山（甲・卯・乙）の八煞は申位（南西）にあります。南西の鋭い突起物を忌み、長男筋や足元の安全・対人トラブルに留意します。",
+                "巽": "巽卦三山（辰・巽・巳）の八煞は酉位（正西）にあります。正西からの直衝を忌み、女性の健康や風評トラブルに留意します。",
+                "乾": "乾卦三山（戌・乾・亥）の八煞は午位（正南）にあります。正南の強い火気が天門の金を剋するのを忌み、家長や循環器の健康に留意します。",
+                "兑": "兌卦三山（庚・酉・辛）の八煞は巳位（南東）にあります。南東の火気が兌金を傷つけるのを忌み、呼吸器や年少女性の健康に留意します。",
+                "艮": "艮卦三山（丑・艮・寅）の八煞は寅位（北東）にあります。北東の破損地形や尖角を忌み、年少者・子供の安定に留意します。",
+                "离": "離卦三山（丙・午・丁）の八煞は亥位（北西）にあります。北西からの水衝や鋭角を忌み、目の健康や次男筋の運勢に留意します。"
+            ]
+            lore = jaLore[palace] ?? "坐山八煞の方位に高圧電線塔や怪石、死水を厳禁とします。"
         case .ko:
             remedy = "소사 법칙: 해당 방위에 고압 전선탑이나 벽도 등의 뾰족한 모서리가 보이면 산해진이나 오악진형도로 가려 화해합니다."
-            lore = "\(palace)괘 좌산의 팔살요위는 \(info.dir)(\(info.zhi))방입니다. 고압탑, 괴석, 오염된 물을 엄금합니다."
+            let koLore: [String: String] = [
+                "坎": "감괘 삼산(임·자·계)의 팔살은 진위(동남)에 있습니다. 동남방의 고압 철탑, 뾰족한 괴석, 고인 물을 꺼리며 신장 기운과 인정 손실을 경계합니다.",
+                "坤": "곤괘 삼산(미·곤·신)의 팔살은 묘위(정동)에 있습니다. 정동방의 충사를 꺼리며 비위 기능과 집안 어머님의 건강을 경계합니다.",
+                "震": "진괘 삼산(갑·묘·을)의 팔살은 신위(서남)에 있습니다. 서남방의 뾰족한 봉우리나 구조물을 꺼리며 장남과 다리 부상·관재를 경계합니다.",
+                "巽": "손괘 삼산(진·손·사)의 팔살은 유위(정서)에 있습니다. 정서방 유금의 직충을 꺼리며 여성 건강과 구설 시비를 경계합니다.",
+                "乾": "건괘 삼산(술·건·해)의 팔살은 오위(정남)에 있습니다. 정남방 화기가 천문 금을 극하는 것을 꺼리며 심뇌혈관 및 가장의 건강을 경계합니다.",
+                "兑": "태괘 삼산(경·유·신)의 팔살은 사위(동남)에 있습니다. 동남방 사화가 금을 상하게 하는 것을 꺼리며 호흡기와 막내딸의 건강을 경계합니다.",
+                "艮": "간괘 삼산(축·간·인)의 팔살은 인위(동북)에 있습니다. 동북방의 험한 지형이나 충사를 꺼리며 어린 자녀의 안정을 경계합니다.",
+                "离": "이괘 삼산(병·오·정)의 팔살은 해위(서북)에 있습니다. 서북방 해수의 충사를 꺼리며 시력 건강과 둘째 가계의 운세를 경계합니다."
+            ]
+            lore = koLore[palace] ?? "좌산 팔살요위 방위의 고압탑, 괴석, 오염된 물을 엄금합니다."
         case .vi:
             remedy = "Pháp tắc tiêu sát: Phương này nếu thấy cột điện cao thế hay góc nhọn xung xạ, cần treo Sơn Hải Trấn hoặc Ngũ Nhạc Chân Hình Đồ để hóa giải."
-            lore = "Khảm quái tọa sơn Bát Sát tại phương \(info.dir) (\(info.zhi)). Kỵ thấy cột điện cao áp, đá nhọn quái dị hay nước tù đọng."
+            let viLore: [String: String] = [
+                "坎": "Khảm quái tam sơn (Nhâm / Tý / Quý) Bát Sát tại phương Thìn (Đông Nam). Phương Thìn kỵ nhất cột điện cao thế, đá nhọn quái dị hoặc nước tù đọng; phạm vào chủ về thận khí và tổn hao nhân đinh.",
+                "坤": "Khôn quái tam sơn (Mùi / Khôn / Thân) Bát Sát tại phương Mão (Chính Đông). Kỵ hướng Đông có vật xung xạ, chủ về tỳ vị suy yếu và sức khỏe người mẹ lớn tuổi.",
+                "震": "Chấn quái tam sơn (Giáp / Mão / Ất) Bát Sát tại phương Thân (Tây Nam). Kỵ hướng Tây Nam có đỉnh nhọn đột ngột, chủ về trưởng phòng, tật ở chân và thị phi quan tụng.",
+                "巽": "Tốn quái tam sơn (Thìn / Tốn / Tỵ) Bát Sát tại phương Dậu (Chính Tây). Kỵ hướng Tây Dậu Kim xung thẳng, chủ về sức khỏe phụ nữ và lời đồn thị phi.",
+                "乾": "Càn quái tam sơn (Tuất / Càn / Hợi) Bát Sát tại phương Ngọ (Chính Nam). Kỵ hướng Nam Ly Hỏa khắc ngược Thiên Môn, chủ về huyết áp tim mạch và gia chủ lớn tuổi.",
+                "兑": "Đoài quái tam sơn (Canh / Dậu / Tân) Bát Sát tại phương Tỵ (Đông Nam). Kỵ hướng Đông Nam Tỵ Hỏa khắc Kim, chủ về hô hấp và bất lợi cho thiếu nữ.",
+                "艮": "Cấn quái tam sơn (Sửu / Cấn / Dần) Bát Sát tại phương Dần (Đông Bắc). Kỵ hướng Đông Bắc có địa hình sạt lở hoặc góc nhọn, ảnh hưởng con út và thiếu nam.",
+                "离": "Ly quái tam sơn (Bính / Ngọ / Đinh) Bát Sát tại phương Hợi (Tây Bắc). Kỵ hướng Tây Bắc Hợi Thủy xung xạ, chủ về thị lực và vận thế chi thứ."
+            ]
+            lore = viLore[palace] ?? "Tọa sơn Bát Sát tại phương Đông Nam (Thìn). Kỵ thấy cột điện cao áp, đá nhọn quái dị hay nước tù đọng."
         case .th:
             remedy = "วิธีแก้เคราะห์: หากทิศดังกล่าวมีเสาไฟฟ้าแรงสูงหรือมุมแหลมพุ่งชน ควรแขวนกระจกซานไห่เจิ้นหรือยันต์ห้าขุนเขาเพื่อสะท้อนสลายพลังร้าย"
-            lore = "ทิศเคราะห์แปดพิฆาตของขุนเขาหลังพิงอยู่ที่ \(info.dir) (\(info.zhi)) ระวังเสาไฟฟ้า หน้าผาหินแหลม หรือน้ำเน่าเสีย"
+            let thLore: [String: String] = [
+                "坎": "สามขุนเขาข่าน (เหริน/จื่อ/กุ่ย) มีจุดแปดพิฆาตอยู่ที่ทิศเฉิน (ตะวันออกเฉียงใต้) ห้ามมีเสาไฟฟ้าแรงสูง หินแหลม หรือน้ำเน่าขัง เพราะจะกระทบพลังไตและบริวาร",
+                "坤": "สามขุนเขาคุน (เว่ย/คุน/เซิน) มีจุดแปดพิฆาตอยู่ที่ทิศเหม่า (ตะวันออก) ห้ามมีสิ่งแหลมคมพุ่งชนจากทิศตะวันออก เพราะจะกระทบระบบย่อยอาหารและผู้หญิงอาวุโส",
+                "震": "สามขุนเขาเจิ้น (เจี่ย/เหม่า/อี้) มีจุดแปดพิฆาตอยู่ที่ทิศเซิน (ตะวันตกเฉียงใต้) ระวังยอดแหลมหรือมุมตึกในทิศตะวันตกเฉียงใต้ กระทบบุตรคนโต ขา และคดีความ",
+                "巽": "สามขุนเขาซวิ่น (เฉิน/ซวิ่น/ซื่อ) มีจุดแปดพิฆาตอยู่ที่ทิศโหย่ว (ตะวันตก) ระวังแรงปะทะจากทิศตะวันตก กระทบสุขภาพสตรีและเรื่องนินทาว่าร้าย",
+                "乾": "สามขุนเขาเฉียน (ซวี/เฉียน/ไฮ่) มีจุดแปดพิฆาตอยู่ที่ทิศอู่ (ใต้) ระวังพลังไฟแรงจากทิศใต้ข่มประตูสวรรค์ กระทบหลอดเลือดหัวใจและผู้อาวุโสชาย",
+                "兑": "สามขุนเขาตุ้ย (เกิง/โหย่ว/ซิน) มีจุดแปดพิฆาตอยู่ที่ทิศซื่อ (ตะวันออกเฉียงใต้) ระวังพลังไฟทิศตะวันออกเฉียงใต้ข่มธาตุทอง กระทบปอดและบุตรสาวคนเล็ก",
+                "艮": "สามขุนเขาเกิ้น (โฉ่ว/เกิ้น/อิ๋น) มีจุดแปดพิฆาตอยู่ที่ทิศอิ๋น (ตะวันออกเฉียงเหนือ) ระวังสิ่งก่อสร้างพังทลายหรือมุมแหลมในทิศตะวันออกเฉียงเหนือ กระทบบุตรชายคนเล็ก",
+                "离": "สามขุนเขาหลี (ปิ่ง/อู่/ติง) มีจุดแปดพิฆาตอยู่ที่ทิศไฮ่ (ตะวันตกเฉียงเหนือ) ระวังทางน้ำหรือมุมแหลมพุ่งชนจากทิศตะวันตกเฉียงเหนือ กระทบสายตาและบุตรคนรอง"
+            ]
+            lore = thLore[palace] ?? "ทิศเคราะห์แปดพิฆาตของขุนเขาหลังพิง ระวังเสาไฟฟ้าแรงสูง หินแหลม หรือน้ำเน่าเสีย"
         case .id:
             remedy = "Netralisasi Sha: Jika terdapat tiang listrik tegangan tinggi atau sudut tajam dinding di arah ini, gantung cermin Shan Hai Zhen atau jimat pelindung."
-            lore = "Sha Posisi Duduk berada di \(info.dir) (\(info.zhi)). Hindari menara listrik, batu tajam, atau genangan air kotor di sektor ini."
+            let idLore: [String: String] = [
+                "坎": "Tiga Gunung Kan (Ren / Zi / Gui) memiliki Ba-Sha di posisi Chen (Tenggara). Hindari menara tegangan tinggi, batu tajam, atau air menggenang di Tenggara; dikaitkan dengan vitalitas ginjal dan keturunan.",
+                "坤": "Tiga Gunung Kun (Wei / Kun / Shen) memiliki Ba-Sha di posisi Mao (Timur). Hindari tusukan jalan atau sudut tajam dari Timur; dikaitkan dengan pencernaan dan kesehatan ibu.",
+                "震": "Tiga Gunung Zhen (Jia / Mao / Yi) memiliki Ba-Sha di posisi Shen (Barat Daya). Hindari struktur runcing di Barat Daya; dikaitkan dengan putra sulung, cedera kaki, dan sengketa.",
+                "巽": "Tiga Gunung Xun (Chen / Xun / Si) memiliki Ba-Sha di posisi You (Barat). Hindari tusukan langsung dari Barat; dikaitkan dengan kesehatan wanita dan gosip.",
+                "乾": "Tiga Gunung Qian (Xu / Qian / Hai) memiliki Ba-Sha di posisi Wu (Selatan). Hindari bentuk Api tajam di Selatan yang menekan Logam Qian; dikaitkan dengan kardiovaskular dan kepala keluarga.",
+                "兑": "Tiga Gunung Dui (Geng / You / Xin) memiliki Ba-Sha di posisi Si (Tenggara). Hindari Sha Api di Tenggara yang menekan Logam; dikaitkan dengan pernapasan dan putri bungsu.",
+                "艮": "Tiga Gunung Gen (Chou / Gen / Yin) memiliki Ba-Sha di posisi Yin (Timur Laut). Hindari lereng rusak atau sudut tajam di Timur Laut; dikaitkan dengan putra bungsu.",
+                "离": "Tiga Gunung Li (Bing / Wu / Ding) memiliki Ba-Sha di posisi Hai (Barat Laut). Hindari tusukan air atau sudut tajam dari Barat Laut; dikaitkan dengan kesehatan mata."
+            ]
+            lore = idLore[palace] ?? "Sha Posisi Duduk berada di Tenggara (Chen). Hindari menara listrik, batu tajam, atau genangan air kotor di sektor ini."
         case .auto, .zhHans:
             remedy = "消砂法则：该方若见高压电线塔、壁刀尖角，急需悬挂山海镇或五岳真形图予以遮挡化解。"
             lore = info.lore

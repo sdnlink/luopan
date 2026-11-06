@@ -165,6 +165,22 @@ public struct QimenPalaceCell: Identifiable {
     public var localizedDoorName: String {
         QimenDoor(name: doorName, palace: palaceId, isAuspicious: isDoorAuspicious, luckType: doorLuck, lore: "").localizedName
     }
+    private static func localizeStem(_ stem: String) -> String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en, .id:
+            return ["甲": "Jia", "乙": "Yi", "丙": "Bing", "丁": "Ding", "戊": "Wu", "己": "Ji", "庚": "Geng", "辛": "Xin", "壬": "Ren", "癸": "Gui"][stem] ?? stem
+        case .ko:
+            return ["甲": "갑", "乙": "을", "丙": "병", "丁": "정", "戊": "무", "己": "기", "庚": "경", "辛": "신", "壬": "임", "癸": "계"][stem] ?? stem
+        case .vi:
+            return ["甲": "Giáp", "乙": "Ất", "丙": "Bính", "丁": "Đinh", "戊": "Mậu", "己": "Kỷ", "庚": "Canh", "辛": "Tân", "壬": "Nhâm", "癸": "Quý"][stem] ?? stem
+        case .th:
+            return ["甲": "เจี่ย", "乙": "อี้", "丙": "ปิ่ง", "丁": "ติง", "戊": "อู่", "己": "จี่", "庚": "เกิง", "辛": "ซิน", "壬": "เหริน", "癸": "กุ่ย"][stem] ?? stem
+        case .auto, .zhHans, .zhHant, .ja:
+            return stem
+        }
+    }
+    public var localizedTianStem: String { Self.localizeStem(tianStem) }
+    public var localizedDiStem: String { Self.localizeStem(diStem) }
     public var localizedStarName: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         switch lang {

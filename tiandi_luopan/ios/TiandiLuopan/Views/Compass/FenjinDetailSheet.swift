@@ -18,10 +18,14 @@ public struct FenjinDetailSheet: View {
                     // 分金标题与吉凶徽章
                     HStack {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("【\(currentFenjin.jiaziName)】\(lang.t("fenjin_title_suffix"))")
+                            let belongPrefix = lang.t("fenjin_mountain_belong")
+                            let belongSep = (belongPrefix.hasSuffix(":") || belongPrefix.hasSuffix("：")) ? " " : "："
+                            Text("【\(currentFenjin.localizedJiaziName)】\(lang.t("fenjin_title_suffix"))")
                                 .adaptiveFont(size: 26, weight: .bold, design: .serif)
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                            Text("\(lang.t("fenjin_mountain_belong"))：\(currentFenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(currentFenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", currentFenjin.centerAngle))°)")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.65)
+                            Text("\(belongPrefix)\(belongSep)\(currentFenjin.localizedMountainName) · \(lang.t("fenjin_index_prefix"))\(currentFenjin.index)\(lang.t("fenjin_title_suffix")) (\(lang.t("fenjin_center_deg")) \(String(format: "%.1f", currentFenjin.centerAngle))°)")
                                 .adaptiveFont(size: 13)
                                 .foregroundColor(.secondary)
                                 .lineLimit(2)

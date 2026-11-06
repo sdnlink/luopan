@@ -333,7 +333,7 @@ public struct House3DSpaceViewer: View {
                     VStack(spacing: 5) {
                         ForEach(survey.rooms) { room in
                             HStack {
-                                Text(room.name)
+                                Text(room.localizedName)
                                     .adaptiveFont(size: 11, weight: .medium)
                                     .foregroundColor(.white)
                                     .frame(minWidth: 66 * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize),
@@ -347,7 +347,7 @@ public struct House3DSpaceViewer: View {
                                     .frame(minWidth: 52 * AdaptiveFontMetrics.dynamicTypeScale(for: dynamicTypeSize),
                                            alignment: .trailing)
                                     .fixedSize(horizontal: true, vertical: false)
-                                Picker(room.name, selection: roomTypeBinding(room)) {
+                                Picker(room.localizedName, selection: roomTypeBinding(room)) {
                                     ForEach(FloorplanRoomType.allCases) { t in
                                         Text(t.localizedName).tag(t)
                                     }
@@ -473,7 +473,7 @@ public struct House3DSpaceViewer: View {
                                 .adaptiveFont(size: 10, weight: .medium)
                                 .foregroundColor(.white.opacity(0.7))
                             Spacer()
-                            Text(item.severity.rawValue)
+                            Text(item.severity.localizedTitle)
                                 .adaptiveFont(size: 9, weight: .bold)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
@@ -843,9 +843,20 @@ public final class HouseSceneCoordinator: NSObject {
         pillarMat.diffuse.contents = UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 0.75)
         pillarMat.emission.contents = UIColor(red: 0.90, green: 0.70, blue: 0.20, alpha: 0.5)
         pillarGeo.materials = [pillarMat]
+        let lang = LocalizationManager.shared.effectiveLanguage
         let pillarNode = SCNNode(geometry: pillarGeo)
         pillarNode.position = SCNVector3(survey.centroidX, survey.dimensions.ceilingHeight * 0.75, survey.centroidZ)
-        pillarNode.name = "【全屋太极立极中心】三维坐标 (\(String(format: "%.1f, %.1f", survey.centroidX, survey.centroidZ)))"
+        let coordStr = String(format: "%.1f, %.1f", survey.centroidX, survey.centroidZ)
+        switch lang {
+        case .zhHans, .auto: pillarNode.name = "【全屋太极立极中心】三维坐标 (\(coordStr))"
+        case .zhHant: pillarNode.name = "【全屋太極立極中心】三維座標 (\(coordStr))"
+        case .en:     pillarNode.name = "[Taiji Center] 3D Coords (\(coordStr))"
+        case .ja:     pillarNode.name = "【全屋太極中心】3D座標 (\(coordStr))"
+        case .ko:     pillarNode.name = "【전체 태극 중심】 3D 좌표 (\(coordStr))"
+        case .vi:     pillarNode.name = "[Tâm Thái Cực] Tọa độ 3D (\(coordStr))"
+        case .th:     pillarNode.name = "[จุดศูนย์กลางไท่จี๋] พิกัด 3D (\(coordStr))"
+        case .id:     pillarNode.name = "[Pusat Taiji] Koordinat 3D (\(coordStr))"
+        }
         rootHouseNode.addChildNode(pillarNode)
 
         let centerRingGeo = SCNTorus(ringRadius: 0.6, pipeRadius: 0.04)
@@ -880,7 +891,18 @@ public final class HouseSceneCoordinator: NSObject {
 
             let angle = atan2(end.z - start.z, end.x - start.x)
             wallNode.eulerAngles.y = -angle
-            wallNode.name = "墙段 #\(idx + 1)：长 \(String(format: "%.2f", len))m · 高 \(String(format: "%.2f", wall.height))m"
+            let lenStr = String(format: "%.2f", len)
+            let hStr = String(format: "%.2f", wall.height)
+            switch lang {
+            case .zhHans, .auto: wallNode.name = "墙段 #\(idx + 1)：长 \(lenStr)m · 高 \(hStr)m"
+            case .zhHant: wallNode.name = "牆段 #\(idx + 1)：長 \(lenStr)m · 高 \(hStr)m"
+            case .en:     wallNode.name = "Wall #\(idx + 1): L \(lenStr)m · H \(hStr)m"
+            case .ja:     wallNode.name = "壁 #\(idx + 1)：長さ \(lenStr)m・高さ \(hStr)m"
+            case .ko:     wallNode.name = "벽체 #\(idx + 1): 길이 \(lenStr)m · 높이 \(hStr)m"
+            case .vi:     wallNode.name = "Tường #\(idx + 1): Dài \(lenStr)m · Cao \(hStr)m"
+            case .th:     wallNode.name = "ผนัง #\(idx + 1): ยาว \(lenStr)m · สูง \(hStr)m"
+            case .id:     wallNode.name = "Dinding #\(idx + 1): P \(lenStr)m · T \(hStr)m"
+            }
             rootHouseNode.addChildNode(wallNode)
         }
 
@@ -910,7 +932,20 @@ public final class HouseSceneCoordinator: NSObject {
             opNode.position = SCNVector3(op.posX, op.posY, op.posZ)
             let normAngle = atan2(op.normalZ, op.normalX)
             opNode.eulerAngles.y = -normAngle + Float.pi / 2
-            opNode.name = "\(op.type.rawValue)：宽 \(String(format: "%.2f", op.width))m × 高 \(String(format: "%.2f", op.height))m · 鲁班尺【\(op.yangGateName)】字门"
+            let wStr = String(format: "%.2f", op.width)
+            let hStr = String(format: "%.2f", op.height)
+            let segName = LubanRulerEvaluation.evaluate(meters: op.width).localizedYangSegmentName
+            let opName = op.type.localizedName
+            switch lang {
+            case .zhHans, .auto: opNode.name = "\(opName)：宽 \(wStr)m × 高 \(hStr)m · 鲁班尺【\(segName)】字门"
+            case .zhHant: opNode.name = "\(opName)：寬 \(wStr)m × 高 \(hStr)m · 魯班尺【\(segName)】字門"
+            case .en:     opNode.name = "\(opName): W \(wStr)m × H \(hStr)m · Lu Ban [\(segName)]"
+            case .ja:     opNode.name = "\(opName)：幅 \(wStr)m × 高 \(hStr)m・魯班尺【\(segName)】門"
+            case .ko:     opNode.name = "\(opName): 폭 \(wStr)m × 높이 \(hStr)m · 노반척【\(segName)】"
+            case .vi:     opNode.name = "\(opName): Rộng \(wStr)m × Cao \(hStr)m · Lỗ Ban [\(segName)]"
+            case .th:     opNode.name = "\(opName): กว้าง \(wStr)m × สูง \(hStr)m · หลู่ปาน [\(segName)]"
+            case .id:     opNode.name = "\(opName): L \(wStr)m × T \(hStr)m · Lu Ban [\(segName)]"
+            }
             rootHouseNode.addChildNode(opNode)
         }
 
@@ -930,7 +965,18 @@ public final class HouseSceneCoordinator: NSObject {
             bNode.position = SCNVector3(midX, y, midZ)
             let bAngle = atan2(beam.endZ - beam.startZ, beam.endX - beam.startX)
             bNode.eulerAngles.y = -bAngle
-            bNode.name = "结构横梁 #\(idx + 1)：净高 \(String(format: "%.2f", beam.clearanceHeight))m · 跨度 \(String(format: "%.2f", len))m"
+            let clrStr = String(format: "%.2f", beam.clearanceHeight)
+            let lenStr = String(format: "%.2f", len)
+            switch lang {
+            case .zhHans, .auto: bNode.name = "结构横梁 #\(idx + 1)：净高 \(clrStr)m · 跨度 \(lenStr)m"
+            case .zhHant: bNode.name = "結構橫梁 #\(idx + 1)：淨高 \(clrStr)m · 跨度 \(lenStr)m"
+            case .en:     bNode.name = "Beam #\(idx + 1): Clearance \(clrStr)m · Span \(lenStr)m"
+            case .ja:     bNode.name = "構造梁 #\(idx + 1)：有効高 \(clrStr)m・スパン \(lenStr)m"
+            case .ko:     bNode.name = "구조 보 #\(idx + 1): 유효높이 \(clrStr)m · 경간 \(lenStr)m"
+            case .vi:     bNode.name = "Xà ngang #\(idx + 1): Cao thông thủy \(clrStr)m · Nhịp \(lenStr)m"
+            case .th:     bNode.name = "คานโครงสร้าง #\(idx + 1): สูงสุทธิ \(clrStr)m · ช่วงยาว \(lenStr)m"
+            case .id:     bNode.name = "Balok #\(idx + 1): Tinggi bersih \(clrStr)m · Bentang \(lenStr)m"
+            }
             rootHouseNode.addChildNode(bNode)
         }
 
@@ -962,7 +1008,20 @@ public final class HouseSceneCoordinator: NSObject {
             // surveys omit it and retain the historical whole-house axis.
             rNode.eulerAngles.y = -(room.rotationY ?? axisAngle)
             rNode.position = SCNVector3(room.centerX, 0.01, room.centerZ)
-            rNode.name = "\(room.name)：实测面积 \(String(format: "%.1f", room.areaSqMeters))㎡ · 面宽 \(String(format: "%.2f", room.sizeX))m × 进深 \(String(format: "%.2f", room.sizeZ))m"
+            let rName = room.localizedName
+            let areaStr = String(format: "%.1f", room.areaSqMeters)
+            let wStr = String(format: "%.2f", room.sizeX)
+            let dStr = String(format: "%.2f", room.sizeZ)
+            switch lang {
+            case .zhHans, .auto: rNode.name = "\(rName)：实测面积 \(areaStr)㎡ · 面宽 \(wStr)m × 进深 \(dStr)m"
+            case .zhHant: rNode.name = "\(rName)：實測面積 \(areaStr)㎡ · 面寬 \(wStr)m × 進深 \(dStr)m"
+            case .en:     rNode.name = "\(rName): Area \(areaStr)㎡ · W \(wStr)m × D \(dStr)m"
+            case .ja:     rNode.name = "\(rName)：実測面積 \(areaStr)㎡・間口 \(wStr)m × 奥行 \(dStr)m"
+            case .ko:     rNode.name = "\(rName): 실측면적 \(areaStr)㎡ · 폭 \(wStr)m × 깊이 \(dStr)m"
+            case .vi:     rNode.name = "\(rName): Diện tích \(areaStr)㎡ · Rộng \(wStr)m × Sâu \(dStr)m"
+            case .th:     rNode.name = "\(rName): พื้นที่ \(areaStr) ตร.ม. · กว้าง \(wStr)m × ลึก \(dStr)m"
+            case .id:     rNode.name = "\(rName): Luas \(areaStr)㎡ · L \(wStr)m × P \(dStr)m"
+            }
             rootHouseNode.addChildNode(rNode)
         }
 
@@ -988,7 +1047,17 @@ public final class HouseSceneCoordinator: NSObject {
             if let yaw = object.rotationY, yaw.isFinite {
                 objectNode.eulerAngles.y = -yaw
             }
-            objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(String(format: "%.2f", object.sizeX))m × \(String(format: "%.2f", object.sizeY))m × \(String(format: "%.2f", object.sizeZ))m"
+            let dimStr = "\(String(format: "%.2f", object.sizeX))m × \(String(format: "%.2f", object.sizeY))m × \(String(format: "%.2f", object.sizeZ))m"
+            switch lang {
+            case .zhHans, .auto: objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(dimStr)"
+            case .zhHant: objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(dimStr)"
+            case .en:     objectNode.name = "Object #\(idx + 1) [\(object.category)]: \(dimStr)"
+            case .ja:     objectNode.name = "家具・設備 #\(idx + 1)【\(object.category)】：\(dimStr)"
+            case .ko:     objectNode.name = "가구·설비 #\(idx + 1) [\(object.category)]: \(dimStr)"
+            case .vi:     objectNode.name = "Vật dụng #\(idx + 1) [\(object.category)]: \(dimStr)"
+            case .th:     objectNode.name = "วัตถุ #\(idx + 1) [\(object.category)]: \(dimStr)"
+            case .id:     objectNode.name = "Objek #\(idx + 1) [\(object.category)]: \(dimStr)"
+            }
             rootHouseNode.addChildNode(objectNode)
         }
 
@@ -1037,12 +1106,25 @@ public final class HouseSceneCoordinator: NSObject {
         let lineMat = SCNMaterial()
         lineMat.diffuse.contents = UIColor(red: 0.0, green: 0.85, blue: 0.95, alpha: 0.85)
 
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let wStr = String(format: "%.2f", w)
+        let dStr = String(format: "%.2f", d)
+        let hStr = String(format: "%.2f", h)
         let widthLineGeo = SCNBox(width: CGFloat(w), height: 0.015, length: 0.015, chamferRadius: 0)
         widthLineGeo.materials = [lineMat]
         let widthLineNode = SCNNode(geometry: widthLineGeo)
         widthLineNode.eulerAngles.y = -axisAngle
         widthLineNode.position = worldPoint(localX: 0, localZ: d * 0.5 + 0.45, y: 0.05)
-        widthLineNode.name = "面宽开间尺寸：\(String(format: "%.2f", w)) 米"
+        switch lang {
+        case .zhHans, .auto: widthLineNode.name = "面宽开间尺寸：\(wStr) 米"
+        case .zhHant: widthLineNode.name = "面寬開間尺寸：\(wStr) 米"
+        case .en:     widthLineNode.name = "Total Width: \(wStr) m"
+        case .ja:     widthLineNode.name = "間口幅寸法：\(wStr) m"
+        case .ko:     widthLineNode.name = "전면 폭 치수: \(wStr) m"
+        case .vi:     widthLineNode.name = "Chiều rộng: \(wStr) m"
+        case .th:     widthLineNode.name = "ความกว้างรวม: \(wStr) ม."
+        case .id:     widthLineNode.name = "Lebar Total: \(wStr) m"
+        }
         dimensionsNode.addChildNode(widthLineNode)
 
         let depthLineGeo = SCNBox(width: 0.015, height: 0.015, length: CGFloat(d), chamferRadius: 0)
@@ -1050,14 +1132,32 @@ public final class HouseSceneCoordinator: NSObject {
         let depthLineNode = SCNNode(geometry: depthLineGeo)
         depthLineNode.eulerAngles.y = -axisAngle
         depthLineNode.position = worldPoint(localX: w * 0.5 + 0.45, localZ: 0, y: 0.05)
-        depthLineNode.name = "进深长度尺寸：\(String(format: "%.2f", d)) 米"
+        switch lang {
+        case .zhHans, .auto: depthLineNode.name = "进深长度尺寸：\(dStr) 米"
+        case .zhHant: depthLineNode.name = "進深長度尺寸：\(dStr) 米"
+        case .en:     depthLineNode.name = "Total Depth: \(dStr) m"
+        case .ja:     depthLineNode.name = "奥行寸法：\(dStr) m"
+        case .ko:     depthLineNode.name = "깊이 치수: \(dStr) m"
+        case .vi:     depthLineNode.name = "Chiều sâu: \(dStr) m"
+        case .th:     depthLineNode.name = "ความลึกรวม: \(dStr) ม."
+        case .id:     depthLineNode.name = "Kedalaman Total: \(dStr) m"
+        }
         dimensionsNode.addChildNode(depthLineNode)
 
         let heightLineGeo = SCNBox(width: 0.015, height: CGFloat(h), length: 0.015, chamferRadius: 0)
         heightLineGeo.materials = [lineMat]
         let heightLineNode = SCNNode(geometry: heightLineGeo)
         heightLineNode.position = worldPoint(localX: -w * 0.5 - 0.45, localZ: -d * 0.5 - 0.45, y: h * 0.5)
-        heightLineNode.name = "室内净层高尺寸：\(String(format: "%.2f", h)) 米"
+        switch lang {
+        case .zhHans, .auto: heightLineNode.name = "室内净层高尺寸：\(hStr) 米"
+        case .zhHant: heightLineNode.name = "室內淨層高尺寸：\(hStr) 米"
+        case .en:     heightLineNode.name = "Clear Ceiling Height: \(hStr) m"
+        case .ja:     heightLineNode.name = "室内有効天井高：\(hStr) m"
+        case .ko:     heightLineNode.name = "실내 유효 층고: \(hStr) m"
+        case .vi:     heightLineNode.name = "Chiều cao trần: \(hStr) m"
+        case .th:     heightLineNode.name = "ความสูงเพดานสุทธิ: \(hStr) ม."
+        case .id:     heightLineNode.name = "Tinggi Plafon Bersih: \(hStr) m"
+        }
         dimensionsNode.addChildNode(heightLineNode)
     }
 
@@ -1065,6 +1165,7 @@ public final class HouseSceneCoordinator: NSObject {
     private func buildPalaceGridOverlay(survey: HouseSpatialSurvey, mode: House3DSpaceViewer.PalaceGridMode) {
         baguaGridNode.childNodes.forEach { $0.removeFromParentNode() }
         guard mode != .off else { return }
+        let lang = LocalizationManager.shared.effectiveLanguage
 
         let cx = survey.centroidX
         let cz = survey.centroidZ
@@ -1102,7 +1203,16 @@ public final class HouseSceneCoordinator: NSObject {
                 let nodeName: String
                 if row == 0 && col == 0 {
                     mat.diffuse.contents = UIColor(red: 0.95, green: 0.85, blue: 0.35, alpha: 0.20)
-                    nodeName = "【中宫太极】九运天心：运星 \(xkChart.period)"
+                    switch lang {
+                    case .zhHans, .auto: nodeName = "【中宫太极】九运天心：运星 \(xkChart.period)"
+                    case .zhHant: nodeName = "【中宮太極】九運天心：運星 \(xkChart.period)"
+                    case .en:     nodeName = "[Center Palace] Period Star \(xkChart.period)"
+                    case .ja:     nodeName = "【中宮太極】天心：運星 \(xkChart.period)"
+                    case .ko:     nodeName = "【중궁 태극】 천심: 운성 \(xkChart.period)"
+                    case .vi:     nodeName = "[Trung Cung Thái Cực] Vận tinh \(xkChart.period)"
+                    case .th:     nodeName = "[เรือนกลางไท่จี๋] ดาวยุค \(xkChart.period)"
+                    case .id:     nodeName = "[Sektor Tengah Taiji] Bintang Periode \(xkChart.period)"
+                    }
                 } else {
                     let angleRad = atan2(Double(localX * cosAxis - localZ * sinAxis),
                                          Double(-(localX * sinAxis + localZ * cosAxis)))
@@ -1117,10 +1227,22 @@ public final class HouseSceneCoordinator: NSObject {
                             } else {
                                 mat.diffuse.contents = UIColor(red: 0.85, green: 0.30, blue: 0.25, alpha: 0.15)
                             }
-                            nodeName = "【八宅·\(cellGua)宫】\(item.direction)：【\(item.star.name)】(\(item.star.isAuspicious ? "吉" : "凶"))"
+                            let gName = item.localizedGuaName
+                            let dName = item.localizedDirection
+                            let sName = item.star.localizedName
+                            switch lang {
+                            case .zhHans, .auto: nodeName = "【八宅·\(gName)宫】\(dName)：【\(sName)】(\(item.star.isAuspicious ? "吉" : "凶"))"
+                            case .zhHant: nodeName = "【八宅·\(gName)宮】\(dName)：【\(sName)】(\(item.star.isAuspicious ? "吉" : "凶"))"
+                            case .en:     nodeName = "[Ba Zhai · \(gName)] \(dName): [\(sName)] (\(item.star.isAuspicious ? "Auspicious" : "Caution"))"
+                            case .ja:     nodeName = "【八宅・\(gName)宮】\(dName)：【\(sName)】(\(item.star.isAuspicious ? "吉" : "凶"))"
+                            case .ko:     nodeName = "【팔택·\(gName)궁】 \(dName): 【\(sName)】(\(item.star.isAuspicious ? "길" : "흉"))"
+                            case .vi:     nodeName = "[Bát Trạch · \(gName)] \(dName): [\(sName)] (\(item.star.isAuspicious ? "Cát" : "Hung"))"
+                            case .th:     nodeName = "[ปาไจ๋ · \(gName)] \(dName): [\(sName)] (\(item.star.isAuspicious ? "มงคล" : "ควรระวัง"))"
+                            case .id:     nodeName = "[Ba Zhai · \(gName)] \(dName): [\(sName)] (\(item.star.isAuspicious ? "Baik" : "Waspada"))"
+                            }
                         } else {
                             mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
-                            nodeName = "【\(cellGua)宫】"
+                            nodeName = "[\(cellGua)]"
                         }
                     } else {
                         // 玄空飞星模式
@@ -1132,10 +1254,20 @@ public final class HouseSceneCoordinator: NSObject {
                             } else {
                                 mat.diffuse.contents = UIColor(red: 0.20, green: 0.65, blue: 0.90, alpha: 0.12)
                             }
-                            nodeName = "【玄空九运·\(cellGua)宫】山星 \(palace.mountainStar) · 向星 \(palace.facingStar) · 运星 \(palace.periodStar)"
+                            let pName = palace.localizedPalaceName
+                            switch lang {
+                            case .zhHans, .auto: nodeName = "【玄空九运·\(pName)宫】山星 \(palace.mountainStar) · 向星 \(palace.facingStar) · 运星 \(palace.periodStar)"
+                            case .zhHant: nodeName = "【玄空九運·\(pName)宮】山星 \(palace.mountainStar) · 向星 \(palace.facingStar) · 運星 \(palace.periodStar)"
+                            case .en:     nodeName = "[Xuan Kong · \(pName)] Mountain \(palace.mountainStar) · Facing \(palace.facingStar) · Base \(palace.periodStar)"
+                            case .ja:     nodeName = "【玄空・\(pName)宮】山星 \(palace.mountainStar)・向星 \(palace.facingStar)・運星 \(palace.periodStar)"
+                            case .ko:     nodeName = "【현공·\(pName)궁】 산성 \(palace.mountainStar) · 향성 \(palace.facingStar) · 운성 \(palace.periodStar)"
+                            case .vi:     nodeName = "[Huyền Không · \(pName)] Sơn \(palace.mountainStar) · Hướng \(palace.facingStar) · Vận \(palace.periodStar)"
+                            case .th:     nodeName = "[เสวียนคง · \(pName)] ภูเขา \(palace.mountainStar) · หัน \(palace.facingStar) · ยุค \(palace.periodStar)"
+                            case .id:     nodeName = "[Xuan Kong · \(pName)] Gunung \(palace.mountainStar) · Hadap \(palace.facingStar) · Dasar \(palace.periodStar)"
+                            }
                         } else {
                             mat.diffuse.contents = UIColor(white: 1.0, alpha: 0.08)
-                            nodeName = "【玄空 \(cellGua)宫】"
+                            nodeName = "[\(cellGua)]"
                         }
                     }
                 }
@@ -1227,6 +1359,7 @@ public final class HouseSceneCoordinator: NSObject {
     }
 
     private func buildShaAlertVisuals(survey: HouseSpatialSurvey) {
+        let lang = LocalizationManager.shared.effectiveLanguage
         for sha in survey.shaItems {
             guard let pos = sha.coordinate else { continue }
 
@@ -1241,7 +1374,7 @@ public final class HouseSceneCoordinator: NSObject {
             // 0.5 m made floor-level, ceiling-level and wall-level findings
             // appear at the same height in the 3D scene.
             sNode.position = SCNVector3(pos.x, pos.y, pos.z)
-            sNode.name = "形煞【\(sha.title)】\(sha.locationName)：\(sha.detail)"
+            sNode.name = "[\(sha.title)] \(sha.locationName): \(sha.detail)"
             shaAlertsNode.addChildNode(sNode)
 
             if let targetPos = sha.vectorEnd {
@@ -1261,7 +1394,16 @@ public final class HouseSceneCoordinator: NSObject {
                     let pitch = asin(-dir.y)
                     let yaw = atan2(dir.x, dir.z)
                     beamNode.eulerAngles = SCNVector3(pitch + Float.pi / 2, yaw, Float(0))
-                    beamNode.name = "冲煞对流轨迹：\(sha.title)"
+                    switch lang {
+                    case .zhHans, .auto: beamNode.name = "冲煞对流轨迹：\(sha.title)"
+                    case .zhHant: beamNode.name = "衝煞對流軌跡：\(sha.title)"
+                    case .en:     beamNode.name = "Airflow / Sha Vector: \(sha.title)"
+                    case .ja:     beamNode.name = "気流・殺気ライン：\(sha.title)"
+                    case .ko:     beamNode.name = "기류·충살 궤적: \(sha.title)"
+                    case .vi:     beamNode.name = "Tuyến xung khí: \(sha.title)"
+                    case .th:     beamNode.name = "แนวกระแสปะทะ: \(sha.title)"
+                    case .id:     beamNode.name = "Jalur Aliran / Sha: \(sha.title)"
+                    }
                     shaAlertsNode.addChildNode(beamNode)
                 }
             }
@@ -1323,8 +1465,116 @@ public enum SurveyReportRenderer {
             UIColor(red: 0.04, green: 0.05, blue: 0.08, alpha: 1.0).setFill()
             cg.fill(CGRect(origin: .zero, size: size))
 
+            let lang = LocalizationManager.shared.effectiveLanguage
+            let reportTitle: String
+            let subtitle: String
+            let dimsHeader: String
+            let dimsText: String
+            let shaHeader: String
+            let remedyPrefix: String
+            let footerText: String
+            let dateStr = DateFormatter.localizedString(from: survey.timestamp, dateStyle: .medium, timeStyle: .short)
+            switch lang {
+            case .zhHans, .auto:
+                reportTitle = "天机演象 · 全屋 3D 空间测绘与形煞全息存证"
+                subtitle = String(format: "测绘基准朝向: %.1f° · 空间得分: %d分 · 测绘时间: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "【房屋全维物理测绘参数】"
+                dimsText = String(
+                    format: "• 开间面宽: %.2f m     • 进深长度: %.2f m\n• 室内净层高: %.2f m    • 进深面宽比: %.2f\n• 套内净面积: %.1f ㎡   • 建筑估算面积: %.1f ㎡\n• 墙体总段数: %d 段     • 门窗开孔总数: %d 处",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "【全屋形煞引擎体检结论与化解】"
+                remedyPrefix = "化解方案："
+                footerText = "天机演象 · AR/LiDAR 空间测绘参考（需现场复核）"
+            case .zhHant:
+                reportTitle = "天機演象 · 全屋 3D 空間測繪與形煞全息存證"
+                subtitle = String(format: "測繪基準朝向: %.1f° · 空間得分: %d分 · 測繪時間: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "【房屋全維物理測繪參數】"
+                dimsText = String(
+                    format: "• 開間面寬: %.2f m     • 進深長度: %.2f m\n• 室內淨層高: %.2f m    • 進深面寬比: %.2f\n• 套內淨面積: %.1f ㎡   • 建築估算面積: %.1f ㎡\n• 牆體總段數: %d 段     • 門窗開孔總數: %d 處",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "【全屋形煞引擎體檢結論與化解】"
+                remedyPrefix = "化解方案："
+                footerText = "天機演象 · AR/LiDAR 空間測繪參考（需現場複核）"
+            case .en:
+                reportTitle = "TianJi · 3D Spatial Survey & Feng Shui Audit"
+                subtitle = String(format: "Heading: %.1f° · Score: %d · Date: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "[Physical Spatial Measurements]"
+                dimsText = String(
+                    format: "• Total Width: %.2f m    • Total Depth: %.2f m\n• Ceiling Height: %.2f m • Depth/Width Ratio: %.2f\n• Net Area: %.1f ㎡      • Est. Gross Area: %.1f ㎡\n• Wall Segments: %d      • Doors & Windows: %d",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "[Spatial Audit Findings & Remedies]"
+                remedyPrefix = "Remedy: "
+                footerText = "TianJi · AR/LiDAR Spatial Survey Reference (Verify on site)"
+            case .ja:
+                reportTitle = "天機演象・全屋3D空間測距＆風水診断レポート"
+                subtitle = String(format: "基準方位: %.1f° ・ スコア: %d点 ・ 計測日時: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "【住戸3D物理計測パラメータ】"
+                dimsText = String(
+                    format: "• 間口幅: %.2f m        • 奥行長: %.2f m\n• 有効天井高: %.2f m    • 奥行間口比: %.2f\n• 専有内法面積: %.1f ㎡ • 推定延床面積: %.1f ㎡\n• 壁セグメント: %d 箇所 • 開口部総数: %d 箇所",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "【空間風水診断結果と化殺対策】"
+                remedyPrefix = "対策："
+                footerText = "天機演象・AR/LiDAR空間計測リファレンス（要現地確認）"
+            case .ko:
+                reportTitle = "천기연상 · 전실 3D 공간 측량 및 풍수 진단 보고서"
+                subtitle = String(format: "기준 향: %.1f° · 공간 점수: %d점 · 측량 일시: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "【주택 물리 측량 파라미터】"
+                dimsText = String(
+                    format: "• 전면 폭: %.2f m       • 깊이 길이: %.2f m\n• 실내 층고: %.2f m     • 깊이/폭 비율: %.2f\n• 전용 면적: %.1f ㎡    • 추정 연면적: %.1f ㎡\n• 벽체 구간: %d개       • 문·창문 개구부: %d곳",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "【전실 형살 진단 결과 및 비보책】"
+                remedyPrefix = "해결 방안: "
+                footerText = "천기연상 · AR/LiDAR 공간 측량 참고 (현장 확인 권장)"
+            case .vi:
+                reportTitle = "Thiên Cơ · Báo Cáo Đo Đạc 3D & Thẩm Định Phong Thủy"
+                subtitle = String(format: "Hướng chuẩn: %.1f° · Điểm: %d · Thời gian: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "[Thông Số Đo Đạc Không Gian]"
+                dimsText = String(
+                    format: "• Chiều rộng: %.2f m     • Chiều sâu: %.2f m\n• Trần thông thủy: %.2f m • Tỷ lệ sâu/rộng: %.2f\n• Diện tích thông thủy: %.1f ㎡ • Diện tích sàn ước tính: %.1f ㎡\n• Số đoạn tường: %d      • Tổng cửa & cửa sổ: %d",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "[Kết Luận Thẩm Định & Phương Án Hóa Giải]"
+                remedyPrefix = "Hóa giải: "
+                footerText = "Thiên Cơ · Tham khảo đo đạc AR/LiDAR (Cần kiểm tra thực tế)"
+            case .th:
+                reportTitle = "เทียนจี · รายงานสำรวจมิติ 3D และวิเคราะห์ฮวงจุ้ย"
+                subtitle = String(format: "ทิศอ้างอิง: %.1f° · คะแนน: %d · เวลา: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "[พารามิเตอร์การวัดพื้นที่จริง]"
+                dimsText = String(
+                    format: "• ความกว้างรวม: %.2f ม.   • ความลึกรวม: %.2f ม.\n• ความสูงเพดาน: %.2f ม.  • อัตราส่วนลึก/กว้าง: %.2f\n• พื้นที่ใช้สอยสุทธิ: %.1f ตร.ม. • พื้นที่รวมประมาณ: %.1f ตร.ม.\n• จำนวนผนัง: %d ช่วง      • ประตูและหน้าต่าง: %d จุด",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "[ผลการตรวจสอบฮวงจุ้ยและวิธีแก้ไข]"
+                remedyPrefix = "วิธีแก้ไข: "
+                footerText = "เทียนจี · ข้อมูลอ้างอิงการสำรวจ AR/LiDAR (ควรตรวจสอบหน้างาน)"
+            case .id:
+                reportTitle = "TianJi · Laporan Survei Ruang 3D & Audit Feng Shui"
+                subtitle = String(format: "Arah Acuan: %.1f° · Skor: %d · Waktu: %@", survey.compassHeading, survey.fengshuiScore, dateStr)
+                dimsHeader = "[Parameter Pengukuran Fisik Bangunan]"
+                dimsText = String(
+                    format: "• Lebar Total: %.2f m    • Kedalaman Total: %.2f m\n• Tinggi Plafon: %.2f m  • Rasio Dalam/Lebar: %.2f\n• Luas Bersih: %.1f ㎡   • Est. Luas Kotor: %.1f ㎡\n• Segmen Dinding: %d     • Total Pintu & Jendela: %d",
+                    survey.dimensions.totalWidth, survey.dimensions.totalDepth, survey.dimensions.ceilingHeight, survey.dimensions.aspectRatio,
+                    survey.dimensions.usableFloorArea, survey.dimensions.grossFloorArea, survey.walls.count, survey.openings.count
+                )
+                shaHeader = "[Temuan Audit Ruang & Solusi Penyeimbang]"
+                remedyPrefix = "Solusi: "
+                footerText = "TianJi · Referensi Survei Ruang AR/LiDAR (Verifikasi di lokasi)"
+            }
+
             // 1. 顶部标题与金线
-            "天机演象 · 全屋 3D 空间测绘与形煞全息存证".draw(
+            reportTitle.draw(
                 at: CGPoint(x: 50, y: 60),
                 withAttributes: [
                     .font: UIFont.boldSystemFont(ofSize: 34),
@@ -1332,12 +1582,6 @@ public enum SurveyReportRenderer {
                 ]
             )
 
-            let subtitle = String(
-                format: "测绘基准朝向: %.1f° · 空间得分: %d分 · 测绘时间: %@",
-                survey.compassHeading,
-                survey.fengshuiScore,
-                DateFormatter.localizedString(from: survey.timestamp, dateStyle: .medium, timeStyle: .short)
-            )
             subtitle.draw(
                 at: CGPoint(x: 50, y: 110),
                 withAttributes: [
@@ -1359,7 +1603,7 @@ public enum SurveyReportRenderer {
             UIColor(red: 0.08, green: 0.10, blue: 0.14, alpha: 0.90).setFill()
             UIBezierPath(roundedRect: panelRect, cornerRadius: 14).fill()
 
-            "【房屋全维物理测绘参数】".draw(
+            dimsHeader.draw(
                 at: CGPoint(x: 75, y: 1070),
                 withAttributes: [
                     .font: UIFont.boldSystemFont(ofSize: 24),
@@ -1367,17 +1611,6 @@ public enum SurveyReportRenderer {
                 ]
             )
 
-            let dimsText = String(
-                format: "• 开间面宽: %.2f m     • 进深长度: %.2f m\n• 室内净层高: %.2f m    • 进深面宽比: %.2f\n• 套内净面积: %.1f ㎡   • 建筑估算面积: %.1f ㎡\n• 墙体总段数: %d 段     • 门窗开孔总数: %d 处",
-                survey.dimensions.totalWidth,
-                survey.dimensions.totalDepth,
-                survey.dimensions.ceilingHeight,
-                survey.dimensions.aspectRatio,
-                survey.dimensions.usableFloorArea,
-                survey.dimensions.grossFloorArea,
-                survey.walls.count,
-                survey.openings.count
-            )
             let pStyle = NSMutableParagraphStyle()
             pStyle.lineSpacing = 8
             dimsText.draw(
@@ -1391,7 +1624,7 @@ public enum SurveyReportRenderer {
 
             // 4. 全屋形煞体检清单
             let shaHeaderY: CGFloat = 1340
-            "【全屋形煞引擎体检结论与化解】".draw(
+            shaHeader.draw(
                 at: CGPoint(x: 50, y: shaHeaderY),
                 withAttributes: [
                     .font: UIFont.boldSystemFont(ofSize: 26),
@@ -1401,7 +1634,7 @@ public enum SurveyReportRenderer {
 
             var curY = shaHeaderY + 45
             for sha in survey.shaItems {
-                let badge = sha.severity == .critical ? "【严重】" : (sha.severity == .warning ? "【警示】" : "【纳吉】")
+                let badge = "[\(sha.severity.localizedTitle)]"
                 let lineTitle = "\(badge) \(sha.title) · \(sha.locationName)"
                 let titleColor = sha.severity == .critical ? UIColor.systemRed : (sha.severity == .warning ? UIColor.systemOrange : UIColor.systemGreen)
 
@@ -1414,7 +1647,7 @@ public enum SurveyReportRenderer {
                 )
                 curY += 28
 
-                let desc = "\(sha.detail)\n化解方案：\(sha.solution)"
+                let desc = "\(sha.detail)\n\(remedyPrefix)\(sha.solution)"
                 let dStyle = NSMutableParagraphStyle()
                 dStyle.lineSpacing = 4
                 desc.draw(
@@ -1429,7 +1662,7 @@ public enum SurveyReportRenderer {
             }
 
             // 5. 底部版权与防伪印记
-            "天机演象 · AR/LiDAR 空间测绘参考（需现场复核）".draw(
+            footerText.draw(
                 at: CGPoint(x: 50, y: size.height - 50),
                 withAttributes: [
                     .font: UIFont.monospacedSystemFont(ofSize: 16, weight: .medium),

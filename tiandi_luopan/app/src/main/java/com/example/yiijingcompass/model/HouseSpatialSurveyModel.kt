@@ -2242,7 +2242,7 @@ object HouseSpatialSurveyEngine {
                 val isMajor = kwLevel == KongWangLevel.LARGE_VOID
                 val isSmall = kwLevel == KongWangLevel.SMALL_VOID
                 val degStr = String.format(Locale.US, "%.1f°", compassHeading)
-                val kwTitle = kwLevel.title
+                val kwTitle = kwLevel.localizedTitle
                 shaItems.add(HouseSpatialShaItem(
                     title = tr8(
                         "玄空出卦 · 空亡破局煞", "玄空出卦 · 空亡破局煞", "Xuan Kong · Void Line (Kong Wang) Warning",

@@ -166,8 +166,22 @@ public class LocalizationManager: ObservableObject {
     }
     
     // MARK: - 字符串本地化快速查询
+    /// 记录启动后已报警的缺失 key，避免重复刷屏日志
+    private var loggedMissingKeys: Set<String> = []
+
     public func t(_ key: String) -> String {
-        return localizedStrings[effectiveLanguage]?[key] ?? localizedStrings[.zhHans]?[key] ?? key
+        if let value = localizedStrings[effectiveLanguage]?[key] {
+            return value
+        }
+        if let zh = localizedStrings[.zhHans]?[key] {
+            return zh
+        }
+        // 漏译兜底：仍返回原始 key（不崩溃），但每个缺失 key 仅记录一次，
+        // 便于在设备控制台 / 崩溃上报中捕获，后续补全翻译。
+        if loggedMissingKeys.insert(key).inserted {
+            NSLog("[i18n] missing key: \(key) (lang=\(effectiveLanguage))")
+        }
+        return key
     }
     
     private let localizedStrings: [AppLanguage: ValidatedTranslationTable] = [
@@ -185,6 +199,7 @@ public class LocalizationManager: ObservableObject {
             // 罗盘与工具
             "lock_heading": "锁定朝向",
             "locked_heading": "已锁定朝向",
+            "btn_reset_heading": "重置朝向",
             "layers_settings": "图层管理",
             "compass_calib": "罗盘双针校准",
             "pure_alignment": "正针纯清",
@@ -758,6 +773,7 @@ public class LocalizationManager: ObservableObject {
             // 羅盤與工具
             "lock_heading": "鎖定朝向",
             "locked_heading": "已鎖定朝向",
+            "btn_reset_heading": "重置朝向",
             "layers_settings": "圖層管理",
             "compass_calib": "羅盤雙針校準",
             "pure_alignment": "正針純清",
@@ -1331,6 +1347,7 @@ public class LocalizationManager: ObservableObject {
             // Compass & Tools
             "lock_heading": "Lock Heading",
             "locked_heading": "Heading Locked",
+            "btn_reset_heading": "Reset Heading",
             "layers_settings": "Dial Layers",
             "compass_calib": "Calibrate Compass",
             "pure_alignment": "Pure Alignment",
@@ -1897,6 +1914,7 @@ public class LocalizationManager: ObservableObject {
             "tab_settings": "สมาชิก VIP",
             "lock_heading": "ล็อกทิศ",
             "locked_heading": "ล็อกทิศแล้ว",
+            "btn_reset_heading": "รีเซ็ตทิศ",
             "layers_settings": "เลเยอร์จาน",
             "compass_calib": "ปรับเทียบเข็มทิศ",
             "pure_alignment": "แนวเข็มหลักบริสุทธิ์",
@@ -2452,6 +2470,7 @@ public class LocalizationManager: ObservableObject {
             "tab_settings": "Hội viên",
             "lock_heading": "Khóa hướng",
             "locked_heading": "Đã khóa hướng",
+            "btn_reset_heading": "Đặt lại hướng",
             "layers_settings": "Lớp la bàn",
             "compass_calib": "Hiệu chuẩn la bàn",
             "pure_alignment": "Chính hướng thuần",
@@ -3007,6 +3026,7 @@ public class LocalizationManager: ObservableObject {
             "tab_settings": "VIP & Setelan",
             "lock_heading": "Kunci Arah",
             "locked_heading": "Arah Terkunci",
+            "btn_reset_heading": "Reset Arah",
             "layers_settings": "Lapisan Kompas",
             "compass_calib": "Kalibrasi Kompas",
             "pure_alignment": "Poros Murni",
@@ -3562,6 +3582,7 @@ public class LocalizationManager: ObservableObject {
             "tab_settings": "会員・設定",
             "lock_heading": "方位を固定",
             "locked_heading": "方位固定中",
+            "btn_reset_heading": "方位をリセット",
             "layers_settings": "レイヤー設定",
             "compass_calib": "コンパス校正",
             "pure_alignment": "正針純清",
@@ -4117,6 +4138,7 @@ public class LocalizationManager: ObservableObject {
             "tab_settings": "멤버십·설정",
             "lock_heading": "방위 고정",
             "locked_heading": "방위 고정됨",
+            "btn_reset_heading": "방위 재설정",
             "layers_settings": "레이어 설정",
             "compass_calib": "나침반 보정",
             "pure_alignment": "정침 순청",

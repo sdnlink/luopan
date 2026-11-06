@@ -1110,6 +1110,9 @@ public class TianJiShuEngine {
             PHPhotoLibrary.shared().performChanges({
                 PHAssetChangeRequest.creationRequestForAsset(from: image)
             }) { success, error in
+                if !success, let error = error {
+                    NSLog("[TianJiShuEngine] Failed to save photo to album: %@", error.localizedDescription)
+                }
                 DispatchQueue.main.async {
                     completion(success, success ? message : failure)
                 }

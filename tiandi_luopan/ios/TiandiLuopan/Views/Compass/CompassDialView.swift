@@ -33,9 +33,11 @@ public struct CompassDialView: View {
             let dialCanvasSize = radius * 2 + 32
             // 盘径自适应：以 iPhone 参考半径 175pt 为 1.0x。
             // 分栏左栏 / Duo 内屏的盘径明显小于整屏，各环的径向间距也随之变窄。
-            // 下限 0.75（不是 0.55）：保证 64 卦/五行最小仍有 5pt 以上可读。
+            // grow 同时驱动字号与各环径向偏移（-radius + N·grow）：下限若明显高于
+            // radius/175，小盘面上文字与偏移都会超比例放大，导致相邻环径向压叠。
+            // 折中取 0.65：仅半径 < ~114pt 的极小盘面才触发下限，64 卦基础字号仍约 5.9pt。
             // iPad 12.9 竖屏盘径 ~500pt，文字同比放大，上限 1.7x。
-            let dialGrow = min(max(radius / 175.0, 0.75), 1.7)
+            let dialGrow = min(max(radius / 175.0, 0.65), 1.7)
             
             ZStack {
                 // 1. 随向旋转主盘 (绑定 continuousHeading 避免 360 度倒转 Bug)

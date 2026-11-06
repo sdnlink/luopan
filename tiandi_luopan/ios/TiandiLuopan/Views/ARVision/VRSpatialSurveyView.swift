@@ -37,6 +37,9 @@ public struct VRSpatialSurveyView: View {
     @State private var depthMetersText: String = "10.0"
     @State private var ceilingMetersText: String = "2.8"
     @State private var validationMessage: String?
+    /// 尺寸输入框是否处于编辑态：数字键盘没有回车键，聚焦时在尺寸行内显示唯一的「完成」按钮。
+    /// （不用 ToolbarItem(.keyboard)：它要求处于 NavigationView 内，且每个输入框各挂一个会重复显示。）
+    @FocusState private var isDimensionFieldFocused: Bool
     /// Preserve the measured survey heading when the editor is opened from a
     /// RoomPlan/AR result. A VR correction should not silently switch to the
     /// phone's current facing direction after the user turns around.
@@ -330,6 +333,13 @@ public struct VRSpatialSurveyView: View {
                 dimensionField(title: lang.t("floorplan_width_hint"), text: $widthMetersText)
                 dimensionField(title: lang.t("floorplan_depth_hint"), text: $depthMetersText)
                 dimensionField(title: lang.t("vr_survey_ceiling_hint"), text: $ceilingMetersText)
+                if isDimensionFieldFocused {
+                    Button(lang.t("done")) {
+                        isDimensionFieldFocused = false
+                    }
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .foregroundColor(.yanCyan)
+                }
             }
             if let validationMessage {
                 Text(validationMessage)
@@ -445,16 +455,7 @@ public struct VRSpatialSurveyView: View {
                 .adaptiveFont(size: 11, design: .monospaced)
                 .foregroundColor(.white)
                 .multilineTextAlignment(.trailing)
-                .toolbar {
-                    ToolbarItem(placement: .keyboard) {
-                        HStack {
-                            Spacer()
-                            Button(lang.t("done")) {
-                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            }
-                        }
-                    }
-                }
+                .focused($isDimensionFieldFocused)
                 .frame(width: 42)
         }
         .padding(.horizontal, 5)

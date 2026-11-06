@@ -66,6 +66,7 @@ class OnDeviceShaAnalyzer private constructor() {
         val hRatio = horizontalEdges.toDouble() / totalPixels
 
         // 形煞模式匹配
+        val lang = LocalizationManager.shared.effectiveLanguage
         val result = when {
             vRatio > 0.18 && darkCenterCount > 50 -> {
                 ShaAnalysisResult(
@@ -74,7 +75,16 @@ class OnDeviceShaAnalyzer private constructor() {
                     targetX = 0.5,
                     targetY = 0.45,
                     detectedRegions = 2,
-                    summary = "检测到两座高耸建筑狭窄垂直夹缝对冲，文丘里风刃效应明显"
+                    summary = when (lang) {
+                        AppLanguage.EN -> "Narrow vertical gap between tall buildings detected (wind-tunnel effect)"
+                        AppLanguage.ZH_HANT -> "檢測到兩座高聳建築狹窄垂直夾縫對衝，文丘里風刃效應明顯"
+                        AppLanguage.JA -> "高層ビル間の狭い垂直隙間を検出（ビル風・天斬殺の兆候）"
+                        AppLanguage.KO -> "고층 건물 사이의 좁은 수직 틈새 감지 (빌딩풍·천참살 징후)"
+                        AppLanguage.VI -> "Phát hiện khe hẹp thẳng đứng giữa hai tòa nhà cao tầng (Thiên Trảm Sát)"
+                        AppLanguage.TH -> "ตรวจพบช่องว่างแคบแนวตั้งระหว่างอาคารสูง (ช่องลมพิฆาต)"
+                        AppLanguage.ID -> "Celah vertikal sempit di antara gedung tinggi terdeteksi (efek lorong angin)"
+                        AppLanguage.AUTO, AppLanguage.ZH_HANS -> "检测到两座高耸建筑狭窄垂直夹缝对冲，文丘里风刃效应明显"
+                    }
                 )
             }
             vRatio > 0.14 && hRatio > 0.12 -> {
@@ -84,7 +94,16 @@ class OnDeviceShaAnalyzer private constructor() {
                     targetX = 0.5,
                     targetY = 0.65,
                     detectedRegions = 1,
-                    summary = "画面中央检测到笔直延伸道路/走廊视觉直冲"
+                    summary = when (lang) {
+                        AppLanguage.EN -> "Straight road or corridor converging directly toward the center"
+                        AppLanguage.ZH_HANT -> "畫面中央檢測到筆直延伸道路/走廊視覺直衝"
+                        AppLanguage.JA -> "画面中央へ一直線に伸びる道路・通路の直衝を検出"
+                        AppLanguage.KO -> "화면 중앙으로 곧게 뻗은 도로·복도 직충 감지"
+                        AppLanguage.VI -> "Phát hiện đường thẳng hoặc hành lang chiếu thẳng vào trung tâm"
+                        AppLanguage.TH -> "ตรวจพบถนนหรือทางเดินพุ่งตรงเข้าสู่กึ่งกลางภาพ"
+                        AppLanguage.ID -> "Jalan lurus atau koridor mengarah langsung ke tengah"
+                        AppLanguage.AUTO, AppLanguage.ZH_HANS -> "画面中央检测到笔直延伸道路/走廊视觉直冲"
+                    }
                 )
             }
             hRatio > 0.18 -> {
@@ -94,7 +113,16 @@ class OnDeviceShaAnalyzer private constructor() {
                     targetX = 0.5,
                     targetY = 0.55,
                     detectedRegions = 1,
-                    summary = "检测到弧形高架桥或弯曲水路反弓凸面对向"
+                    summary = when (lang) {
+                        AppLanguage.EN -> "Curved overpass or road arc convex side facing the property"
+                        AppLanguage.ZH_HANT -> "檢測到弧形高架橋或彎曲水路反弓凸面對向"
+                        AppLanguage.JA -> "弧状の高架橋またはカーブ道路の凸面（反弓）を検出"
+                        AppLanguage.KO -> "곡선 고가도로 또는 굽은 길의 볼록면(반궁) 대향 감지"
+                        AppLanguage.VI -> "Phát hiện cầu vượt hoặc đường cong uốn ngược hướng vào (Phản Cung)"
+                        AppLanguage.TH -> "ตรวจพบทางยกระดับหรือถนนโค้งหันหลังคันธนูเข้าหา"
+                        AppLanguage.ID -> "Lengkungan jalan layang atau jalan melengkung menghadap ke arah bangunan"
+                        AppLanguage.AUTO, AppLanguage.ZH_HANS -> "检测到弧形高架桥或弯曲水路反弓凸面对向"
+                    }
                 )
             }
             else -> {
@@ -104,7 +132,16 @@ class OnDeviceShaAnalyzer private constructor() {
                     targetX = 0.5,
                     targetY = 0.35,
                     detectedRegions = 1,
-                    summary = "前方建筑物轮廓上方隐约出现屋顶突出结构或尖峰"
+                    summary = when (lang) {
+                        AppLanguage.EN -> "Protruding roof structure or sharp peak rising behind the front building"
+                        AppLanguage.ZH_HANT -> "前方建築物輪廓上方隱約出現屋頂突出結構或尖峰"
+                        AppLanguage.JA -> "前方建物の上方に突き出た屋根構造・尖峰（探頭殺）を検出"
+                        AppLanguage.KO -> "전방 건물 윤곽 위로 돌출된 옥상 구조물·첨봉(탐두살) 감지"
+                        AppLanguage.VI -> "Phát hiện cấu trúc mái nhô cao phía sau tòa nhà trước mặt (Thám Đầu Sát)"
+                        AppLanguage.TH -> "ตรวจพบโครงสร้างหลังคาหรือยอดแหลมโผล่พ้นอาคารด้านหน้า"
+                        AppLanguage.ID -> "Struktur atap menonjol atau puncak tajam di balik gedung depan"
+                        AppLanguage.AUTO, AppLanguage.ZH_HANS -> "前方建筑物轮廓上方隐约出现屋顶突出结构或尖峰"
+                    }
                 )
             }
         }

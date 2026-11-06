@@ -187,7 +187,39 @@ data class FloorplanAuditItem(
     val severity: String,
     val lore: String,
     val solution: String
-)
+) {
+    val localizedSeverity: String
+        get() = when (severity) {
+            "吉" -> when (LocalizationManager.shared.effectiveLanguage) {
+                AppLanguage.EN -> "Auspicious"
+                AppLanguage.ZH_HANT, AppLanguage.JA -> "吉"
+                AppLanguage.KO -> "길"
+                AppLanguage.VI -> "Cát"
+                AppLanguage.TH -> "มงคล"
+                AppLanguage.ID -> "Baik"
+                AppLanguage.ZH_HANS, AppLanguage.AUTO -> "吉"
+            }
+            "平" -> when (LocalizationManager.shared.effectiveLanguage) {
+                AppLanguage.EN -> "Neutral"
+                AppLanguage.ZH_HANT, AppLanguage.JA -> "平"
+                AppLanguage.KO -> "평"
+                AppLanguage.VI -> "Bình"
+                AppLanguage.TH -> "ปานกลาง"
+                AppLanguage.ID -> "Netral"
+                AppLanguage.ZH_HANS, AppLanguage.AUTO -> "平"
+            }
+            else -> when (LocalizationManager.shared.effectiveLanguage) {
+                AppLanguage.EN -> "Caution"
+                AppLanguage.ZH_HANT -> "預警"
+                AppLanguage.JA -> "注意"
+                AppLanguage.KO -> "주의"
+                AppLanguage.VI -> "Lưu ý"
+                AppLanguage.TH -> "ควรระวัง"
+                AppLanguage.ID -> "Perhatian"
+                AppLanguage.ZH_HANS, AppLanguage.AUTO -> "预警"
+            }
+        }
+}
 
 data class Quad<A, B, C, D>(
     val title: A,
@@ -265,11 +297,11 @@ class FloorplanEngine private constructor() {
 
     fun generateSampleRooms(): List<FloorplanRoom> {
         return listOf(
-            FloorplanRoom("r1", "客厅", FloorplanRoomType.LIVING_ROOM, RectF(100f, 100f, 300f, 300f)),
-            FloorplanRoom("r2", "主卧", FloorplanRoomType.MASTER_BEDROOM, RectF(300f, 100f, 500f, 250f)),
-            FloorplanRoom("r3", "厨房", FloorplanRoomType.KITCHEN, RectF(100f, 300f, 200f, 450f)),
-            FloorplanRoom("r4", "卫生间", FloorplanRoomType.BATHROOM, RectF(200f, 300f, 300f, 450f)),
-            FloorplanRoom("r5", "阳台", FloorplanRoomType.BALCONY, RectF(100f, 50f, 300f, 100f))
+            FloorplanRoom("r1", FloorplanRoomType.LIVING_ROOM.localizedName, FloorplanRoomType.LIVING_ROOM, RectF(100f, 100f, 300f, 300f)),
+            FloorplanRoom("r2", FloorplanRoomType.MASTER_BEDROOM.localizedName, FloorplanRoomType.MASTER_BEDROOM, RectF(300f, 100f, 500f, 250f)),
+            FloorplanRoom("r3", FloorplanRoomType.KITCHEN.localizedName, FloorplanRoomType.KITCHEN, RectF(100f, 300f, 200f, 450f)),
+            FloorplanRoom("r4", FloorplanRoomType.BATHROOM.localizedName, FloorplanRoomType.BATHROOM, RectF(200f, 300f, 300f, 450f)),
+            FloorplanRoom("r5", FloorplanRoomType.BALCONY.localizedName, FloorplanRoomType.BALCONY, RectF(100f, 50f, 300f, 100f))
         )
     }
 
@@ -331,7 +363,7 @@ class FloorplanEngine private constructor() {
                 auditReport.add(
                     FloorplanAuditItem(
                         id = "manual-missing-corner-${room.id}",
-                        title = "${r.name} · ${content.first}",
+                        title = "${r.type.localizedName} · ${content.first}",
                         palace = r.palaceName,
                         severity = "预警",
                         lore = lore,
@@ -351,7 +383,7 @@ class FloorplanEngine private constructor() {
             auditReport.add(
                 FloorplanAuditItem(
                     id = "room-${room.id}",
-                    title = "${r.name} · ${audit.title}",
+                    title = "${r.type.localizedName} · ${audit.title}",
                     palace = r.palaceName,
                     severity = audit.level,
                     lore = audit.lore,
@@ -1181,7 +1213,7 @@ class FloorplanEngine private constructor() {
             sb.append("0\nLINE\n8\nROOMS\n10\n$right\n20\n$bottom\n30\n0.0\n11\n$left\n21\n$bottom\n31\n0.0\n")
             sb.append("0\nLINE\n8\nROOMS\n10\n$left\n20\n$bottom\n30\n0.0\n11\n$left\n21\n$top\n31\n0.0\n")
 
-            sb.append("0\nTEXT\n8\nROOMS\n10\n${(left + right) / 2f}\n20\n${(top + bottom) / 2f}\n30\n0.0\n40\n0.3\n1\n${r.name}\n")
+            sb.append("0\nTEXT\n8\nROOMS\n10\n${(left + right) / 2f}\n20\n${(top + bottom) / 2f}\n30\n0.0\n40\n0.3\n1\n${r.type.localizedName}\n")
         }
 
         val cx = centroid.x / 100f

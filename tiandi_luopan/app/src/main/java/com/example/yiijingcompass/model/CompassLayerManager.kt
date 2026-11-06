@@ -7,7 +7,15 @@ enum class CompassPreset(val rawValue: String) {
     COMPREHENSIVE("综合全息盘"),
     SAN_YUAN("三元玄空盘"),
     SAN_HE("三合水法盘"),
-    MINIMALIST("极简勘测盘")
+    MINIMALIST("极简勘测盘");
+
+    val localizedTitle: String
+        get() = when (this) {
+            COMPREHENSIVE -> LocalizationManager.instance.t("layers.preset.comprehensive")
+            SAN_YUAN -> LocalizationManager.instance.t("layers.preset.sanyuan")
+            SAN_HE -> LocalizationManager.instance.t("layers.preset.sanhe")
+            MINIMALIST -> LocalizationManager.instance.t("layers.preset.minimalist")
+        }
 }
 
 class CompassLayerManager private constructor() {

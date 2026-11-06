@@ -33,7 +33,7 @@ class AppWebBridge(
 
         override fun onPurchaseSuccess(productId: String, orderId: String) {
             activity.runOnUiThread {
-                Toast.makeText(activity, "Google Play 支付成功！权益已生效", Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, LocalizationManager.instance.t("iap_purchase_success"), Toast.LENGTH_LONG).show()
                 val statusJson = UserEntitlementsManager.instance.getStatusJson()
                 webView.evaluateJavascript("if(window.onNativeIAPPurchaseSuccess){window.onNativeIAPPurchaseSuccess('$productId', '$orderId');}", null)
                 webView.evaluateJavascript("if(window.onNativeIAPStatusUpdate){window.onNativeIAPStatusUpdate($statusJson);}", null)
@@ -44,7 +44,8 @@ class AppWebBridge(
         override fun onPurchaseFailed(productId: String?, errorCode: Int, message: String) {
             activity.runOnUiThread {
                 if (errorCode != com.android.billingclient.api.BillingClient.BillingResponseCode.USER_CANCELED) {
-                    Toast.makeText(activity, "支付失败: $message", Toast.LENGTH_SHORT).show()
+                    val failMsg = String.format(LocalizationManager.instance.t("iap_purchase_failed_fmt"), message)
+                    Toast.makeText(activity, failMsg, Toast.LENGTH_SHORT).show()
                 }
                 webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('googleplay', false, '$message');}", null)
             }
@@ -54,7 +55,8 @@ class AppWebBridge(
             activity.runOnUiThread {
                 val statusJson = UserEntitlementsManager.instance.getStatusJson()
                 val count = restoredProductIds.size
-                Toast.makeText(activity, if (count > 0) "已成功恢复 $count 项 Google Play 购买" else "未发现待恢复的购买记录", Toast.LENGTH_SHORT).show()
+                val restoreMsg = if (count > 0) LocalizationManager.instance.t("iap_restore_success") else LocalizationManager.instance.t("iap_restore_empty")
+                Toast.makeText(activity, restoreMsg, Toast.LENGTH_SHORT).show()
                 webView.evaluateJavascript("if(window.onNativeIAPStatusUpdate){window.onNativeIAPStatusUpdate($statusJson);}", null)
             }
         }
@@ -91,7 +93,17 @@ class AppWebBridge(
             val declFormatted = String.format(Locale.US, "%.1f", motion.currentDeclination)
             val speedFormatted = String.format(Locale.US, "%.1f", speedKmH)
             val escapedCoords = coordsDesc.replace("'", "\\'")
-            val escapedDesc = "磁偏角补偿 ${declFormatted}°"
+            val lang = LocalizationManager.instance.effectiveLanguage
+            val escapedDesc = when (lang) {
+                AppLanguage.EN -> "Declination ${declFormatted}°"
+                AppLanguage.ZH_HANT -> "磁偏角補償 ${declFormatted}°"
+                AppLanguage.JA -> "磁気偏角補正 ${declFormatted}°"
+                AppLanguage.KO -> "자기편각 보정 ${declFormatted}°"
+                AppLanguage.VI -> "Bù độ lệch từ ${declFormatted}°"
+                AppLanguage.TH -> "ชดเชยมุมบ่ายเบนแม่เหล็ก ${declFormatted}°"
+                AppLanguage.ID -> "Kompensasi Deklinasi ${declFormatted}°"
+                else -> "磁偏角补偿 ${declFormatted}°"
+            }
 
             webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declFormatted, true, '$escapedDesc');}", null)
             webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate($lat, $lon, $alt, true, '$escapedCoords');}", null)
@@ -337,16 +349,17 @@ class AppWebBridge(
     fun calculateBaZhaiJson(sittingGua: String, facingGua: String): String {
         val result = BaZhaiEngine.instance.analyze(sittingGua, facingGua)
         val obj = JSONObject().apply {
-            put("houseGua", result.houseGua)
-            put("houseType", result.houseType)
-            put("gateDirection", result.gateDirection)
-            put("gateStar", result.gateStar.rawValue)
+            put("houseGua", result.localizedHouseGua)
+            put("houseType", result.localizedHouseType)
+            put("gateDirection", result.localizedGateDirection)
+            put("gateStar", result.gateStar.localizedName)
             val itemsArr = JSONArray()
             for (it in result.items) {
                 itemsArr.put(JSONObject().apply {
-                    put("direction", it.direction)
+                    put("direction", it.localizedDirection)
                     put("guaName", it.guaName)
-                    put("star", it.star.rawValue)
+                    put("star", it.star.localizedName)
+                    put("suggestion", it.localizedSuggestion)
                     put("isAuspicious", it.star.isAuspicious)
                 })
             }
@@ -415,7 +428,9 @@ class AppWebBridge(
                     put("godName", c.godName)
                     put("localizedGodName", c.localizedGodName)
                     put("tianPanGan", c.tianPanGan)
+                    put("localizedTianStem", c.localizedTianStem)
                     put("diPanGan", c.diPanGan)
+                    put("localizedDiStem", c.localizedDiStem)
                     put("isAuspicious", c.isAuspicious)
                     put("luckType", c.luckType)
                     put("isCenter", c.isCenter)
@@ -527,7 +542,8 @@ class AppWebBridge(
                 shaArr.put(JSONObject().apply {
                     put("id", item.id)
                     put("title", item.title)
-                    put("severity", item.severity.rawValue)
+                    put("severity", item.severity.localizedTitle)
+                    put("severityCode", item.severity.rawValue)
                     put("location", item.locationName)
                     put("detail", item.detail)
                     put("lore", item.fengshuiLore)
@@ -557,9 +573,9 @@ class AppWebBridge(
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 val id = obj.optString("id", "r$i")
-                val name = obj.optString("name", "房间")
                 val typeStr = obj.optString("type", "UNKNOWN")
                 val type = try { FloorplanRoomType.valueOf(typeStr) } catch (_: Exception) { FloorplanRoomType.UNKNOWN }
+                val name = obj.optString("name", "").ifEmpty { type.localizedName }
                 val l = obj.optDouble("left", 0.0).toFloat()
                 val t = obj.optDouble("top", 0.0).toFloat()
                 val r = obj.optDouble("right", 100.0).toFloat()
@@ -583,7 +599,8 @@ class AppWebBridge(
                     put("id", item.id)
                     put("title", item.title)
                     put("palace", item.palace)
-                    put("severity", item.severity)
+                    put("severity", item.localizedSeverity)
+                    put("severityCode", item.severity)
                     put("lore", item.lore)
                     put("solution", item.solution)
                 })
@@ -603,9 +620,9 @@ class AppWebBridge(
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     val id = obj.optString("id", "r$i")
-                    val name = obj.optString("name", "房间")
                     val typeStr = obj.optString("type", "UNKNOWN")
                     val type = try { FloorplanRoomType.valueOf(typeStr) } catch (_: Exception) { FloorplanRoomType.UNKNOWN }
+                    val name = obj.optString("name", "").ifEmpty { type.localizedName }
                     val l = obj.optDouble("left", 0.0).toFloat()
                     val t = obj.optDouble("top", 0.0).toFloat()
                     val r = obj.optDouble("right", 100.0).toFloat()
@@ -672,7 +689,7 @@ class AppWebBridge(
         val success = UserEntitlementsManager.instance.applyPurchase(productId)
         if (success) {
             activity.runOnUiThread {
-                Toast.makeText(activity, "会员特权已成功激活！", Toast.LENGTH_SHORT).show()
+                Toast.makeText(activity, LocalizationManager.instance.t("iap_purchase_success"), Toast.LENGTH_SHORT).show()
                 webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('iap', true, '$productId');}", null)
             }
         }
@@ -693,7 +710,7 @@ class AppWebBridge(
     @JavascriptInterface
     fun restorePurchases() {
         activity.runOnUiThread {
-            Toast.makeText(activity, "正在查询 Google Play 购买记录...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, LocalizationManager.instance.t("paywall_restore_purchases"), Toast.LENGTH_SHORT).show()
             com.example.yiijingcompass.billing.GooglePlayBillingManager.instance.queryPurchases()
         }
     }
@@ -732,7 +749,17 @@ class AppWebBridge(
                 launchGooglePlayPurchase(pid)
             } else {
                 activity.runOnUiThread {
-                    Toast.makeText(activity, "正在连接支付网关...", Toast.LENGTH_SHORT).show()
+                    val msg = when (LocalizationManager.instance.effectiveLanguage) {
+                        AppLanguage.EN -> "Connecting to payment gateway..."
+                        AppLanguage.ZH_HANT -> "正在連接支付網關..."
+                        AppLanguage.JA -> "決済ゲートウェイに接続中..."
+                        AppLanguage.KO -> "결제 게이트웨이에 연결 중..."
+                        AppLanguage.VI -> "Đang kết nối cổng thanh toán..."
+                        AppLanguage.TH -> "กำลังเชื่อมต่อเกตเวย์การชำระเงิน..."
+                        AppLanguage.ID -> "Menghubungkan ke gerbang pembayaran..."
+                        AppLanguage.ZH_HANS, AppLanguage.AUTO -> "正在连接支付网关..."
+                    }
+                    Toast.makeText(activity, msg, Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {

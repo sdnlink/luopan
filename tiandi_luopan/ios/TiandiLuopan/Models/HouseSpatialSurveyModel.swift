@@ -363,6 +363,173 @@ public struct SpatialObject3D: Identifiable, Codable {
     public var position: SIMD3<Float> { SIMD3<Float>(posX, posY, posZ) }
     public var size: SIMD3<Float> { SIMD3<Float>(sizeX, sizeY, sizeZ) }
 
+    public var localizedCategoryName: String {
+        let key = category.lowercased()
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .zhHans, .auto:
+            switch key {
+            case "bed": return "卧床"
+            case "sofa": return "沙发"
+            case "chair": return "座椅"
+            case "table", "desk": return "桌台"
+            case "television": return "电视"
+            case "stove": return "炉灶"
+            case "oven": return "烤箱"
+            case "refrigerator": return "冰箱"
+            case "toilet": return "马桶"
+            case "bathtub": return "浴缸"
+            case "sink": return "水槽"
+            case "washerdryer": return "洗烘机"
+            case "dishwasher": return "洗碗机"
+            case "storage": return "收纳柜"
+            case "fireplace": return "壁炉"
+            case "stairs": return "楼梯"
+            default: return category
+            }
+        case .zhHant:
+            switch key {
+            case "bed": return "臥床"
+            case "sofa": return "沙發"
+            case "chair": return "座椅"
+            case "table", "desk": return "桌台"
+            case "television": return "電視"
+            case "stove": return "爐灶"
+            case "oven": return "烤箱"
+            case "refrigerator": return "冰箱"
+            case "toilet": return "馬桶"
+            case "bathtub": return "浴缸"
+            case "sink": return "水槽"
+            case "washerdryer": return "洗烘機"
+            case "dishwasher": return "洗碗機"
+            case "storage": return "收納櫃"
+            case "fireplace": return "壁爐"
+            case "stairs": return "樓梯"
+            default: return category
+            }
+        case .en:
+            switch key {
+            case "bed": return "Bed"
+            case "sofa": return "Sofa"
+            case "chair": return "Chair"
+            case "table", "desk": return "Table"
+            case "television": return "TV"
+            case "stove": return "Stove"
+            case "oven": return "Oven"
+            case "refrigerator": return "Refrigerator"
+            case "toilet": return "Toilet"
+            case "bathtub": return "Bathtub"
+            case "sink": return "Sink"
+            case "washerdryer": return "Washer/Dryer"
+            case "dishwasher": return "Dishwasher"
+            case "storage": return "Cabinet"
+            case "fireplace": return "Fireplace"
+            case "stairs": return "Stairs"
+            default: return category
+            }
+        case .ja:
+            switch key {
+            case "bed": return "ベッド"
+            case "sofa": return "ソファ"
+            case "chair": return "椅子"
+            case "table", "desk": return "テーブル"
+            case "television": return "テレビ"
+            case "stove": return "コンロ"
+            case "oven": return "オーブン"
+            case "refrigerator": return "冷蔵庫"
+            case "toilet": return "トイレ"
+            case "bathtub": return "浴槽"
+            case "sink": return "シンク"
+            case "washerdryer": return "洗濯乾燥機"
+            case "dishwasher": return "食洗機"
+            case "storage": return "収納棚"
+            case "fireplace": return "暖炉"
+            case "stairs": return "階段"
+            default: return category
+            }
+        case .ko:
+            switch key {
+            case "bed": return "침대"
+            case "sofa": return "소파"
+            case "chair": return "의자"
+            case "table", "desk": return "테이블"
+            case "television": return "TV"
+            case "stove": return "조리대/가스레인지"
+            case "oven": return "오븐"
+            case "refrigerator": return "냉장고"
+            case "toilet": return "변기"
+            case "bathtub": return "욕조"
+            case "sink": return "싱크대"
+            case "washerdryer": return "세탁건조기"
+            case "dishwasher": return "식기세척기"
+            case "storage": return "수납장"
+            case "fireplace": return "벽난로"
+            case "stairs": return "계단"
+            default: return category
+            }
+        case .vi:
+            switch key {
+            case "bed": return "Giường"
+            case "sofa": return "Sofa"
+            case "chair": return "Ghế"
+            case "table", "desk": return "Bàn"
+            case "television": return "TV"
+            case "stove": return "Bếp nấu"
+            case "oven": return "Lò nướng"
+            case "refrigerator": return "Tủ lạnh"
+            case "toilet": return "Bồn cầu"
+            case "bathtub": return "Bồn tắm"
+            case "sink": return "Bồn rửa"
+            case "washerdryer": return "Máy giặt/sấy"
+            case "dishwasher": return "Máy rửa bát"
+            case "storage": return "Tủ kệ"
+            case "fireplace": return "Lò sưởi"
+            case "stairs": return "Cầu thang"
+            default: return category
+            }
+        case .th:
+            switch key {
+            case "bed": return "เตียงนอน"
+            case "sofa": return "โซฟา"
+            case "chair": return "เก้าอี้"
+            case "table", "desk": return "โต๊ะ"
+            case "television": return "ทีวี"
+            case "stove": return "เตาไฟ"
+            case "oven": return "เตาอบ"
+            case "refrigerator": return "ตู้เย็น"
+            case "toilet": return "โถสุขภัณฑ์"
+            case "bathtub": return "อ่างอาบน้ำ"
+            case "sink": return "อ่างล้าง"
+            case "washerdryer": return "เครื่องซัก/อบผ้า"
+            case "dishwasher": return "เครื่องล้างจาน"
+            case "storage": return "ตู้เก็บของ"
+            case "fireplace": return "เตาผิง"
+            case "stairs": return "บันได"
+            default: return category
+            }
+        case .id:
+            switch key {
+            case "bed": return "Tempat Tidur"
+            case "sofa": return "Sofa"
+            case "chair": return "Kursi"
+            case "table", "desk": return "Meja"
+            case "television": return "TV"
+            case "stove": return "Kompor"
+            case "oven": return "Oven"
+            case "refrigerator": return "Kulkas"
+            case "toilet": return "Kloset"
+            case "bathtub": return "Bak Mandi"
+            case "sink": return "Wastafel"
+            case "washerdryer": return "Mesin Cuci"
+            case "dishwasher": return "Mesin Cuci Piring"
+            case "storage": return "Lemari"
+            case "fireplace": return "Perapian"
+            case "stairs": return "Tangga"
+            default: return category
+            }
+        }
+    }
+
     public init(
         id: UUID = UUID(),
         category: String,

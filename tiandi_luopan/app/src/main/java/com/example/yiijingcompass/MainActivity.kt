@@ -119,15 +119,26 @@ class MainActivity : AppCompatActivity() {
                 val pitchStr = String.format(java.util.Locale.US, "%.1f", motion.pitch)
                 val rollStr = String.format(java.util.Locale.US, "%.1f", motion.roll)
 
+                val sysLang = LocalizationManager.instance.effectiveLanguage
+                val declLabel = when (sysLang) {
+                    com.example.yiijingcompass.model.AppLanguage.EN -> "Declination $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.ZH_HANT -> "磁偏角 $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.JA -> "磁気偏角 $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.KO -> "자기편각 $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.VI -> "Độ lệch từ $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.TH -> "มุมบ่ายเบนแม่เหล็ก $declFormatted°"
+                    com.example.yiijingcompass.model.AppLanguage.ID -> "Deklinasi $declFormatted°"
+                    else -> "磁偏角 $declFormatted°"
+                }
                 webView.evaluateJavascript("if(window.onNativeCompassAvailable){window.onNativeCompassAvailable($hasSensor);}", null)
                 webView.evaluateJavascript("if(window.onNativeCompassAccuracy){window.onNativeCompassAccuracy(${motion.accuracyLevel});}", null)
                 webView.evaluateJavascript("if(window.onNativeHeadingUpdate){window.onNativeHeadingUpdate($initHeading);}", null)
-                webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declFormatted, ${motion.hasDeclination}, '磁偏角 $declFormatted°');}", null)
+                webView.evaluateJavascript("if(window.onNativeDeclinationUpdate){window.onNativeDeclinationUpdate($declFormatted, ${motion.hasDeclination}, '$declLabel');}", null)
                 webView.evaluateJavascript("if(window.onNativeLocationUpdate){window.onNativeLocationUpdate(${motion.latitude}, ${motion.longitude}, ${motion.altitude}, true, '$escapedCoords');}", null)
                 webView.evaluateJavascript("if(window.onNativeSpeedUpdate){window.onNativeSpeedUpdate($speedFormatted);}", null)
                 webView.evaluateJavascript("if(window.onNativeTiltUpdate){window.onNativeTiltUpdate($pitchStr, $rollStr);}", null)
-                val sysLang = LocalizationManager.instance.effectiveLanguage.rawValue
-                webView.evaluateJavascript("if(window.onSystemLanguageUpdate){window.onSystemLanguageUpdate('$sysLang');}", null)
+                val sysLangRaw = sysLang.rawValue
+                webView.evaluateJavascript("if(window.onSystemLanguageUpdate){window.onSystemLanguageUpdate('$sysLangRaw');}", null)
             }
         }
 
@@ -283,7 +294,7 @@ class MainActivity : AppCompatActivity() {
                             arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
                             PERMISSION_REQUEST_STORAGE
                         )
-                        Toast.makeText(this@MainActivity, "请允许存储权限后再次保存图片。", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, LocalizationManager.instance.t("tianji_err_permission"), Toast.LENGTH_SHORT).show()
                     }
                     return false
                 }

@@ -118,6 +118,38 @@ public struct House3DSpaceViewer: View {
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
         }
+        .onAppear {
+            refreshSurveyForActiveLanguage()
+        }
+        .onChange(of: lang.effectiveLanguage) { _ in
+            refreshSurveyForActiveLanguage()
+        }
+    }
+
+    private func refreshSurveyForActiveLanguage() {
+        let localizedRooms = survey.rooms.map { r in
+            SpatialRoom3D(
+                id: r.id,
+                name: r.type.localizedName,
+                type: r.type,
+                center: r.center,
+                size: r.size,
+                areaSqMeters: r.areaSqMeters,
+                rotationY: r.rotationY
+            )
+        }
+        let rebuilt = HouseSpatialSurveyEngine.analyzeSpatialHouse(
+            scanMethod: survey.scanMethod,
+            walls: survey.walls,
+            openings: survey.openings,
+            beams: survey.beams,
+            rooms: localizedRooms,
+            objects: survey.objects,
+            compassHeading: survey.compassHeading
+        )
+        survey = rebuilt
+        selectedShaItem = nil
+        inspectedElementDesc = nil
     }
 
     // MARK: - 顶部测绘总览看板
@@ -1048,15 +1080,16 @@ public final class HouseSceneCoordinator: NSObject {
                 objectNode.eulerAngles.y = -yaw
             }
             let dimStr = "\(String(format: "%.2f", object.sizeX))m × \(String(format: "%.2f", object.sizeY))m × \(String(format: "%.2f", object.sizeZ))m"
+            let catName = object.localizedCategoryName
             switch lang {
-            case .zhHans, .auto: objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(dimStr)"
-            case .zhHant: objectNode.name = "物件 #\(idx + 1)【\(object.category)】：\(dimStr)"
-            case .en:     objectNode.name = "Object #\(idx + 1) [\(object.category)]: \(dimStr)"
-            case .ja:     objectNode.name = "家具・設備 #\(idx + 1)【\(object.category)】：\(dimStr)"
-            case .ko:     objectNode.name = "가구·설비 #\(idx + 1) [\(object.category)]: \(dimStr)"
-            case .vi:     objectNode.name = "Vật dụng #\(idx + 1) [\(object.category)]: \(dimStr)"
-            case .th:     objectNode.name = "วัตถุ #\(idx + 1) [\(object.category)]: \(dimStr)"
-            case .id:     objectNode.name = "Objek #\(idx + 1) [\(object.category)]: \(dimStr)"
+            case .zhHans, .auto: objectNode.name = "物件 #\(idx + 1)【\(catName)】：\(dimStr)"
+            case .zhHant: objectNode.name = "物件 #\(idx + 1)【\(catName)】：\(dimStr)"
+            case .en:     objectNode.name = "Object #\(idx + 1) [\(catName)]: \(dimStr)"
+            case .ja:     objectNode.name = "家具・設備 #\(idx + 1)【\(catName)】：\(dimStr)"
+            case .ko:     objectNode.name = "가구·설비 #\(idx + 1) [\(catName)]: \(dimStr)"
+            case .vi:     objectNode.name = "Vật dụng #\(idx + 1) [\(catName)]: \(dimStr)"
+            case .th:     objectNode.name = "วัตถุ #\(idx + 1) [\(catName)]: \(dimStr)"
+            case .id:     objectNode.name = "Objek #\(idx + 1) [\(catName)]: \(dimStr)"
             }
             rootHouseNode.addChildNode(objectNode)
         }

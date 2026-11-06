@@ -15,7 +15,9 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.example.yiijingcompass.model.AppLanguage
 import com.example.yiijingcompass.model.CompassHeadingState
+import com.example.yiijingcompass.model.LocalizationManager
 import com.example.yiijingcompass.model.Mountain24Data
 import com.example.yiijingcompass.model.SolarTimeCalculator
 import com.example.yiijingcompass.model.WorldMagneticModel
@@ -376,9 +378,15 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         altitude = if (loc.hasAltitude()) loc.altitude else 0.0
         speedKmH = if (loc.hasSpeed()) loc.speed * 3.6f else 0f
 
-        val latHem = if (latitude >= 0) "北纬" else "南纬"
-        val lonHem = if (longitude >= 0) "东经" else "西经"
-        coordsDesc = "$latHem ${String.format(Locale.US, "%.4f°", abs(latitude))}, $lonHem ${String.format(Locale.US, "%.4f°", abs(longitude))}"
+        val lang = LocalizationManager.instance.effectiveLanguage
+        val suffixHemisphere = lang == AppLanguage.EN || lang == AppLanguage.ID || lang == AppLanguage.VI || lang == AppLanguage.TH
+        val latHem = (if (latitude >= 0) LocalizationManager.instance.t("lat_north") else LocalizationManager.instance.t("lat_south")).trim()
+        val lonHem = (if (longitude >= 0) LocalizationManager.instance.t("lon_east") else LocalizationManager.instance.t("lon_west")).trim()
+        val latDeg = String.format(Locale.US, "%.4f°", abs(latitude))
+        val lonDeg = String.format(Locale.US, "%.4f°", abs(longitude))
+        val latStr = if (suffixHemisphere) "$latDeg $latHem" else "$latHem $latDeg"
+        val lonStr = if (suffixHemisphere) "$lonDeg $lonHem" else "$lonHem $lonDeg"
+        coordsDesc = "$latStr, $lonStr"
 
         // WMM geomagnetic declination calculation offline
         val dec = WorldMagneticModel.instance.declination(latitude, longitude, altitude)

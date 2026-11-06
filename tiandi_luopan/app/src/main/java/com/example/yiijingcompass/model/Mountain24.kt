@@ -465,9 +465,42 @@ class Mountain24Data private constructor() {
 
         val fFenjin = resolveFenjin(norm)
         val sFenjin = resolveFenjin(sittingAngle)
-
-        val jianText = if (isJian) "兼向 (偏${String.format(Locale.US, "%.1f°", delta)})" else "正向"
-        val fenJinDesc = "${fFenjin.jiaziName}分金 · ${sFenjin.jiaziName}分金 ($jianText)"
+        val lang = LocalizationManager.shared.effectiveLanguage
+        val degStr = String.format(Locale.US, "%.1f°", delta)
+        val fenJinDesc = when (lang) {
+            AppLanguage.EN -> {
+                val jianText = if (isJian) "Sub-alignment ($degStr)" else "Direct"
+                "${fFenjin.localizedJiaziName} · ${sFenjin.localizedJiaziName} ($jianText)"
+            }
+            AppLanguage.ZH_HANT -> {
+                val jianText = if (isJian) "兼向 (偏$degStr)" else "正向"
+                "${fFenjin.localizedJiaziName}分金 · ${sFenjin.localizedJiaziName}分金 ($jianText)"
+            }
+            AppLanguage.JA -> {
+                val jianText = if (isJian) "兼向 (偏$degStr)" else "正針"
+                "${fFenjin.localizedJiaziName}分金・${sFenjin.localizedJiaziName}分金 ($jianText)"
+            }
+            AppLanguage.KO -> {
+                val jianText = if (isJian) "겸향 (편$degStr)" else "정향"
+                "${fFenjin.localizedJiaziName}분금 · ${sFenjin.localizedJiaziName}분금 ($jianText)"
+            }
+            AppLanguage.VI -> {
+                val jianText = if (isJian) "Kiêm hướng (lệch $degStr)" else "Chính hướng"
+                "Phân kim ${fFenjin.localizedJiaziName} · ${sFenjin.localizedJiaziName} ($jianText)"
+            }
+            AppLanguage.TH -> {
+                val jianText = if (isJian) "เฉียง ($degStr)" else "ตรงทิศ"
+                "เฟินจิน ${fFenjin.localizedJiaziName} · ${sFenjin.localizedJiaziName} ($jianText)"
+            }
+            AppLanguage.ID -> {
+                val jianText = if (isJian) "Condong ($degStr)" else "Arah Lurus"
+                "Fenjin ${fFenjin.localizedJiaziName} · ${sFenjin.localizedJiaziName} ($jianText)"
+            }
+            AppLanguage.AUTO, AppLanguage.ZH_HANS -> {
+                val jianText = if (isJian) "兼向 (偏$degStr)" else "正向"
+                "${fFenjin.jiaziName}分金 · ${sFenjin.jiaziName}分金 ($jianText)"
+            }
+        }
 
         return CompassHeadingState(
             heading = norm,

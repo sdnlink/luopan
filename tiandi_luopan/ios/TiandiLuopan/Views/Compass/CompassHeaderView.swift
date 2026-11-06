@@ -17,26 +17,7 @@ public struct CompassHeaderView: View {
         let palaceText = state.facingMountain.localizedPalace + lang.t("palace_suffix")
 
         VStack(spacing: 8) {
-            // 顶栏 1 (最顶部): 真太阳时与双轴倾角 (俯仰 / 横滚)
-            ViewThatFits(in: .horizontal) {
-                HStack {
-                    solarTimeLabel
-                    Spacer(minLength: 8)
-                    pitchRollLabel
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    solarTimeLabel
-                    pitchRollLabel
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 5)
-            .frame(maxWidth: .infinity)
-            .background(Color.black.opacity(0.35))
-            .cornerRadius(8)
-            .padding(.horizontal, 12)
-
-            // 顶栏 2: 核心度数与坐向徽章
+            // 顶栏 1: 核心度数与坐向徽章（英雄行，最顶部）
             // 窄屏 (iPhone / Duo 外屏)：英/印尼/泰/越译文字比中文长很多，
             // 尤其泰语词间无空格不会主动断行，度数行、坐向标题、宫位徽章和
             // 两个圆按钮挤在同一 HStack 里会互相穿插重叠。改为两行堆叠：
@@ -86,6 +67,25 @@ public struct CompassHeaderView: View {
                     }
                 }
             }
+            .padding(.horizontal, 16)
+
+            // 顶栏 2: 真太阳时与双轴倾角 (俯仰 / 横滚)，深色胶囊
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    solarTimeLabel
+                    Spacer(minLength: 8)
+                    pitchRollLabel
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    solarTimeLabel
+                    pitchRollLabel
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
+            .background(Color.black.opacity(0.35))
+            .cornerRadius(8)
             .padding(.horizontal, 16)
         }
         // iPad 宽屏单列下顶部仪表会被拉得很宽，度数在左、按钮在右，中间一片空白；

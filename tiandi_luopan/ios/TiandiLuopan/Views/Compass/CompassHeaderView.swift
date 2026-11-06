@@ -17,7 +17,26 @@ public struct CompassHeaderView: View {
         let palaceText = state.facingMountain.localizedPalace + lang.t("palace_suffix")
 
         VStack(spacing: 8) {
-            // 顶栏 1: 核心度数与坐向徽章
+            // 顶栏 1 (最顶部): 真太阳时与双轴倾角 (俯仰 / 横滚)
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    solarTimeLabel
+                    Spacer(minLength: 8)
+                    pitchRollLabel
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    solarTimeLabel
+                    pitchRollLabel
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity)
+            .background(Color.black.opacity(0.35))
+            .cornerRadius(8)
+            .padding(.horizontal, 12)
+
+            // 顶栏 2: 核心度数与坐向徽章
             // 窄屏 (iPhone / Duo 外屏)：英/印尼/泰/越译文字比中文长很多，
             // 尤其泰语词间无空格不会主动断行，度数行、坐向标题、宫位徽章和
             // 两个圆按钮挤在同一 HStack 里会互相穿插重叠。改为两行堆叠：
@@ -68,36 +87,6 @@ public struct CompassHeaderView: View {
                 }
             }
             .padding(.horizontal, 16)
-            
-            // 顶栏 2: 真太阳时、经纬度与双轴倾角
-            // 窄左栏里真太阳时与倾角横排 + Spacer 会把两段长文案压成截断；
-            // 改为纵向堆叠，各占整行完整显示。
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Image(systemName: "sun.max.fill")
-                        .adaptiveFont(size: 11)
-                        .foregroundColor(Color.orange)
-                    Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
-                        .adaptiveFont(size: 11, weight: .medium)
-                        .foregroundColor(.white.opacity(0.85))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                // 水平倾角状态
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(motion.isLevel ? Color.green : Color.orange)
-                        .frame(width: 6, height: 6)
-                    Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
-                        .adaptiveFont(size: 11, weight: .regular, design: .monospaced)
-                        .foregroundColor(.white.opacity(0.75))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 4)
-            .background(Color.black.opacity(0.35))
-            .cornerRadius(8)
-            .padding(.horizontal, 12)
         }
         // iPad 宽屏单列下顶部仪表会被拉得很宽，度数在左、按钮在右，中间一片空白；
         // 限宽 720pt 居中，保持与内容区同一视觉宽度。
@@ -168,5 +157,31 @@ public struct CompassHeaderView: View {
             .foregroundColor(state.isJianXiang ? Color.orange : Color(red: 0.8, green: 0.8, blue: 0.85))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
+    }
+
+    private var solarTimeLabel: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "sun.max.fill")
+                .adaptiveFont(size: 11)
+                .foregroundColor(Color.orange)
+            Text("\(lang.t("true_solar_time_prefix")) \(motion.trueSolarTimeStr)")
+                .adaptiveFont(size: 11, weight: .medium)
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+    }
+
+    private var pitchRollLabel: some View {
+        HStack(spacing: 5) {
+            Circle()
+                .fill(motion.isLevel ? Color.green : Color.orange)
+                .frame(width: 6, height: 6)
+            Text("\(lang.t("pitch_label")) \(String(format: "%.1f", motion.pitch))° / \(lang.t("roll_label")) \(String(format: "%.1f", motion.roll))°")
+                .adaptiveFont(size: 11, weight: .regular, design: .monospaced)
+                .foregroundColor(.white.opacity(0.75))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
     }
 }

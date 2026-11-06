@@ -12,6 +12,35 @@ public struct SolarTimeResult {
     public let solarTermName: String
     public let baziGanzhi: String
     public let dayPillar: String
+
+    /// Localized day pillar (e.g. 甲子 → "Jia Zi" in English, native script
+    /// elsewhere). The stored `dayPillar` is always a two-character Chinese
+    /// Heavenly Stem + Earthly Branch pair.
+    public var localizedDayPillar: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let stem = String(dayPillar.prefix(1))
+        let branch = String(dayPillar.suffix(1))
+        switch lang {
+        case .en, .id:
+            let stems = ["甲": "Jia", "乙": "Yi", "丙": "Bing", "丁": "Ding", "戊": "Wu", "己": "Ji", "庚": "Geng", "辛": "Xin", "壬": "Ren", "癸": "Gui"]
+            let branches = ["子": "Zi", "丑": "Chou", "寅": "Yin", "卯": "Mao", "辰": "Chen", "巳": "Si", "午": "Wu", "未": "Wei", "申": "Shen", "酉": "You", "戌": "Xu", "亥": "Hai"]
+            return "\(stems[stem, default: stem])\(branches[branch, default: branch])"
+        case .ko:
+            let stems = ["甲": "갑", "乙": "을", "丙": "병", "丁": "정", "戊": "무", "己": "기", "庚": "경", "辛": "신", "壬": "임", "癸": "계"]
+            let branches = ["子": "자", "丑": "축", "寅": "인", "卯": "묘", "辰": "진", "巳": "사", "午": "오", "未": "미", "申": "신", "酉": "유", "戌": "술", "亥": "해"]
+            return "\(stems[stem, default: stem])\(branches[branch, default: branch])"
+        case .vi:
+            let stems = ["甲": "Giáp", "乙": "Ất", "丙": "Bính", "丁": "Đinh", "戊": "Mậu", "己": "Kỷ", "庚": "Canh", "辛": "Tân", "壬": "Nhâm", "癸": "Quý"]
+            let branches = ["子": "Tý", "丑": "Sửu", "寅": "Dần", "卯": "Mão", "辰": "Thìn", "巳": "Tỵ", "午": "Ngọ", "未": "Mùi", "申": "Thân", "酉": "Dậu", "戌": "Tuất", "亥": "Hợi"]
+            return "\(stems[stem, default: stem])\(branches[branch, default: branch])"
+        case .th:
+            let stems = ["甲": "เจี่ย", "乙": "อี้", "丙": "ปิ่ง", "丁": "ติง", "戊": "อู่", "己": "จี่", "庚": "เกิง", "辛": "ซิน", "壬": "เหริน", "癸": "กุ่ย"]
+            let branches = ["子": "จื่อ", "丑": "โฉ่ว", "寅": "หยิน", "卯": "เหมา", "辰": "เฉิน", "巳": "ซื่อ", "午": "อู่", "未": "เว่ย", "申": "เซิน", "酉": "โหย่ว", "戌": "ซวี", "亥": "ฮ่าย"]
+            return "\(stems[stem, default: stem])\(branches[branch, default: branch])"
+        case .ja, .zhHant, .zhHans, .auto:
+            return dayPillar
+        }
+    }
 }
 
 public final class SolarTimeCalculator {

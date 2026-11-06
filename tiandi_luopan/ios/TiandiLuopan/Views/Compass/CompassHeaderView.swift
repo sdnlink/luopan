@@ -17,14 +17,26 @@ public struct CompassHeaderView: View {
         let palaceText = state.facingMountain.localizedPalace + lang.t("palace_suffix")
 
         VStack(spacing: 8) {
-            // 顶栏 1: 核心度数与坐向徽章（英雄行，最顶部）
-            // 窄屏 (iPhone / Duo 外屏)：英/印尼/泰/越译文字比中文长很多，
-            // 尤其泰语词间无空格不会主动断行，度数行、坐向标题、宫位徽章和
-            // 两个圆按钮挤在同一 HStack 里会互相穿插重叠。改为两行堆叠：
-            // 第一行只放度数 + 按钮，第二行整行放坐向标题 + 宫位徽章。
-            // 宽屏 (iPad / Duo 内屏分栏) 仍保持原来的一行横排。
+            // 顶栏 1: 核心度数 + 坐向名(含副标题) 在左，按钮+宫位徽章在右，一行横排。
+            // 长译文(英/印尼/泰/越)用 ViewThatFits 兜底：一行放不下时退到两行堆叠。
             Group {
-                if horizontalSizeClass == .compact {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 8) {
+                        degreeBlock(state: state)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(sitFacingText)
+                                .adaptiveFont(size: 18, weight: .bold, design: .serif)
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                            fenjinDescLine(state: state)
+                        }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            lockButtons
+                            palaceBadge(text: palaceText)
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .center) {
                             degreeBlock(state: state)
@@ -42,28 +54,6 @@ public struct CompassHeaderView: View {
                             palaceBadge(text: palaceText)
                         }
                         fenjinDescLine(state: state)
-                    }
-                } else {
-                    HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        degreeBlock(state: state)
-
-                        // 坐向与二十四山
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 6) {
-                                Text(sitFacingText)
-                                    .adaptiveFont(size: 18, weight: .bold, design: .serif)
-                                    .foregroundColor(.white)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.6)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                palaceBadge(text: palaceText)
-                            }
-                            fenjinDescLine(state: state)
-                        }
-
-                        Spacer()
-                        lockButtons
                     }
                 }
             }

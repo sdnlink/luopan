@@ -1081,7 +1081,14 @@ public class TianJiShuEngine {
             .font: UIFont.systemFont(ofSize: 20),
             .foregroundColor: UIColor(red: 120/255.0, green: 100/255.0, blue: 80/255.0, alpha: 1.0)
         ]
-        disclaimer.draw(in: CGRect(x: 100, y: curY + 260, width: 880, height: 180), withAttributes: attr)
+        let maxWidth: CGFloat = 880
+        let neededHeight = ceil(disclaimer.boundingRect(
+            with: CGSize(width: maxWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attr,
+            context: nil
+        ).height) + 8
+        disclaimer.draw(in: CGRect(x: 100, y: curY + 260, width: maxWidth, height: neededHeight), withAttributes: attr)
     }
     
     // 保存至相册

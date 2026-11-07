@@ -235,8 +235,8 @@ struct AlmanacWidgetRootView: View {
 private struct InlineView: View {
     let s: WidgetAlmanacSnapshot
     var body: some View {
-        // accessoryInline 只接受单行文字，直接给最短可用文案，避免被系统截断。
-        Text("\(s.termName) · \(s.localizedDayPillar) · \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
+        // accessoryInline 只接受单行文字，优先采用 termShortName 避免英文长节气名在锁屏单行截断。
+        Text("\(s.termShortName) · \(s.localizedDayPillar) · \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
             .lineLimit(1)
             .minimumScaleFactor(0.7)
     }

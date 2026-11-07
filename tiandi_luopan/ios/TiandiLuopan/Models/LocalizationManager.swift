@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 // MARK: - 天机演象 原生国际化多语言管理器 (LocalizationManager)
 // 支持：zh-Hans, zh-Hant, en, th, vi, id, ja, ko, auto (跟随系统)
@@ -83,6 +86,11 @@ public class LocalizationManager: ObservableObject {
             UserDefaults.standard.set(raw, forKey: "app_language")
             Self.sharedDefaults?.set(raw, forKey: "app_language")
             updateEffectiveLanguage()
+            #if canImport(WidgetKit) && !WIDGET_EXTENSION
+            if #available(iOS 14.0, *) {
+                WidgetCenter.shared.reloadTimelines(ofKind: "TiandiLuopanAlmanacWidget")
+            }
+            #endif
         }
     }
     
@@ -116,6 +124,12 @@ public class LocalizationManager: ObservableObject {
         let setting = AppLanguage(rawValue: saved) ?? .auto
         self.currentSetting = setting
         self.effectiveLanguage = LocalizationManager.resolveLanguage(for: setting)
+        #if !WIDGET_EXTENSION
+        // 首次安装或升级时：若共享容器尚无偏好，同步补写，避免小组件冷启动读不到主 App 语言
+        if Self.sharedDefaults?.string(forKey: kAppLanguageKey) != setting.rawValue {
+            Self.sharedDefaults?.set(setting.rawValue, forKey: kAppLanguageKey)
+        }
+        #endif
         // Widget Extension 进程内存上限很低，启动时遍历 8 张全量表做完备性校验
         // 会制造不必要的瞬时峰值。校验用于开发期抓漏译，只在主 App 运行。
         #if WIDGET_EXTENSION

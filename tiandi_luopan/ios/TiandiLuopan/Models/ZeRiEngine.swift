@@ -4,6 +4,12 @@ import Foundation
 
 public struct ZeRiAnalysis {
     public let fourPillarsText: String
+    /// 两字中文日柱（如 甲子），与 fourPillarsText 同源于本地日历日期 + 23 点子初换日。
+    /// 供小组件等调用方显示单一日柱，避免另用真太阳时口径造成矛盾。
+    public let dayPillar: String
+    public var localizedDayPillar: String {
+        SolarTimeCalculator.localizedDayPillar(dayPillar)
+    }
     public let overallStatus: String
     public let isAuspicious: Bool
     public let suiPoWarning: String?
@@ -39,7 +45,14 @@ public final class ZeRiEngine {
         return analyze(date: date, sitting: sitting)
     }
 
-    public func analyze(date: Date, sitting: Mountain24Item) -> ZeRiAnalysis {
+    /// 通用日课：不含坐山冲克判定，供小组件等没有现场坐向的场景使用。
+    /// 调用方必须在 UI 上标注「未含坐山冲克」，不得把结果解读为某一宅的坐向结论。
+    public func analyzeGeneralDay(date: Date = Date()) -> ZeRiAnalysis {
+        return analyze(date: date, sitting: nil)
+    }
+
+    /// sitting 传 nil 时只按岁破 / 月破与四柱判读，跳过坐山冲克。
+    public func analyze(date: Date, sitting: Mountain24Item?) -> ZeRiAnalysis {
         var calendar = Calendar(identifier: .gregorian)
         // Date is an absolute instant; all selectable-day pillars must use
         // the user's civil time zone so a late-night local date is not shifted
@@ -218,8 +231,8 @@ public final class ZeRiEngine {
             "庚": "酉", "酉": "酉", "辛": "酉",
             "戌": "戌", "乾": "戌", "亥": "亥"
         ]
-        let sittingBranch = mountainBranch[sitting.name] ?? sitting.name
-        if let sClash = clashMap[sittingBranch], sClash == dayBranch {
+        let sittingBranch = mountainBranch[sitting?.name ?? ""] ?? ""
+        if let sitting = sitting, let sClash = clashMap[sittingBranch], sClash == dayBranch {
             switch lang {
             case .en:
                 sittingClash = "Day branch (\(enBranches[dayBranch] ?? dayBranch)) clashes with House Sitting Mountain (\(sitting.localizedName)); Sitting Clash Taboo."
@@ -317,6 +330,7 @@ public final class ZeRiEngine {
         
         return ZeRiAnalysis(
             fourPillarsText: pillars,
+            dayPillar: "\(dayStem)\(dayBranch)",
             overallStatus: status,
             isAuspicious: isAuspicious,
             suiPoWarning: suiPo,

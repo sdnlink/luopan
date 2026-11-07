@@ -70,6 +70,20 @@
 		1076 /* ShaSurveyModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2076 /* ShaSurveyModels.swift */; };
 		1077 /* GeometryUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2077 /* GeometryUtils.swift */; };
 		1078 /* VRSpatialSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2078 /* VRSpatialSurveyView.swift */; };
+		9100 /* WidgetAlmanacSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9200 /* WidgetAlmanacSnapshot.swift */; };
+		9101 /* TiandiLuopanAlmanacWidget.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9201 /* TiandiLuopanAlmanacWidget.swift */; };
+		9102 /* AlmanacWidgetViews.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9202 /* AlmanacWidgetViews.swift */; };
+		9103 /* WidgetAlmanacSnapshot.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9200 /* WidgetAlmanacSnapshot.swift */; };
+		9104 /* SolarTimeCalculator.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2025 /* SolarTimeCalculator.swift */; };
+		9105 /* SolarTermsData.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2063 /* SolarTermsData.swift */; };
+		9106 /* PurpleWhiteEngine.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2052 /* PurpleWhiteEngine.swift */; };
+		9107 /* ZeRiEngine.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2066 /* ZeRiEngine.swift */; };
+		9108 /* Mountain24.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2020 /* Mountain24.swift */; };
+		9109 /* LocalizationManager.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 2069 /* LocalizationManager.swift */; };
+		9110 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9210 /* WidgetKit.framework */; };
+		9112 /* WidgetKit.framework in App Frameworks */ = {isa = PBXBuildFile; fileRef = 9210 /* WidgetKit.framework */; };
+		9113 /* Widget PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9211 /* Widget PrivacyInfo.xcprivacy */; };
+		9111 /* TiandiLuopanWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9209 /* TiandiLuopanWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -152,7 +166,38 @@
 		2076 /* ShaSurveyModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ShaSurveyModels.swift"; sourceTree = "<group>"; };
 		2077 /* GeometryUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/GeometryUtils.swift"; sourceTree = "<group>"; };
 		2078 /* VRSpatialSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/VRSpatialSurveyView.swift"; sourceTree = "<group>"; };
+		9200 /* WidgetAlmanacSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WidgetAlmanacSnapshot.swift"; sourceTree = "<group>"; };
+		9201 /* TiandiLuopanAlmanacWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TiandiLuopanAlmanacWidget.swift; sourceTree = "<group>"; };
+		9202 /* AlmanacWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlmanacWidgetViews.swift; sourceTree = "<group>"; };
+		9203 /* Widget Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9209 /* TiandiLuopanWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TiandiLuopanWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9210 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		9211 /* Widget PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		9001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5002;
+			remoteInfo = TiandiLuopanWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3004 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				9111 /* TiandiLuopanWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		3001 /* Frameworks */ = {
@@ -168,6 +213,15 @@
 				1042 /* Photos.framework in Frameworks */,
 				1043 /* ARKit.framework in Frameworks */,
 				1044 /* RoomPlan.framework in Frameworks */,
+				9112 /* WidgetKit.framework in App Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3010 /* Widget Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9110 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -178,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				4001 /* TiandiLuopan */,
+				4004 /* TiandiLuopanWidget */,
 				4002 /* Frameworks */,
 				4003 /* Products */,
 			);
@@ -238,6 +293,7 @@
 				2073 /* ARRoomPlanCaptureView.swift */,
 				2075 /* House3DSpaceViewer.swift */,
 				2078 /* VRSpatialSurveyView.swift */,
+				9200 /* WidgetAlmanacSnapshot.swift */,
 				2087 /* PrivacyInfo.xcprivacy */,
 				2013 /* InfoPlist.strings */,
 				2090 /* Localizable.strings */,
@@ -298,8 +354,20 @@
 			isa = PBXGroup;
 			children = (
 				2000 /* TiandiLuopan.app */,
+				9209 /* TiandiLuopanWidget.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		4004 /* TiandiLuopanWidget */ = {
+			isa = PBXGroup;
+			children = (
+				9201 /* TiandiLuopanAlmanacWidget.swift */,
+				9202 /* AlmanacWidgetViews.swift */,
+				9203 /* Widget Info.plist */,
+				9211 /* Widget PrivacyInfo.xcprivacy */,
+			);
+			path = TiandiLuopanWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -312,17 +380,44 @@
 				3002 /* Sources */,
 				3001 /* Frameworks */,
 				3003 /* Resources */,
+				3004 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9002 /* PBXTargetDependency */,
 			);
 			name = TiandiLuopan;
 			productName = TiandiLuopan;
 			productReference = 2000 /* TiandiLuopan.app */;
 			productType = "com.apple.product-type.application";
 		};
+		5002 /* TiandiLuopanWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6003 /* Build configuration list for PBXNativeTarget "TiandiLuopanWidget" */;
+			buildPhases = (
+				3011 /* Widget Sources */,
+				3010 /* Widget Frameworks */,
+				3012 /* Widget Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TiandiLuopanWidget;
+			productName = TiandiLuopanWidget;
+			productReference = 9209 /* TiandiLuopanWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		9002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5002 /* TiandiLuopanWidget */;
+			targetProxy = 9001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		7001 /* Project object */ = {
@@ -333,6 +428,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					5001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					5002 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -358,6 +456,7 @@
 			projectRoot = "";
 			targets = (
 				5001 /* TiandiLuopan */,
+				5002 /* TiandiLuopanWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -372,6 +471,14 @@
 				1012 /* InfoPlist.strings in Resources */,
 				1013 /* Localizable.strings in Resources */,
 				1014 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3012 /* Widget Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9113 /* Widget PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -431,9 +538,26 @@
 				1076 /* ShaSurveyModels.swift in Sources */,
 				1077 /* GeometryUtils.swift in Sources */,
 				1078 /* VRSpatialSurveyView.swift in Sources */,
+				9100 /* WidgetAlmanacSnapshot.swift in Sources */,
 
 
 
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3011 /* Widget Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9101 /* TiandiLuopanAlmanacWidget.swift in Widget Sources */,
+				9102 /* AlmanacWidgetViews.swift in Widget Sources */,
+				9103 /* WidgetAlmanacSnapshot.swift in Widget Sources */,
+				9104 /* SolarTimeCalculator.swift in Widget Sources */,
+				9105 /* SolarTermsData.swift in Widget Sources */,
+				9106 /* PurpleWhiteEngine.swift in Widget Sources */,
+				9107 /* ZeRiEngine.swift in Widget Sources */,
+				9108 /* Mountain24.swift in Widget Sources */,
+				9109 /* LocalizationManager.swift in Widget Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -451,7 +575,6 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 133;
 				ENABLE_BITCODE = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -468,7 +591,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -489,7 +611,6 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 133;
 				ENABLE_BITCODE = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_OPTIMIZATION_LEVEL = s;
@@ -499,7 +620,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.3.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_COMPILATION_MODE = "wholemodule";
@@ -515,6 +635,8 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 133;
+				MARKETING_VERSION = 1.3.4;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -534,6 +656,8 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 133;
+				MARKETING_VERSION = 1.3.4;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -544,6 +668,50 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		8005 /* Widget Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = TiandiLuopanWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8006 /* Widget Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = TiandiLuopanWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_COMPILATION_MODE = "wholemodule";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -565,6 +733,15 @@
 			buildConfigurations = (
 				8003 /* Project Debug */,
 				8004 /* Project Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6003 /* Build configuration list for PBXNativeTarget "TiandiLuopanWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8005 /* Widget Debug */,
+				8006 /* Widget Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

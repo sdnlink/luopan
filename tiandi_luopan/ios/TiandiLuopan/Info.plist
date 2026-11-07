@@ -61,6 +61,17 @@
 	<string>天机演象需要访问相册以导入户型图，并保存实景勘测长图与水印存证相片。</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.yanxiang.compass.almanac</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>tiandiluopan</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

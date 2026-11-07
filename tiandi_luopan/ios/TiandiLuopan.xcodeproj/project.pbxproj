@@ -83,7 +83,7 @@
 		9110 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9210 /* WidgetKit.framework */; };
 		9112 /* WidgetKit.framework in App Frameworks */ = {isa = PBXBuildFile; fileRef = 9210 /* WidgetKit.framework */; };
 		9113 /* Widget PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9211 /* Widget PrivacyInfo.xcprivacy */; };
-		9111 /* TiandiLuopanWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9209 /* TiandiLuopanWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9111 /* TiandiLuopanWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9209 /* TiandiLuopanWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -677,7 +677,7 @@
 		8005 /* Widget Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = "$(WIDGET_CODE_SIGNING_ALLOWED)";
+				CODE_SIGNING_ALLOWED = YES;
 				CODE_SIGN_STYLE = Automatic;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = TiandiLuopanWidget/Info.plist;
@@ -701,7 +701,7 @@
 		8006 /* Widget Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGNING_ALLOWED = "$(WIDGET_CODE_SIGNING_ALLOWED)";
+				CODE_SIGNING_ALLOWED = "$(WIDGET_CODE_SIGNING_ALLOWED:default=YES)";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = TiandiLuopanWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;

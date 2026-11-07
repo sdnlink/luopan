@@ -167,6 +167,7 @@ jobs:
         if: steps.detect_duo.outputs.duo_available == 'true'
         run: |
           set -euo pipefail
+          rm -rf tiandi_luopan/build-duo
           xcodebuild build \
             -project tiandi_luopan/ios/TiandiLuopan.xcodeproj \
             -scheme TiandiLuopan \

@@ -367,6 +367,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          rm -rf build
           mkdir -p build
 
           if [ "$HAS_WIDGET_PROFILE" = "true" ]; then

@@ -86,6 +86,7 @@ jobs:
       - name: Build App for iOS Simulator (Debug)
         run: |
           echo "=== Building TiandiLuopan for iOS Simulator ==="
+          rm -rf tiandi_luopan/build
           xcodebuild build \
             -project tiandi_luopan/ios/TiandiLuopan.xcodeproj \
             -scheme TiandiLuopan \

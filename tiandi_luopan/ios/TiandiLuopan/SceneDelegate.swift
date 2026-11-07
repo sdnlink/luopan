@@ -1,8 +1,32 @@
 import UIKit
 import WidgetKit
+import Combine
+
+/// 小组件深链的待处理路由。
+/// 不能用 NotificationCenter 直接投递：冷启动时 SceneDelegate 同步发通知，
+/// SwiftUI 视图树尚未挂载，.onReceive 订阅者还不存在，通知会被静默吞掉。
+/// 改为把「意图」留在单例状态里，由 RootContentView 挂载后主动消费。
+public final class AppNavigationRouter: ObservableObject {
+    public static let shared = AppNavigationRouter()
+
+    @Published public private(set) var pendingAlmanacRoute = false
+
+    private init() {}
+
+    public func requestAlmanac() {
+        pendingAlmanacRoute = true
+    }
+
+    /// 幂等消费：只有第一个消费者拿到 true，避免冷/热启动两条路径重复跳转。
+    public func consumeAlmanac() -> Bool {
+        guard pendingAlmanacRoute else { return false }
+        pendingAlmanacRoute = false
+        return true
+    }
+}
 
 extension Notification.Name {
-    /// 小组件日课深链：RootContentView 收到后切到「玄空理气」Tab。
+    /// 保留给已有监听方使用（热启动即时性），冷启动以 AppNavigationRouter 为准。
     public static let didTapAlmanacWidget = Notification.Name("com.yanxiang.compass.didTapAlmanacWidget")
 }
 
@@ -36,8 +60,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     /// 仅处理本 App 的日课深链，其它 scheme 忽略。
+    /// 冷启动与热启动都先写入单例状态，再由 RootContentView 挂载后消费；
+    /// 通知仅作热启动时的即时补充。
     private static func routeWidgetURL(_ url: URL) {
         guard url.scheme == "tiandiluopan", url.host == "almanac" else { return }
+        AppNavigationRouter.shared.requestAlmanac()
         NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
     }
 

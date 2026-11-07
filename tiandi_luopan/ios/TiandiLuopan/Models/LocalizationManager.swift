@@ -68,9 +68,20 @@ public struct ValidatedTranslationTable: ExpressibleByDictionaryLiteral {
 public class LocalizationManager: ObservableObject {
     public static let shared = LocalizationManager()
     
+    /// 主 App 与 Widget Extension 是两个沙盒进程。配置 App Group 后，
+    /// 共享容器可让小组件跟随 App 内手动选择的语言；未配置时 suite 数据
+    /// 只在本进程可见，自动回退系统语言，行为与旧版一致。
+    public static let appGroupID = "group.com.yanxiang.compass"
+    public static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: appGroupID)
+    }
+
     @Published public var currentSetting: AppLanguage {
         didSet {
-            UserDefaults.standard.set(currentSetting.rawValue, forKey: "app_language")
+            let raw = currentSetting.rawValue
+            // standard 始终写，保证旧版本用户偏好与 UI 测试参数不丢。
+            UserDefaults.standard.set(raw, forKey: "app_language")
+            Self.sharedDefaults?.set(raw, forKey: "app_language")
             updateEffectiveLanguage()
         }
     }
@@ -81,9 +92,24 @@ public class LocalizationManager: ObservableObject {
     public private(set) var translationValidationIssues: [String] = []
     
     private let kAppLanguageKey = "app_language"
+
+    /// Widget 进程每次生成 Timeline 前重读共享偏好。
+    /// 未配置 App Group 时读不到值，保持系统语言不变。
+    /// 只在扩展进程生效：主 App 的 currentSetting 是权威来源，不应被反向覆盖。
+    public func syncFromSharedDefaults() {
+        #if WIDGET_EXTENSION
+        guard let raw = Self.sharedDefaults?.string(forKey: kAppLanguageKey),
+              let setting = AppLanguage(rawValue: raw),
+              setting != currentSetting else { return }
+        currentSetting = setting
+        #endif
+    }
     
     private init() {
-        var saved = UserDefaults.standard.string(forKey: kAppLanguageKey) ?? "auto"
+        // 共享容器优先，旧版 standard 值兜底，避免升级后用户的语言选择被重置。
+        var saved = Self.sharedDefaults?.string(forKey: kAppLanguageKey)
+            ?? UserDefaults.standard.string(forKey: kAppLanguageKey)
+            ?? "auto"
         if let idx = CommandLine.arguments.firstIndex(of: "-appLanguage"), idx + 1 < CommandLine.arguments.count {
             saved = CommandLine.arguments[idx + 1]
         }

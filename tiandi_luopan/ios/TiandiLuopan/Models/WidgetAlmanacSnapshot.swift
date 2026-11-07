@@ -19,6 +19,8 @@ public struct WidgetAlmanacSnapshot {
 
     /// 当前节气名（已本地化）
     public let termName: String
+    /// 节气短称（罗盘环口径），供锁屏 accessoryCircular 在极小直径内显示。
+    public let termShortName: String
     /// 当前节气已走过的比例 0...1
     public let termProgress: Double
     /// 距下一节气的整天数
@@ -64,6 +66,8 @@ public enum WidgetAlmanacBuilder {
 
     /// 为指定时刻生成快照。所有输入都来自 Date，不依赖主 App 运行状态。
     public static func make(for date: Date = Date()) -> WidgetAlmanacSnapshot {
+        // 配置 App Group 后跟随主 App 手动选择的语言；未配置时保持系统语言。
+        LocalizationManager.shared.syncFromSharedDefaults()
         let solar = SolarTimeCalculator.shared
 
         // 通用日课：不传坐山，跳过坐山冲克，只按四柱 / 岁破 / 月破判读。
@@ -74,8 +78,15 @@ public enum WidgetAlmanacBuilder {
         let starEngine = PurpleWhiteEngine.shared
 
         let rawTermName = solar.solarTermName(for: date)
-        let termName = SolarTermsData.shared.terms
-            .first { $0.name == rawTermName }?.localizedName ?? rawTermName
+        let termItem = SolarTermsData.shared.terms.first { $0.name == rawTermName }
+        let termName = termItem?.localizedName ?? rawTermName
+        // localizedDialName 在英/印尼语给短称，其它语种回退 localizedName；
+        // 仍过长时再做字符上限，保证锁屏圆形内不被强截成首字母。
+        var shortName = termItem?.localizedDialName ?? termName
+        if shortName.count > 10 {
+            shortName = String(shortName.prefix(9)) + "…"
+        }
+        let termShortName = shortName
 
         let elapsedDays = solar.solarTermProgress(for: date)
         let progress = min(1.0, max(0.0, elapsedDays / termLengthDays))
@@ -88,6 +99,7 @@ public enum WidgetAlmanacBuilder {
             yiActivities: dayCourse.yiActivities,
             jiActivities: dayCourse.jiActivities,
             termName: termName,
+            termShortName: termShortName,
             termProgress: progress,
             daysToNextTerm: daysLeft,
             yearCentralStar: purple.yearCentralStar,
@@ -103,8 +115,11 @@ public enum WidgetAlmanacBuilder {
     /// - 每日 00:00（换日柱）与 23:00（子初换日柱）；
     /// - 每 3 小时一个采样点，让节气进度环连续推进而不是一天只跳两次；
     /// - 节气交接时刻（termIndex 变化点），保证节气名、流月飞星及时切换。
+    ///
+    /// 按 Apple 建议只填充约 24~36 小时：days 默认 1，配合次日 00:00 的
+    /// reload 策略，系统每天主动唤醒重取，避免长周期 Timeline 被系统清理后长期陈旧。
     /// 返回从 now 起、按时间排序且去重的时刻。
-    public static func refreshDates(from now: Date, days: Int = 3) -> [Date] {
+    public static func refreshDates(from now: Date, days: Int = 1) -> [Date] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         let startOfToday = calendar.startOfDay(for: now)

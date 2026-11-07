@@ -44,6 +44,7 @@ jobs:
 
     env:
       APP_BUNDLE_ID: com.yanxiang.compass
+      WIDGET_BUNDLE_ID: com.yanxiang.compass.widget
       PROJECT_PATH: ios/TiandiLuopan.xcodeproj
       SCHEME_NAME: TiandiLuopan
       CONFIGURATION: Release
@@ -121,10 +122,12 @@ jobs:
           DEV_P12: ${{ secrets.DEV_CERTIFICATE_P12 || secrets.BUILD_CERTIFICATE_P12 }}
           DEV_P12_PWD: ${{ secrets.DEV_P12_PASSWORD || secrets.P12_PASSWORD }}
           DEV_PROV: ${{ secrets.DEV_PROVISION_PROFILE || secrets.BUILD_PROVISION_PROFILE }}
+          DEV_WIDGET_PROV: ${{ secrets.DEV_WIDGET_PROVISION_PROFILE || secrets.WIDGET_PROVISION_PROFILE }}
           # 发布者模式凭证 (含 fallback)
           DIST_P12: ${{ secrets.DIST_CERTIFICATE_P12 || secrets.BUILD_CERTIFICATE_P12 }}
           DIST_P12_PWD: ${{ secrets.DIST_P12_PASSWORD || secrets.P12_PASSWORD }}
           DIST_PROV: ${{ secrets.DIST_PROVISION_PROFILE || secrets.BUILD_PROVISION_PROFILE }}
+          DIST_WIDGET_PROV: ${{ secrets.DIST_WIDGET_PROVISION_PROFILE || secrets.WIDGET_PROVISION_PROFILE }}
         run: |
           set -euo pipefail
 
@@ -273,16 +276,77 @@ jobs:
             exit 1
           fi
 
-          # 安装 Provisioning Profile
+          # 安装主工程 Provisioning Profile
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           cp "$PP_PATH" "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          # --------------------------------------------------
+          # 小组件描述文件处理（兼容通配符 Wildcard / 独立描述文件 / 优雅降级）
+          # --------------------------------------------------
+          if [ "$BUILD_TARGET" = "app-store" ]; then
+            WIDGET_PROV_RAW="$DIST_WIDGET_PROV"
+          else
+            WIDGET_PROV_RAW="$DEV_WIDGET_PROV"
+          fi
+
+          EXPECTED_WIDGET_APP_ID="$TEAM_ID.$WIDGET_BUNDLE_ID"
+          HAS_WIDGET_PROFILE="false"
+          WIDGET_PROFILE_UUID=""
+
+          # shellcheck disable=SC2053
+          if [[ "$EXPECTED_WIDGET_APP_ID" == $PROFILE_APP_ID ]]; then
+            echo "Main profile is a wildcard that covers the widget ($PROFILE_APP_ID)."
+            HAS_WIDGET_PROFILE="true"
+            WIDGET_PROFILE_UUID="$PROFILE_UUID"
+          elif [ -n "$WIDGET_PROV_RAW" ]; then
+            echo "==== Configuring Widget Provisioning Profile ===="
+            WIDGET_PP_PATH="$RUNNER_TEMP/signing/widget_profile.mobileprovision"
+            WIDGET_PROFILE_PLIST="$RUNNER_TEMP/signing/widget_profile.plist"
+
+            printf '%s' "$WIDGET_PROV_RAW" | base64 -D > "$WIDGET_PP_PATH"
+            security cms -D -i "$WIDGET_PP_PATH" > "$WIDGET_PROFILE_PLIST"
+
+            WIDGET_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$WIDGET_PROFILE_PLIST")
+            WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$WIDGET_PROFILE_PLIST")
+            WIDGET_PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$WIDGET_PROFILE_PLIST")
+            WIDGET_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$WIDGET_PROFILE_PLIST")
+
+            echo "===== Widget Provisioning Profile Metadata ====="
+            echo "Name: $WIDGET_PROFILE_NAME"
+            echo "UUID: $WIDGET_PROFILE_UUID"
+            echo "Team: $WIDGET_PROFILE_TEAM"
+            echo "App ID: $WIDGET_PROFILE_APP_ID"
+
+            # shellcheck disable=SC2053
+            if [[ "$EXPECTED_WIDGET_APP_ID" != $WIDGET_PROFILE_APP_ID ]]; then
+              echo "ERROR: Widget Profile App ID ($WIDGET_PROFILE_APP_ID) does not cover $EXPECTED_WIDGET_APP_ID"
+              exit 1
+            fi
+
+            if [ "$WIDGET_PROFILE_TEAM" != "$TEAM_ID" ]; then
+              echo "ERROR: Widget Profile Team ID mismatch: expected $TEAM_ID, got $WIDGET_PROFILE_TEAM"
+              exit 1
+            fi
+
+            cp "$WIDGET_PP_PATH" "$PROFILE_DIR/$WIDGET_PROFILE_UUID.mobileprovision"
+            HAS_WIDGET_PROFILE="true"
+            echo "Widget profile installed successfully: $WIDGET_PROFILE_NAME ($WIDGET_PROFILE_UUID)"
+          else
+            echo "::warning::No widget provisioning profile secret found for $BUILD_TARGET mode."
+            echo "::warning::Expected App ID: $EXPECTED_WIDGET_APP_ID."
+            echo "::warning::To sign the widget on CI, configure DEV_WIDGET_PROVISION_PROFILE / DIST_WIDGET_PROVISION_PROFILE in GitHub Secrets."
+            HAS_WIDGET_PROFILE="false"
+            WIDGET_PROFILE_UUID=""
+          fi
 
           # 输出供后续步骤使用
           {
             echo "signing_identity=$SIGNING_IDENTITY"
             echo "profile_uuid=$PROFILE_UUID"
             echo "profile_name=$PROFILE_NAME"
+            echo "has_widget_profile=$HAS_WIDGET_PROFILE"
+            echo "widget_profile_uuid=$WIDGET_PROFILE_UUID"
             echo "export_method=$METHOD"
             echo "signing_cert_type=$CERT_TYPE"
           } >> "$GITHUB_OUTPUT"
@@ -297,11 +361,23 @@ jobs:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           SIGNING_IDENTITY: ${{ steps.setup_signing.outputs.signing_identity }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
+          HAS_WIDGET_PROFILE: ${{ steps.setup_signing.outputs.has_widget_profile }}
+          WIDGET_PROFILE_UUID: ${{ steps.setup_signing.outputs.widget_profile_uuid }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
 
           mkdir -p build
+
+          if [ "$HAS_WIDGET_PROFILE" = "true" ]; then
+            WIDGET_SIGN_ALLOWED="YES"
+            WIDGET_SPECIFIER="$WIDGET_PROFILE_UUID"
+            echo "Archiving with Widget Extension code signing enabled ($WIDGET_PROFILE_UUID)"
+          else
+            WIDGET_SIGN_ALLOWED="NO"
+            WIDGET_SPECIFIER=""
+            echo "Archiving with Widget Extension code signing disabled (no profile provided)"
+          fi
 
           xcodebuild archive \
             -project "$PROJECT_PATH" \
@@ -312,7 +388,9 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
             DEVELOPMENT_TEAM="$TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            APP_PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
+            WIDGET_CODE_SIGNING_ALLOWED="$WIDGET_SIGN_ALLOWED" \
+            WIDGET_PROVISIONING_PROFILE_SPECIFIER="$WIDGET_SPECIFIER" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             2>&1 | tee build/xcodebuild-archive.log
 
@@ -331,6 +409,15 @@ jobs:
               ;;
           esac
 
+          # 若未配置小组件描述文件，从归档中剥离未签名的 appex，避免后续 export 阶段校验失败
+          if [ "$HAS_WIDGET_PROFILE" != "true" ]; then
+            if [ -d "$ARCHIVED_APP/PlugIns/TiandiLuopanWidget.appex" ]; then
+              echo "::warning::Removing unsigned TiandiLuopanWidget.appex from archive to allow main app IPA export."
+              rm -rf "$ARCHIVED_APP/PlugIns/TiandiLuopanWidget.appex"
+              rmdir "$ARCHIVED_APP/PlugIns" 2>/dev/null || true
+            fi
+          fi
+
           # build number 是否真的写进了产物（Info.plist 若写死了 CFBundleVersion 则不会生效）
           ACTUAL_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ARCHIVED_APP/Info.plist" 2>/dev/null || true)"
           echo "Archived CFBundleVersion = $ACTUAL_BUILD (expected $BUILD_NUMBER)"
@@ -345,12 +432,24 @@ jobs:
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
+          HAS_WIDGET_PROFILE: ${{ steps.setup_signing.outputs.has_widget_profile }}
+          WIDGET_PROFILE_UUID: ${{ steps.setup_signing.outputs.widget_profile_uuid }}
           METHOD: ${{ steps.setup_signing.outputs.export_method }}
           SIGNING_CERT: ${{ steps.setup_signing.outputs.signing_cert_type }}
         run: |
           set -euo pipefail
 
           mkdir -p dist-ios
+
+          if [ "$HAS_WIDGET_PROFILE" = "true" ]; then
+            PROFILES_MAP="<key>${APP_BUNDLE_ID}</key>
+                  <string>${PROFILE_UUID}</string>
+                  <key>${WIDGET_BUNDLE_ID}</key>
+                  <string>${WIDGET_PROFILE_UUID}</string>"
+          else
+            PROFILES_MAP="<key>${APP_BUNDLE_ID}</key>
+                  <string>${PROFILE_UUID}</string>"
+          fi
 
           cat > ExportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -368,8 +467,7 @@ jobs:
 
               <key>provisioningProfiles</key>
               <dict>
-                  <key>${APP_BUNDLE_ID}</key>
-                  <string>${PROFILE_UUID}</string>
+                  ${PROFILES_MAP}
               </dict>
 
               <key>destination</key>
@@ -439,6 +537,18 @@ jobs:
           security cms -D -i "$EMBEDDED_PROFILE" > "$VERIFY_DIR/embedded-profile.plist"
           /usr/libexec/PlistBuddy -c "Print :Name" "$VERIFY_DIR/embedded-profile.plist"
           /usr/libexec/PlistBuddy -c "Print :Entitlements:get-task-allow" "$VERIFY_DIR/embedded-profile.plist"
+
+          # 检查小组件扩展签名（若存在）
+          WIDGET_APPEX="$(find "$APP_PATH/PlugIns" -maxdepth 1 -name '*.appex' 2>/dev/null | head -n 1 || true)"
+          if [ -n "$WIDGET_APPEX" ] && [ -d "$WIDGET_APPEX" ]; then
+            echo "===== Widget Extension Code Signature Info ====="
+            codesign -dv --verbose=4 "$WIDGET_APPEX" 2>&1 | tee build/widget-codesign-info.log
+            codesign --verify --verbose=2 "$WIDGET_APPEX"
+            if [ -f "$WIDGET_APPEX/embedded.mobileprovision" ]; then
+              security cms -D -i "$WIDGET_APPEX/embedded.mobileprovision" > "$VERIFY_DIR/widget-profile.plist"
+              echo "Widget Profile Name: $(/usr/libexec/PlistBuddy -c "Print :Name" "$VERIFY_DIR/widget-profile.plist" 2>/dev/null || true)"
+            fi
+          fi
 
       # --------------------------------------------------
       # 9. 生成 SHA256 校验码

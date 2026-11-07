@@ -743,6 +743,10 @@ public struct RootContentView: View {
         .onChange(of: selectedTab) { _ in
             updateResourceUsage()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didTapAlmanacWidget)) { _ in
+            // 点击今日日课小组件：直达「玄空理气」页（含日课 / 择日 / 紫白）。
+            selectedTab = 3
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // Re-enable sensors only after the app is visible again. Keeping
             // Core Location/Core Motion streams alive while the app is

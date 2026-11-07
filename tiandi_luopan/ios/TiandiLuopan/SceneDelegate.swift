@@ -1,4 +1,10 @@
 import UIKit
+import WidgetKit
+
+extension Notification.Name {
+    /// 小组件日课深链：RootContentView 收到后切到「玄空理气」Tab。
+    public static let didTapAlmanacWidget = Notification.Name("com.yanxiang.compass.didTapAlmanacWidget")
+}
 
 @available(iOS 13.0, *)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -16,6 +22,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = ViewController()
         self.window = window
         window.makeKeyAndVisible()
+        // 冷启动时由小组件 URL 拉起：把目标页交给 RootContentView 切换。
+        if let url = connectionOptions.urlContexts.first?.url {
+            Self.routeWidgetURL(url)
+        }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        // 已运行状态下点击小组件：同样转发，避免只冷启动到首页。
+        if let url = URLContexts.first?.url {
+            Self.routeWidgetURL(url)
+        }
+    }
+
+    /// 仅处理本 App 的日课深链，其它 scheme 忽略。
+    private static func routeWidgetURL(_ url: URL) {
+        guard url.scheme == "tiandiluopan", url.host == "almanac" else { return }
+        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}
@@ -43,6 +66,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard !isAnotherSceneActive(excluding: scene) else { return }
         UIApplication.shared.isIdleTimerDisabled = false
         CompassMotionManager.shared.stop()
+        // 跨日 / 节气交接后回到前台时，让小组件重建 Timeline。
+        WidgetCenter.shared.reloadTimelines(ofKind: "TiandiLuopanAlmanacWidget")
     }
 
     /// 是否还有别的场景处于前台活跃状态。

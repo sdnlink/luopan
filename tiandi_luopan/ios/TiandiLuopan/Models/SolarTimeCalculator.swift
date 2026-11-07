@@ -17,6 +17,16 @@ public struct SolarTimeResult {
     /// elsewhere). The stored `dayPillar` is always a two-character Chinese
     /// Heavenly Stem + Earthly Branch pair.
     public var localizedDayPillar: String {
+        SolarTimeCalculator.localizedDayPillar(dayPillar)
+    }
+}
+
+public final class SolarTimeCalculator {
+    public static let shared = SolarTimeCalculator()
+
+    /// 把两字中文干支（如 甲子）按当前有效语言转写。
+    /// 抽成静态方法，使小组件等无 SolarTimeResult 实例的调用方也能复用同一份映射。
+    public static func localizedDayPillar(_ dayPillar: String) -> String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let stem = String(dayPillar.prefix(1))
         let branch = String(dayPillar.suffix(1))
@@ -41,10 +51,6 @@ public struct SolarTimeResult {
             return dayPillar
         }
     }
-}
-
-public final class SolarTimeCalculator {
-    public static let shared = SolarTimeCalculator()
 
     // 以小寒 285°为起点，顺序为太阳视黄经每 15°对应的节气。
     private let solarTerms = [

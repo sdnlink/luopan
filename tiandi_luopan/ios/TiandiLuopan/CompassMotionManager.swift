@@ -129,6 +129,27 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.updateResolvedState(force: true)
             }
             .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshTimeAndSolarTerm()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshTimeAndSolarTerm()
+            }
+            .store(in: &cancellables)
+
+        Timer.publish(every: 30.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.refreshTimeAndSolarTermIfNeeded()
+            }
+            .store(in: &cancellables)
         hapticTick.prepare()
         hapticLevel.prepare()
     }
@@ -185,7 +206,10 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             stop()
             return
         }
-        guard !isRunning else { return }
+        guard !isRunning else {
+            updateResolvedState(force: true)
+            return
+        }
         isRunning = true
         updateHeadingOrientation()
 
@@ -206,6 +230,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         if deviceMotionEnabled {
             startMotionUpdates()
         }
+        updateResolvedState(force: true)
     }
     
     /// 供 SceneDelegate 前台生命周期调用：仅当当前活跃标签页或校准弹窗允许传感器工作时才恢复运行
@@ -214,6 +239,39 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             start()
         } else {
             stop()
+        }
+        refreshTimeAndSolarTerm()
+    }
+
+    /// 强制即时重算时间与二十四节气并刷新主盘面
+    public func refreshTimeAndSolarTerm() {
+        if Thread.isMainThread {
+            let currentTermName = SolarTimeCalculator.shared.solarTermName(for: Date())
+            if self.currentSolarTermName != currentTermName {
+                self.currentSolarTermName = currentTermName
+            }
+            self.updateResolvedState(force: true)
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshTimeAndSolarTerm()
+            }
+        }
+    }
+
+    /// 低频定时心跳检测节气与真太阳时跨界
+    public func refreshTimeAndSolarTermIfNeeded() {
+        if Thread.isMainThread {
+            let currentTermName = SolarTimeCalculator.shared.solarTermName(for: Date())
+            if self.currentSolarTermName != currentTermName {
+                self.currentSolarTermName = currentTermName
+                self.updateResolvedState(force: true)
+            } else if self.isRunning && self.hasLocationFix {
+                self.updateResolvedState(force: true)
+            }
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshTimeAndSolarTermIfNeeded()
+            }
         }
     }
     

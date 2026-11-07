@@ -74,6 +74,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         StoreKitIAPManager.shared.refreshEntitlements()
         StoreKitIAPManager.shared.refreshProductsIfNeeded()
         CompassMotionManager.shared.resumeIfSensorsEnabled()
+        CompassMotionManager.shared.refreshTimeAndSolarTerm()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -87,6 +88,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func sceneWillEnterForeground(_ scene: UIScene) {
         CompassMotionManager.shared.resumeIfSensorsEnabled()
+        CompassMotionManager.shared.refreshTimeAndSolarTerm()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

@@ -17,6 +17,12 @@ public struct CompassDialView: View {
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
     
+    private static let clockRefreshTimer = Timer.publish(
+        every: 30,
+        on: .main,
+        in: .common
+    ).autoconnect()
+    
     private let mountains = Mountain24Data.shared.mountains
     private let hexagrams = Hexagram64Data.shared.hexagrams
     
@@ -78,6 +84,7 @@ public struct CompassDialView: View {
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
+                .id("dial-canvas-\(motion.currentSolarTermName)-\(lang.effectiveLanguage.rawValue)")
                 .frame(width: dialCanvasSize, height: dialCanvasSize)
                 .drawingGroup() // 启用 Metal GPU 纹理光栅化，彻底消除旋转时几百个图层的 CPU 测量与重绘负荷
                 .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
@@ -138,6 +145,18 @@ public struct CompassDialView: View {
                         lastScale = scale
                     }
             )
+            .onAppear {
+                motion.refreshTimeAndSolarTerm()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                motion.refreshTimeAndSolarTerm()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                motion.refreshTimeAndSolarTerm()
+            }
+            .onReceive(Self.clockRefreshTimer) { _ in
+                motion.refreshTimeAndSolarTermIfNeeded()
+            }
         }
     }
     
@@ -207,22 +226,26 @@ public struct CompassDialView: View {
     
     // MARK: - 二十四节气与十二消息卦环
     private func solarTermsLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
+        let activeTermName = motion.currentSolarTermName.isEmpty
+            ? SolarTimeCalculator.shared.solarTermName(for: Date())
+            : motion.currentSolarTermName
         let activeTerm = SolarTermsData.shared.terms.first {
-            $0.name == motion.currentSolarTermName
+            $0.name == activeTermName
         }
 
         return ZStack {
             if let activeTerm = activeTerm {
-                solarTermHighlightLayer(radius: radius, term: activeTerm)
+                solarTermHighlightLayer(radius: radius, grow: grow, term: activeTerm)
             }
 
             ForEach(SolarTermsData.shared.terms) { term in
+                let isActive = term.name == activeTermName
                 VStack(spacing: 0) {
                     Text(term.localizedDialName)
                         .adaptiveFont(size: 7 * grow, weight: term.isMajorTerm ? .bold : .regular)
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
-                        .foregroundColor(term.name == motion.currentSolarTermName
+                        .foregroundColor(isActive
                             ? Color.black
                             : (term.isMajorTerm ? Color(red: 0.95, green: 0.45, blue: 0.3) : Color.white.opacity(0.65)))
                     if let hex = term.localizedHexagramLabel {
@@ -230,7 +253,7 @@ public struct CompassDialView: View {
                             .adaptiveFont(size: 6 * grow, weight: .bold)
                             .lineLimit(1)
                             .minimumScaleFactor(0.55)
-                            .foregroundColor(term.name == motion.currentSolarTermName ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
+                            .foregroundColor(isActive ? Color.black.opacity(0.85) : Color(red: 0.95, green: 0.85, blue: 0.45))
                     }
                 }
                 .frame(width: radius * 0.24)
@@ -243,10 +266,10 @@ public struct CompassDialView: View {
     /// Highlights the complete 15° solar-term sector in the same north-based
     /// coordinate system as the labels. A polygon is used instead of a shape
     /// arc so the sector remains stable inside the fixed dial canvas.
-    private func solarTermHighlightLayer(radius: CGFloat, term: SolarTermItem) -> some View {
+    private func solarTermHighlightLayer(radius: CGFloat, grow: CGFloat = 1.0, term: SolarTermItem) -> some View {
         let center = CGPoint(x: radius, y: radius)
-        let innerRadius = max(0, radius - 18)
-        let outerRadius = radius + 5
+        let innerRadius = max(0, radius - 18 * grow)
+        let outerRadius = radius + 5 * grow
         let startAngle = term.angleCenter - 7.5
         let endAngle = term.angleCenter + 7.5
         let steps = 12

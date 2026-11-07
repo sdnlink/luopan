@@ -116,6 +116,20 @@ public struct CompassMainView: View {
         .sheet(isPresented: $showCalibSheet) {
             CalibrationSheet()
         }
+        .onAppear {
+            motion.refreshTimeAndSolarTerm()
+        }
+        .onChange(of: isActive) { active in
+            if active {
+                motion.refreshTimeAndSolarTerm()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            motion.refreshTimeAndSolarTerm()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            motion.refreshTimeAndSolarTerm()
+        }
     }
     
     // MARK: - 罗盘工具条

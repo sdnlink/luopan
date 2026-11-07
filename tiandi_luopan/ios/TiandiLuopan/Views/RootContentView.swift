@@ -548,6 +548,9 @@ public struct RootContentView: View {
     private let motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedTab: Int
+    /// 理气页的子 Tab（0 玄空九星 / 1 八宅三合日课 / 2 紫白 / 3 奇门）。
+    /// 由根视图持有，小组件深链可把日课子页一并定位。
+    @State private var analysisSubTab: Int = 0
     // 读取 size class 建立环境依赖：折叠/展开（或 iPad 分屏拖动）切换时本视图
     // 重渲染并级联子视图 body 重算，使 Font.adaptive 的静态查询同步刷新
     //（配合 body 尾部 onChange 一起生效）。
@@ -685,7 +688,8 @@ public struct RootContentView: View {
                 .tag(2)
             
             // Tab 4: 玄空理气与三式绝学 (玄空飞星、八宅三合、流年紫白、时家奇门、天机长卷)
-            XuanKongGridView(isActive: selectedTab == 3)
+            XuanKongGridView(isActive: selectedTab == 3,
+                             selectedSubTab: $analysisSubTab)
                 .tabItem {
                     Image(systemName: "square.grid.3x3.fill")
                     Text(lang.t("tab_analysis"))
@@ -743,9 +747,20 @@ public struct RootContentView: View {
         .onChange(of: selectedTab) { _ in
             updateResourceUsage()
         }
+        // 冷启动：URL 在 SceneDelegate 同步到达时视图树尚未挂载，
+        // 通知会丢；改为挂载后主动消费单例里暂存的路由意图。
+        .onAppear {
+            consumePendingAlmanacRoute()
+        }
+        // 热启动：SceneDelegate 收到 URL 后立即投递，同时刷新路由状态。
         .onReceive(NotificationCenter.default.publisher(for: .didTapAlmanacWidget)) { _ in
-            // 点击今日日课小组件：直达「玄空理气」页（含日课 / 择日 / 紫白）。
-            selectedTab = 3
+            consumePendingAlmanacRoute()
+        }
+        .onOpenURL { url in
+            // SwiftUI 原生兜底：若系统把 URL 交给视图层，也能定位到日课。
+            guard url.scheme == "tiandiluopan", url.host == "almanac" else { return }
+            AppNavigationRouter.shared.requestAlmanac()
+            consumePendingAlmanacRoute()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             // Re-enable sensors only after the app is visible again. Keeping
@@ -758,6 +773,14 @@ public struct RootContentView: View {
             motion.stop()
             UIApplication.shared.isIdleTimerDisabled = false
         }
+    }
+
+    /// 消费小组件深链的待处理意图（幂等）。
+    /// Tab 3 = 理气页，子 Tab 1 = 八宅三合里的天星择日日课卡。
+    private func consumePendingAlmanacRoute() {
+        guard AppNavigationRouter.shared.consumeAlmanac() else { return }
+        selectedTab = 3
+        analysisSubTab = 1
     }
 
     /// The live compass and camera survey need an awake screen while they are

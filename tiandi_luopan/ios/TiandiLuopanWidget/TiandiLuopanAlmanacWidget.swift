@@ -35,7 +35,13 @@ struct AlmanacProvider: TimelineProvider {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .current
         let last = entries.last?.date ?? now
-        let reload = calendar.date(byAdding: .hour, value: 1, to: last) ?? last
+        // 每日凌晨主动重取：保证系统每天唤醒一次拉最新一天的时间线，
+        // 而不是等 3 天以上的长周期 Timeline 到期。
+        let nextMidnight = calendar.date(byAdding: .day, value: 1,
+                                         to: calendar.startOfDay(for: now)) ?? last
+        // 不早于最后一个条目，避免系统提前重载造成无效刷新循环。
+        let earliest = last.addingTimeInterval(60)
+        let reload = max(nextMidnight, earliest)
         completion(Timeline(entries: entries, policy: .after(reload)))
     }
 }

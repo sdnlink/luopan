@@ -4,10 +4,12 @@ import SwiftUI
 
 public struct XuanKongGridView: View {
     public var isActive: Bool = true
+    /// 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门。
+    /// 由根视图持有，使小组件深链可以直接落到「八宅三合」里的日课卡。
+    @Binding public var selectedSubTab: Int
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
-    @State private var selectedSubTab: Int = 0 // 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门
     @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     @State private var useTiGua: Bool = false
     // 手动替卦锁定：nil=跟随传感器 isJianXiang；非 nil=用户手动指定，传感器不再覆盖。
@@ -47,8 +49,9 @@ public struct XuanKongGridView: View {
         isLargeLayout && !isSplitLayout
     }
     
-    public init(isActive: Bool = true) {
+    public init(isActive: Bool = true, selectedSubTab: Binding<Int> = .constant(0)) {
         self.isActive = isActive
+        self._selectedSubTab = selectedSubTab
     }
     
     public var body: some View {

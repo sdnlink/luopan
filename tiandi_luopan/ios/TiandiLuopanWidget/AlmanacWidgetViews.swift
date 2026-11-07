@@ -153,7 +153,10 @@ enum WidgetText {
     }
 }
 
-// MARK: - 背景：iOS 17 用 containerBackground，锁屏 accessory 交给系统渲染
+// MARK: - 背景与边距：iOS 17 引入系统 widgetContentMargins（约 16pt），
+// 若视图内部再叠加 .padding(12)，小尺寸可用区会被压到约 100pt。
+// 这里按系统版本收敛内边距，避免在 WidgetConfiguration 上调用
+// iOS 17 才有的 .contentMarginsDisabled()（部署目标 16.0，opaque 返回类型受限）。
 
 private struct WidgetBackground: ViewModifier {
     let isAccessory: Bool
@@ -168,6 +171,23 @@ private struct WidgetBackground: ViewModifier {
             content.containerBackground(for: .widget) { Palette.background }
         } else {
             content.background(Palette.background)
+        }
+    }
+}
+
+/// 主屏尺寸的内容留白：iOS 17 起系统已提供 contentMargins，内部只留极小间距。
+/// 锁屏 accessory 由系统控制排版，绝不能叠加内边距（圆形直径仅 40~48pt）。
+private struct ContentInset: ViewModifier {
+    let isAccessory: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isAccessory {
+            content
+        } else if #available(iOS 17.0, *) {
+            content.padding(2)
+        } else {
+            content.padding(12)
         }
     }
 }
@@ -204,6 +224,7 @@ struct AlmanacWidgetRootView: View {
                 SmallView(s: entry.snapshot)
             }
         }
+        .modifier(ContentInset(isAccessory: isAccessory))
         .modifier(WidgetBackground(isAccessory: isAccessory))
         .widgetURL(URL(string: "tiandiluopan://almanac"))
     }
@@ -226,23 +247,20 @@ private struct InlineView: View {
 private struct CircularView: View {
     let s: WidgetAlmanacSnapshot
     var body: some View {
-        ZStack {
-            Circle().stroke(Color.primary.opacity(0.22), lineWidth: 6)
-            Circle()
-                .trim(from: 0, to: max(0.02, min(1.0, s.termProgress)))
-                .stroke(Color.primary, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            VStack(spacing: 0) {
-                Text(s.termName)
-                    .font(.system(size: 11, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text("\(Int(s.termProgress * 100))%")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
+        // 系统 Gauge 会按锁屏 vibrancy 与可用直径自动排布，
+        // 避免自绘圆环内塞两行长文本（英文节气名可达 20 字符）被强截。
+        Gauge(value: min(1.0, max(0.0, s.termProgress)), in: 0...1) {
+            Text(s.termShortName)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+        } currentValueLabel: {
+            Text("\(Int(s.termProgress * 100))")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
-        .padding(6)
+        .gaugeStyle(.accessoryCircular)
+        .accessibilityLabel("\(s.termName) \(Int(s.termProgress * 100))%")
     }
 }
 
@@ -282,51 +300,77 @@ private struct RectangularView: View {
     }
 }
 
-// MARK: - 小尺寸：节气进度环
+// MARK: - 小尺寸：今日日课（宜/忌 + 节气进度环）
+// 组件对外名称是「今日日课」，最常用的 Small 必须能看到宜忌，
+// 否则用户冲着日课添加却只看到节气环。
 
 private struct SmallView: View {
     let s: WidgetAlmanacSnapshot
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 3) {
             HStack(spacing: 4) {
-                Text(WidgetText.term.string())
-                    .font(.system(size: 10, weight: .medium))
+                Text(WidgetText.dayCourse.string())
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(Palette.dim)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 Text(s.localizedDayPillar)
                     .font(.system(size: 10, weight: .bold, design: .serif))
                     .foregroundColor(Palette.gold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             ZStack {
-                Circle().stroke(Palette.gold.opacity(0.18), lineWidth: 9)
+                Circle().stroke(Palette.gold.opacity(0.18), lineWidth: 6)
                 Circle()
                     .trim(from: 0, to: max(0.02, min(1.0, s.termProgress)))
-                    .stroke(Palette.gold, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                    .stroke(Palette.gold, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                VStack(spacing: 1) {
-                    Text(s.termName)
-                        .font(.system(size: 16, weight: .bold, design: .serif))
+                VStack(spacing: 0) {
+                    Text(s.termShortName)
+                        .font(.system(size: 12, weight: .bold, design: .serif))
                         .foregroundColor(Palette.yellow)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     Text("\(Int(s.termProgress * 100))%")
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundColor(Palette.dim)
                 }
             }
             .frame(maxHeight: .infinity)
-            Text("\(WidgetText.dayOfficer.string()) \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(Palette.cyan)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(String(format: WidgetText.daysToNext.string(), s.daysToNextTerm))
-                .font(.system(size: 9))
-                .foregroundColor(Palette.dim)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+
+            // 核心宜 / 忌各取首项，两列并排，契合「今日日课」的命名预期。
+            HStack(spacing: 4) {
+                Text("\(WidgetText.yi.string()) \(s.yiActivities.first ?? "-")")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(Palette.yellow)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("\(WidgetText.ji.string()) \(s.jiActivities.first ?? "-")")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(Palette.red)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // 通用日课标注：小尺寸含宜忌，必须一并说明「未含坐山冲克」。
+            HStack(spacing: 3) {
+                if s.isGeneralDay {
+                    Text(WidgetText.generalShort.string())
+                        .font(.system(size: 8))
+                        .foregroundColor(Palette.dim)
+                }
+                Spacer(minLength: 0)
+                Text("\(WidgetText.dayOfficer.string()) \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
+                    .font(.system(size: 8))
+                    .foregroundColor(Palette.cyan)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
         }
-        .padding(12)
     }
 }
 
@@ -387,7 +431,6 @@ private struct MediumView: View {
             }
             .frame(width: 100)
         }
-        .padding(12)
     }
 }
 
@@ -482,7 +525,6 @@ private struct LargeView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(12)
     }
 }
 

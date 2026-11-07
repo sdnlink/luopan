@@ -317,6 +317,8 @@ private struct SmallView: View {
                 Text(WidgetText.dayOfficerName(at: s.dayOfficerIndex))
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(Palette.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1.5)
                     .background(Palette.cyan.opacity(0.16))
@@ -395,6 +397,8 @@ private struct MediumView: View {
                     Text(WidgetText.dayOfficerName(at: s.dayOfficerIndex))
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Palette.cyan)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Palette.cyan.opacity(0.16))
@@ -451,6 +455,7 @@ private struct MediumView: View {
                             .font(.system(size: 12, weight: .bold, design: .serif))
                             .foregroundColor(Palette.yellow)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.65)
                         Text("\(Int(s.termProgress * 100))%")
                             .font(.system(size: 9, weight: .medium, design: .monospaced))
                             .foregroundColor(Palette.dim)
@@ -519,6 +524,8 @@ private struct LargeView: View {
                     Text(WidgetText.dayOfficerName(at: s.dayOfficerIndex))
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Palette.cyan)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Palette.cyan.opacity(0.16))
@@ -528,7 +535,7 @@ private struct LargeView: View {
                 Spacer(minLength: 8)
 
                 HStack(spacing: 4) {
-                    ForEach(pillarCapsules, id: \.self) { pillar in
+                    ForEach(Array(pillarCapsules.enumerated()), id: \.offset) { _, pillar in
                         Text(pillar)
                             .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundColor(Palette.dim)
@@ -593,6 +600,7 @@ private struct LargeView: View {
                                 .font(.system(size: 13, weight: .bold, design: .serif))
                                 .foregroundColor(Palette.yellow)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.65)
                             Text("\(Int(s.termProgress * 100))%")
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundColor(Palette.dim)

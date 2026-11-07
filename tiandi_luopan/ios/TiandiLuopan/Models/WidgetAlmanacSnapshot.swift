@@ -30,6 +30,11 @@ public struct WidgetAlmanacSnapshot {
     public let yearStarName: String
     public let monthStarName: String
 
+    /// 建除十二神值日索引 0...11（建除满平定执破危成收开闭）。
+    /// 纯历法标注，按「月建地支 + 日支相对位置」推算，每日变化，
+    /// 不附加任何吉凶判断，也不改动主 App 的择日结论。
+    public let dayOfficerIndex: Int
+
     /// 小组件使用「通用日课」：不含坐山冲克判定。
     /// 所有展示宜忌的尺寸都必须显示此说明，避免把结果误读为某一宅的坐向结论。
     public let isGeneralDay: Bool
@@ -40,6 +45,22 @@ public enum WidgetAlmanacBuilder {
     /// 一个节气桶为太阳视黄经 15°，按引擎采用的平均视运动 0.98564736°/天换算。
     /// 与 SolarTimeCalculator.solarTermProgress(for:) 的分母保持一致。
     private static let termLengthDays: Double = 15.0 / 0.98564736
+
+    private static let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+
+    /// 建除十二神值日（传统历法标注，非吉凶判断）。
+    /// 规则：以节气月建地支为「建」起点，日支依次顺行
+    /// 建→除→满→平→定→执→破→危→成→收→开→闭，12 日一循环。
+    /// 月建口径与 ZeRiEngine 一致（小寒大寒仍属丑月，立春起寅月）。
+    /// 简化：传统通书在节气交接当日会「重复」前一日值神，此处按自然日顺行，
+    /// 因此仅作历法参考标注，不用于任何择日或吉凶判断。
+    private static func resolveDayOfficerIndex(for date: Date, dayPillar: String) -> Int {
+        let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
+        let monthBranchIdx = termIndex < 2 ? 1 : (2 + (termIndex - 2) / 2) % 12
+        let dayBranch = String(dayPillar.suffix(1))
+        guard let dayBranchIdx = branches.firstIndex(of: dayBranch) else { return 0 }
+        return (dayBranchIdx - monthBranchIdx + 12) % 12
+    }
 
     /// 为指定时刻生成快照。所有输入都来自 Date，不依赖主 App 运行状态。
     public static func make(for date: Date = Date()) -> WidgetAlmanacSnapshot {
@@ -73,6 +94,7 @@ public enum WidgetAlmanacBuilder {
             monthCentralStar: purple.monthCentralStar,
             yearStarName: starEngine.starName(for: purple.yearCentralStar),
             monthStarName: starEngine.starName(for: purple.monthCentralStar),
+            dayOfficerIndex: resolveDayOfficerIndex(for: date, dayPillar: dayCourse.dayPillar),
             isGeneralDay: true
         )
     }

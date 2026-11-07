@@ -18,7 +18,27 @@ private enum Palette {
 // 语言与各引擎共用 LocalizationManager.effectiveLanguage，避免混语与地区映射差异。
 
 enum WidgetText {
-    case yi, ji, term, yearStar, monthStar, daysToNext, generalNote, generalShort, dayCourse
+    case yi, ji, term, yearStar, monthStar, daysToNext, generalNote, generalShort, dayCourse, dayOfficer
+
+    /// 建除十二神值日名称（传统历法标注，非吉凶判断）。
+    /// 汉字文化圈沿用原字，其它语种给出对应通行译名。
+    static func dayOfficerName(at index: Int) -> String {
+        let clamped = min(11, max(0, index))
+        switch lang {
+        case .zhHans, .zhHant, .ja:
+            return ["建", "除", "满", "平", "定", "执", "破", "危", "成", "收", "开", "闭"][clamped]
+        case .ko:
+            return ["건", "제", "만", "평", "정", "집", "파", "위", "성", "수", "개", "폐"][clamped]
+        case .vi:
+            return ["Kiến", "Trừ", "Mãn", "Bình", "Định", "Chấp", "Phá", "Nguy", "Thành", "Thu", "Khai", "Bế"][clamped]
+        case .th:
+            return ["สร้าง", "ขจัด", "เต็ม", "ราบ", "ตั้ง", "ถือ", "ทำลาย", "อันตราย", "สำเร็จ", "เก็บ", "เปิด", "ปิด"][clamped]
+        case .id:
+            return ["Bangun", "Hapus", "Penuh", "Rata", "Tetap", "Pegang", "Rusak", "Bahaya", "Jadi", "Kumpul", "Buka", "Tutup"][clamped]
+        case .en:
+            return ["Establish", "Remove", "Full", "Level", "Settle", "Hold", "Break", "Risk", "Complete", "Gather", "Open", "Close"][clamped]
+        }
+    }
 
     private enum Lang: String {
         case zhHans, zhHant, en, th, vi, id, ja, ko
@@ -120,6 +140,15 @@ enum WidgetText {
         case (.dayCourse, .vi): return "Nhật khóa hôm nay"
         case (.dayCourse, .th): return "ฤกษ์วันนี้"
         case (.dayCourse, .id): return "Almanak Hari Ini"
+
+        case (.dayOfficer, .zhHans): return "值日"
+        case (.dayOfficer, .zhHant): return "值日"
+        case (.dayOfficer, .en): return "Day Officer"
+        case (.dayOfficer, .ja): return "十二直"
+        case (.dayOfficer, .ko): return "십이직"
+        case (.dayOfficer, .vi): return "Trực ngày"
+        case (.dayOfficer, .th): return "ประจำวัน"
+        case (.dayOfficer, .id): return "Harian"
         }
     }
 }
@@ -186,7 +215,7 @@ private struct InlineView: View {
     let s: WidgetAlmanacSnapshot
     var body: some View {
         // accessoryInline 只接受单行文字，直接给最短可用文案，避免被系统截断。
-        Text("\(s.termName) · \(WidgetText.generalShort.string()) · \(s.localizedDayPillar)")
+        Text("\(s.termName) · \(s.localizedDayPillar) · \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
             .lineLimit(1)
             .minimumScaleFactor(0.7)
     }
@@ -228,6 +257,9 @@ private struct RectangularView: View {
                     .font(.system(size: 13, weight: .bold))
                 Text(s.termName)
                     .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(WidgetText.dayOfficerName(at: s.dayOfficerIndex))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                 if s.isGeneralDay {
                     Text(WidgetText.generalShort.string())
@@ -283,9 +315,14 @@ private struct SmallView: View {
                 }
             }
             .frame(maxHeight: .infinity)
+            Text("\(WidgetText.dayOfficer.string()) \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(Palette.cyan)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(String(format: WidgetText.daysToNext.string(), s.daysToNextTerm))
                 .font(.system(size: 9))
-                .foregroundColor(Palette.cyan)
+                .foregroundColor(Palette.dim)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -315,6 +352,11 @@ private struct MediumView: View {
                 Text(s.localizedDayPillar)
                     .font(.system(size: 22, weight: .bold, design: .serif))
                     .foregroundColor(Palette.gold)
+                Text("\(WidgetText.dayOfficer.string()) \(WidgetText.dayOfficerName(at: s.dayOfficerIndex))")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Palette.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 VStack(alignment: .leading, spacing: 3) {
                     LabelLine(title: WidgetText.yi.string(), value: joined(s.yiActivities), color: Palette.yellow)
@@ -364,6 +406,17 @@ private struct LargeView: View {
                         .font(.system(size: 26, weight: .bold, design: .serif))
                         .foregroundColor(Palette.gold)
                 }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(WidgetText.dayOfficer.string())
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(Palette.dim)
+                    Text(WidgetText.dayOfficerName(at: s.dayOfficerIndex))
+                        .font(.system(size: 15, weight: .bold, design: .serif))
+                        .foregroundColor(Palette.cyan)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                .padding(.leading, 10)
                 Spacer()
                 Text(s.fourPillarsText)
                     .font(.system(size: 11, design: .monospaced))

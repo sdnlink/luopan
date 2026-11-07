@@ -90,7 +90,13 @@ public class LocalizationManager: ObservableObject {
         let setting = AppLanguage(rawValue: saved) ?? .auto
         self.currentSetting = setting
         self.effectiveLanguage = LocalizationManager.resolveLanguage(for: setting)
+        // Widget Extension 进程内存上限很低，启动时遍历 8 张全量表做完备性校验
+        // 会制造不必要的瞬时峰值。校验用于开发期抓漏译，只在主 App 运行。
+        #if WIDGET_EXTENSION
+        self.isTranslationTableValid = true
+        #else
         self.isTranslationTableValid = validateTranslationTables()
+        #endif
     }
     
     /// 启动加载时执行非致命的“重复 key 与全语种并集 key 完备性校验”（避免单条翻译疏漏导致 Debug/TestFlight 崩溃，同时可捕获 zhHans 自身笔误）

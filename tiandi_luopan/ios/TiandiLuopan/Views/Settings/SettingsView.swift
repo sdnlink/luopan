@@ -10,6 +10,8 @@ public enum LegalLinks {
     public static let termsOfUse = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-support/")!
     public static let privacyPolicy = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-privacy/")!
     public static let subscriptionInfo = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-subscription/")!
+    /// 正式上架后分配的 App Store 数字 ID（配置后点击评分直接直达 App Store 撰写长评页面）
+    public static let appStoreID: String = ""
 }
 
 private enum LegalDocument: String, Identifiable {
@@ -53,6 +55,7 @@ public struct SettingsView: View {
     @State private var paymentError: String = ""
     @State private var paymentAlertIsError: Bool = true
     @State private var showPaymentError: Bool = false
+    @State private var showTestFlightRateTip: Bool = false
     @State private var legalDocument: LegalDocument?
 
     private static let appearanceConfigured: Void = {
@@ -221,7 +224,7 @@ public struct SettingsView: View {
                     }
                     
                     Button(action: {
-                        retention.requestImmediateReview()
+                        handleRateAppTap()
                     }) {
                         HStack {
                             Label(rateAppTitle(), systemImage: "star.bubble.fill")
@@ -463,6 +466,16 @@ public struct SettingsView: View {
                         onConfirm: { showPaymentError = false },
                         onCancel: { showPaymentError = false }
                     )
+                } else if showTestFlightRateTip {
+                    FloorplanConfirmDialog(
+                        title: testFlightRateAlertTitle(),
+                        message: testFlightRateAlertMessage(),
+                        confirmTitle: lang.t("done"),
+                        cancelTitle: nil,
+                        confirmColor: Color(red: 0.83, green: 0.68, blue: 0.21),
+                        onConfirm: { showTestFlightRateTip = false },
+                        onCancel: { showTestFlightRateTip = false }
+                    )
                 }
             }
         )
@@ -655,6 +668,54 @@ public struct SettingsView: View {
         case .th: return "ให้คะแนนแอป"
         case .id: return "Beri Nilai Aplikasi"
         default: return "为「天机演象」评分鼓励"
+        }
+    }
+
+    private func handleRateAppTap() {
+        if !LegalLinks.appStoreID.isEmpty,
+           let url = URL(string: "https://apps.apple.com/app/id\(LegalLinks.appStoreID)?action=write-review"),
+           UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            return
+        }
+
+        if RetentionServiceManager.isTestFlightOrDebug {
+            showTestFlightRateTip = true
+        }
+        retention.requestImmediateReview()
+    }
+
+    private func testFlightRateAlertTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "TestFlight Beta Notice"
+        case .zhHant: return "TestFlight 測試版提示"
+        case .ja: return "TestFlight ベータ版のご案内"
+        case .ko: return "TestFlight 베타 안내"
+        case .vi: return "Thông Báo TestFlight Beta"
+        case .th: return "ข้อความแจ้งเตือน TestFlight"
+        case .id: return "Pemberitahuan Beta TestFlight"
+        case .auto, .zhHans: return "TestFlight 测试版提示"
+        }
+    }
+
+    private func testFlightRateAlertMessage() -> String {
+        switch lang.effectiveLanguage {
+        case .en:
+            return "You are currently running a TestFlight beta build. Under Apple's rules, the 'Submit' button in rating dialogs is disabled in TestFlight and sandbox environments. Reviews will be fully active once released on the App Store! To submit feedback now, please use the 'Send Beta Feedback' option in the TestFlight app."
+        case .zhHant:
+            return "當前處於 TestFlight 測試環境。依蘋果官方規則，測試版應用評分彈窗中的「提交」按鈕會被系統強制置灰，無法向 App Store 提交公開評分。正式上架後將全面開放評價！您可在 TestFlight 中點擊「發送反饋」向我們提出建議。"
+        case .ja:
+            return "現在 TestFlight ベータテスト環境をご利用中です。Apple の仕様により、テスト版では評価ダイアログの「送信」ボタンが無効化されており、App Store に公開評価を投稿することはできません。正式リリース後に評価が可能となります。ご意見は TestFlight の「フィードバックを送信」よりお寄せください。"
+        case .ko:
+            return "현재 TestFlight 베타 환경입니다. Apple의 정책에 따라 테스트 버전에서는 평가 팝업의 '제출' 버튼이 비활성화되어 App Store에 공개 평가를 등록할 수 없습니다. 정식 출시 후 평가가 가능하며, 의견은 TestFlight 앱의 '피드백 보내기'를 이용해 주시기 바랍니다."
+        case .vi:
+            return "Bạn đang sử dụng phiên bản thử nghiệm TestFlight. Theo quy định của Apple, nút 'Gửi' trong hộp thoại đánh giá sẽ bị vô hiệu hóa trong môi trường thử nghiệm. Đánh giá sẽ hoạt động bình thường sau khi phát hành chính thức! Bạn có thể gửi ý kiến qua mục 'Gửi phản hồi Beta' trong ứng dụng TestFlight."
+        case .th:
+            return "ขณะนี้คุณกำลังใช้งานเวอร์ชันทดสอบ TestFlight ตามนโยบายของ Apple ปุ่ม 'ส่ง' ในหน้าต่างให้คะแนนจะถูกปิดใช้งานในเวอร์ชันทดสอบ เมื่อเปิดตัวอย่างเป็นทางการจะสามารถส่งคะแนนได้ตามปกติ หากมีข้อเสนอแนะโปรดใช้ตัวเลือก 'ส่งความคิดเห็น' ในแอป TestFlight"
+        case .id:
+            return "Anda saat ini menggunakan versi beta TestFlight. Berdasarkan kebijakan Apple, tombol 'Kirim' dinonaktifkan pada versi beta. Ulasan akan dibuka penuh setelah rilis resmi di App Store. Untuk memberikan saran, silakan gunakan 'Kirim Masukan' di aplikasi TestFlight."
+        case .auto, .zhHans:
+            return "当前处于 TestFlight 测试环境。按苹果官方规则，测试版应用弹出的评分弹窗中「提交」按钮会被系统强制置灰，无法向 App Store 提交公开评分。正式上架后将全面开放评价！您可在 TestFlight 中点击「发送反馈」向我们提出宝贵建议。"
         }
     }
 }

@@ -1200,6 +1200,16 @@ public final class RetentionServiceManager: ObservableObject {
         return false
     }
 
+    /// 当前是否运行于 TestFlight 测试分发或 Xcode 本地调试沙盒环境
+    public static var isTestFlightOrDebug: Bool {
+        #if DEBUG
+        return true
+        #else
+        guard let url = Bundle.main.appStoreReceiptURL else { return false }
+        return url.lastPathComponent == "sandboxReceipt"
+        #endif
+    }
+
     /// 记录用户核心正向行为（锁盘、保存户型档案、导出天机长卷等），达到阈值且距上次弹窗超过 14 天时请求系统级评分
     public func recordMilestone(reason: String) {
         guard !Self.isRunningAutomatedTests else { return }

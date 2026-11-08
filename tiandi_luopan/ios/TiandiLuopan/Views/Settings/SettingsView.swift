@@ -45,7 +45,10 @@ public struct SettingsView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @ObservedObject var kuaProfile = UserKuaProfileManager.shared
+    @ObservedObject var retention = RetentionServiceManager.shared
     @State private var showCalibrationGuide: Bool = false
+    @State private var showOnboardingGuide: Bool = false
     @State private var selectedProductId: String = IAPProductID.vipYearly.rawValue
     @State private var paymentError: String = ""
     @State private var paymentAlertIsError: Bool = true
@@ -164,6 +167,71 @@ public struct SettingsView: View {
                     privilegeRow(icon: "house.fill", title: lang.t("privilege_floorplan_title"))
                     privilegeRow(icon: "scroll.fill", title: lang.t("privilege_tianji_title"))
                     privilegeRow(icon: "camera.viewfinder", title: lang.t("ar_title"))
+                }
+                
+                // 2.5 宅主本命卦档案与节气吉日提醒
+                Section(header: Text(profileAndReminderSectionTitle())) {
+                    Toggle(ownerProfileEnableTitle(), isOn: $kuaProfile.isProfileEnabled)
+                    
+                    if kuaProfile.isProfileEnabled {
+                        HStack {
+                            Text(ownerBirthYearTitle())
+                            Spacer()
+                            Menu {
+                                ForEach((1930...2026).reversed(), id: \.self) { yr in
+                                    Button("\(yr)") {
+                                        kuaProfile.birthYear = yr
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text("\(kuaProfile.birthYear) · \(kuaProfile.localizedZodiac(language: lang.effectiveLanguage)) · \(kuaProfile.localizedLifeKuaName(language: lang.effectiveLanguage))")
+                                        .adaptiveFont(size: 12, weight: .bold)
+                                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .adaptiveFont(size: 10)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                        
+                        Picker(ownerGenderTitle(), selection: $kuaProfile.isMale) {
+                            Text(maleLabel()).tag(true)
+                            Text(femaleLabel()).tag(false)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                    }
+                    
+                    Toggle(solarTermNotifyTitle(), isOn: Binding(
+                        get: { retention.solarTermNotificationsEnabled },
+                        set: { retention.setSolarTermNotifications(enabled: $0) }
+                    ))
+                    
+                    Button(action: {
+                        showOnboardingGuide = true
+                    }) {
+                        HStack {
+                            Label(onboardingReplayTitle(), systemImage: "book.pages.fill")
+                                .foregroundColor(Color.yanCyan)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .adaptiveFont(size: 11)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Button(action: {
+                        retention.requestImmediateReview()
+                    }) {
+                        HStack {
+                            Label(rateAppTitle(), systemImage: "star.bubble.fill")
+                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .adaptiveFont(size: 11)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 
                 // 3. 专业罗盘与偏好设置
@@ -345,6 +413,9 @@ public struct SettingsView: View {
             .sheet(isPresented: $showCalibrationGuide) {
                 CalibrationSheet(keepsMotionActive: true)
             }
+            .sheet(isPresented: $showOnboardingGuide) {
+                OnboardingGuideSheet()
+            }
             .sheet(item: $legalDocument) { document in
                 LegalDocumentSheet(
                     title: lang.t(document.titleKey),
@@ -463,6 +534,127 @@ public struct SettingsView: View {
             Text(lang.t("vip_short"))
                 .adaptiveFont(size: 9, weight: .bold)
                 .foregroundColor(.yellow)
+        }
+    }
+    
+    private func profileAndReminderSectionTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "宅主命卦与节气提醒"
+        case .zhHant: return "宅主命卦與節氣提醒"
+        case .en: return "Owner Life Gua & Solar Term Alerts"
+        case .ja: return "家主本命卦と節気リマインダー"
+        case .ko: return "건축주 본명괘 및 절기 알림"
+        case .vi: return "Bản Mệnh Trạch Chủ & Nhắc Tiết Khí"
+        case .th: return "รหัสชีวิตเจ้าของบ้านและการแจ้งเตือนสารท"
+        case .id: return "Gua Pemilik & Pengingat Musim"
+        default: return "宅主命卦与节气提醒"
+        }
+    }
+    
+    private func ownerProfileEnableTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "启用宅主本命卦人宅配卦"
+        case .zhHant: return "啟用宅主本命卦人宅配卦"
+        case .en: return "Enable Owner Life Gua Matching"
+        case .ja: return "家主本命卦マッチングを有効化"
+        case .ko: return "본명괘 매칭 활성화"
+        case .vi: return "Bật Phối Quẻ Trạch Chủ"
+        case .th: return "เปิดใช้การจับคู่รหัสชีวิต"
+        case .id: return "Aktifkan Pencocokan Gua Pemilik"
+        default: return "启用宅主本命卦人宅配卦"
+        }
+    }
+    
+    private func ownerBirthYearTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "出生年份与本命卦"
+        case .zhHant: return "出生年份與本命卦"
+        case .en: return "Birth Year & Life Gua"
+        case .ja: return "生年と本命卦"
+        case .ko: return "출생연도 및 본명괘"
+        case .vi: return "Năm Sinh & Bản Mệnh Quái"
+        case .th: return "ปีเกิดและรหัสชีวิต"
+        case .id: return "Tahun Lahir & Gua"
+        default: return "出生年份与本命卦"
+        }
+    }
+    
+    private func ownerGenderTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "性别"
+        case .zhHant, .ja: return "性別"
+        case .en: return "Gender"
+        case .ko: return "성별"
+        case .vi: return "Giới tính"
+        case .th: return "เพศ"
+        case .id: return "Jenis Kelamin"
+        default: return "性别"
+        }
+    }
+    
+    private func maleLabel() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans, .zhHant, .ja: return "乾造 (男)"
+        case .en: return "Male"
+        case .ko: return "남성"
+        case .vi: return "Nam"
+        case .th: return "ชาย"
+        case .id: return "Pria"
+        default: return "乾造 (男)"
+        }
+    }
+    
+    private func femaleLabel() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans, .zhHant, .ja: return "坤造 (女)"
+        case .en: return "Female"
+        case .ko: return "여성"
+        case .vi: return "Nữ"
+        case .th: return "หญิง"
+        case .id: return "Wanita"
+        default: return "坤造 (女)"
+        }
+    }
+    
+    private func solarTermNotifyTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "二十四节气交节与九星换月提醒"
+        case .zhHant: return "二十四節氣交節與九星換月提醒"
+        case .en: return "Solar Term & Monthly Star Alerts"
+        case .ja: return "二十四節気・月盤切替通知"
+        case .ko: return "24절기 및 월반 교체 알림"
+        case .vi: return "Nhắc Giao Tiết & Đổi Sao Tháng"
+        case .th: return "แจ้งเตือนวันเปลี่ยนสารทและดาวประจำเดือน"
+        case .id: return "Pengingat Pergantian Musim & Bintang"
+        default: return "二十四节气交节与九星换月提醒"
+        }
+    }
+    
+    private func onboardingReplayTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "新手 3 步快速立向教学指南"
+        case .zhHant: return "新手 3 步快速立向教學指南"
+        case .en: return "3-Step Quick Compass Guide"
+        case .ja: return "3ステップ立向クイックガイド"
+        case .ko: return "3단계 나침반 빠른 가이드"
+        case .vi: return "Hướng Dẫn Lập Hướng 3 Bước"
+        case .th: return "คู่มือการวัดทิศ 3 ขั้นตอน"
+        case .id: return "Panduan Cepat 3 Langkah"
+        default: return "新手 3 步快速立向教学指南"
+        }
+    }
+    
+    private func rateAppTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "为「天机演象」评分鼓励"
+        case .zhHant: return "為「天機演象」評分鼓勵"
+        case .en: return "Rate Tiandi Luopan"
+        case .ja: return "アプリを評価して応援する"
+        case .ko: return "앱 평가하기"
+        case .vi: return "Đánh Giá Ứng Dụng"
+        case .th: return "ให้คะแนนแอป"
+        case .id: return "Beri Nilai Aplikasi"
+        default: return "为「天机演象」评分鼓励"
         }
     }
 }

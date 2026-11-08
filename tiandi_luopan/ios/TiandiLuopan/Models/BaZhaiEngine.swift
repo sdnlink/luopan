@@ -1,4 +1,9 @@
 import Foundation
+import SwiftUI
+import UIKit
+import StoreKit
+import UserNotifications
+import Photos
 
 // MARK: - 八宅风水与大游年九星吉凶模型 (BaZhai Engine)
 
@@ -436,5 +441,1368 @@ public final class BaZhaiEngine {
             "兑": ["乾": .shengQi, "艮": .yanNian, "坤": .tianYi, "震": .jueMing, "离": .wuGui, "巽": .liuSha, "坎": .huoHai]
         ]
         return pairs[base]?[target] ?? .fuWei
+    }
+}
+
+extension StarLuckType {
+    /// 顶置白话吉凶速断（面向大众用户的一句话通俗宜忌）
+    public var plainLanguageSummary: String {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en:
+            switch self {
+            case .shengQi: return "✅ Top Wealth & Vitality Spot: Best for main door, master bedroom, or work desk."
+            case .yanNian: return "✅ Harmony & Relationship Spot: Ideal for master bedroom and family living room."
+            case .tianYi:  return "✅ Health & Benefactor Spot: Great for beds, elders' room, and clean kitchen."
+            case .fuWei:   return "✅ Study & Calm Spot: Best for study desk, reading corner, or children's room."
+            case .jueMing: return "⚠️ Major Taboo Spot: Avoid sleeping or working here long-term; use as bathroom/storage."
+            case .wuGui:   return "⚠️ Dispute & Fire Taboo: Keep calm and tidy; avoid red decor or drilling here."
+            case .liuSha:  return "⚠️ Restless Energy Spot: Better for storage cabinets; avoid master bed or study."
+            case .huoHai:  return "⚠️ Minor Drain Spot: Keep quiet with earth/ceramic decor; avoid heavy renovation."
+            }
+        case .zhHant:
+            switch self {
+            case .shengQi: return "✅ 【白話速斷 · 第一大吉位】最旺財運與事業晉升，首選設為大門、主臥或辦公桌。"
+            case .yanNian: return "✅ 【白話速斷 · 感情貴人位】最利夫妻和睦與人際長壽，極宜設為主臥或客廳沙發。"
+            case .tianYi:  return "✅ 【白話速斷 · 健康祛病位】利睡眠養生與貴人扶持，宜安床、長輩房或整潔廚房。"
+            case .fuWei:   return "✅ 【白話速斷 · 文昌安穩位】氣場平和利讀書思考，宜設書房、書桌或兒童房。"
+            case .jueMing: return "⚠️ 【白話速斷 · 凶位避忌】不宜久睡久坐，建議作衛生間或儲物間以「凶位壓凶」。"
+            case .wuGui:   return "⚠️ 【白話速斷 · 防是非火險】忌大紅大紫與動土鑽牆，宜保持整潔或放黑曜石/靜水化氣。"
+            case .liuSha:  return "⚠️ 【白話速斷 · 防爛桃花口舌】不宜作主臥或書房，建議設儲物櫃並保持乾爽。"
+            case .huoHai:  return "⚠️ 【白話速斷 · 防小人破耗】宜靜不宜動，可擺陶瓷器物穩固氣場。"
+            }
+        case .ja:
+            switch self {
+            case .shengQi: return "✅ 【要点】財運・昇進の第一吉方位。玄関・主寝室・デスクに最適。"
+            case .yanNian: return "✅ 【要点】夫婦円満・対人運の吉方位。主寝室やリビングに好適。"
+            case .tianYi:  return "✅ 【要点】健康・厄除けの吉方位。ベッド配置や年長者の部屋に吉。"
+            case .fuWei:   return "✅ 【要点】学業・安定の吉方位。書斎・学習机・子供部屋に好適。"
+            case .jueMing: return "⚠️ 【注意】長時間過ごす寝室や書斎は避け、浴室や収納に充てると吉。"
+            case .wuGui:   return "⚠️ 【注意】口論・火気に注意。赤色や工事を避け、静かに保つこと。"
+            case .liuSha:  return "⚠️ 【注意】感情の乱れに注意。収納棚として使い、寝室は避ける。"
+            case .huoHai:  return "⚠️ 【注意】出費・小人に注意。陶器の置物で気を安定させると良い。"
+            }
+        case .ko:
+            switch self {
+            case .shengQi: return "✅ [핵심 요약] 재물·승진 최고 길방. 대문·안방·책상 배치에 최적."
+            case .yanNian: return "✅ [핵심 요약] 부부 화목·인간관계 길방. 안방이나 거실 소파에 적합."
+            case .tianYi:  return "✅ [핵심 요약] 건강·귀인 길방. 침대 배치나 어르신 방에 길함."
+            case .fuWei:   return "✅ [핵심 요약] 학업·안정 길방. 서재·공부방·아이방으로 적합."
+            case .jueMing: return "⚠️ [주의] 침실·서재는 피하고 화장실이나 창고로 눌러주면 무난합니다."
+            case .wuGui:   return "⚠️ [주의] 구설·화기 주의. 붉은색과 공사를 피하고 정갈히 유지하세요."
+            case .liuSha:  return "⚠️ [주의] 감정 소모 주의. 수납장으로 활용하고 안방 배치는 피하세요."
+            case .huoHai:  return "⚠️ [주의] 금전 손실 주의. 도자기 소품으로 기운을 안정시키세요."
+            }
+        case .vi:
+            switch self {
+            case .shengQi: return "✅ [Tóm tắt] Cung Đại Cát vượng tài lộc: Rất hợp đặt cửa chính, phòng ngủ chính, bàn làm việc."
+            case .yanNian: return "✅ [Tóm tắt] Cung Hòa Hợp & Quý Nhân: Tốt cho phòng ngủ vợ chồng và phòng khách."
+            case .tianYi:  return "✅ [Tóm tắt] Cung Sức Khỏe: Hợp kê giường ngủ, phòng người lớn tuổi."
+            case .fuWei:   return "✅ [Tóm tắt] Cung Văn Xương: Hợp làm phòng đọc sách, bàn học."
+            case .jueMing: return "⚠️ [Lưu ý] Tránh đặt giường ngủ/bàn làm việc; nên dùng làm phòng tắm hoặc kho."
+            case .wuGui:   return "⚠️ [Lưu ý] Phòng thị phi; tránh màu đỏ rực và khoan đục tại đây."
+            case .liuSha:  return "⚠️ [Lưu ý] Nên đặt tủ chứa đồ gọn gàng, tránh làm phòng ngủ chính."
+            case .huoHai:  return "⚠️ [Lưu ý] Nên giữ tĩnh, đặt đồ gốm sứ để ổn định khí trường."
+            }
+        case .th:
+            switch self {
+            case .shengQi: return "✅ [สรุปเข้าใจง่าย] ทิศมงคลสูงสุดด้านโชคลาภ: เหมาะตั้งประตูหลัก ห้องนอนใหญ่ หรือโต๊ะทำงาน"
+            case .yanNian: return "✅ [สรุปเข้าใจง่าย] ทิศความรักและครอบครัว: เหมาะกับห้องนอนใหญ่และห้องนั่งเล่น"
+            case .tianYi:  return "✅ [สรุปเข้าใจง่าย] ทิศสุขภาพและผู้อุปถัมภ์: เหมาะตั้งเตียงนอนและห้องผู้สูงอายุ"
+            case .fuWei:   return "✅ [สรุปเข้าใจง่าย] ทิศการเรียนและสมาธิ: เหมาะตั้งโต๊ะหนังสือและห้องเด็ก"
+            case .jueMing: return "⚠️ [ข้อควรระวัง] ไม่ควรใช้เป็นห้องนอนหรือโต๊ะทำงาน แนะนำใช้เป็นห้องน้ำหรือห้องเก็บของ"
+            case .wuGui:   return "⚠️ [ข้อควรระวัง] ระวังปากเสียง เลี่ยงสีแดงจัดและการเจาะทุบในทิศนี้"
+            case .liuSha:  return "⚠️ [ข้อควรระวัง] แนะนำวางตู้เก็บของให้เป็นระเบียบ เลี่ยงการตั้งเตียงนอน"
+            case .huoHai:  return "⚠️ [ข้อควรระวัง] ควรปล่อยให้นิ่ง วางเครื่องปั้นดินเผาเพื่อเสริมความมั่นคง"
+            }
+        case .id:
+            switch self {
+            case .shengQi: return "✅ [Ringkasan] Titik Rezeki Utama: Terbaik untuk pintu utama, kamar utama, atau meja kerja."
+            case .yanNian: return "✅ [Ringkasan] Titik Harmoni Keluarga: Cocok untuk kamar tidur utama & ruang keluarga."
+            case .tianYi:  return "✅ [Ringkasan] Titik Kesehatan: Baik untuk posisi ranjang & kamar lansia."
+            case .fuWei:   return "✅ [Ringkasan] Titik Studi & Fokus: Cocok untuk ruang belajar & kamar anak."
+            case .jueMing: return "⚠️ [Perhatian] Hindari tidur/kerja lama di sini; gunakan sebagai kamar mandi/gudang."
+            case .wuGui:   return "⚠️ [Perhatian] Jaga tetap tenang & rapi; hindari warna merah menyala atau renovasi."
+            case .liuSha:  return "⚠️ [Perhatian] Lebih baik untuk lemari penyimpanan; hindari kamar utama."
+            case .huoHai:  return "⚠️ [Perhatian] Jaga tetap tenang dengan dekorasi keramik/tanah."
+            }
+        case .auto, .zhHans:
+            switch self {
+            case .shengQi: return "✅ 【白话速断 · 第一大吉位】最旺财运与事业晋升，首选设为大门、主卧或办公桌。"
+            case .yanNian: return "✅ 【白话速断 · 感情贵人位】最利夫妻和睦与人际长寿，极宜设为主卧或客厅沙发。"
+            case .tianYi:  return "✅ 【白话速断 · 健康祛病位】利睡眠养生与贵人扶持，宜安床、长辈房或整洁厨房。"
+            case .fuWei:   return "✅ 【白话速断 · 文昌安稳位】气场平和利读书思考，宜设书房、书桌或儿童房。"
+            case .jueMing: return "⚠️ 【白话速断 · 凶位避忌】不宜久睡久坐，建议作卫生间或储物间以“凶位压凶”。"
+            case .wuGui:   return "⚠️ 【白话速断 · 防是非火险】忌大红大紫与动土钻墙，宜保持整洁或放黑曜石/静水化气。"
+            case .liuSha:  return "⚠️ 【白话速断 · 防烂桃花口舌】不宜作主卧或书房，建议设储物柜并保持干爽。"
+            case .huoHai:  return "⚠️ 【白话速断 · 防小人破耗】宜静不宜动，可摆陶瓷器物稳固气场。"
+            }
+        }
+    }
+}
+
+// MARK: - P1.1 宅主个人命卦画像与「人宅合一」配对引擎 (UserKuaProfileManager)
+
+public struct HouseKuaCompatibility {
+    public let ownerGua: String             // 如 "离"
+    public let localizedOwnerGuaName: String// 如 "离命 (九紫火)"
+    public let isEastLife: Bool             // true = 东四命, false = 西四命
+    public let localizedLifeGroup: String   // "东四命" / "西四命"
+    public let zodiacBranch: String         // 生肖地支，如 "午"
+    public let localizedZodiacName: String  // 如 "午马"
+    public let isMatchedWithHouse: Bool     // 命宅是否同属东四/西四
+    public let matchBadgeTitle: String      // "命宅相配 · 大吉" / "命宅相违 · 需调和"
+    public let matchAdvice: String          // 定制化安床/书桌/催吉指引
+    public let wealthDirection: String      // 本命生气财位
+    public let healthDirection: String      // 本命天医健康位
+    public let harmonyDirection: String     // 本命延年感情位
+    public let studyDirection: String       // 本命伏位文昌位
+}
+
+public final class UserKuaProfileManager: ObservableObject {
+    public static let shared = UserKuaProfileManager()
+
+    private let kBirthYearKey = "tiandi_owner_birth_year"
+    private let kIsMaleKey = "tiandi_owner_is_male"
+    private let kEnabledKey = "tiandi_owner_profile_enabled"
+
+    @Published public var birthYear: Int {
+        didSet {
+            let clamped = max(1920, min(2035, birthYear))
+            if birthYear != clamped {
+                birthYear = clamped
+                return
+            }
+            UserDefaults.standard.set(birthYear, forKey: kBirthYearKey)
+            LocalizationManager.sharedDefaults?.set(birthYear, forKey: kBirthYearKey)
+        }
+    }
+
+    @Published public var isMale: Bool {
+        didSet {
+            UserDefaults.standard.set(isMale, forKey: kIsMaleKey)
+            LocalizationManager.sharedDefaults?.set(isMale, forKey: kIsMaleKey)
+        }
+    }
+
+    @Published public var isProfileEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isProfileEnabled, forKey: kEnabledKey)
+            LocalizationManager.sharedDefaults?.set(isProfileEnabled, forKey: kEnabledKey)
+        }
+    }
+
+    private init() {
+        let shared = LocalizationManager.sharedDefaults
+        let savedYear = (shared?.object(forKey: kBirthYearKey) as? Int)
+            ?? (UserDefaults.standard.object(forKey: kBirthYearKey) as? Int)
+            ?? 1990
+        let savedMale = (shared?.object(forKey: kIsMaleKey) as? Bool)
+            ?? (UserDefaults.standard.object(forKey: kIsMaleKey) as? Bool)
+            ?? true
+        let savedEnabled = (shared?.object(forKey: kEnabledKey) as? Bool)
+            ?? (UserDefaults.standard.object(forKey: kEnabledKey) as? Bool)
+            ?? true
+        self.birthYear = max(1920, min(2035, savedYear))
+        self.isMale = savedMale
+        self.isProfileEnabled = savedEnabled
+    }
+
+    /// 根据后天洛书命卦公式计算本命卦洛书数 (1..9，5男寄坤2、女寄艮8)
+    public var lifeGuaNumber: Int {
+        var sum = birthYear
+        while sum >= 10 {
+            var next = 0
+            var temp = sum
+            while temp > 0 {
+                next += temp % 10
+                temp /= 10
+            }
+            sum = next
+        }
+        let raw: Int
+        if isMale {
+            var v = (11 - sum) % 9
+            if v <= 0 { v += 9 }
+            raw = (v == 5) ? 2 : v
+        } else {
+            var v = (sum + 4) % 9
+            if v <= 0 { v += 9 }
+            raw = (v == 5) ? 8 : v
+        }
+        return raw
+    }
+
+    public var ownerGuaKey: String {
+        switch lifeGuaNumber {
+        case 1: return "坎"
+        case 2: return "坤"
+        case 3: return "震"
+        case 4: return "巽"
+        case 6: return "乾"
+        case 7: return "兑"
+        case 8: return "艮"
+        case 9: return "离"
+        default: return "坎"
+        }
+    }
+
+    public var isEastLife: Bool {
+        return [1, 3, 4, 9].contains(lifeGuaNumber)
+    }
+
+    public func localizedZodiac(language: AppLanguage = LocalizationManager.shared.effectiveLanguage) -> String {
+        return evaluateCompatibility(sittingPalace: "坎").localizedZodiacName
+    }
+
+    public func localizedLifeKuaName(language: AppLanguage = LocalizationManager.shared.effectiveLanguage) -> String {
+        let compat = evaluateCompatibility(sittingPalace: "坎")
+        return "\(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup))"
+    }
+
+    public func evaluateCompatibility(sittingPalace: String) -> HouseKuaCompatibility {
+        let houseIsEast = ["坎", "震", "巽", "离"].contains(sittingPalace)
+        let isMatched = (isEastLife == houseIsEast)
+        let personalChart = BaZhaiEngine.shared.analyze(sittingPalace: ownerGuaKey, facingPalace: sittingPalace)
+
+        let dirForStar: (StarLuckType) -> String = { target in
+            personalChart.items.first(where: { $0.star == target })?.localizedDirection ?? "-"
+        }
+        let wealthDir = dirForStar(.shengQi)
+        let healthDir = dirForStar(.tianYi)
+        let harmonyDir = dirForStar(.yanNian)
+        let studyDir = dirForStar(.fuWei)
+
+        let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
+        let bIdx = ((birthYear - 4) % 12 + 12) % 12
+        let branch = branches[bIdx]
+
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let zodiacNames: [String]
+        switch lang {
+        case .en, .id:
+            zodiacNames = ["Rat", "Ox", "Tiger", "Rabbit", "Dragon", "Snake", "Horse", "Goat", "Monkey", "Rooster", "Dog", "Pig"]
+        case .zhHant, .ja:
+            zodiacNames = ["子鼠", "丑牛", "寅虎", "卯兔", "辰龍", "巳蛇", "午馬", "未羊", "申猴", "酉雞", "戌狗", "亥豬"]
+        case .ko:
+            zodiacNames = ["자쥐", "축소", "인호랑이", "묘토끼", "진용", "사뱀", "오말", "미양", "신원숭이", "유닭", "술개", "해돼지"]
+        case .vi:
+            zodiacNames = ["Tý", "Sửu", "Dần", "Mão", "Thìn", "Tỵ", "Ngọ", "Mùi", "Thân", "Dậu", "Tuất", "Hợi"]
+        case .th:
+            zodiacNames = ["ชวด", "ฉลู", "ขาล", "เถาะ", "มะโรง", "มะเส็ง", "มะเมีย", "มะแม", "วอก", "ระกา", "จอ", "กุน"]
+        case .auto, .zhHans:
+            zodiacNames = ["子鼠", "丑牛", "寅虎", "卯兔", "辰龙", "巳蛇", "午马", "未羊", "申猴", "酉鸡", "戌狗", "亥猪"]
+        }
+
+        let guaItem = BaZhaiPalaceItem(id: 0, direction: "", guaName: ownerGuaKey, star: .fuWei)
+        let localizedGua: String
+        let lifeGroup: String
+        let badge: String
+        let advice: String
+
+        switch lang {
+        case .en:
+            localizedGua = "\(guaItem.localizedGuaName) Gua (#\(lifeGuaNumber))"
+            lifeGroup = isEastLife ? "East 4 Life" : "West 4 Life"
+            badge = isMatched ? "Life & House Matched · Auspicious" : "Life & House Mismatch · Adjust Bed/Desk"
+            advice = isMatched
+                ? "Your \(lifeGroup) matches this house. Place your master bed or work desk facing your personal Wealth (\(wealthDir)) or Health (\(healthDir)) sector."
+                : "Your \(lifeGroup) differs from this house's group. Mitigate by placing your bedhead or desk toward your personal Tian Yi (\(healthDir)) or Sheng Qi (\(wealthDir)) direction."
+        case .zhHant:
+            localizedGua = "\(guaItem.localizedGuaName)命"
+            lifeGroup = isEastLife ? "東四命" : "西四命"
+            badge = isMatched ? "宅命相配 · 人宅合一" : "宅命不同組 · 宜用本命吉方調候"
+            advice = isMatched
+                ? "宅主屬【\(lifeGroup)】，與本宅坐向同氣相求！主臥安床與辦公桌首選朝向本命生氣財位【\(wealthDir)】或天醫位【\(healthDir)】。"
+                : "宅主屬【\(lifeGroup)】，與本宅不同四宅。化解之法：將床頭、書桌或常坐沙發朝向宅主本命天醫位【\(healthDir)】或生氣位【\(wealthDir)】，即可納吉氣。"
+        case .ja:
+            localizedGua = "\(guaItem.localizedGuaName)命"
+            lifeGroup = isEastLife ? "東四命" : "西四命"
+            badge = isMatched ? "宅命一致 · 大吉" : "宅命不一致 · 吉方位で調整"
+            advice = isMatched
+                ? "施主は【\(lifeGroup)】で家相と調和しています。ベッドや机は本命の生気財位【\(wealthDir)】または天医位【\(healthDir)】に向けると吉。"
+                : "施主は【\(lifeGroup)】です。ベッドの頭や机を本命の天医位【\(healthDir)】または生気位【\(wealthDir)】に向けて調和させてください。"
+        case .ko:
+            localizedGua = "\(guaItem.localizedGuaName)명"
+            lifeGroup = isEastLife ? "동사명" : "서사명"
+            badge = isMatched ? "택명상배 · 대길" : "택명불일치 · 본명 길방 활용"
+            advice = isMatched
+                ? "택주는 【\(lifeGroup)】으로 본 주택과 조화롭습니다. 침대와 책상은 본명 생기 재물방【\(wealthDir)】이나 천의방【\(healthDir)】으로 배치하세요."
+                : "택주는 【\(lifeGroup)】입니다. 침대 머리나 책상을 본명 천의방【\(healthDir)】 또는 생기방【\(wealthDir)】으로 두어 조화시키세요."
+        case .vi:
+            localizedGua = "Mệnh \(guaItem.localizedGuaName)"
+            lifeGroup = isEastLife ? "Đông Tứ Mệnh" : "Tây Tứ Mệnh"
+            badge = isMatched ? "Mệnh Trạch Tương Hợp · Đại Cát" : "Mệnh Trạch Khác Nhóm · Hóa Giải"
+            advice = isMatched
+                ? "Gia chủ thuộc 【\(lifeGroup)】, hợp với hướng nhà. Nên đặt giường hoặc bàn làm việc hướng về Sinh Khí 【\(wealthDir)】 hoặc Thiên Y 【\(healthDir)】."
+                : "Gia chủ thuộc 【\(lifeGroup)】. Hóa giải bằng cách xoay đầu giường hoặc bàn làm việc về hướng Thiên Y 【\(healthDir)】 hoặc Sinh Khí 【\(wealthDir)】."
+        case .th:
+            localizedGua = "ดวง\(guaItem.localizedGuaName)"
+            lifeGroup = isEastLife ? "ดวงทิศตะวันออก" : "ดวงทิศตะวันตก"
+            badge = isMatched ? "ดวงเจ้าของบ้านสมพงศ์กับบ้าน" : "ดวงต่างกลุ่ม · ปรับด้วยทิศมงคลเฉพาะตัว"
+            advice = isMatched
+                ? "เจ้าของบ้านอยู่กลุ่ม【\(lifeGroup)】สมพงศ์กับบ้าน แนะนำหันหัวเตียงหรือโต๊ะทำงานไปทางทิศโชคลาภ【\(wealthDir)】หรือทิศสุขภาพ【\(healthDir)】"
+                : "แนะนำปรับแก้โดยหันหัวเตียงหรือโต๊ะทำงานไปทางทิศหมอสวรรค์【\(healthDir)】หรือทิศโชคลาภ【\(wealthDir)】ของเจ้าของบ้าน"
+        case .id:
+            localizedGua = "Gua \(guaItem.localizedGuaName)"
+            lifeGroup = isEastLife ? "Empat Timur" : "Empat Barat"
+            badge = isMatched ? "Gua Pemilik & Rumah Selaras" : "Beda Kelompok · Sesuaikan Arah Ranjang"
+            advice = isMatched
+                ? "Gua Anda (\(lifeGroup)) selaras dengan rumah ini. Arahkan ranjang atau meja kerja ke arah Rezeki (\(wealthDir)) atau Kesehatan (\(healthDir))."
+                : "Sesuaikan dengan mengarahkan kepala ranjang atau meja kerja ke arah Tian Yi (\(healthDir)) atau Sheng Qi (\(wealthDir)) pribadi Anda."
+        case .auto, .zhHans:
+            localizedGua = "\(guaItem.localizedGuaName)命"
+            lifeGroup = isEastLife ? "东四命" : "西四命"
+            badge = isMatched ? "宅命相配 · 人宅合一" : "宅命不同组 · 宜用本命吉方调候"
+            advice = isMatched
+                ? "宅主属【\(lifeGroup)】，与本宅坐向同气相求！主卧安床与办公桌首选朝向本命生气财位【\(wealthDir)】或天医位【\(healthDir)】。"
+                : "宅主属【\(lifeGroup)】，与本宅不同四宅。化解之法：将床头、书桌或常坐沙发朝向宅主本命天医位【\(healthDir)】或生气位【\(wealthDir)】，即可纳吉气。"
+        }
+
+        return HouseKuaCompatibility(
+            ownerGua: ownerGuaKey,
+            localizedOwnerGuaName: localizedGua,
+            isEastLife: isEastLife,
+            localizedLifeGroup: lifeGroup,
+            zodiacBranch: branch,
+            localizedZodiacName: zodiacNames[bIdx],
+            isMatchedWithHouse: isMatched,
+            matchBadgeTitle: badge,
+            matchAdvice: advice,
+            wealthDirection: wealthDir,
+            healthDirection: healthDir,
+            harmonyDirection: harmonyDir,
+            studyDirection: studyDir
+        )
+    }
+}
+
+// MARK: - P1.3 留存与召回服务：App Store 智能好评引导与节气/吉日本地通知 (RetentionServiceManager)
+
+public final class RetentionServiceManager: ObservableObject {
+    public static let shared = RetentionServiceManager()
+
+    private let kMilestoneCountKey = "tiandi_review_milestone_count"
+    private let kLastReviewPromptTimeKey = "tiandi_last_review_prompt_ts"
+    private let kSolarTermNotifyKey = "tiandi_solar_term_notify_enabled"
+    private let kScheduledDaysKey = "tiandi_scheduled_auspicious_days"
+
+    @Published public var solarTermNotificationsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(solarTermNotificationsEnabled, forKey: kSolarTermNotifyKey)
+            if solarTermNotificationsEnabled {
+                requestAndScheduleSolarTermNotifications()
+            } else {
+                UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
+            }
+        }
+    }
+
+    @Published public private(set) var scheduledDayIDs: Set<String> = []
+
+    private init() {
+        self.solarTermNotificationsEnabled = UserDefaults.standard.bool(forKey: kSolarTermNotifyKey)
+        if let saved = UserDefaults.standard.stringArray(forKey: kScheduledDaysKey) {
+            self.scheduledDayIDs = Set(saved)
+        }
+    }
+
+    /// 是否正处于自动化 UI 测试或截图流水线环境（避免弹窗干扰自动化测试）
+    public static var isRunningAutomatedTests: Bool {
+        let args = CommandLine.arguments
+        let env = ProcessInfo.processInfo.environment
+        if env["XCTestConfigurationFilePath"] != nil { return true }
+        if args.contains("-appLanguage") || args.contains("-uiTesting") { return true }
+        return false
+    }
+
+    /// 记录用户核心正向行为（锁盘、保存户型档案、导出天机长卷等），达到阈值且距上次弹窗超过 14 天时请求系统级评分
+    public func recordMilestone(reason: String) {
+        guard !Self.isRunningAutomatedTests else { return }
+        let count = UserDefaults.standard.integer(forKey: kMilestoneCountKey) + 1
+        UserDefaults.standard.set(count, forKey: kMilestoneCountKey)
+        // 在第 2 次、第 6 次、第 15 次关键操作完成时触发
+        guard count == 2 || count == 6 || count % 15 == 0 else { return }
+        let lastPrompt = UserDefaults.standard.double(forKey: kLastReviewPromptTimeKey)
+        let now = Date().timeIntervalSince1970
+        guard now - lastPrompt > 14 * 86400 else { return }
+        UserDefaults.standard.set(now, forKey: kLastReviewPromptTimeKey)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            self.requestImmediateReview()
+        }
+    }
+
+    public func setSolarTermNotifications(enabled: Bool) {
+        self.solarTermNotificationsEnabled = enabled
+    }
+
+    public func requestImmediateReview() {
+        guard let scene = UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene else { return }
+        if #available(iOS 14.0, *) {
+            SKStoreReviewController.requestReview(in: scene)
+        }
+    }
+
+    /// 开启并排程下一节气交节与流月飞星换局提醒
+    public func requestAndScheduleSolarTermNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            guard granted else {
+                DispatchQueue.main.async {
+                    self.solarTermNotificationsEnabled = false
+                }
+                return
+            }
+            let solar = SolarTimeCalculator.shared
+            let now = Date()
+            let elapsed = solar.solarTermProgress(for: now)
+            let termDays = 15.0 / 0.98564736
+            let daysLeft = max(1, Int(ceil(termDays - elapsed)))
+            var cal = Calendar.current
+            cal.timeZone = .current
+            guard let targetDay = cal.date(byAdding: .day, value: daysLeft, to: now),
+                  let fireDate = cal.date(bySettingHour: 8, minute: 30, second: 0, of: targetDay) else { return }
+
+            let nextIndex = (solar.solarTermIndex(for: now) + 1) % 24
+            let nextTermName = SolarTermsData.shared.terms[safe: nextIndex]?.localizedName ?? ""
+
+            let content = UNMutableNotificationContent()
+            switch LocalizationManager.shared.effectiveLanguage {
+            case .en:
+                content.title = "Solar Term Transition · \(nextTermName)"
+                content.body = "Monthly Flying Stars and Qi shift today. Open Tiandi Luopan to check your home's auspicious directions."
+            case .zhHant:
+                content.title = "節氣交節提醒 · 今日【\(nextTermName)】"
+                content.body = "節氣更迭，流月紫白九星氣場今日換局，點擊查看本宅最新流月財位與吉凶宜忌。"
+            case .ja:
+                content.title = "節気交節リマインダー・本日【\(nextTermName)】"
+                content.body = "節気が切り替わり、流月紫白九星の気場が更新されました。今月の財位と吉凶方位を確認しましょう。"
+            case .ko:
+                content.title = "절기 교절 알림 · 오늘 【\(nextTermName)】"
+                content.body = "절기가 바뀌며 유월 자백구성 기장이 전환되었습니다. 이달의 재물방과 길흉 방위를 확인하세요."
+            case .vi:
+                content.title = "Nhắc Nhở Giao Tiết Khí · Hôm Nay 【\(nextTermName)】"
+                content.body = "Tiết khí chuyển giao, Cửu Tinh lưu nguyệt đổi cục hôm nay. Mở ứng dụng để xem tài vị và hướng tốt."
+            case .th:
+                content.title = "แจ้งเตือนเปลี่ยน절기 · วันนี้ 【\(nextTermName)】"
+                content.body = "เปลี่ยนสาร์ท절기 ดาวบินประจำเดือนเปลี่ยน局วันนี้ เปิดแอปเพื่อตรวจทิศโชคลาภและฤกษ์มงคล"
+            case .id:
+                content.title = "Pengingat Pergantian Musim · Hari Ini 【\(nextTermName)】"
+                content.body = "Bintang Terbang bulanan berganti hari ini. Buka Tiandi Luopan untuk memeriksa arah keberuntungan rumah Anda."
+            case .auto, .zhHans:
+                content.title = "节气交节提醒 · 今日【\(nextTermName)】"
+                content.body = "节气更迭，流月紫白九星气场今日换局，点击查看本宅最新流月财位与吉凶宜忌。"
+            }
+            content.sound = .default
+
+            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let req = UNNotificationRequest(identifier: "tiandi_next_solar_term", content: content, trigger: trigger)
+            center.add(req, withCompletionHandler: nil)
+        }
+    }
+
+    /// 为用户选定的吉日设置当天早晨 08:00 动土/入宅/出行提醒
+    public func toggleAuspiciousDayReminder(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String) {
+        let reqID = "tiandi_zeri_\(day.id)"
+        let center = UNUserNotificationCenter.current()
+        if scheduledDayIDs.contains(day.id) {
+            center.removePendingNotificationRequests(withIdentifiers: [reqID])
+            scheduledDayIDs.remove(day.id)
+            UserDefaults.standard.set(Array(scheduledDayIDs), forKey: kScheduledDaysKey)
+            return
+        }
+
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            var cal = Calendar.current
+            cal.timeZone = .current
+            let now = Date()
+            var fireDate = cal.date(bySettingHour: 8, minute: 0, second: 0, of: day.date) ?? day.date
+            if fireDate <= now {
+                fireDate = now.addingTimeInterval(10)
+            }
+            let content = UNMutableNotificationContent()
+            switch LocalizationManager.shared.effectiveLanguage {
+            case .en:
+                content.title = "Auspicious Day Reminder · \(day.localizedDayPillar)"
+                content.body = "\(day.dateLabel) (\(sittingName)): Good for \(day.yiSummary)."
+            case .zhHant:
+                content.title = "黃道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
+                content.body = "本宅【\(sittingName)】今日無歲破月破衝山，宜：\(day.yiSummary)。"
+            case .ja:
+                content.title = "吉日リマインダー・\(day.dateLabel) (\(day.localizedDayPillar)日)"
+                content.body = "本宅【\(sittingName)】本日は歳破・月破の沖山なし。宜：\(day.yiSummary)。"
+            case .ko:
+                content.title = "황도길일 알림 · \(day.dateLabel) (\(day.localizedDayPillar)일)"
+                content.body = "본택【\(sittingName)】 오늘은 세파·월파 충산이 없는 길일입니다. 마땅함: \(day.yiSummary)."
+            case .vi:
+                content.title = "Nhắc Nhở Ngày Hoàng Đạo · \(day.dateLabel) (\(day.localizedDayPillar))"
+                content.body = "Bản trạch 【\(sittingName)】 hôm nay không phạm Tuế Phá/Nguyệt Phá. Nên: \(day.yiSummary)."
+            case .th:
+                content.title = "แจ้งเตือนวันธงชัย · \(day.dateLabel) (\(day.localizedDayPillar))"
+                content.body = "บ้าน【\(sittingName)】วันนี้ไม่ชงทิศหลังบ้าน เหมาะสำหรับ: \(day.yiSummary)"
+            case .id:
+                content.title = "Pengingat Hari Baik · \(day.dateLabel) (\(day.localizedDayPillar))"
+                content.body = "Rumah 【\(sittingName)】 bebas bentrokan hari ini. Baik untuk: \(day.yiSummary)."
+            case .auto, .zhHans:
+                content.title = "黄道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
+                content.body = "本宅【\(sittingName)】今日无岁破月破冲山，宜：\(day.yiSummary)。"
+            }
+            content.sound = .default
+            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
+            center.add(req) { _ in
+                DispatchQueue.main.async {
+                    self.scheduledDayIDs.insert(day.id)
+                    UserDefaults.standard.set(Array(self.scheduledDayIDs), forKey: self.kScheduledDaysKey)
+                }
+            }
+        }
+    }
+}
+
+private extension Collection {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+}
+
+// MARK: - P2.3 「今日吉方日签」黑金国风分享卡生成与预览弹窗 (DailyAuspiciousCardSheet)
+
+public struct DailyAuspiciousCardSheet: View {
+    public let targetDate: Date
+    @ObservedObject private var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var renderedImage: UIImage? = nil
+    @State private var showShareSheet = false
+    @State private var savedToast = false
+
+    public init(targetDate: Date = Date(), sittingMountain: Mountain24Item? = nil) {
+        self.targetDate = targetDate
+    }
+
+    public var body: some View {
+        NavigationView {
+            ZStack {
+                Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea()
+
+                VStack(spacing: 14) {
+                    if let img = renderedImage {
+                        ScrollView {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFit()
+                                .cornerRadius(14)
+                                .shadow(color: .black.opacity(0.6), radius: 12, x: 0, y: 6)
+                                .padding(.horizontal, 24)
+                                .padding(.top, 12)
+                        }
+                    } else {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.95, green: 0.85, blue: 0.45)))
+                        Spacer()
+                    }
+
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            guard let img = renderedImage else { return }
+                            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                                guard status == .authorized || status == .limited else { return }
+                                UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+                                DispatchQueue.main.async {
+                                    savedToast = true
+                                    RetentionServiceManager.shared.recordMilestone(reason: "save_daily_card")
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        savedToast = false
+                                    }
+                                }
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.down.fill")
+                                Text(lang.t("save_to_photos"))
+                            }
+                            .adaptiveFont(size: 13, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                            .foregroundColor(.black)
+                            .cornerRadius(10)
+                        }
+
+                        Button(action: {
+                            guard renderedImage != nil else { return }
+                            showShareSheet = true
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.up.fill")
+                                Text(lang.t("share_and_print"))
+                            }
+                            .adaptiveFont(size: 13, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.white.opacity(0.14))
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+                }
+
+                if savedToast {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.seal.fill").foregroundColor(.green)
+                        Text(lang.t("save_success"))
+                            .adaptiveFont(size: 12, weight: .bold)
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.85))
+                    .cornerRadius(20)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(cardTitle)
+                        .adaptiveFont(size: 15, weight: .bold)
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(lang.t("done")) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let img = renderedImage {
+                    ActivityShareSheet(items: [img])
+                }
+            }
+            .onAppear {
+                renderedImage = Self.renderPoster(date: targetDate, state: motion.headingState)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var cardTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Daily Auspicious Sign Card"
+        case .zhHant, .ja: return "今日吉方日籤 · 宣紙海報"
+        case .ko: return "오늘의 길방 일첨 카드"
+        case .vi: return "Thẻ Cát Phương Hôm Nay"
+        case .th: return "การ์ดทิศมงคลประจำวัน"
+        case .id: return "Kartu Arah Keberuntungan Harian"
+        case .auto, .zhHans: return "今日吉方日签 · 宣纸海报"
+        }
+    }
+
+    public static func renderPoster(date: Date, state: CompassHeadingState) -> UIImage {
+        let size = CGSize(width: 750, height: 1080)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let zeri = ZeRiEngine.shared.analyze(date: date, sitting: state.sittingMountain)
+        let gods = ZeRiEngine.shared.dailyCompassDirections(for: date)
+        let qimen = QimenEngine.shared.calculateChart(date: date, heading: state.facingAngle)
+        let kuaMatch = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: state.sittingMountain.palace)
+        let termRaw = SolarTimeCalculator.shared.solarTermName(for: date)
+        let termName = SolarTermsData.shared.terms.first(where: { $0.name == termRaw })?.localizedName ?? termRaw
+        let df = DateFormatter()
+        df.dateFormat = "yyyy · MM · dd"
+        let dateStr = df.string(from: date)
+        let effLang = LocalizationManager.shared.effectiveLanguage
+
+        return renderer.image { ctx in
+            let cg = ctx.cgContext
+            let rect = CGRect(origin: .zero, size: size)
+
+            // 1. 黑金渐变底色与外框
+            UIColor(red: 0.08, green: 0.08, blue: 0.11, alpha: 1.0).setFill()
+            cg.fill(rect)
+
+            let borderRect = rect.insetBy(dx: 28, dy: 28)
+            cg.setStrokeColor(UIColor(red: 0.85, green: 0.70, blue: 0.30, alpha: 0.65).cgColor)
+            cg.setLineWidth(2.5)
+            cg.stroke(borderRect)
+
+            let innerRect = rect.insetBy(dx: 38, dy: 38)
+            cg.setStrokeColor(UIColor(red: 0.85, green: 0.70, blue: 0.30, alpha: 0.25).cgColor)
+            cg.setLineWidth(1.0)
+            cg.stroke(innerRect)
+
+            let gold = UIColor(red: 0.95, green: 0.83, blue: 0.42, alpha: 1.0)
+            let cyan = UIColor(red: 0.35, green: 0.85, blue: 0.80, alpha: 1.0)
+            let white = UIColor.white
+            let dim = UIColor.white.withAlphaComponent(0.72)
+
+            let centerStyle = NSMutableParagraphStyle()
+            centerStyle.alignment = .center
+
+            // 2. 顶部纪年与节气
+            let headerAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 22, weight: .semibold),
+                .foregroundColor: gold,
+                .paragraphStyle: centerStyle
+            ]
+            ("\(dateStr)  ·  \(termName)" as NSString).draw(in: CGRect(x: 60, y: 72, width: 630, height: 34), withAttributes: headerAttrs)
+
+            // 3. 日柱大字
+            let pillarAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.boldSystemFont(ofSize: 78),
+                .foregroundColor: gold,
+                .paragraphStyle: centerStyle
+            ]
+            (zeri.localizedDayPillar as NSString).draw(in: CGRect(x: 60, y: 125, width: 630, height: 96), withAttributes: pillarAttrs)
+
+            let fourPillarAttrs: [NSAttributedString.Key: Any] = [
+                .font: UIFont.monospacedSystemFont(ofSize: 20, weight: .medium),
+                .foregroundColor: dim,
+                .paragraphStyle: centerStyle
+            ]
+            (zeri.fourPillarsText as NSString).draw(in: CGRect(x: 60, y: 232, width: 630, height: 32), withAttributes: fourPillarAttrs)
+
+            // 4. 今日财神 / 喜神 / 奇门动身吉方 / 宅主本命卦卡片
+            let cardRect = CGRect(x: 64, y: 288, width: 622, height: 342)
+            UIColor(red: 0.13, green: 0.13, blue: 0.17, alpha: 1.0).setFill()
+            UIBezierPath(roundedRect: cardRect, cornerRadius: 16).fill()
+
+            let leftStyle = NSMutableParagraphStyle()
+            leftStyle.alignment = .left
+            leftStyle.lineSpacing = 7
+
+            let sectionTitle: String
+            let wealthLine: String
+            let joyLine: String
+            let qimenLine: String
+            let sittingLine: String
+            let kuaLine: String
+            let yiLabel: String
+            let jiLabel: String
+            let footer: String
+
+            switch effLang {
+            case .en:
+                sectionTitle = "✦ TODAY'S AUSPICIOUS COMPASS GUIDE"
+                wealthLine = "💰 God of Wealth: \(gods.wealthDirection) (\(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 God of Joy: \(gods.joyDirection) (\(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 Qimen Best Gate: \(qimen.bestNavDirection)"
+                sittingLine = "🏠 House Sitting: \(state.sittingMountain.localizedName) → \(state.facingMountain.localizedName) (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 Owner Gua: \(kuaMatch.localizedOwnerGuaName) · Wealth \(kuaMatch.wealthDirection)"
+                yiLabel = "GOOD FOR: "
+                jiLabel = "AVOID: "
+                footer = "TIANDI LUOPAN · CLASSICAL FENGSHUI & COMPASS"
+            case .zhHant:
+                sectionTitle = "✦ 今日出行納吉方位導引"
+                wealthLine = "💰 今日財神正位：【\(gods.wealthDirection)】 (羅盤 \(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 今日喜神吉位：【\(gods.joyDirection)】 (羅盤 \(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 時家奇門吉門：【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 當前立極坐向：\(state.sittingMountain.localizedName)山\(state.facingMountain.localizedName)向 (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 宅主本命配卦：\(kuaMatch.localizedOwnerGuaName)（\(kuaMatch.matchBadgeTitle)）· 生氣【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【今日宜】 "
+                jiLabel = "【今日忌】 "
+                footer = "天地羅盤 · 三元玄空與三式絕學專業堪輿羅經"
+            case .ja:
+                sectionTitle = "✦ 本日の出行納吉方位ガイド"
+                wealthLine = "💰 本日の財神方位：【\(gods.wealthDirection)】 (羅盤 \(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 本日の喜神方位：【\(gods.joyDirection)】 (羅盤 \(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 時家奇門吉門：【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 現在の立極坐向：\(state.sittingMountain.localizedName)山\(state.facingMountain.localizedName)向 (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 家主本命卦：\(kuaMatch.localizedOwnerGuaName)（\(kuaMatch.matchBadgeTitle)）・生気【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【本日の宜】 "
+                jiLabel = "【本日の忌】 "
+                footer = "天地羅盤・三元玄空＆三式風水プロフェッショナル羅経"
+            case .ko:
+                sectionTitle = "✦ 오늘의 출행 납길 방위 가이드"
+                wealthLine = "💰 오늘의 재신 방위: 【\(gods.wealthDirection)】 (나경 \(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 오늘의 희신 방위: 【\(gods.joyDirection)】 (나경 \(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 시가기문 길문: 【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 현재 입극 좌향: \(state.sittingMountain.localizedName)산 \(state.facingMountain.localizedName)향 (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 택주 본명괘: \(kuaMatch.localizedOwnerGuaName) (\(kuaMatch.matchBadgeTitle)) · 생기【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【오늘의 의(宜)】 "
+                jiLabel = "【오늘의 기(忌)】 "
+                footer = "천지나경 · 삼원현공 및 삼식 풍수 전문 나경"
+            case .vi:
+                sectionTitle = "✦ HƯỚNG DẪN PHƯƠNG VỊ ĐÓN CÁT HÔM NAY"
+                wealthLine = "💰 Hướng Thần Tài: 【\(gods.wealthDirection)】 (La bàn \(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 Hướng Hỷ Thần: 【\(gods.joyDirection)】 (La bàn \(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 Cát Môn Kỳ Môn: 【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 Tọa Hướng Lập Cực: Tọa \(state.sittingMountain.localizedName) Hướng \(state.facingMountain.localizedName) (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 Bản Mệnh Gia Chủ: \(kuaMatch.localizedOwnerGuaName) · Sinh Khí 【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【NÊN LÀM】 "
+                jiLabel = "【KIÊNG KỴ】 "
+                footer = "THIÊN ĐỊA LA BÀN · LA KINH PHONG THỦY TAM NGUYÊN HUYỀN KHÔNG"
+            case .th:
+                sectionTitle = "✦ เข็มทิศนำทางรับโชคมงคลวันนี้"
+                wealthLine = "💰 ทิศเทพเจ้าโชคลาภ: 【\(gods.wealthDirection)】 (\(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 ทิศเทพแห่งความยินดี: 【\(gods.joyDirection)】 (\(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 ประตูมงคลฉีเหมิน: 【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 ทิศบ้านปัจจุบัน: หลังพิง\(state.sittingMountain.localizedName) หันหน้า\(state.facingMountain.localizedName) (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 ดวงเจ้าของบ้าน: \(kuaMatch.localizedOwnerGuaName) · ทิศโชคลาภ【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【สิ่งที่ควรทำ】 "
+                jiLabel = "【สิ่งที่ควรเลี่ยง】 "
+                footer = "เทียนตี้หลัวผาน · เข็มทิศฮวงจุ้ยซานหยวนเสวียนคงระดับมืออาชีพ"
+            case .id:
+                sectionTitle = "✦ PANDUAN ARAH KEBERUNTUNGAN HARI INI"
+                wealthLine = "💰 Arah Dewa Rezeki: 【\(gods.wealthDirection)】 (\(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 Arah Dewa Kebahagiaan: 【\(gods.joyDirection)】 (\(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 Gerbang Baik Qimen: 【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 Arah Rumah: Duduk \(state.sittingMountain.localizedName) Hadap \(state.facingMountain.localizedName) (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 Gua Pemilik: \(kuaMatch.localizedOwnerGuaName) · Rezeki 【\(kuaMatch.wealthDirection)】"
+                yiLabel = "BAIK UNTUK: "
+                jiLabel = "HINDARI: "
+                footer = "TIANDI LUOPAN · KOMPAS FENG SHUI KLASIK PROFESIONAL"
+            case .auto, .zhHans:
+                sectionTitle = "✦ 今日出行纳吉方位导引"
+                wealthLine = "💰 今日财神正位：【\(gods.wealthDirection)】 (罗盘 \(Int(gods.wealthAngle))°)"
+                joyLine = "🎉 今日喜神吉位：【\(gods.joyDirection)】 (罗盘 \(Int(gods.joyAngle))°)"
+                qimenLine = "🧭 时家奇门吉门：【\(qimen.bestNavDirection)】"
+                sittingLine = "🏠 当前立极坐向：\(state.sittingMountain.localizedName)山\(state.facingMountain.localizedName)向 (\(String(format: "%.1f°", state.facingAngle)))"
+                kuaLine = "👤 宅主本命配卦：\(kuaMatch.localizedOwnerGuaName)（\(kuaMatch.matchBadgeTitle)）· 生气【\(kuaMatch.wealthDirection)】"
+                yiLabel = "【今日宜】 "
+                jiLabel = "【今日忌】 "
+                footer = "天地罗盘 · 三元玄空与三式绝学专业堪舆罗经"
+            }
+
+            (sectionTitle as NSString).draw(
+                in: CGRect(x: 92, y: 312, width: 566, height: 32),
+                withAttributes: [.font: UIFont.boldSystemFont(ofSize: 22), .foregroundColor: cyan]
+            )
+
+            let bodyText = [wealthLine, joyLine, qimenLine, sittingLine, kuaLine].joined(separator: "\n")
+            (bodyText as NSString).draw(
+                in: CGRect(x: 92, y: 356, width: 566, height: 262),
+                withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 21, weight: .semibold),
+                    .foregroundColor: white,
+                    .paragraphStyle: leftStyle
+                ]
+            )
+
+            // 5. 今日宜忌卡片
+            let yijiRect = CGRect(x: 64, y: 650, width: 622, height: 240)
+            UIColor(red: 0.13, green: 0.12, blue: 0.14, alpha: 1.0).setFill()
+            UIBezierPath(roundedRect: yijiRect, cornerRadius: 16).fill()
+
+            let yiStr = yiLabel + zeri.yiActivities.joined(separator: " · ")
+            let jiStr = jiLabel + zeri.jiActivities.joined(separator: " · ")
+
+            (zeri.overallStatus as NSString).draw(
+                in: CGRect(x: 92, y: 676, width: 566, height: 32),
+                withAttributes: [
+                    .font: UIFont.boldSystemFont(ofSize: 24),
+                    .foregroundColor: zeri.isAuspicious ? UIColor.systemGreen : UIColor.systemOrange
+                ]
+            )
+            (yiStr as NSString).draw(
+                in: CGRect(x: 92, y: 726, width: 566, height: 64),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 21, weight: .medium), .foregroundColor: gold]
+            )
+            (jiStr as NSString).draw(
+                in: CGRect(x: 92, y: 798, width: 566, height: 64),
+                withAttributes: [.font: UIFont.systemFont(ofSize: 20, weight: .regular), .foregroundColor: dim]
+            )
+
+            // 6. 底部品牌落款
+            (footer as NSString).draw(
+                in: CGRect(x: 60, y: 955, width: 630, height: 40),
+                withAttributes: [
+                    .font: UIFont.systemFont(ofSize: 19, weight: .bold),
+                    .foregroundColor: gold.withAlphaComponent(0.85),
+                    .paragraphStyle: centerStyle
+                ]
+            )
+        }
+    }
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - P2.3 首次启动三步新手引导 (OnboardingGuideSheet)
+
+public struct OnboardingGuideSheet: View {
+    private static let kCompletedKey = "tiandi_onboarding_v1_completed"
+    @ObservedObject private var lang = LocalizationManager.shared
+    @ObservedObject private var kua = UserKuaProfileManager.shared
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var step: Int = 0
+
+    public init() {}
+
+    public static func shouldPresentOnLaunch() -> Bool {
+        if RetentionServiceManager.isRunningAutomatedTests { return false }
+        return !UserDefaults.standard.bool(forKey: kCompletedKey)
+    }
+
+    public static func markCompleted() {
+        UserDefaults.standard.set(true, forKey: kCompletedKey)
+    }
+
+    public var body: some View {
+        ZStack {
+            Color(red: 0.07, green: 0.07, blue: 0.10).ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                HStack {
+                    Text("✦ \(headerTitle)")
+                        .adaptiveFont(size: 16, weight: .bold)
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Spacer()
+                    Button(action: finish) {
+                        Text(skipTitle)
+                            .adaptiveFont(size: 13, weight: .medium)
+                            .foregroundColor(.white.opacity(0.65))
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+
+                // 步骤指示条
+                HStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { idx in
+                        Capsule()
+                            .fill(idx <= step ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.15))
+                            .frame(height: 5)
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Spacer(minLength: 8)
+
+                if step == 0 {
+                    stepView(
+                        icon: "safari.fill",
+                        title: step1Title,
+                        subtitle: step1Desc,
+                        bullets: step1Bullets
+                    )
+                } else if step == 1 {
+                    VStack(spacing: 16) {
+                        stepView(
+                            icon: "person.text.rectangle.fill",
+                            title: step2Title,
+                            subtitle: step2Desc,
+                            bullets: step2Bullets
+                        )
+
+                        // 直接在引导第 2 步完成宅主生辰录入
+                        VStack(spacing: 10) {
+                            HStack {
+                                Text(birthYearLabel)
+                                    .adaptiveFont(size: 13, weight: .semibold)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Picker("", selection: $kua.birthYear) {
+                                    ForEach(1940...2025, id: \.self) { yr in
+                                        Text("\(String(yr))").tag(yr)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .accentColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+
+                                Picker("", selection: $kua.isMale) {
+                                    Text(maleLabel).tag(true)
+                                    Text(femaleLabel).tag(false)
+                                }
+                                .pickerStyle(.segmented)
+                                .frame(width: 120)
+                            }
+                            let compat = kua.evaluateCompatibility(sittingPalace: "坎")
+                            HStack {
+                                Text("🌟 \(compat.localizedOwnerGuaName) · \(compat.localizedLifeGroup) (\(compat.localizedZodiacName))")
+                                    .adaptiveFont(size: 12, weight: .bold)
+                                    .foregroundColor(Color.yanCyan)
+                                Spacer()
+                            }
+                        }
+                        .padding(14)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 24)
+                    }
+                } else {
+                    stepView(
+                        icon: "house.fill",
+                        title: step3Title,
+                        subtitle: step3Desc,
+                        bullets: step3Bullets
+                    )
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: {
+                    if step < 2 {
+                        withAnimation { step += 1 }
+                    } else {
+                        finish()
+                    }
+                }) {
+                    Text(step < 2 ? nextButtonTitle : startButtonTitle)
+                        .adaptiveFont(size: 15, weight: .bold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 0.95, green: 0.82, blue: 0.38), Color(red: 0.78, green: 0.58, blue: 0.20)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .foregroundColor(.black)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 28)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func finish() {
+        Self.markCompleted()
+        presentationMode.wrappedValue.dismiss()
+    }
+
+    private func stepView(icon: String, title: String, subtitle: String, bullets: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(title)
+                    .adaptiveFont(size: 20, weight: .bold)
+                    .foregroundColor(.white)
+            }
+
+            Text(subtitle)
+                .adaptiveFont(size: 13)
+                .foregroundColor(.white.opacity(0.8))
+                .lineSpacing(4)
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(bullets, id: \.self) { b in
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            .font(.system(size: 14))
+                        Text(b)
+                            .adaptiveFont(size: 13)
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                }
+            }
+            .padding(14)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var headerTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Quick Start Guide (3 Steps)"
+        case .zhHant: return "三步快速上手指南"
+        case .ja: return "3ステップ・クイックガイド"
+        case .ko: return "3단계 빠른 시작 가이드"
+        case .vi: return "Hướng Dẫn Nhanh 3 Bước"
+        case .th: return "คู่มือเริ่มต้นใช้งาน 3 ขั้นตอน"
+        case .id: return "Panduan Cepat 3 Langkah"
+        case .auto, .zhHans: return "三步快速上手指南"
+        }
+    }
+    private var skipTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Skip"
+        case .zhHant: return "跳過"
+        case .ja: return "スキップ"
+        case .ko: return "건너뛰기"
+        case .vi: return "Bỏ qua"
+        case .th: return "ข้าม"
+        case .id: return "Lewati"
+        case .auto, .zhHans: return "跳过"
+        }
+    }
+    private var step1Title: String {
+        switch lang.effectiveLanguage {
+        case .en: return "1. Stand at Center & Lock Heading"
+        case .zhHant: return "第一步：客廳中心立極與鎖盤"
+        case .ja: return "ステップ1：家の中心で立極＆方位固定"
+        case .ko: return "1단계: 거실 중심 입극 및 좌향 잠금"
+        case .vi: return "Bước 1: Lập Cực Tại Tâm Nhà & Khóa Hướng"
+        case .th: return "ขั้นตอนที่ 1: ยืนกลางบ้านและล็อกทิศ"
+        case .id: return "Langkah 1: Berdiri di Tengah & Kunci Arah"
+        case .auto, .zhHans: return "第一步：客厅中心立极与锁盘"
+        }
+    }
+    private var step1Desc: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Hold your phone flat at the center of your living room, facing the main door or largest balcony window:"
+        case .zhHant: return "站在房屋客廳中心，手持手機端平（使中央水泡居中），面朝入戶大門或主陽台採光面："
+        case .ja: return "リビングの中央に立ち、スマホを水平に保ちながら玄関またはメインバルコニーに向きます："
+        case .ko: return "거실 중앙에 서서 스마트폰을 수평으로 들고 현관문이나 주 발코니를 바라보세요:"
+        case .vi: return "Đứng ở tâm phòng khách, giữ điện thoại phẳng (bọt nước ở giữa), hướng về cửa chính hoặc ban công lớn:"
+        case .th: return "ยืนที่กึ่งกลางห้องนั่งเล่น ถือโทรศัพท์ให้ขนานกับพื้น หันหน้าไปทางประตูหลักหรือระเบียงรับแสง:"
+        case .id: return "Berdiri di tengah ruang tamu, pegang ponsel rata menghadap pintu utama atau balkon utama:"
+        case .auto, .zhHans: return "站在房屋客厅中心，手持手机端平（使中央水泡居中），面朝入户大门或主阳台采光面："
+        }
+    }
+    private var step1Bullets: [String] {
+        switch lang.effectiveLanguage {
+        case .en:
+            return [
+                "Tap [Lock Heading] to freeze your house's sitting/facing direction across all tabs.",
+                "Or pick any of the 24 Mountains manually on the Analysis tab without rotating your phone.",
+                "Enable [God of Wealth Guide] on the compass to see today's lucky travel bearings."
+            ]
+        case .zhHant:
+            return [
+                "點擊【鎖定朝向】，坐向度數將跨頁面持久保存並同步至桌面小組件。",
+                "不在現場時，可在「理氣」頁頂部直接手選【二十四山】靜態排盤。",
+                "開啟羅盤【吉方導引】，一鍵標出今日財神、喜神與奇門吉門方位。"
+            ]
+        case .ja:
+            return [
+                "【方位固定】をタップすると、坐向が全タブおよびホーム画面ウィジェットに同期されます。",
+                "現地にいない場合でも、「理気」タブ上部から【二十四山】を手動選択して静的排盤が可能です。",
+                "羅盤の【吉方ガイド】をONにすると、本日の財神・喜神方位が盤面上に光って表示されます。"
+            ]
+        case .ko:
+            return [
+                "【방향 잠금】을 누르면 좌향 각도가 모든 탭과 홈 화면 위젯에 동기화됩니다.",
+                "현장이 아닐 때는 '이기' 탭 상단에서 【24산】을 직접 선택해 정적 배반할 수 있습니다.",
+                "나경의 【길방 가이드】를 켜면 오늘의 재신·희신 방위가 반면에 표시됩니다."
+            ]
+        case .vi:
+            return [
+                "Nhấn [Khóa Hướng] để lưu tọa hướng xuyên suốt các tab và đồng bộ với Widget màn hình chính.",
+                "Khi không ở hiện trường, có thể chọn thủ công [24 Sơn] ngay đầu tab Lý Khí.",
+                "Bật [Chỉ Dẫn Cát Phương] trên la bàn để hiển thị hướng Thần Tài và Hỷ Thần hôm nay."
+            ]
+        case .th:
+            return [
+                "แตะ [ล็อกทิศ] เพื่อบันทึกองศาหลังพิง-หันหน้าข้ามทุกแท็บและซิงค์กับวิดเจ็ตหน้าจอโฮม",
+                "หากไม่อยู่หน้างาน สามารถเลือก [24 ขุนเขา] ด้วยตนเองที่ด้านบนของแท็บวิเคราะห์",
+                "เปิด [นำทางทิศมงคล] บนเข็มทิศเพื่อแสดงตำแหน่งเทพโชคลาภและเทพแห่งความยินดีบนหน้าปัด"
+            ]
+        case .id:
+            return [
+                "Ketuk [Kunci Arah] untuk menyimpan arah duduk/hadap di semua tab dan menyinkronkan ke Widget.",
+                "Pilih [24 Gunung] secara manual di bagian atas tab Analisis saat tidak berada di lokasi.",
+                "Aktifkan [Panduan Arah Baik] di kompas untuk menampilkan penanda Dewa Rezeki & Kebahagiaan."
+            ]
+        case .auto, .zhHans:
+            return [
+                "点击【锁定朝向】，坐向度数将跨页面持久保存并同步至桌面小组件。",
+                "不在现场时，可在“理气”页顶部直接手选【二十四山】静态排盘。",
+                "开启罗盘【吉方导引】，一键标出今日财神、喜神与奇门吉门方位。"
+            ]
+        }
+    }
+    private var step2Title: String {
+        switch lang.effectiveLanguage {
+        case .en: return "2. Set Owner Birth Year (Life Gua)"
+        case .zhHant: return "第二步：設定宅主生辰（人宅合一）"
+        case .ja: return "ステップ2：家主の生年設定（人宅合一）"
+        case .ko: return "2단계: 택주 생년 설정 (인택합일)"
+        case .vi: return "Bước 2: Cài Đặt Năm Sinh Gia Chủ (Nhân Trạch Hợp Nhất)"
+        case .th: return "ขั้นตอนที่ 2: ตั้งค่าปีเกิดเจ้าของบ้าน (คนสมพงศ์บ้าน)"
+        case .id: return "Langkah 2: Atur Tahun Lahir Pemilik (Harmoni Gua)"
+        case .auto, .zhHans: return "第二步：设定宅主生辰（人宅合一）"
+        }
+    }
+    private var step2Desc: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Enter the homeowner's birth year & gender to compute your Personal Life Gua, Wealth/Study spots, and Zodiac clash-free dates:"
+        case .zhHant: return "八宅風水講究「宅命相配」。設定出生年份後，系統將自動推算您的本命卦、個人財位/文昌位，並在擇日時避開衝生肖之日："
+        case .ja: return "八宅風水では「宅命相配」を重視します。生年を設定すると本命卦・個人の財位/文昌位を算出し、択日で干支冲を自動回避します："
+        case .ko: return "팔택풍수는 '택명상배'를 중시합니다. 출생연도를 설정하면 본명괘와 개인 재물/문창방을 계산하고 택일 시 띠 충을 피합니다:"
+        case .vi: return "Bát Trạch chú trọng 'Trạch Mệnh Tương Phối'. Nhập năm sinh để tính Bản Mệnh Quái, Tài vị/Văn Xương và lọc ngày không xung tuổi:"
+        case .th: return "ฮวงจุ้ยแปดทิศเน้นความสมพงศ์ระหว่างคนกับบ้าน ตั้งปีเกิดเพื่อคำนวณรหัสประจำตัว ทิศโชคลาภ และคัดกรองวันมงคลไม่ชงปีเกิด:"
+        case .id: return "Masukkan tahun lahir & jenis kelamin pemilik untuk menghitung Gua Pribadi, titik Rezeki/Studi, dan hari baik bebas bentrokan Shio:"
+        case .auto, .zhHans: return "八宅风水讲究“宅命相配”。设定出生年份后，系统将自动推算您的本命卦、个人财位/文昌位，并在择日时避开冲生肖之日："
+        }
+    }
+    private var step2Bullets: [String] {
+        switch lang.effectiveLanguage {
+        case .en:
+            return [
+                "Instant East/West 4 Life matching with your house's sitting palace.",
+                "30-Day Auspicious Calendar for moving, renovation, and business opening."
+            ]
+        case .zhHant:
+            return [
+                "自動判定「東四命/西四命」是否與本宅坐山相配，給出安床與書桌朝向方案。",
+                "支持「未來30天黃道吉日速查」與時辰穿越撥盤，可一鍵開啟早晨吉日提醒。"
+            ]
+        case .ja:
+            return [
+                "「東四命／西四命」と家屋の坐山との相性を自動判定し、ベッドや机の最適方位を提案します。",
+                "「今後30日間の吉日一覧」と日時トラベル機能を備え、当日の朝リマインダーも設定可能です。"
+            ]
+        case .ko:
+            return [
+                "'동사명/서사명'과 주택 좌산의 조화를 자동 판정하여 침대 및 책상 배치 방안을 제시합니다.",
+                "'향후 30일 황도길일 속람'과 시간 탐색 다이얼 및 당일 아침 알림을 지원합니다."
+            ]
+        case .vi:
+            return [
+                "Tự động đối chiếu 'Đông Tứ Mệnh / Tây Tứ Mệnh' với tọa sơn của nhà, gợi ý hướng kê giường và bàn làm việc.",
+                "Hỗ trợ 'Tra cứu ngày tốt 30 ngày tới', xoay thời gian và bật nhắc nhở buổi sáng."
+            ]
+        case .th:
+            return [
+                "ตรวจสอบกลุ่มดวงตะวันออก/ตะวันตกกับทิศบ้านโดยอัตโนมัติ พร้อมแนะนำทิศหัวนอนและโต๊ะทำงาน",
+                "รองรับปฏิทินฤกษ์มงคล 30 วันข้างหน้า การย้อน/ข้ามเวลา และการตั้งเตือนเช้าวันมงคล"
+            ]
+        case .id:
+            return [
+                "Pencocokan otomatis Empat Timur/Barat dengan arah duduk rumah, lengkap dengan saran arah ranjang & meja.",
+                "Kalender Hari Baik 30 Hari ke depan dengan pengingat pagi otomatis."
+            ]
+        case .auto, .zhHans:
+            return [
+                "自动判定“东四命/西四命”是否与本宅坐山相配，给出安床与书桌朝向方案。",
+                "支持“未来30天黄道吉日速查”与时辰穿越拨盘，可一键开启早晨吉日提醒。"
+            ]
+        }
+    }
+    private var step3Title: String {
+        switch lang.effectiveLanguage {
+        case .en: return "3. Multi-Case Floorplan & AR Survey"
+        case .zhHant: return "第三步：多套戶型檔案與 AR 實景勘測"
+        case .ja: return "ステップ3：複数物件の宅譜管理＆AR実景測量"
+        case .ko: return "3단계: 다주택 평면도 보관함 및 AR 실경 측정"
+        case .vi: return "Bước 3: Kho Hồ Sơ Đa Căn Hộ & Khảo Sát AR"
+        case .th: return "ขั้นตอนที่ 3: คลังผังบ้านหลายหลังและสแกน AR"
+        case .id: return "Langkah 3: Arsip Multi-Properti & Survei AR"
+        case .auto, .zhHans: return "第三步：多套户型档案与 AR 实景勘测"
+        }
+    }
+    private var step3Desc: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Import floorplans or scan with 3D RoomPlan, and save multiple property cases to compare anytime:"
+        case .zhHant: return "導入戶型圖或使用 RoomPlan 3D 掃描全屋，建立您的專屬「宅譜檔案夾」："
+        case .ja: return "間取り図の読込やRoomPlan 3Dスキャンで、複数物件の「宅譜アーカイブ」を構築できます："
+        case .ko: return "평면도를 불러오거나 RoomPlan 3D 스캔을 사용하여 나만의 '택보 보관함'을 구축하세요:"
+        case .vi: return "Nhập sơ đồ mặt bằng hoặc quét 3D RoomPlan, lưu trữ nhiều hồ sơ căn hộ để so sánh bất cứ lúc nào:"
+        case .th: return "นำเข้าผังบ้านหรือสแกน 3D RoomPlan พร้อมบันทึกแฟ้มบ้านหลายหลังเพื่อสลับเปรียบเทียบได้ตลอดเวลา:"
+        case .id: return "Impor denah atau pindai 3D RoomPlan, dan simpan beberapa arsip properti untuk dibandingkan kapan saja:"
+        case .auto, .zhHans: return "导入户型图或使用 RoomPlan 3D 扫描全屋，建立您的专属“宅谱档案夹”："
+        }
+    }
+    private var step3Bullets: [String] {
+        switch lang.effectiveLanguage {
+        case .en:
+            return [
+                "Save & switch between multiple properties (Home, Office, Client Cases).",
+                "Diagnose bathroom/kitchen placement (Fire at Heaven's Gate) in plain language."
+            ]
+        case .zhHant:
+            return [
+                "支持保存多套看房/客戶戶型檔案，隨時切換對比，單次解鎖憑證獨立隨檔案永久保留。",
+                "每個宮位均提供「白話吉凶速斷」與古籍斷語雙重視角，新手老手皆宜。"
+            ]
+        case .ja:
+            return [
+                "自宅・オフィス・内見物件など複数の間取りを保存して比較でき、単回アンロック権限も各物件に永続保持されます。",
+                "すべての宮位に「わかりやすい現代語解説」と「古典断語」の両方を収録しています。"
+            ]
+        case .ko:
+            return [
+                "자택, 사무실, 매물 등 여러 평면도를 저장 및 전환할 수 있으며 단건 잠금해제 권한도 영구 보존됩니다.",
+                "모든 궁위에 '쉬운 현대어 해설'과 '고전 단언'을 함께 제공하여 초보자와 전문가 모두에게 적합합니다."
+            ]
+        case .vi:
+            return [
+                "Lưu và chuyển đổi giữa nhiều căn hộ (Nhà ở, Văn phòng, Khách hàng), giữ nguyên quyền mở khóa cho từng hồ sơ.",
+                "Mỗi cung vị đều có cả 'Luận giải dễ hiểu' lẫn 'Đoán ngữ cổ tịch', phù hợp cho cả người mới và chuyên gia."
+            ]
+        case .th:
+            return [
+                "บันทึกและสลับดูผังบ้านหลายหลัง (บ้าน ออฟฟิศ หรือบ้านลูกค้า) โดยสิทธิ์ปลดล็อกจะถูกเก็บไว้กับแต่ละแฟ้มอย่างถาวร",
+                "ทุกวังมีทั้งคำอธิบายภาษาเข้าใจง่ายและคัมภีร์โบราณ เหมาะสำหรับทั้งมือใหม่และซินแสมืออาชีพ"
+            ]
+        case .id:
+            return [
+                "Simpan & beralih antar beberapa properti (Rumah, Kantor, Klien) dengan bukti buka kunci yang tersimpan permanen.",
+                "Setiap istana dilengkapi ringkasan bahasa sehari-hari yang mudah dipahami serta teks klasik."
+            ]
+        case .auto, .zhHans:
+            return [
+                "支持保存多套看房/客户户型档案，随时切换对比，单次解锁凭证独立随档案永久保留。",
+                "每个宫位均提供“白话吉凶速断”与古籍断语双重视角，新手老手皆宜。"
+            ]
+        }
+    }
+    private var birthYearLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Owner Birth Year:"
+        case .zhHant: return "宅主出生年份："
+        case .ja: return "家主の生年："
+        case .ko: return "택주 출생연도:"
+        case .vi: return "Năm sinh gia chủ:"
+        case .th: return "ปีเกิดเจ้าของบ้าน:"
+        case .id: return "Tahun Lahir Pemilik:"
+        case .auto, .zhHans: return "宅主出生年份："
+        }
+    }
+    private var maleLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Male"
+        case .ko: return "남"
+        case .vi: return "Nam"
+        case .th: return "ชาย"
+        case .id: return "Pria"
+        case .auto, .zhHans, .zhHant, .ja: return "男"
+        }
+    }
+    private var femaleLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Female"
+        case .ko: return "여"
+        case .vi: return "Nữ"
+        case .th: return "หญิง"
+        case .id: return "Wanita"
+        case .auto, .zhHans, .zhHant, .ja: return "女"
+        }
+    }
+    private var nextButtonTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Next Step"
+        case .zhHant: return "下一步"
+        case .ja: return "次へ"
+        case .ko: return "다음 단계"
+        case .vi: return "Bước tiếp"
+        case .th: return "ถัดไป"
+        case .id: return "Berikutnya"
+        case .auto, .zhHans: return "下一步"
+        }
+    }
+    private var startButtonTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Start Using Tiandi Luopan"
+        case .zhHant: return "立即開啟天地羅盤"
+        case .ja: return "天地羅盤をはじめる"
+        case .ko: return "천지나경 시작하기"
+        case .vi: return "Bắt Đầu Sử Dụng Thiên Địa La Bàn"
+        case .th: return "เริ่มต้นใช้งานเทียนตี้หลัวผาน"
+        case .id: return "Mulai Gunakan Tiandi Luopan"
+        case .auto, .zhHans: return "立即开启天地罗盘"
+        }
     }
 }

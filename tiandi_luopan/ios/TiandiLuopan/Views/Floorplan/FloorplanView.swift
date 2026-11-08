@@ -23,6 +23,17 @@ private struct SavedFloorplanLayout: Codable {
     let floorplanAccessGrantSignature: String?
 }
 
+/// P1.2 多套户型宅谱档案记录（支持保存多套房源/客户户型、关联 3D 空间测绘模型及各自的已购解锁凭证）
+private struct FloorplanCaseRecord: Codable, Identifiable {
+    let id: String
+    var title: String
+    let createdAt: Date
+    let sittingSummary: String
+    let layout: SavedFloorplanLayout
+    let imageFileName: String?
+    var spatialSurvey: HouseSpatialSurvey? = nil
+}
+
 /// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
 private struct RoomCandidate: Equatable {
     var rect: CGRect
@@ -87,8 +98,13 @@ public struct FloorplanView: View {
     // identity so a large JPEG is encoded only when the imported image
     // itself changes, rather than after every drag gesture.
     @State private var persistedImageObjectID: ObjectIdentifier?
+    @State private var savedCases: [FloorplanCaseRecord] = []
+    @State private var showCaseArchiveSheet: Bool = false
+    @State private var newCaseTitleInput: String = ""
+    @State private var caseBackupToastMessage: String? = nil
 
     private static let savedLayoutKey = "tiandi_floorplan_saved_layout_v1"
+    private static let savedCasesArchiveKey = "tiandi_floorplan_cases_archive_v1"
     private static let savedImageFileName = "floorplan-background.jpg"
     
     public init(isActive: Bool = true) {
@@ -352,6 +368,9 @@ public struct FloorplanView: View {
                 House3DSpaceViewer(survey: s)
             }
         }
+        .sheet(isPresented: $showCaseArchiveSheet) {
+            caseArchiveSheetView()
+        }
         .onChange(of: lang.effectiveLanguage) { _ in
             // Keep the user's room geometry while refreshing language-dependent
             // sample labels and diagnostics.
@@ -489,6 +508,10 @@ public struct FloorplanView: View {
         guard !didRestorePersistedLayout else { return }
         didRestorePersistedLayout = true
         reloadSpatialSurveyArchives()
+        if let casesData = UserDefaults.standard.data(forKey: Self.savedCasesArchiveKey),
+           let decodedCases = try? JSONDecoder().decode([FloorplanCaseRecord].self, from: casesData) {
+            savedCases = decodedCases
+        }
         guard let data = UserDefaults.standard.data(forKey: Self.savedLayoutKey),
               let saved = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data) else { return }
 
@@ -626,6 +649,417 @@ public struct FloorplanView: View {
             return nil
         }
         return directory.appendingPathComponent(savedImageFileName, isDirectory: false)
+    }
+
+    private static func caseImageURL(fileName: String) -> URL? {
+        guard let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            return nil
+        }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent(fileName, isDirectory: false)
+    }
+
+    private var archiveButtonTitle: String {
+        let base: String
+        switch lang.effectiveLanguage {
+        case .en: base = "Cases"
+        case .zhHant: base = "宅譜庫"
+        case .ja: base = "宅譜庫"
+        case .ko: base = "택보함"
+        case .vi: base = "Hồ Sơ"
+        case .th: base = "คลังผัง"
+        case .id: base = "Arsip"
+        case .auto, .zhHans: base = "宅谱库"
+        }
+        return savedCases.isEmpty ? base : "\(base)(\(savedCases.count))"
+    }
+
+    private func saveCurrentCaseToArchive(customTitle: String) {
+        let caseID = UUID().uuidString
+        let trimmed = customTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sittingText = "\(floorplanHeadingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(floorplanHeadingState.facingMountain.localizedName)\(lang.t("facing_suffix")) (\(String(format: "%.1f°", effectiveHeading)))"
+        let df = DateFormatter()
+        df.dateFormat = "MM-dd HH:mm"
+        let resolvedTitle = trimmed.isEmpty ? "\(sittingText) · \(df.string(from: Date()))" : trimmed
+
+        var imgFileName: String? = nil
+        if let image = userFloorplanImage,
+           let data = image.jpegData(compressionQuality: 0.82) ?? image.pngData() {
+            let fname = "floorplan-case-\(caseID).jpg"
+            if let url = Self.caseImageURL(fileName: fname) {
+                try? data.write(to: url, options: .atomic)
+                imgFileName = fname
+            }
+        }
+
+        let currentLayout = SavedFloorplanLayout(
+            rooms: rooms,
+            centroidX: Double(centroid.x),
+            centroidY: Double(centroid.y),
+            compassRotation: Self.normalizedHeading(effectiveHeading),
+            isSyncWithCompass: false,
+            hasFloorplanAccess: didConsumeFloorplanCredit
+                && floorplanAccessGrantID != nil
+                && floorplanAccessGrantSignature != nil,
+            floorplanAccessGrantID: floorplanAccessGrantID,
+            floorplanAccessGrantSignature: floorplanAccessGrantSignature
+        )
+
+        let record = FloorplanCaseRecord(
+            id: caseID,
+            title: resolvedTitle,
+            createdAt: Date(),
+            sittingSummary: sittingText,
+            layout: currentLayout,
+            imageFileName: imgFileName,
+            spatialSurvey: persistedSpatialSurvey ?? persistedVirtualSpatialSurvey
+        )
+        savedCases.insert(record, at: 0)
+        persistCasesArchive()
+        RetentionServiceManager.shared.recordMilestone(reason: "save_floorplan_case")
+    }
+
+    private func loadCaseFromArchive(_ record: FloorplanCaseRecord) {
+        let saved = record.layout
+        rooms = saved.rooms.map { r in
+            var copy = Self.sanitizedRoom(r)
+            copy.name = copy.type.localizedName
+            return copy
+        }
+        centroid = CGPoint(
+            x: Self.clampedUnit(saved.centroidX, fallback: 0.5),
+            y: Self.clampedUnit(saved.centroidY, fallback: 0.5)
+        )
+        compassRotation = Self.normalizedHeading(saved.compassRotation)
+        isSyncWithCompass = saved.isSyncWithCompass
+        if saved.hasFloorplanAccess,
+           let gID = saved.floorplanAccessGrantID,
+           let gSig = saved.floorplanAccessGrantSignature,
+           iap.validateFloorplanAccessGrant(FloorplanAccessGrant(id: gID, signature: gSig)) {
+            floorplanAccessGrantID = gID
+            floorplanAccessGrantSignature = gSig
+            didConsumeFloorplanCredit = true
+        } else {
+            floorplanAccessGrantID = nil
+            floorplanAccessGrantSignature = nil
+            didConsumeFloorplanCredit = false
+        }
+
+        if let fname = record.imageFileName,
+           let url = Self.caseImageURL(fileName: fname),
+           let img = UIImage(contentsOfFile: url.path) {
+            userFloorplanImage = img
+        } else {
+            userFloorplanImage = nil
+        }
+
+        if let survey = record.spatialSurvey {
+            let isVR = survey.scanMethod.localizedCaseInsensitiveContains("VR") || survey.scanMethod.contains("仿真")
+            if isVR {
+                persistedVirtualSpatialSurvey = survey
+                if let sData = try? JSONEncoder().encode(survey) {
+                    UserDefaults.standard.set(sData, forKey: SpatialSurveyArchiveKeys.virtual)
+                }
+            } else {
+                persistedSpatialSurvey = survey
+                if let sData = try? JSONEncoder().encode(survey) {
+                    UserDefaults.standard.set(sData, forKey: SpatialSurveyArchiveKeys.measured)
+                }
+            }
+            ShaSurveyStore.shared.updateInterior(survey)
+        }
+
+        persistedImageObjectID = nil
+        persistLayout()
+        refreshAudit(force: true)
+    }
+
+    private func exportCaseJSONToClipboard(_ record: FloorplanCaseRecord) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(record),
+              let jsonStr = String(data: data, encoding: .utf8) else { return }
+        UIPasteboard.general.string = jsonStr
+        switch lang.effectiveLanguage {
+        case .en: caseBackupToastMessage = "Copied case JSON backup to clipboard"
+        case .zhHant: caseBackupToastMessage = "已複製該宅譜 JSON 備份至剪貼簿"
+        case .ja: caseBackupToastMessage = "宅譜 JSON バックアップをコピーしました"
+        case .ko: caseBackupToastMessage = "택보 JSON 백업을 클립보드에 복사했습니다"
+        case .vi: caseBackupToastMessage = "Đã sao chép JSON hồ sơ vào bộ nhớ tạm"
+        case .th: caseBackupToastMessage = "คัดลอกข้อมูลสำรอง JSON ไปยังคลิปบอร์ดแล้ว"
+        case .id: caseBackupToastMessage = "JSON cadangan arsip disalin ke papan klip"
+        case .auto, .zhHans: caseBackupToastMessage = "已复制该宅谱 JSON 备份至剪贴板"
+        }
+    }
+
+    private func importCaseJSONFromClipboard() {
+        guard let raw = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let data = raw.data(using: .utf8),
+              var decoded = try? JSONDecoder().decode(FloorplanCaseRecord.self, from: data) else {
+            switch lang.effectiveLanguage {
+            case .en: caseBackupToastMessage = "Clipboard does not contain valid Case JSON"
+            case .zhHant: caseBackupToastMessage = "剪貼簿中未檢測到有效的宅譜 JSON 數據"
+            case .ja: caseBackupToastMessage = "クリップボードに有効な宅譜 JSON がありません"
+            case .ko: caseBackupToastMessage = "클립보드에 유효한 택보 JSON이 없습니다"
+            case .vi: caseBackupToastMessage = "Bộ nhớ tạm không có dữ liệu JSON hồ sơ hợp lệ"
+            case .th: caseBackupToastMessage = "ไม่พบข้อมูล JSON ผังบ้านที่ถูกต้องในคลิปบอร์ด"
+            case .id: caseBackupToastMessage = "Papan klip tidak berisi JSON arsip yang valid"
+            case .auto, .zhHans: caseBackupToastMessage = "剪贴板中未检测到有效的宅谱 JSON 数据"
+            }
+            return
+        }
+        if savedCases.contains(where: { $0.id == decoded.id }) {
+            decoded = FloorplanCaseRecord(
+                id: UUID().uuidString,
+                title: decoded.title,
+                createdAt: decoded.createdAt,
+                sittingSummary: decoded.sittingSummary,
+                layout: decoded.layout,
+                imageFileName: decoded.imageFileName,
+                spatialSurvey: decoded.spatialSurvey
+            )
+        }
+        savedCases.insert(decoded, at: 0)
+        persistCasesArchive()
+        switch lang.effectiveLanguage {
+        case .en: caseBackupToastMessage = "Imported case: \(decoded.title)"
+        case .zhHant: caseBackupToastMessage = "已成功導入宅譜：\(decoded.title)"
+        case .ja: caseBackupToastMessage = "宅譜をインポートしました：\(decoded.title)"
+        case .ko: caseBackupToastMessage = "택보 가져오기 완료: \(decoded.title)"
+        case .vi: caseBackupToastMessage = "Đã nhập hồ sơ: \(decoded.title)"
+        case .th: caseBackupToastMessage = "นำเข้าแฟ้มสำเร็จ: \(decoded.title)"
+        case .id: caseBackupToastMessage = "Arsip berhasil diimpor: \(decoded.title)"
+        case .auto, .zhHans: caseBackupToastMessage = "已成功导入宅谱：\(decoded.title)"
+        }
+    }
+
+    private func deleteCaseFromArchive(_ record: FloorplanCaseRecord) {
+        if let fname = record.imageFileName,
+           let url = Self.caseImageURL(fileName: fname) {
+            try? FileManager.default.removeItem(at: url)
+        }
+        savedCases.removeAll { $0.id == record.id }
+        persistCasesArchive()
+    }
+
+    private func persistCasesArchive() {
+        if let data = try? JSONEncoder().encode(savedCases) {
+            UserDefaults.standard.set(data, forKey: Self.savedCasesArchiveKey)
+        }
+    }
+
+    @ViewBuilder
+    private func caseArchiveSheetView() -> some View {
+        let sheetTitle: String
+        let placeholder: String
+        let saveBtnTitle: String
+        let importBtnTitle: String
+        let emptyTip: String
+        let loadBtn: String
+        switch lang.effectiveLanguage {
+        case .en:
+            sheetTitle = "Property & Floorplan Cases"
+            placeholder = "Case Name (e.g. Home 120㎡)"
+            saveBtnTitle = "Save Current Plan to Archive"
+            importBtnTitle = "Import Case JSON from Clipboard"
+            emptyTip = "No saved property cases yet. Save your current floorplan above so you can compare multiple properties without losing your paid unlock."
+            loadBtn = "Load"
+        case .zhHant:
+            sheetTitle = "多套戶型宅譜檔案庫"
+            placeholder = "輸入檔案名（如：萬科翡翠 120㎡）"
+            saveBtnTitle = "保存當前戶型至宅譜庫"
+            importBtnTitle = "從剪貼簿導入宅譜 JSON 備份"
+            emptyTip = "暫無已存宅譜。點擊上方按鈕即可將當前戶型、房間布局、3D模型、立極坐向及單次解鎖憑證完整歸檔，方便多房源隨時切換對比。"
+            loadBtn = "載入"
+        case .ja:
+            sheetTitle = "複数物件の間取り宅譜アーカイブ"
+            placeholder = "物件名を入力（例：自宅 120㎡）"
+            saveBtnTitle = "現在の間取りを宅譜庫に保存"
+            importBtnTitle = "クリップボードから宅譜 JSON を読込"
+            emptyTip = "保存された宅譜はありません。上のボタンから現在の間取り・部屋配置・3Dモデル・坐向・単回アンロック権限を保存し、複数物件を比較できます。"
+            loadBtn = "読込"
+        case .ko:
+            sheetTitle = "다주택 평면도 택보 보관함"
+            placeholder = "보관함 이름 입력 (예: 자택 120㎡)"
+            saveBtnTitle = "현재 평면도를 택보함에 저장"
+            importBtnTitle = "클립보드에서 택보 JSON 가져오기"
+            emptyTip = "저장된 택보가 없습니다. 상단 버튼을 눌러 현재 평면도, 방 배치, 3D 모델, 좌향 및 단건 잠금해제 권한을 보관하고 여러 매물을 비교해 보세요."
+            loadBtn = "불러오기"
+        case .vi:
+            sheetTitle = "Kho Hồ Sơ Mặt Bằng Nhiều Căn Hộ"
+            placeholder = "Nhập tên hồ sơ (VD: Căn hộ 120㎡)"
+            saveBtnTitle = "Lưu Mặt Bằng Hiện Tại Vào Kho"
+            importBtnTitle = "Nhập Hồ Sơ JSON Từ Bộ Nhớ Tạm"
+            emptyTip = "Chưa có hồ sơ nào. Nhấn nút phía trên để lưu mặt bằng, bố cục phòng, 3D, tọa hướng và quyền mở khóa để dễ dàng so sánh nhiều căn hộ."
+            loadBtn = "Tải"
+        case .th:
+            sheetTitle = "คลังแฟ้มผังบ้านหลายหลัง"
+            placeholder = "ตั้งชื่อแฟ้ม (เช่น บ้าน 120 ตร.ม.)"
+            saveBtnTitle = "บันทึกผังปัจจุบันลงในคลัง"
+            importBtnTitle = "นำเข้า JSON ผังบ้านจากคลิปบอร์ด"
+            emptyTip = "ยังไม่มีแฟ้มที่บันทึกไว้ กดปุ่มด้านบนเพื่อบันทึกผังห้อง 3D ทิศทาง และสิทธิ์ปลดล็อก เพื่อสลับเปรียบเทียบหลายบ้านได้ทันที"
+            loadBtn = "โหลด"
+        case .id:
+            sheetTitle = "Arsip Denah Multi-Properti"
+            placeholder = "Nama Arsip (mis. Rumah 120㎡)"
+            saveBtnTitle = "Simpan Denah Saat Ini ke Arsip"
+            importBtnTitle = "Impor JSON Arsip dari Papan Klip"
+            emptyTip = "Belum ada arsip tersimpan. Simpan denah, tata ruang, model 3D, arah, dan akses buka kunci Anda di atas untuk membandingkan beberapa properti."
+            loadBtn = "Muat"
+        case .auto, .zhHans:
+            sheetTitle = "多套户型宅谱档案库"
+            placeholder = "输入档案名（如：万科翡翠 120㎡）"
+            saveBtnTitle = "保存当前户型至宅谱库"
+            importBtnTitle = "从剪贴板导入宅谱 JSON 备份"
+            emptyTip = "暂无已存宅谱。点击上方按钮即可将当前户型、房间布局、3D模型、立极坐向及单次解锁凭证完整归档，方便多房源随时切换对比。"
+            loadBtn = "载入"
+        }
+
+        NavigationView {
+            ZStack {
+                Color(red: 0.08, green: 0.08, blue: 0.11).ignoresSafeArea()
+
+                VStack(spacing: 14) {
+                    VStack(spacing: 10) {
+                        TextField(placeholder, text: $newCaseTitleInput)
+                            .adaptiveFont(size: 13)
+                            .padding(10)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+
+                        Button(action: {
+                            saveCurrentCaseToArchive(customTitle: newCaseTitleInput)
+                            newCaseTitleInput = ""
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tray.and.arrow.down.fill")
+                                Text(saveBtnTitle)
+                            }
+                            .adaptiveFont(size: 13, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                            .foregroundColor(.black)
+                            .cornerRadius(8)
+                        }
+
+                        Button(action: {
+                            importCaseJSONFromClipboard()
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "doc.on.clipboard")
+                                Text(importBtnTitle)
+                            }
+                            .adaptiveFont(size: 11, weight: .semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(Color.yanCyan)
+                            .cornerRadius(8)
+                        }
+
+                        if let toast = caseBackupToastMessage {
+                            Text(toast)
+                                .adaptiveFont(size: 11, weight: .semibold)
+                                .foregroundColor(.green)
+                        }
+                    }
+                    .padding(14)
+                    .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+                    .cornerRadius(12)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+
+                    if savedCases.isEmpty {
+                        Spacer()
+                        Text(emptyTip)
+                            .adaptiveFont(size: 13)
+                            .foregroundColor(.white.opacity(0.65))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 10) {
+                                ForEach(savedCases) { item in
+                                    HStack(spacing: 10) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Text(item.title)
+                                                    .adaptiveFont(size: 14, weight: .bold)
+                                                    .foregroundColor(.white)
+                                                if item.spatialSurvey != nil {
+                                                    Text("3D")
+                                                        .adaptiveFont(size: 9, weight: .bold)
+                                                        .padding(.horizontal, 5)
+                                                        .padding(.vertical, 1.5)
+                                                        .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.22))
+                                                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                                        .cornerRadius(4)
+                                                }
+                                            }
+                                            Text("\(item.sittingSummary) · \(item.layout.rooms.count) Rooms")
+                                                .adaptiveFont(size: 11)
+                                                .foregroundColor(Color.yanCyan)
+                                        }
+                                        Spacer()
+                                        Button(action: {
+                                            loadCaseFromArchive(item)
+                                            showCaseArchiveSheet = false
+                                        }) {
+                                            Text(loadBtn)
+                                                .adaptiveFont(size: 12, weight: .bold)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(Color.yanCyan.opacity(0.2))
+                                                .foregroundColor(Color.yanCyan)
+                                                .cornerRadius(6)
+                                        }
+                                        Button(action: {
+                                            exportCaseJSONToClipboard(item)
+                                        }) {
+                                            Image(systemName: "doc.on.doc")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                                .padding(6)
+                                        }
+                                        Button(action: {
+                                            deleteCaseFromArchive(item)
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .font(.system(size: 13))
+                                                .foregroundColor(.red.opacity(0.85))
+                                                .padding(6)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+                                    .cornerRadius(10)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 20)
+                        }
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(sheetTitle)
+                        .adaptiveFont(size: 15, weight: .bold)
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(lang.t("done")) {
+                        showCaseArchiveSheet = false
+                    }
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 
     private static func clampedUnit(_ value: Double, fallback: Double) -> CGFloat {
@@ -768,6 +1202,22 @@ public struct FloorplanView: View {
                 .cornerRadius(6)
             }
             
+            // P1.2 多套户型宅谱档案库按钮
+            Button(action: {
+                showCaseArchiveSheet = true
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "folder.fill.badge.plus")
+                    Text(archiveButtonTitle)
+                }
+                .adaptiveFont(size: 11, weight: .bold)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.22))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .cornerRadius(6)
+            }
+
             Button(action: {
                 showResetConfirmation = true
             }) {
@@ -2464,33 +2914,35 @@ public struct FloorplanView: View {
                 .font: UIFont.boldSystemFont(ofSize: 32),
                 .foregroundColor: UIColor(red: 0.95, green: 0.85, blue: 0.45, alpha: 1.0)
             ]
+            let kuaMatch = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: state.sittingMountain.palace)
+            let kuaSuffix = " · \(kuaMatch.localizedOwnerGuaName) (\(kuaMatch.matchBadgeTitle))"
             let reportMainTitle: String
             let reportSubHeadline: String
             switch lang.effectiveLanguage {
             case .en:
                 reportMainTitle = "YanXiang · Whole-Home Floorplan & Feng Shui Report"
-                reportSubHeadline = "Period 9 · Nine-Palace Bagua Alignment & Spatial Remedies"
+                reportSubHeadline = "Period 9 · Nine-Palace Bagua Alignment\(kuaSuffix)"
             case .zhHant:
                 reportMainTitle = "演象 · 戶型空間立極與全屋堪輿全案"
-                reportSubHeadline = "下元九運 · 九宮八卦立極透視與居家化解建議"
+                reportSubHeadline = "下元九運 · 九宮八卦立極透視\(kuaSuffix)"
             case .ja:
                 reportMainTitle = "演象・間取り立極＆全室風水鑑定レポート"
-                reportSubHeadline = "下元九運・九宮八卦立極透視と住空間の化煞アドバイス"
+                reportSubHeadline = "下元九運・九宮八卦立極透視\(kuaSuffix)"
             case .ko:
                 reportMainTitle = "연상 · 평면도 입극 및 전택 풍수 감정 보고서"
-                reportSubHeadline = "하원 9운 · 구궁팔괘 입극 투시 및 주거 비보 제안"
+                reportSubHeadline = "하원 9운 · 구궁팔괘 입극 투시\(kuaSuffix)"
             case .vi:
                 reportMainTitle = "Diễn Tượng · Hồ Sơ Phong Thủy & Lập Cực Mặt Bằng"
-                reportSubHeadline = "Hạ Nguyên Vận 9 · Thấu Thị Cửu Cung Bát Quái & Hóa Giải"
+                reportSubHeadline = "Hạ Nguyên Vận 9 · Thấu Thị Cửu Cung Bát Quái\(kuaSuffix)"
             case .th:
                 reportMainTitle = "เหยียนเซี่ยง · รายงานฮวงจุ้ยและจุดศูนย์กลางผังบ้าน"
-                reportSubHeadline = "ยุค 9 ล่าง · วิเคราะห์เก้าวังแปดทิศและคำแนะนำการปรับแก้"
+                reportSubHeadline = "ยุค 9 ล่าง · วิเคราะห์เก้าวังแปดทิศ\(kuaSuffix)"
             case .id:
                 reportMainTitle = "YanXiang · Laporan Feng Shui & Titik Pusat Denah Rumah"
-                reportSubHeadline = "Periode 9 · Analisis Sembilan Istana Bagua & Solusi Ruang"
+                reportSubHeadline = "Periode 9 · Analisis Sembilan Istana Bagua\(kuaSuffix)"
             case .auto, .zhHans:
                 reportMainTitle = "演象 · 户型空间立极与全屋堪舆全案"
-                reportSubHeadline = "下元九运 · 九宫八卦立极透视与居家化解建议"
+                reportSubHeadline = "下元九运 · 九宫八卦立极透视\(kuaSuffix)"
             }
             reportMainTitle.draw(at: CGPoint(x: 70, y: 64), withAttributes: titleAttrs)
 

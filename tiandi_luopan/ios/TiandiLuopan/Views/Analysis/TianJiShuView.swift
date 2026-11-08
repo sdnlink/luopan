@@ -100,6 +100,7 @@ public struct TianJiShuView: View {
                                                     // The credit is committed only
                                                     // after the photo write succeeds.
                                                     commitReservedTianjiCredit()
+                                                    RetentionServiceManager.shared.recordMilestone(reason: "save_tianjishu")
                                                     withAnimation { showSavedToast = true }
                                                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                                                         withAnimation { showSavedToast = false }

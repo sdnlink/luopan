@@ -340,6 +340,39 @@ jobs:
             WIDGET_PROFILE_UUID=""
           fi
 
+          # 动态探测描述文件是否包含 App Groups 权限 (com.apple.security.application-groups)
+          # 若主工程描述文件与小组件描述文件均已开启 App Group，则自动生成并注入 Entitlements，激活真机主程序与小组件实时坐向同步；
+          # 若描述文件尚未勾选 App Group（如 Wildcard 通配描述文件），则保持空 Entitlements，确保归档签名不报错。
+          MAIN_APP_GROUP=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" "$PROFILE_PLIST" 2>/dev/null || true)
+          WIDGET_APP_GROUP=""
+          if [ "$HAS_WIDGET_PROFILE" = "true" ]; then
+            if [ -f "${WIDGET_PROFILE_PLIST:-}" ]; then
+              WIDGET_APP_GROUP=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" "$WIDGET_PROFILE_PLIST" 2>/dev/null || true)
+            else
+              WIDGET_APP_GROUP="$MAIN_APP_GROUP"
+            fi
+          fi
+
+          ENTITLEMENTS_PATH=""
+          if [ -n "$MAIN_APP_GROUP" ] && { [ "$HAS_WIDGET_PROFILE" != "true" ] || [ -n "$WIDGET_APP_GROUP" ]; }; then
+            ENTITLEMENTS_PATH="$RUNNER_TEMP/signing/AppGroup.entitlements"
+            cat > "$ENTITLEMENTS_PATH" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>${MAIN_APP_GROUP}</string>
+	</array>
+</dict>
+</plist>
+EOF
+            echo "Detected App Group entitlement ($MAIN_APP_GROUP) in provisioning profile; generated $ENTITLEMENTS_PATH"
+          else
+            echo "No App Group entitlement found in provisioning profile(s); archiving without CODE_SIGN_ENTITLEMENTS override."
+          fi
+
           # 输出供后续步骤使用
           {
             echo "signing_identity=$SIGNING_IDENTITY"
@@ -347,6 +380,7 @@ jobs:
             echo "profile_name=$PROFILE_NAME"
             echo "has_widget_profile=$HAS_WIDGET_PROFILE"
             echo "widget_profile_uuid=$WIDGET_PROFILE_UUID"
+            echo "entitlements_path=$ENTITLEMENTS_PATH"
             echo "export_method=$METHOD"
             echo "signing_cert_type=$CERT_TYPE"
           } >> "$GITHUB_OUTPUT"
@@ -363,6 +397,7 @@ jobs:
           PROFILE_UUID: ${{ steps.setup_signing.outputs.profile_uuid }}
           HAS_WIDGET_PROFILE: ${{ steps.setup_signing.outputs.has_widget_profile }}
           WIDGET_PROFILE_UUID: ${{ steps.setup_signing.outputs.widget_profile_uuid }}
+          ENTITLEMENTS_PATH: ${{ steps.setup_signing.outputs.entitlements_path }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
@@ -380,6 +415,12 @@ jobs:
             echo "Archiving with Widget Extension code signing disabled (no profile provided)"
           fi
 
+          EXTRA_ENTITLEMENTS_ARG=()
+          if [ -n "${ENTITLEMENTS_PATH:-}" ] && [ -f "$ENTITLEMENTS_PATH" ]; then
+            EXTRA_ENTITLEMENTS_ARG+=("CODE_SIGN_ENTITLEMENTS=$ENTITLEMENTS_PATH")
+            echo "Injecting CODE_SIGN_ENTITLEMENTS=$ENTITLEMENTS_PATH"
+          fi
+
           xcodebuild archive \
             -project "$PROJECT_PATH" \
             -scheme "$SCHEME_NAME" \
@@ -393,6 +434,7 @@ jobs:
             WIDGET_CODE_SIGNING_ALLOWED="$WIDGET_SIGN_ALLOWED" \
             WIDGET_PROVISIONING_PROFILE_SPECIFIER="$WIDGET_SPECIFIER" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            ${EXTRA_ENTITLEMENTS_ARG[@]+"${EXTRA_ENTITLEMENTS_ARG[@]}"} \
             2>&1 | tee build/xcodebuild-archive.log
 
           test -d build/TiandiLuopan.xcarchive

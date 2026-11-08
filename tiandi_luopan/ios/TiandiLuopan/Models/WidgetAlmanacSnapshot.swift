@@ -37,9 +37,13 @@ public struct WidgetAlmanacSnapshot {
     /// 不附加任何吉凶判断，也不改动主 App 的择日结论。
     public let dayOfficerIndex: Int
 
-    /// 小组件使用「通用日课」：不含坐山冲克判定。
-    /// 所有展示宜忌的尺寸都必须显示此说明，避免把结果误读为某一宅的坐向结论。
+    /// 小组件默认使用「通用日课」；当主 App 已锁定坐山并通过 App Group 共享时，
+    /// 自动升级为含坐山冲克判定的「自宅日课」（isGeneralDay = false）。
     public let isGeneralDay: Bool
+    /// 主 App 锁定的坐山短名（如 "壬山" / "Ren"），未锁定时为 nil
+    public let sittingMountainBadge: String?
+    /// 若今日冲克锁定坐山，标记为 true
+    public let hasSittingClash: Bool
 }
 
 public enum WidgetAlmanacBuilder {
@@ -70,9 +74,47 @@ public enum WidgetAlmanacBuilder {
         LocalizationManager.shared.syncFromSharedDefaults()
         let solar = SolarTimeCalculator.shared
 
-        // 通用日课：不传坐山，跳过坐山冲克，只按四柱 / 岁破 / 月破判读。
-        // 日柱与四柱均由这里统一提供，口径一致。
-        let dayCourse = ZeRiEngine.shared.analyzeGeneralDay(date: date)
+        // 优先从 App Group 共享容器（或本进程 UserDefaults）读取主 App 已锁定的自宅坐山；
+        // 若未锁定则回退为不含坐山冲克的「通用日课」。
+        let shared = LocalizationManager.sharedDefaults
+        let isLocked = (shared?.object(forKey: "compass_is_locked") as? Bool)
+            ?? UserDefaults.standard.bool(forKey: "compass_is_locked")
+        let savedMountainID = (shared?.object(forKey: "saved_sitting_mountain_id") as? Int)
+            ?? (UserDefaults.standard.object(forKey: "saved_sitting_mountain_id") as? Int)
+        let lockedMountain: Mountain24Item? = {
+            guard isLocked, let id = savedMountainID else { return nil }
+            return Mountain24Data.shared.mountains.first { $0.id == id }
+        }()
+
+        let dayCourse: ZeRiAnalysis
+        let sittingBadge: String?
+        if let mountain = lockedMountain {
+            dayCourse = ZeRiEngine.shared.analyze(date: date, sitting: mountain)
+            let mountains = Mountain24Data.shared.mountains
+            let facing = mountains.first { $0.id == (mountain.id + 12) % 24 } ?? mountain
+            let hasClash = dayCourse.sittingClashWarning != nil
+            switch LocalizationManager.shared.effectiveLanguage {
+            case .en:
+                sittingBadge = "\(mountain.localizedName)→\(facing.localizedName) · \(hasClash ? "Sitting Clash" : "Sitting Safe")"
+            case .zhHant:
+                sittingBadge = "\(mountain.localizedName)山\(facing.localizedName)向 · \(hasClash ? "坐山犯煞" : "坐山吉")"
+            case .ja:
+                sittingBadge = "\(mountain.localizedName)山\(facing.localizedName)向 · \(hasClash ? "坐山犯煞" : "坐山吉")"
+            case .ko:
+                sittingBadge = "\(mountain.localizedName)산\(facing.localizedName)향 · \(hasClash ? "좌산범살" : "좌산길")"
+            case .vi:
+                sittingBadge = "Tọa \(mountain.localizedName) Hướng \(facing.localizedName) · \(hasClash ? "Phạm Sát" : "Tọa Cát")"
+            case .th:
+                sittingBadge = "พิง\(mountain.localizedName)หัน\(facing.localizedName) · \(hasClash ? "ชงหลังพิง" : "ทิศพิงมงคล")"
+            case .id:
+                sittingBadge = "\(mountain.localizedName)→\(facing.localizedName) · \(hasClash ? "Bentrok" : "Aman")"
+            case .zhHans, .auto:
+                sittingBadge = "\(mountain.localizedName)山\(facing.localizedName)向 · \(hasClash ? "坐山犯煞" : "坐山吉")"
+            }
+        } else {
+            dayCourse = ZeRiEngine.shared.analyzeGeneralDay(date: date)
+            sittingBadge = nil
+        }
 
         let purple = PurpleWhiteEngine.shared.calculateChart(date: date)
         let starEngine = PurpleWhiteEngine.shared
@@ -107,7 +149,9 @@ public enum WidgetAlmanacBuilder {
             yearStarName: starEngine.starName(for: purple.yearCentralStar),
             monthStarName: starEngine.starName(for: purple.monthCentralStar),
             dayOfficerIndex: resolveDayOfficerIndex(for: date, dayPillar: dayCourse.dayPillar),
-            isGeneralDay: true
+            isGeneralDay: sittingBadge == nil,
+            sittingMountainBadge: sittingBadge,
+            hasSittingClash: dayCourse.sittingClashWarning != nil
         )
     }
 

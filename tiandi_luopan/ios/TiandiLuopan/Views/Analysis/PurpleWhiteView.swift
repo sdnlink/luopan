@@ -12,6 +12,8 @@ public struct PurpleWhiteView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
+    @State private var selectedDate: Date = Date()
+    @State private var isUsingCustomDate: Bool = false
     @State private var cachedChart: PurpleWhiteChart?
     @State private var selectedPalaceId: Int? = nil
     @State private var lastFacingSector: Int?
@@ -41,13 +43,17 @@ public struct PurpleWhiteView: View {
     public var body: some View {
         Group {
             if isActive {
+                let effectiveDate = isUsingCustomDate ? selectedDate : Date()
                 // Keep the expensive calendar and annual/monthly star
                 // calculation out of hidden sub-tab redraws.
-                let chart = cachedChart ?? PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+                let chart = cachedChart ?? PurpleWhiteEngine.shared.calculateChart(date: effectiveDate, heading: motion.headingState.facingAngle)
                 chartContent(chart: chart)
             } else {
                 Color.clear
             }
+        }
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
         }
         .onAppear {
             refreshChart(force: true)
@@ -100,57 +106,49 @@ public struct PurpleWhiteView: View {
             }
             .padding(.horizontal, 16)
             
-            if !iap.hasUnlockedVIP {
-                VIPLockCardView(
-                    title: lang.t("privilege_purplewhite_title"),
-                    featureDesc: lang.t("privilege_purplewhite_desc"),
-                    badge: lang.t("vip_badge_title"),
-                    targetProductId: .vipYearly,
-                    onUnlockTap: { showPaywall = true }
-                )
-                .sheet(isPresented: $showPaywall) {
-                    VIPPaywallSheet(defaultProductId: .vipYearly)
-                }
-            } else {
-                // 太岁、岁破、三煞警戒条
-                HStack(spacing: 8) {
-                    tagPill(title: lang.t("tai_sui_label"), value: chart.taiSuiDescription, color: Color.red)
-                    tagPill(title: lang.t("sui_po_label"), value: chart.suiPoDescription, color: Color.orange)
-                    tagPill(title: lang.t("san_sha_label"), value: chart.sanShaDescription, color: Color.purple)
-                }
+            // P0.3 流年/流月时间穿越切换栏
+            monthControlBar()
                 .padding(.horizontal, 16)
-                
-                // 3x3 九宫飞星网格 (流年客星与二五交加报警)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                    ForEach(chart.palaceItems) { item in
-                        let activeId = selectedPalaceId ?? chart.currentFacingPalace
-                        palaceCellView(
-                            item: item,
-                            isFacing: item.palaceId == chart.currentFacingPalace,
-                            isSelected: item.palaceId == activeId
-                        )
-                        .onTapGesture {
-                            selectedPalaceId = item.palaceId
-                        }
+
+            // P0.2 开放九宫飞星盘面与太岁三煞预警预览（先建立凶吉感知，深度断语再做 VIP 转化）
+            HStack(spacing: 8) {
+                tagPill(title: lang.t("tai_sui_label"), value: chart.taiSuiDescription, color: Color.red)
+                tagPill(title: lang.t("sui_po_label"), value: chart.suiPoDescription, color: Color.orange)
+                tagPill(title: lang.t("san_sha_label"), value: chart.sanShaDescription, color: Color.purple)
+            }
+            .padding(.horizontal, 16)
+            
+            // 3x3 九宫飞星网格 (流年客星与二五交加报警)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(chart.palaceItems) { item in
+                    let activeId = selectedPalaceId ?? chart.currentFacingPalace
+                    palaceCellView(
+                        item: item,
+                        isFacing: item.palaceId == chart.currentFacingPalace,
+                        isSelected: item.palaceId == activeId
+                    )
+                    .onTapGesture {
+                        selectedPalaceId = item.palaceId
                     }
                 }
-                // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
-                .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
-                .padding(.horizontal, isLargeLayout ? 0 : 16)
+            }
+            // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
+            .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
+            .padding(.horizontal, isLargeLayout ? 0 : 16)
+            }
+            } analysis: {
+            // 选中宫位流年/流月客星详解与宜忌建议（展开态右栏 / 折叠态底部）
+            VStack(spacing: 12) {
+                if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
+                    palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
+                        .padding(.horizontal, 16)
                 }
-                }
-                } analysis: {
-                // 选中宫位流年/流月客星详解与宜忌建议（展开态右栏 / 折叠态底部）
-                if iap.hasUnlockedVIP {
-                    if let activeItem = chart.palaceItems.first(where: { $0.palaceId == (selectedPalaceId ?? chart.currentFacingPalace) }) ?? chart.palaceItems.first {
-                        palaceDetailCard(item: activeItem, isFacing: activeItem.palaceId == chart.currentFacingPalace)
-                            .padding(.horizontal, 16)
-                    }
-                } else if isSplitLayout {
+                if !iap.hasUnlockedVIP {
                     purpleWhiteVIPPreviewCard()
                         .padding(.horizontal, 16)
                 }
             }
+        }
     }
 
     // MARK: - 紫白飞星 VIP 展开态预览卡 (消除展开态双栏右侧留白)
@@ -218,17 +216,101 @@ public struct PurpleWhiteView: View {
         .cornerRadius(12)
     }
 
+    private func monthControlBar() -> some View {
+        let prevLabel: String
+        let nextLabel: String
+        let nowLabel: String
+        switch lang.effectiveLanguage {
+        case .en:
+            prevLabel = "-1 Month"; nextLabel = "+1 Month"; nowLabel = "Current"
+        case .zhHant:
+            prevLabel = "上一節氣月"; nextLabel = "下一節氣月"; nowLabel = "回到當月"
+        case .ja:
+            prevLabel = "前節気月"; nextLabel = "次節気月"; nowLabel = "今月へ"
+        case .ko:
+            prevLabel = "이전 절기월"; nextLabel = "다음 절기월"; nowLabel = "이번달"
+        case .vi:
+            prevLabel = "Tháng trước"; nextLabel = "Tháng sau"; nowLabel = "Tháng này"
+        case .th:
+            prevLabel = "เดือนก่อน"; nextLabel = "เดือนถัดไป"; nowLabel = "เดือนนี้"
+        case .id:
+            prevLabel = "-1 Bulan"; nextLabel = "+1 Bulan"; nowLabel = "Bulan Ini"
+        case .auto, .zhHans:
+            prevLabel = "上一节气月"; nextLabel = "下一节气月"; nowLabel = "回到当月"
+        }
+
+        return HStack(spacing: 8) {
+            Button(action: {
+                let base = isUsingCustomDate ? selectedDate : Date()
+                selectedDate = Calendar.current.date(byAdding: .day, value: -30, to: base) ?? base
+                isUsingCustomDate = true
+                refreshChart(force: true)
+            }) {
+                Text(prevLabel)
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+            }
+
+            DatePicker("", selection: $selectedDate, displayedComponents: [.date])
+                .labelsHidden()
+                .colorScheme(.dark)
+                .scaleEffect(0.88)
+                .onChange(of: selectedDate) { _ in
+                    isUsingCustomDate = true
+                    refreshChart(force: true)
+                }
+
+            Button(action: {
+                let base = isUsingCustomDate ? selectedDate : Date()
+                selectedDate = Calendar.current.date(byAdding: .day, value: 30, to: base) ?? base
+                isUsingCustomDate = true
+                refreshChart(force: true)
+            }) {
+                Text(nextLabel)
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+            }
+
+            if isUsingCustomDate {
+                Button(action: {
+                    isUsingCustomDate = false
+                    selectedDate = Date()
+                    refreshChart(force: true)
+                }) {
+                    Text(nowLabel)
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(Color.yanCyan.opacity(0.2))
+                        .foregroundColor(Color.yanCyan)
+                        .cornerRadius(6)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
     private func refreshChart(force: Bool = false) {
         guard isActive else { return }
+        let effectiveDate = isUsingCustomDate ? selectedDate : Date()
         let sector = facingSector(for: motion.headingState.facingAngle)
-        let components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: effectiveDate)
         let calendarDayKey = (components.year ?? 0) * 10_000
             + (components.month ?? 0) * 100
             + (components.day ?? 0)
         if !force, lastFacingSector == sector, lastCalendarDayKey == calendarDayKey { return }
         lastFacingSector = sector
         lastCalendarDayKey = calendarDayKey
-        cachedChart = PurpleWhiteEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+        cachedChart = PurpleWhiteEngine.shared.calculateChart(date: effectiveDate, heading: motion.headingState.facingAngle)
     }
 
     private func facingSector(for heading: Double) -> Int {
@@ -267,6 +349,44 @@ public struct PurpleWhiteView: View {
     
     private func palaceDetailCard(item: PurpleWhitePalaceItem, isFacing: Bool) -> some View {
         let isDanger = item.isDanger25 || item.yearGuestStar == 5 || item.monthGuestStar == 5
+        let isJi = [1, 4, 6, 8, 9].contains(item.yearGuestStar) && !isDanger
+        let plainSummary: String = {
+            switch lang.effectiveLanguage {
+            case .en:
+                if isDanger { return "⚠️ Plain Summary: 5-Yellow/2-Black Sha lands in \(item.palaceName). Keep quiet, avoid renovation/drilling, and place metal/brass cures." }
+                if isJi { return "✅ Plain Summary: Auspicious Star (\(item.starName)) visits \(item.palaceName). Activate with daily activity, lighting, or water/plants." }
+                return "💡 Plain Summary: Watch for petty disputes or drain in \(item.palaceName). Keep tidy and well-lit."
+            case .zhHant:
+                if isDanger { return "⚠️ 【白話速斷】流年/流月五黃二黑煞星飛臨【\(item.palaceName)】，切忌動土鑽牆或放紅色地墊，宜掛銅錢/銅葫蘆化洩。" }
+                if isJi { return "✅ 【白話速斷】流年吉星【\(item.starName)】飛臨【\(item.palaceName)】，主旺財喜文昌，宜常坐臥、開窗納氣或擺放催旺器物。" }
+                return "💡 【白話速斷】本宮流年見【\(item.starName)】，注意防口舌是非或小破耗，保持整潔明亮即可。"
+            case .ja:
+                if isDanger { return "⚠️ 【平易解説】五黄・二黒の凶星が【\(item.palaceName)】に飛来。動土や赤い装飾を避け、銅銭や銅製ひょうたんで化殺してください。" }
+                if isJi { return "✅ 【平易解説】吉星【\(item.starName)】が【\(item.palaceName)】に飛来。財運・文昌に吉。換気と採光を良くして活用しましょう。" }
+                return "💡 【平易解説】本宮は【\(item.starName)】が巡ります。口論や小出費に注意し、整理整頓を心がけてください。"
+            case .ko:
+                if isDanger { return "⚠️ [쉬운 해설] 오황·이흑 살성이 【\(item.palaceName)】에 비임했습니다. 공사나 붉은 매트를 피하고 동전/동호리병으로 화살하세요." }
+                if isJi { return "✅ [쉬운 해설] 유년 길성 【\(item.starName)】이 【\(item.palaceName)】에 비임해 재물과 문창이 왕성합니다. 자주 머물고 환기하세요." }
+                return "💡 [쉬운 해설] 본 궁에 【\(item.starName)】이 비임하여 구설수나 작은 지출을 주의하고 밝고 깨끗이 유지하세요."
+            case .vi:
+                if isDanger { return "⚠️ [Tóm tắt] Sao Ngũ Hoàng/Nhị Hắc bay vào 【\(item.palaceName)】, kỵ khoan đục hoặc trải thảm đỏ; nên treo tiền đồng/hồ lô đồng hóa giải." }
+                if isJi { return "✅ [Tóm tắt] Cát tinh 【\(item.starName)】 đáo 【\(item.palaceName)】, vượng tài và văn xương; nên mở cửa đón khí hoặc sinh hoạt thường xuyên." }
+                return "💡 [Tóm tắt] Cung 【\(item.palaceName)】 gặp 【\(item.starName)】, lưu ý tránh thị phi nhỏ, giữ gọn gàng sáng sủa."
+            case .th:
+                if isDanger { return "⚠️ [สรุปเข้าใจง่าย] ดาวร้าย 5 เหลือง/2 ดำจรเข้า【\(item.palaceName)】 ห้ามเจาะทุบหรือวางพรมแดง แนะนำแขวนเหรียญทองเหลืองแก้เคล็ด" }
+                if isJi { return "✅ [สรุปเข้าใจง่าย] ดาวมงคล【\(item.starName)】จรเข้า【\(item.palaceName)】 เสริมโชคลาภและการงาน แนะนำเปิดรับแสงลมและใช้งานบ่อยๆ" }
+                return "💡 [สรุปเข้าใจง่าย] วังนี้พบดาว【\(item.starName)】 ระวังปากเสียงเล็กน้อย รักษาความสะอาดและแสงสว่าง"
+            case .id:
+                if isDanger { return "⚠️ [Ringkasan] Bintang 5-Kuning/2-Hitam di 【\(item.palaceName)】. Hindari renovasi & karpet merah; pasang koin/labu kuningan." }
+                if isJi { return "✅ [Ringkasan] Bintang Keberuntungan 【\(item.starName)】 di 【\(item.palaceName)】. Aktifkan dengan pencahayaan & sirkulasi udara." }
+                return "💡 [Ringkasan] Sektor 【\(item.palaceName)】 bertemu 【\(item.starName)】. Jaga tetap rapi dan terang untuk menghindari perselisihan kecil."
+            case .auto, .zhHans:
+                if isDanger { return "⚠️ 【白话速断】流年/流月五黄二黑煞星飞临【\(item.palaceName)】，切忌动土钻墙或放红色地垫，宜挂铜钱/铜葫芦化泄。" }
+                if isJi { return "✅ 【白话速断】流年吉星【\(item.starName)】飞临【\(item.palaceName)】，主旺财喜文昌，宜常坐卧、开窗纳气或摆放催旺器物。" }
+                return "💡 【白话速断】本宫流年见【\(item.starName)】，注意防口舌是非或小破耗，保持整洁明亮即可。"
+            }
+        }()
+
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: isDanger ? "exclamationmark.triangle.fill" : "sparkles")
@@ -282,10 +402,18 @@ public struct PurpleWhiteView: View {
                     .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
             }
-            Text(item.advice)
-                .adaptiveFont(size: 12)
-                .foregroundColor(.white.opacity(0.85))
-                .lineSpacing(3)
+
+            Text(plainSummary)
+                .adaptiveFont(size: 11, weight: .semibold)
+                .foregroundColor(isDanger ? Color.orange : (isJi ? Color.green : Color(red: 0.95, green: 0.85, blue: 0.45)))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if iap.hasUnlockedVIP {
+                Text(item.advice)
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(3)
+            }
         }
         .padding(12)
         .background(Color(red: 0.12, green: 0.12, blue: 0.16))

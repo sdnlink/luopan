@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import simd
 
 // MARK: - 通用几何工具 (多边形面积 / 质心 / 包围盒)
 // 供全景形煞档案与户型立极共用：识别与测绘产生的房间/区域边界以
@@ -68,16 +69,84 @@ struct ARCapturePose: Equatable {
     let heading: Double
     let elevation: Double
     let projection: ARTargetProjection
+    let right: SIMD3<Double>
+    let up: SIMD3<Double>
+    let forward: SIMD3<Double>
+
+    init(heading: Double, elevation: Double, projection: ARTargetProjection, roll: Double = 0) {
+        self.heading = heading
+        self.elevation = elevation
+        self.projection = projection
+        let h = heading * .pi / 180, e = elevation * .pi / 180, r = roll * .pi / 180
+        forward = SIMD3(sin(h) * cos(e), sin(e), -cos(h) * cos(e))
+        let horizontalRight = SIMD3(cos(h), 0, sin(h))
+        let verticalUp = SIMD3(-sin(h) * sin(e), cos(e), cos(h) * sin(e))
+        right = horizontalRight * cos(r) - verticalUp * sin(r)
+        up = horizontalRight * sin(r) + verticalUp * cos(r)
+    }
+
+    /// viewMatrix(for:) supplies axes aligned with the displayed viewport,
+    /// including portrait/landscape orientation and the camera's full rotation.
+    init(worldFromCamera: simd_float4x4, coordinateHeading: Double, projection: ARTargetProjection) {
+        let angle = coordinateHeading * .pi / 180
+        func geographic(_ column: SIMD4<Float>) -> SIMD3<Double> {
+            let x = Double(column.x), y = Double(column.y), z = Double(column.z)
+            return simd_normalize(SIMD3(x * cos(angle) - z * sin(angle), y,
+                                       x * sin(angle) + z * cos(angle)))
+        }
+        right = geographic(worldFromCamera.columns.0)
+        up = geographic(worldFromCamera.columns.1)
+        let ray = -geographic(worldFromCamera.columns.2)
+        forward = ray
+        heading = (atan2(ray.x, -ray.z) * 180 / .pi + 720).truncatingRemainder(dividingBy: 360)
+        elevation = asin(max(-1, min(1, ray.y))) * 180 / .pi
+        self.projection = projection
+    }
+
+    func direction(point: CGPoint) -> SIMD3<Double> {
+        let x = (Double(point.x) - 0.5) * 2 * tan(projection.horizontalFOVDegrees * .pi / 360)
+        let y = (0.5 - Double(point.y)) * 2 * tan(projection.verticalFOVDegrees * .pi / 360)
+        return simd_normalize(forward + right * x + up * y)
+    }
+
+    func bearing(point: CGPoint) -> Double {
+        let ray = direction(point: point)
+        return (atan2(ray.x, -ray.z) * 180 / .pi + 720).truncatingRemainder(dividingBy: 360)
+    }
+
+    func elevation(point: CGPoint) -> Double {
+        asin(max(-1, min(1, direction(point: point).y))) * 180 / .pi
+    }
 
     func isCompatible(with other: ARCapturePose) -> Bool {
-        let delta = abs(heading - other.heading).truncatingRemainder(dividingBy: 360)
-        return min(delta, 360 - delta) <= 3 && abs(elevation - other.elevation) <= 3
+        let cosine = (simd_dot(right, other.right) + simd_dot(up, other.up) + simd_dot(forward, other.forward) - 1) / 2
+        let rotation = acos(max(-1, min(1, cosine))) * 180 / .pi
+        return rotation <= 3
             && abs(projection.aspectRatio - other.projection.aspectRatio) < 0.02
             && abs(projection.horizontalFOVDegrees - other.projection.horizontalFOVDegrees) < 0.5
     }
 }
 
 public enum GeometryUtils {
+
+    /// Polygon edges count as inside, including the shared edge of two rooms.
+    public static func polygonContains(_ point: CGPoint, points: [CGPoint]) -> Bool {
+        guard points.count >= 3, point.x.isFinite, point.y.isFinite,
+              points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }),
+              polygonArea(points) > 1e-12 else { return false }
+        var inside = false
+        for i in points.indices {
+            let a = points[i], b = points[(i + 1) % points.count]
+            let dx = b.x - a.x, dy = b.y - a.y
+            let cross = (point.x - a.x) * dy - (point.y - a.y) * dx
+            if abs(cross) <= 1e-9 * max(1, hypot(dx, dy)),
+               point.x >= min(a.x, b.x) - 1e-9, point.x <= max(a.x, b.x) + 1e-9,
+               point.y >= min(a.y, b.y) - 1e-9, point.y <= max(a.y, b.y) + 1e-9 { return true }
+            if (a.y > point.y) != (b.y > point.y),
+               point.x < a.x + (point.y - a.y) * dx / dy { inside.toggle() }
+        }
+        return inside
+    }
 
     /// Distance to the outer convex envelope is invariant under rigid rotation.
     /// Concave entrances remain user-confirmable in the RoomPlan result.

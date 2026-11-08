@@ -29,6 +29,7 @@ struct VRSurveyReference {
 }
 
 public struct VRSpatialSurveyView: View {
+    @State private var propertyID: UUID
     @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) private var presentationMode
 
@@ -66,6 +67,7 @@ public struct VRSpatialSurveyView: View {
     /// RoomPlan/AR result. A VR correction should not silently switch to the
     /// phone's current facing direction after the user turns around.
     @State private var surveyReference: VRSurveyReference
+    @State private var followsEntranceFacing = true
 
     private var metersW: CGFloat { boundedMeters(widthMetersText, fallback: 12.0) }
     private var metersD: CGFloat { boundedMeters(depthMetersText, fallback: 10.0) }
@@ -91,8 +93,11 @@ public struct VRSpatialSurveyView: View {
         initialCeilingMeters: CGFloat? = nil,
         initialCoordinateHeading: Double? = nil,
         initialHouseFacingDegrees: Double? = nil,
-        initialCentroid: CGPoint? = nil
+        initialHouseFacingWasExplicit: Bool? = nil,
+        initialCentroid: CGPoint? = nil,
+        propertyID: UUID = ShaSurveyStore.shared.propertyID
     ) {
+        self._propertyID = State(initialValue: propertyID)
         if let initialSurvey {
             let seeded = Self.seededItems(from: initialSurvey)
             self._surveyReference = State(initialValue: VRSurveyReference(
@@ -101,6 +106,7 @@ public struct VRSpatialSurveyView: View {
                 normalizedCentroid: seeded.centroid,
                 yaw: Self.primaryAxisAngle(from: initialSurvey)
             ))
+            self._followsEntranceFacing = State(initialValue: initialSurvey.fixedHouseFacing == nil)
             self._rooms = State(initialValue: seeded.rooms)
             self._openings = State(initialValue: seeded.openings)
             self._widthMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.totalWidth))
@@ -113,6 +119,7 @@ public struct VRSpatialSurveyView: View {
                 normalizedCentroid: initialCentroid,
                 yaw: 0
             ))
+            self._followsEntranceFacing = State(initialValue: initialHouseFacingDegrees == nil || initialHouseFacingWasExplicit == false)
             let seededRooms = initialFloorplanRooms
                 .filter { $0.type != .missingCorner }
                 .map { VRRoomItem(type: $0.type, rect: Self.clampedRect($0.rect)) }
@@ -132,14 +139,23 @@ public struct VRSpatialSurveyView: View {
     public var body: some View {
         VStack(spacing: 8) {
             header
+            if surveyReference.houseFacingDegrees != nil {
+                Toggle(lang.t("vr_follow_entrance_facing"), isOn: $followsEntranceFacing)
+                    .adaptiveFont(size: 11)
+                    .foregroundColor(.white)
+                    .tint(Color.yanCyan)
+            }
             canvas
             toolbar
         }
         .padding(10)
         .background(Color.black.ignoresSafeArea())
+        .onReceive(ShaSurveyStore.shared.$propertyID) { id in
+            if id != propertyID { presentationMode.wrappedValue.dismiss() }
+        }
         .sheet(isPresented: resultPresented) {
             if let survey = resultSurvey {
-                House3DSpaceViewer(survey: survey)
+                House3DSpaceViewer(survey: survey, propertyID: propertyID)
             }
         }
         .sheet(isPresented: $showPaywall) {
@@ -510,6 +526,7 @@ public struct VRSpatialSurveyView: View {
     // MARK: - 生成测绘报告
 
     private func generateReport() {
+        guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return }
         if !iap.hasUnlockedVIP {
             showPaywall = true
             return
@@ -661,15 +678,13 @@ public struct VRSpatialSurveyView: View {
             objects: [],
             compassHeading: heading,
             centroidOverride: surveyReference.centroid(width: Float(width), depth: Float(depth)),
-            houseFacingDegrees: surveyReference.houseFacingDegrees
+            houseFacingDegrees: followsEntranceFacing ? nil : surveyReference.houseFacingDegrees
         )
         // Keep virtual output separate from the measured archive. A VR edit is
         // a correction/planning result and must never replace the latest
         // LiDAR/RoomPlan survey used by the measured 3D entry and long scroll.
-        if let data = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.virtual)
-            NotificationCenter.default.post(name: .didUpdateHouseSpatialSurvey, object: nil)
-        }
+        guard ShaSurveyStore.shared.saveSurvey(survey, key: SpatialSurveyArchiveKeys.virtual,
+                                               propertyID: propertyID) else { return }
         resultSurvey = survey
         validationMessage = nil
     }

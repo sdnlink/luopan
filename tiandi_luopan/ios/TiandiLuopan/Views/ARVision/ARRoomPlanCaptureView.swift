@@ -20,6 +20,12 @@ private func stopRoomCaptureSession(_ session: RoomCaptureSession) {
 
 @available(iOS 16.0, *)
 public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessionDelegate {
+    let propertyID: UUID
+
+    public init(propertyID: UUID = ShaSurveyStore.shared.propertyID) {
+        self.propertyID = propertyID
+        super.init()
+    }
     @Published public private(set) var wallCount = 0
     @Published public private(set) var doorCount = 0
     @Published public private(set) var windowCount = 0
@@ -531,6 +537,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             rooms: generatedRooms,
             centroid: centroid,
             blueprintImage: blueprint,
+            propertyID: propertyID,
             // The blueprint's top is world -Z, rather than the door normal.
             compassHeading: coordinateHeading,
             spatialSurvey: currentSpatialSurvey
@@ -1080,13 +1087,9 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             self.estimatedAreaSqMeters = area
             self.spatialFindings = findings
             self.currentSpatialSurvey = survey
-            if commitToHistory, let survey, let data = try? JSONEncoder().encode(survey) {
-                UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
-                NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
-            }
-            if commitToHistory {
-                // 仅在正式提交扫描房间时更新全景形煞档案的室内侧。
-                ShaSurveyStore.shared.updateInterior(survey)
+            if commitToHistory, let survey {
+                ShaSurveyStore.shared.saveSurvey(survey, key: SpatialSurveyArchiveKeys.measured,
+                                                 propertyID: self.propertyID)
             }
         }
         if Thread.isMainThread {
@@ -1124,11 +1127,10 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             Self.buildSpatialSurvey(from: combined, heading: $0, entranceID: confirmedEntranceID)
         }
         currentSpatialSurvey = survey
-        if let survey, let data = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
-            NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
+        if let survey {
+            ShaSurveyStore.shared.saveSurvey(survey, key: SpatialSurveyArchiveKeys.measured,
+                                             propertyID: propertyID)
         }
-        ShaSurveyStore.shared.updateInterior(survey)
     }
 
     public func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
@@ -1204,14 +1206,16 @@ public struct ARRoomPlanPreviewView: UIViewRepresentable {
 @available(iOS 16.0, *)
 public struct ARRoomPlanSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
-    @StateObject private var model = ARRoomPlanModel()
+    @StateObject private var model: ARRoomPlanModel
     @Environment(\.presentationMode) private var presentationMode
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var shareItem: ARRoomPlanShareItem?
     @State private var reportMessage: String?
     @State private var show3DViewer: Bool = false
 
-    public init() {}
+    public init(propertyID: UUID = ShaSurveyStore.shared.propertyID) {
+        self._model = StateObject(wrappedValue: ARRoomPlanModel(propertyID: propertyID))
+    }
 
     public var body: some View {
         ZStack {
@@ -1442,12 +1446,18 @@ public struct ARRoomPlanSurveyView: View {
         }
         .background(Color.black.ignoresSafeArea())
         .onDisappear { model.stop() }
+        .onReceive(ShaSurveyStore.shared.$propertyID) { id in
+            if id != model.propertyID {
+                model.stop()
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
         .sheet(item: $shareItem) { item in
             ARRoomPlanShareSheet(items: item.urls)
         }
         .sheet(isPresented: $show3DViewer) {
             if let survey = model.currentSpatialSurvey {
-                House3DSpaceViewer(survey: survey)
+                House3DSpaceViewer(survey: survey, propertyID: model.propertyID)
             }
         }
     }

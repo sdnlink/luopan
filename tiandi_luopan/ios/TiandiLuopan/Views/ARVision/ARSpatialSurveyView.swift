@@ -30,19 +30,52 @@ public enum ARSpatialSurveyError: Error, Equatable {
     case mapOrientationUnavailable
 }
 
+struct SpatialMapPoint: Codable, Equatable {
+    let x: Float
+    let y: Float
+    let z: Float
+    init(_ point: SIMD3<Float>) { x = point.x; y = point.y; z = point.z }
+    var position: SIMD3<Float> { SIMD3(x, y, z) }
+}
+
+struct SpatialMapAnnotations: Codable {
+    let cornerRooms: [SpatialRoom3D]
+    let cornerPoints: [SpatialMapPoint]
+    let lubanPoints: [SpatialMapPoint]
+
+    init(cornerRooms: [SpatialRoom3D] = [], cornerPoints: [SIMD3<Float>] = [], lubanPoints: [SIMD3<Float>] = []) {
+        self.cornerRooms = cornerRooms
+        self.cornerPoints = cornerPoints.map(SpatialMapPoint.init)
+        self.lubanPoints = lubanPoints.map(SpatialMapPoint.init)
+    }
+
+    func makeAnchors() -> [ARAnchor] {
+        func anchors(_ points: [SpatialMapPoint], name: String) -> [ARAnchor] {
+            points.map { point in
+                var transform = matrix_identity_float4x4
+                transform.columns.3 = SIMD4(point.x, point.y, point.z, 1)
+                return ARAnchor(name: name, transform: transform)
+            }
+        }
+        return anchors(cornerPoints, name: "corner-pin") + anchors(lubanPoints, name: "luban-anchor")
+    }
+}
+
 /// Map and north reference are persisted atomically, so restoration cannot
 /// combine an old world coordinate system with the phone's current bearing.
 struct SpatialWorldMapArchive: Codable {
     let version: Int
     let mapData: Data
     let coordinateHeading: Double
+    let annotations: SpatialMapAnnotations?
 
-    init(mapData: Data, coordinateHeading: Double) throws {
+    init(mapData: Data, coordinateHeading: Double, annotations: SpatialMapAnnotations = SpatialMapAnnotations()) throws {
         guard !mapData.isEmpty, coordinateHeading.isFinite else {
             throw ARSpatialSurveyError.mapOrientationUnavailable
         }
-        self.version = 1
+        self.version = 2
         self.mapData = mapData
+        self.annotations = annotations
         self.coordinateHeading = (coordinateHeading.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
     }
 
@@ -52,7 +85,7 @@ struct SpatialWorldMapArchive: Codable {
         guard let archive = try? JSONDecoder().decode(Self.self, from: data) else {
             throw ARSpatialSurveyError.mapOrientationUnavailable
         }
-        guard archive.version == 1, archive.coordinateHeading.isFinite,
+        guard (1...2).contains(archive.version), archive.coordinateHeading.isFinite,
               !archive.mapData.isEmpty else { throw ARSpatialSurveyError.archiveFailed }
         return archive
     }
@@ -347,9 +380,9 @@ public struct ARCapturedFrame {
     func exteriorRecord(shaID: String, point: CGPoint, confidence: Double?, source: ShaRecordSource, note: String?) -> ExteriorShaRecord? {
         guard let pose else { return nil }
         return ExteriorShaRecord(shaID: shaID,
-                                 bearingDegrees: pose.projection.bearing(point: point, cameraHeading: pose.heading),
+                                 bearingDegrees: pose.bearing(point: point),
                                  capturedHeadingDegrees: pose.heading,
-                                 elevationDegrees: pose.projection.elevation(point: point, cameraElevation: pose.elevation),
+                                 elevationDegrees: pose.elevation(point: point),
                                  distanceMeters: depth?.sample(at: point), confidence: confidence,
                                  capturedAt: capturedAt, source: source, note: note)
     }
@@ -379,6 +412,13 @@ public struct ARCapturedFrame {
 /// Owns one AR session and throttles expensive mesh and raycast work.  The
 /// existing camera based AR screen and this object are never active together.
 public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDelegate, ARSCNViewDelegate {
+    let propertyID: UUID
+    weak var cameraLeaseToken: CameraLeaseToken?
+
+    public init(propertyID: UUID = ShaSurveyStore.shared.propertyID) {
+        self.propertyID = propertyID
+        super.init()
+    }
     @Published public private(set) var trackingState: ARSpatialTrackingState = .initializing
     @Published public private(set) var mappingState: ARSpatialMappingState = .unavailable
     @Published public private(set) var planeCount: Int = 0
@@ -424,6 +464,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
     private var lastPlaneGeometryUpdate: [UUID: TimeInterval] = [:]
     private var activeConfiguration: ARWorldTrackingConfiguration?
+    private var isSessionPaused = true
     private var distanceSamples: [Float] = []
     private var rendersSpatialMesh = true
     private var lastCapturedTimestamp: TimeInterval = 0
@@ -518,6 +559,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func start() {
+        if let cameraLeaseToken, !CameraExclusivity.shared.owns(cameraLeaseToken) { return }
         guard let sceneView = sceneView else { return }
         guard ARWorldTrackingConfiguration.isSupported else {
             trackingState = .unavailable
@@ -572,6 +614,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         sceneView.session.pause()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
+        isSessionPaused = false
         retryCount = 0
         refreshSavedWorldMapState()
     }
@@ -584,8 +627,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     /// camera; if the view was already replaced (another flip) meanwhile, the
     /// deferred start is abandoned.
     public func startOn(_ view: ARSCNView, afterDelay delay: TimeInterval) {
+        let generation = sessionGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak view] in
-            guard let self = self, let view = view, self.sceneView === view else { return }
+            guard let self = self, let view = view, self.sceneView === view,
+                  self.sessionGeneration == generation else { return }
             self.start()
         }
     }
@@ -940,9 +985,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     /// and syncs them directly to `FloorplanView`, enabling AR-to-Floorplan mapping
     /// even on iOS 14/15 or non-RoomPlan devices.
     public func buildSpatialSurvey() -> HouseSpatialSurvey? {
+        guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return nil }
         guard let frame = sceneView?.session.currentFrame else { return nil }
         let planes = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
-        guard !planes.isEmpty else { return nil }
+        guard !planes.isEmpty || !cornerRooms.isEmpty else { return nil }
 
         var walls3D: [SpatialWall3D] = []
         let openings3D: [SpatialOpening3D] = []
@@ -1059,7 +1105,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             ))
         }
         // 无水平平面（未扫描地板）时退化为单一客厅，并如实标注无房间分割
-        if rooms3D.isEmpty {
+        if rooms3D.isEmpty && cornerRooms.isEmpty {
             rooms3D.append(SpatialRoom3D(
                 name: FloorplanRoomType.livingRoom.localizedName,
                 type: .livingRoom,
@@ -1091,14 +1137,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             compassHeading: heading
         )
         // 汇入全景形煞档案（与外部标注同源消费）
-        ShaSurveyStore.shared.updateInterior(survey)
         // Keep the ordinary AR result available to 户型立极 after this page
         // closes. VR corrections use a separate archive slot and must not
         // replace this measured snapshot.
-        if let data = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
-            NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
-        }
+        guard ShaSurveyStore.shared.saveSurvey(survey, key: SpatialSurveyArchiveKeys.measured,
+                                               propertyID: propertyID) else { return nil }
         return survey
     }
 
@@ -1217,6 +1260,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             rooms: floorplanRooms,
             centroid: CGPoint(x: weightedX, y: weightedY),
             blueprintImage: blueprint,
+            propertyID: propertyID,
             compassHeading: surveyHeadingDegrees,
             spatialSurvey: currentSurvey
         )
@@ -1703,6 +1747,25 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             clearLubanPoints()
             clearCornerRooms()
             clearGroundBaguaOverlay()
+            let annotations = archive.annotations ?? SpatialMapAnnotations()
+            cornerRooms = annotations.cornerRooms
+            cornerRoomCount = cornerRooms.count
+            cornerPoints = annotations.cornerPoints.map(\.position)
+            cornerPinActive = !cornerPoints.isEmpty
+            cornerRoomAnchors = worldMap.anchors.filter { $0.name == "corner-pin" }
+            lubanAnchors = worldMap.anchors.filter { $0.name == "luban-anchor" }
+            let rulerPoints = annotations.lubanPoints.map(\.position)
+            lubanPointA = rulerPoints.first
+            lubanPointB = rulerPoints.dropFirst().first
+            if let a = lubanPointA, let b = lubanPointB {
+                let span = simd_distance(a, b)
+                lubanSpanMeters = span
+                let evaluation = LubanRulerEvaluation.evaluate(meters: span)
+                lubanEvaluation = evaluation
+                let line = Self.makeLineNode(from: a, to: b, color: evaluation.yangIsAuspicious ? .green : .red)
+                sceneView.scene.rootNode.addChildNode(line)
+                lubanLineNode = line
+            }
             sessionGeneration += 1
             surveyHeadingDegrees = archive.coordinateHeading
             hasHeadingReference = true
@@ -1711,6 +1774,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             mappingState = .extending
             sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
             activeConfiguration = configuration
+            isSessionPaused = false
             completion(.success(mapURL))
         } catch {
             completion(.failure(error))
@@ -1781,12 +1845,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let viewport = sceneView?.bounds.size ?? fullImage.size
         let image = ARCapturedFrame.viewportImage(fullImage, size: viewport)
         let projection = Self.viewportProjection(for: frame, orientation: interfaceOrientation, size: viewport)
-        let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x, frame.camera.transform.columns.2.y, frame.camera.transform.columns.2.z)
-        let worldYaw = atan2(Double(forward.x), Double(-forward.z)) * 180 / .pi
         let pose: ARCapturePose? = (frameTrackingIsNormal ? surveyHeadingDegrees : nil).flatMap { baseline in
-            projection.map { ARCapturePose(heading: (baseline + worldYaw + 720).truncatingRemainder(dividingBy: 360),
-                                          elevation: asin(max(-1, min(1, Double(forward.y)))) * 180 / .pi,
-                                          projection: $0) }
+            projection.map { ARCapturePose(worldFromCamera: frame.camera.viewMatrix(for: interfaceOrientation).inverse,
+                                          coordinateHeading: baseline, projection: $0) }
         }
         let capturedDepth = ARCapturedDepth.capture(depthMap, confidence: confidenceMap,
             viewToImage: frame.displayTransform(for: interfaceOrientation, viewportSize: viewport).inverted())
@@ -1815,11 +1876,21 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func pause() {
+        isSessionPaused = true
         sceneView?.session.pause()
     }
 
     public func resume() {
-        guard let sceneView = sceneView, let configuration = activeConfiguration else { return }
+        if let cameraLeaseToken, !CameraExclusivity.shared.owns(cameraLeaseToken) {
+            pause()
+            return
+        }
+        guard let sceneView = sceneView else { return }
+        guard let configuration = activeConfiguration else {
+            startOn(sceneView, afterDelay: 0.25)
+            return
+        }
+        isSessionPaused = false
         sceneView.session.run(configuration)
     }
 
@@ -1838,6 +1909,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             return
         }
         let generation = sessionGeneration
+        let annotations = SpatialMapAnnotations(cornerRooms: cornerRooms, cornerPoints: cornerPoints,
+                                                 lubanPoints: [lubanPointA, lubanPointB].compactMap { $0 })
         session.getCurrentWorldMap { worldMap, error in
             DispatchQueue.main.async {
                 guard self.sessionGeneration == generation else {
@@ -1849,11 +1922,17 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                     return
                 }
                 do {
+                    // The map callback can arrive after another pin edit.
+                    // Rebuild marker anchors from the same frozen annotations
+                    // instead of combining two different instants in one file.
+                    worldMap.anchors.removeAll { $0.name == "corner-pin" || $0.name == "luban-anchor" }
+                    worldMap.anchors.append(contentsOf: annotations.makeAnchors())
                     let mapData = try NSKeyedArchiver.archivedData(
                         withRootObject: worldMap,
                         requiringSecureCoding: true
                     )
-                    let archive = try SpatialWorldMapArchive(mapData: mapData, coordinateHeading: coordinateHeading)
+                    let archive = try SpatialWorldMapArchive(mapData: mapData, coordinateHeading: coordinateHeading,
+                                                             annotations: annotations)
                     let data = try JSONEncoder().encode(archive)
                     let name = "TianJiYanXiang-\(UUID().uuidString).arworldmap"
                     let directory = try Self.worldMapDirectory()
@@ -1870,6 +1949,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func stop() {
+        isSessionPaused = true
         sessionGeneration += 1
         clearLubanPoints()
         clearCornerRooms()
@@ -1983,7 +2063,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let delay = Double(retryCount) * 0.4
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self, let current = self.sceneView,
-                  current.session === failedSession else { return }
+                  current.session === failedSession, !self.isSessionPaused else { return }
+            if let token = self.cameraLeaseToken, !CameraExclusivity.shared.owns(token) { return }
             self.trackingState = .initializing
             if configuration.initialWorldMap == nil {
                 self.surveyHeadingDegrees = nil
@@ -2007,10 +2088,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         cameraRollDegrees = asin(rightY) * 180.0 / .pi
         if trackingState == .normal, let baseline = surveyHeadingDegrees,
            let projection = Self.viewportProjection(for: frame, orientation: orientation, size: sceneView.bounds.size) {
-            let forward = -frame.camera.transform.columns.2
-            let yaw = atan2(Double(forward.x), Double(-forward.z)) * 180 / .pi
-            currentCameraPose = ARCapturePose(heading: (baseline + yaw + 720).truncatingRemainder(dividingBy: 360),
-                                             elevation: cameraElevationDegrees, projection: projection)
+            currentCameraPose = ARCapturePose(worldFromCamera: frame.camera.viewMatrix(for: orientation).inverse,
+                                             coordinateHeading: baseline, projection: projection)
         } else { currentCameraPose = nil }
         if groundBaguaProjected {
             updateStandingPalace(cameraTransform: frame.camera.transform)
@@ -2491,6 +2570,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 }
 
 public struct ARSpatialPreviewView: UIViewRepresentable {
+    @Environment(\.cameraLeaseToken) private var cameraLeaseToken
+    @Environment(\.cameraLeaseActive) private var cameraLeaseActive
     @ObservedObject private var model: ARSpatialSurveyModel
 
     public init(model: ARSpatialSurveyModel) {
@@ -2509,13 +2590,26 @@ public struct ARSpatialPreviewView: UIViewRepresentable {
         view.preferredFramesPerSecond = 30
         view.antialiasingMode = .none
         model.attach(to: view)
-        model.start()
+        model.cameraLeaseToken = cameraLeaseToken
+        if cameraLeaseActive { model.start() }
         return view
     }
 
-    public func updateUIView(_ uiView: ARSCNView, context: Context) {}
+    public func updateUIView(_ uiView: ARSCNView, context: Context) {
+        model.cameraLeaseToken = cameraLeaseToken
+        guard context.coordinator.wasActive != cameraLeaseActive else { return }
+        context.coordinator.wasActive = cameraLeaseActive
+        if cameraLeaseActive { model.resume() } else { model.pause() }
+    }
 
-    public static func dismantleUIView(_ uiView: ARSCNView, coordinator: ()) {
+    public func makeCoordinator() -> Coordinator { Coordinator(wasActive: cameraLeaseActive) }
+
+    public final class Coordinator {
+        var wasActive: Bool
+        init(wasActive: Bool) { self.wasActive = wasActive }
+    }
+
+    public static func dismantleUIView(_ uiView: ARSCNView, coordinator: Coordinator) {
         uiView.session.pause()
     }
 }
@@ -2524,6 +2618,8 @@ public struct ARSpatialPreviewView: UIViewRepresentable {
 /// same tracking/mesh model as the spatial survey, but only exposes captured
 /// frames to the caller and keeps the AR overlay in SwiftUI.
 public struct ARFusionCaptureView: UIViewRepresentable {
+    @Environment(\.cameraLeaseToken) private var cameraLeaseToken
+    @Environment(\.cameraLeaseActive) private var cameraLeaseActive
     @ObservedObject private var model: ARSpatialSurveyModel
     public let isActive: Bool
     public let captureTrigger: Int
@@ -2556,7 +2652,8 @@ public struct ARFusionCaptureView: UIViewRepresentable {
         // drawing the full classified mesh here; the dedicated spatial survey
         // screen remains responsible for that heavier visualization.
         model.attach(to: view, renderMesh: false)
-        if isActive {
+        model.cameraLeaseToken = cameraLeaseToken
+        if isActive && cameraLeaseActive {
             // Camera hardware is exclusive: the plain camera session released
             // on a lens flip stops asynchronously, so starting AR immediately
             // would fail and leave a black frame. Defer to let it release.
@@ -2566,7 +2663,8 @@ public struct ARFusionCaptureView: UIViewRepresentable {
     }
 
     public func updateUIView(_ uiView: ARSCNView, context: Context) {
-        if !isActive {
+        model.cameraLeaseToken = cameraLeaseToken
+        if !isActive || !cameraLeaseActive {
             if context.coordinator.lastActive {
                 context.coordinator.lastActive = false
                 model.pause()
@@ -2632,8 +2730,9 @@ private struct ARSpatialShareSheet: UIViewControllerRepresentable {
 /// ARKit powered room survey.  On devices without ARWorldTracking support it
 /// keeps the camera based AR experience available and explains the limitation.
 public struct ARSpatialSurveyView: View {
+    @Environment(\.cameraLeaseToken) private var cameraLeaseToken
     @ObservedObject private var lang = LocalizationManager.shared
-    @StateObject private var model = ARSpatialSurveyModel()
+    @StateObject private var model: ARSpatialSurveyModel
     @StateObject private var fallbackCameraModel = CameraPreviewController()
     @Environment(\.presentationMode) private var presentationMode
     @ObservedObject private var iap = StoreKitIAPManager.shared
@@ -2668,7 +2767,9 @@ public struct ARSpatialSurveyView: View {
         (.seat, "ar_spatial_seat", "chair"),
     ]
 
-    public init() {}
+    public init(propertyID: UUID = ShaSurveyStore.shared.propertyID) {
+        self._model = StateObject(wrappedValue: ARSpatialSurveyModel(propertyID: propertyID))
+    }
 
     public var body: some View {
         ZStack {
@@ -2701,13 +2802,25 @@ public struct ARSpatialSurveyView: View {
             }
         }
         .background(Color.black.ignoresSafeArea())
+        .onAppear {
+            model.cameraLeaseToken = cameraLeaseToken
+            if !showRoomPlan { model.resume() }
+        }
+        .onReceive(CameraExclusivity.shared.$holderSceneID) { _ in
+            model.cameraLeaseToken = cameraLeaseToken
+            if !showRoomPlan { model.resume() }
+        }
         .onDisappear {
-            // Presenting RoomPlan can make the covered view temporarily
-            // disappear. Keep the model attached in that case so closing the
-            // full-screen capture can resume the same spatial session.
-            if !showRoomPlan {
-                fallbackCameraModel.stopSession()
+            // Covers and a temporarily denied lease must preserve measured
+            // geometry. The representable pauses again when it is dismantled;
+            // property changes explicitly stop and invalidate the model.
+            fallbackCameraModel.pauseSessionForBackground()
+            model.pause()
+        }
+        .onReceive(ShaSurveyStore.shared.$propertyID) { id in
+            if id != model.propertyID {
                 model.stop()
+                presentationMode.wrappedValue.dismiss()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
@@ -2741,7 +2854,7 @@ public struct ARSpatialSurveyView: View {
         .fullScreenCover(isPresented: $showRoomPlan) {
             if #available(iOS 16.0, *) {
                 CameraExclusiveGate {
-                    ARRoomPlanSurveyView()
+                    ARRoomPlanSurveyView(propertyID: model.propertyID)
                 }
             }
         }
@@ -3159,7 +3272,7 @@ public struct ARSpatialSurveyView: View {
                             .frame(maxWidth: .infinity)
                             .background(Color.orange.opacity(0.1))
                     }
-                    House3DSpaceViewer(survey: survey)
+                    House3DSpaceViewer(survey: survey, propertyID: model.propertyID)
                 }
             }
         }
@@ -3167,7 +3280,7 @@ public struct ARSpatialSurveyView: View {
             // If a spatial scan already exists, let the VR editor start from
             // that measured geometry so users can correct/complete it. An
             // empty simulation is only used before the first scan.
-            VRSpatialSurveyView(initialSurvey: latestSurveyForVR)
+            VRSpatialSurveyView(initialSurvey: latestSurveyForVR, propertyID: model.propertyID)
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)

@@ -849,6 +849,7 @@ public final class CameraExclusivity: ObservableObject {
     /// 申请相机使用权。同窗口的申请会接管；跨窗口返回 false。
     public func acquire(_ owner: AnyObject, sceneID: ObjectIdentifier?) -> Bool {
         lock.lock()
+        if holder === owner, holderScene == sceneID { lock.unlock(); return true }
         if let current = holder, current !== owner,
            let currentScene = holderScene, let targetScene = sceneID,
            currentScene != targetScene {
@@ -885,6 +886,12 @@ public final class CameraExclusivity: ObservableObject {
         }
     }
 
+    public func owns(_ owner: AnyObject) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return holder === owner
+    }
+
     /// 相机是否被**别的窗口**占着。
     public func isBusy(for sceneID: ObjectIdentifier?) -> Bool {
         lock.lock()
@@ -898,18 +905,48 @@ public final class CameraExclusivity: ObservableObject {
 /// 视图销毁时自动 dealloc，租约的 weak 引用也随之失效。
 public final class CameraLeaseToken {}
 
+private struct CameraLeaseEnvironmentKey: EnvironmentKey {
+    static let defaultValue: CameraLeaseToken? = nil
+}
+
+private struct CameraLeaseActiveKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var cameraLeaseActive: Bool {
+        get { self[CameraLeaseActiveKey.self] }
+        set { self[CameraLeaseActiveKey.self] = newValue }
+    }
+    var cameraLeaseToken: CameraLeaseToken? {
+        get { self[CameraLeaseEnvironmentKey.self] }
+        set { self[CameraLeaseEnvironmentKey.self] = newValue }
+    }
+}
+
 /// 读出当前视图所在的 UIWindowScene（SwiftUI 没有直接给出场景标识的环境值）。
 private struct WindowSceneIDProbe: UIViewRepresentable {
     @Binding var sceneID: ObjectIdentifier?
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView(frame: .zero)
+    final class ProbeView: UIView {
+        var sceneDidChange: ((UIWindowScene) -> Void)?
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let scene = window?.windowScene { sceneDidChange?(scene) }
+        }
+    }
+
+    func makeUIView(context: Context) -> ProbeView {
+        let view = ProbeView(frame: .zero)
+        view.sceneDidChange = { scene in
+            DispatchQueue.main.async { self.sceneID = ObjectIdentifier(scene) }
+        }
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
+    func updateUIView(_ uiView: ProbeView, context: Context) {
         guard let windowScene = uiView.window?.windowScene else { return }
         let identifier = ObjectIdentifier(windowScene)
         guard identifier != sceneID else { return }
@@ -931,6 +968,9 @@ public struct CameraExclusiveGate<Content: View>: View {
     @State private var phase: Phase = .pending
     @State private var sceneID: ObjectIdentifier?
     @State private var token = CameraLeaseToken()
+    @State private var isVisible = false
+    @State private var isAcquiring = false
+    @State private var hasConstructedContent = false
 
     private let content: () -> Content
 
@@ -939,10 +979,17 @@ public struct CameraExclusiveGate<Content: View>: View {
     }
 
     public var body: some View {
-        Group {
+        ZStack {
+            if hasConstructedContent {
+                content()
+                    .environment(\.cameraLeaseToken, token)
+                    .environment(\.cameraLeaseActive, isVisible && phase == .granted && exclusivity.owns(token))
+                    .opacity(phase == .granted ? 1 : 0)
+                    .allowsHitTesting(phase == .granted)
+            }
             switch phase {
             case .granted:
-                content()
+                EmptyView()
             case .denied:
                 deniedCard
             case .pending:
@@ -955,17 +1002,14 @@ public struct CameraExclusiveGate<Content: View>: View {
                 .frame(width: 0, height: 0)
         )
         .onAppear {
-            tryAcquire()
-            // 兜底：极端情况下探针拿不到窗口（例如视图在离屏层级里），
-            // 300ms 后按「无场景标识」放行，宁可回到多窗口的老行为，也不锁死功能。
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                if phase == .pending {
-                    phase = .granted
-                }
-            }
+            isVisible = true
+            tryAcquire(onReturn: true)
         }
         .onDisappear {
+            isVisible = false
             CameraExclusivity.shared.release(token)
+            // Keep the covered content's state alive until its nested cover
+            // closes. onAppear always revalidates ownership before returning.
         }
         .onReceive(exclusivity.$holderSceneID) { _ in
             tryAcquire()
@@ -990,10 +1034,14 @@ public struct CameraExclusiveGate<Content: View>: View {
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
     }
 
-    private func tryAcquire() {
-        guard phase != .granted else { return }
+    private func tryAcquire(onReturn: Bool = false) {
+        guard isVisible, !isAcquiring else { return }
+        guard onReturn || phase != .granted else { return }
         guard let windowSceneID = sceneID else { return }
+        isAcquiring = true
+        defer { isAcquiring = false }
         if CameraExclusivity.shared.acquire(token, sceneID: windowSceneID) {
+            hasConstructedContent = true
             phase = .granted
         } else {
             phase = .denied

@@ -26,6 +26,7 @@ public final class CameraPreviewController: ObservableObject {
 }
 
 public struct CameraPreviewView: UIViewRepresentable {
+    @Environment(\.cameraLeaseActive) private var cameraLeaseActive
     public var controller: CameraPreviewController?
     public var cameraPosition: AVCaptureDevice.Position
     public var isActive: Bool
@@ -471,7 +472,7 @@ public struct CameraPreviewView: UIViewRepresentable {
         // 分栏左栏时在 UIView 层自行裁剪，确保预览层不越界。
         view.clipsToBounds = true
         controller?.activeView = view
-        if isActive {
+        if isActive && cameraLeaseActive {
             view.setupSession(position: cameraPosition)
         }
         return view
@@ -479,7 +480,7 @@ public struct CameraPreviewView: UIViewRepresentable {
     
     public func updateUIView(_ uiView: CameraUIView, context: Context) {
         controller?.activeView = uiView
-        if !isActive {
+        if !isActive || !cameraLeaseActive {
             context.coordinator.lastActive = false
             uiView.stopSession()
             return
@@ -559,6 +560,7 @@ public struct ARVisionView: View {
     @State private var aiResult: ShaAnalysisResult?
     @State private var aiError: String?
     @State private var aiScanGeneration: Int = 0
+    @State private var capturePropertyID = ShaSurveyStore.shared.propertyID
     @State private var aiScanFrames: [ARCapturedFrame] = []
     @State private var photoPermissionDenied: Bool = false
     @State private var showSpatialSurvey: Bool = false
@@ -605,7 +607,8 @@ public struct ARVisionView: View {
     }
 
     private var targetCalculatedHeading: Double {
-        targetProjection.bearing(point: currentTargetSamplePoint, cameraHeading: arCameraFacingAngle)
+        currentCapturePose?.bearing(point: currentTargetSamplePoint)
+            ?? targetProjection.bearing(point: currentTargetSamplePoint, cameraHeading: arCameraFacingAngle)
     }
 
     private var targetMountain: Mountain24 {
@@ -844,6 +847,17 @@ public struct ARVisionView: View {
             CameraExclusiveGate {
                 ARSpatialSurveyView()
             }
+        }
+        .onReceive(shaStore.$propertyID) { id in
+            guard id != capturePropertyID else { return }
+            pendingCapturePurpose = nil
+            aiScanGeneration &+= 1
+            snapshotGeneration &+= 1
+            isAIScanning = false
+            aiScanFrames.removeAll(keepingCapacity: true)
+            aiResult = nil
+            targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
+            targetNormalizedDrag = .zero
         }
         .onDisappear {
             cameraModel.stopSession()
@@ -1326,6 +1340,7 @@ public struct ARVisionView: View {
                         } else {
                             guard pendingCapturePurpose == nil else { return }
                             if hasCameraPermission && isActive {
+                                capturePropertyID = shaStore.propertyID
                                 pendingCapturePurpose = .snapshot
                                 captureTrigger += 1
                             } else {
@@ -1651,11 +1666,13 @@ public struct ARVisionView: View {
         aiScanFrames.removeAll(keepingCapacity: true)
         isAIScanning = true
         aiScanGeneration &+= 1
+        capturePropertyID = shaStore.propertyID
         pendingCapturePurpose = .aiScan(aiScanGeneration, 0)
         captureTrigger += 1
     }
 
     private func handleCapturedFrame(_ frame: ARCapturedFrame?) {
+        guard shaStore.isCurrentProperty(capturePropertyID) else { return }
         switch pendingCapturePurpose {
         case .aiScan(let generation, let frameIndex):
             pendingCapturePurpose = nil
@@ -1774,7 +1791,7 @@ public struct ARVisionView: View {
         firstFailure: OnDeviceShaAnalyzer.AnalysisError?,
         frames: [ARCapturedFrame]
     ) {
-        guard generation == aiScanGeneration else { return }
+        guard generation == aiScanGeneration, shaStore.isCurrentProperty(capturePropertyID) else { return }
         isAIScanning = false
         // Require every captured frame to produce the same candidate. A single
         // inconsistent frame is treated as environmental motion/occlusion,
@@ -1839,7 +1856,7 @@ public struct ARVisionView: View {
             if let record = frame.exteriorRecord(shaID: analysis.shaID, point: currentTargetSamplePoint,
                                                   confidence: analysis.confidence, source: .ai,
                                                   note: "three-frame-temporal-consensus") {
-                shaStore.addRecord(record)
+                shaStore.addRecord(record, propertyID: capturePropertyID)
             }
 
         }
@@ -1862,19 +1879,21 @@ public struct ARVisionView: View {
         let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
         let record = ExteriorShaRecord(
             shaID: sha.id,
-            bearingDegrees: pose.projection.bearing(point: sample, cameraHeading: pose.heading),
+            bearingDegrees: pose.bearing(point: sample),
             capturedHeadingDegrees: pose.heading,
-            elevationDegrees: pose.projection.elevation(point: sample, cameraElevation: pose.elevation),
+            elevationDegrees: pose.elevation(point: sample),
             distanceMeters: dist,
             confidence: aiResult?.confidence,
             source: aiResult == nil ? .manual : .ai,
             note: aiResult == nil ? nil : "three-frame-temporal-consensus"
         )
-        shaStore.addRecord(record)
+        shaStore.addRecord(record, propertyID: shaStore.propertyID)
     }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
     private func captureAndSaveSnapshot(frame: ARCapturedFrame) {
+        let propertyID = capturePropertyID
+        guard shaStore.isCurrentProperty(propertyID) else { return }
         guard let pose = frame.pose else { aiError = lang.t("ar_survey_heading_pending"); return }
         let baseImage = frame.image
         snapshotGeneration += 1
@@ -1903,7 +1922,7 @@ public struct ARVisionView: View {
         let facingPinyin = mFacing.pinyin
         let facingName = mFacing.localizedName
         let facingPalace = mFacing.localizedPalace
-        let targetHeading = pose.projection.bearing(point: currentTargetSamplePoint, cameraHeading: pose.heading)
+        let targetHeading = pose.bearing(point: currentTargetSamplePoint)
         let targetMtn = Mountain24Data.shared.mountain(for: targetHeading)
         let targetMtnName = targetMtn.localizedName
         let targetPalace = targetMtn.localizedPalace
@@ -2086,7 +2105,8 @@ public struct ARVisionView: View {
             }
         
             DispatchQueue.main.async {
-                guard self.isActive, self.snapshotGeneration == generation else { return }
+                guard self.isActive, self.snapshotGeneration == generation,
+                      self.shaStore.isCurrentProperty(propertyID) else { return }
                 self.latestSnapshotImage = image
                 self.saveSnapshotToPhotoLibrary(image)
             }

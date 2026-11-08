@@ -18,6 +18,7 @@ public struct XuanKongGridView: View {
     @State private var showTianJiShuSheet: Bool = false
     @State private var showDailySignSheet: Bool = false
     @State private var showPaywall: Bool = false
+    @State private var showMountainPickerSheet: Bool = false
     @State private var cachedChart: XuanKongChart?
     @State private var selectedPalaceIdx: Int = 4
     @State private var lastCurrentPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
@@ -113,6 +114,9 @@ public struct XuanKongGridView: View {
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
+        }
+        .sheet(isPresented: $showMountainPickerSheet) {
+            Mountain24PickerSheet(isPresented: $showMountainPickerSheet)
         }
         .onAppear {
             refreshChart()
@@ -234,17 +238,22 @@ public struct XuanKongGridView: View {
         }
 
         return HStack(spacing: 8) {
-            // 当前坐山朝向与度数
-            HStack(spacing: 4) {
-                Image(systemName: motion.isLocked ? "lock.fill" : "location.north.line.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
-                Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", state.facingAngle))")
-                    .adaptiveFont(size: 12, weight: .bold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            // 当前坐山朝向与度数（支持点击直接调出 24 山选向弹窗）
+            Button(action: {
+                showMountainPickerSheet = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: motion.isLocked ? "lock.fill" : "location.north.line.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", state.facingAngle))")
+                        .adaptiveFont(size: 12, weight: .bold)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
             }
+            .buttonStyle(PlainButtonStyle())
 
             Spacer(minLength: 4)
 
@@ -261,24 +270,12 @@ public struct XuanKongGridView: View {
                     .foregroundColor(motion.isLocked ? .red : .white)
                     .cornerRadius(6)
             }
+            .buttonStyle(PlainButtonStyle())
 
-            // 24 山下拉快速选向（无需转动手机即可静态排盘任意坐向）
-            Menu {
-                ForEach(Mountain24Data.shared.mountains) { m in
-                    let facingIdx = (m.id + 12) % 24
-                    let facingM = Mountain24Data.shared.mountains[facingIdx]
-                    Button(action: {
-                        motion.selectSittingMountain(m)
-                    }) {
-                        HStack {
-                            Text("\(m.localizedName)\(lang.t("mountain_suffix"))\(facingM.localizedName)\(lang.t("facing_suffix")) (\(Int(m.centerAngle))°)")
-                            if m.id == state.sittingMountain.id {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
+            // 24 山手选快速选向按钮（打开 24 山专业选向面板，彻底解决手选无法点击选定问题）
+            Button(action: {
+                showMountainPickerSheet = true
+            }) {
                 HStack(spacing: 3) {
                     Image(systemName: "dial.medium.fill")
                         .font(.system(size: 10, weight: .bold))
@@ -292,6 +289,7 @@ public struct XuanKongGridView: View {
                 .foregroundColor(Color.yanCyan)
                 .cornerRadius(6)
             }
+            .buttonStyle(PlainButtonStyle())
 
             // 今日吉方日签海报按钮
             Button(action: {
@@ -310,6 +308,7 @@ public struct XuanKongGridView: View {
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 .cornerRadius(6)
             }
+            .buttonStyle(PlainButtonStyle())
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
@@ -720,6 +719,511 @@ public struct XuanKongGridView: View {
             } else {
                 return "💡 【白话速断】本宫星气平稳（山\(sel.sittingStar)向\(sel.facingStar)），日常保持采光通风与整洁即可。"
             }
+        }
+    }
+}
+
+// MARK: - 二十四山专业选向与排盘锁定面板 (Mountain24PickerSheet)
+
+public struct Mountain24PickerSheet: View {
+    @Binding var isPresented: Bool
+    @ObservedObject private var motion = CompassMotionManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
+    
+    // 八宫快速分类选择器：0=全部八宫, 1=坎, 2=艮, 3=震, 4=巽, 5=离, 6=坤, 7=兑, 8=乾
+    @State private var selectedPalaceFilter: Int = 0
+
+    public init(isPresented: Binding<Bool>) {
+        self._isPresented = isPresented
+    }
+
+    private struct PalaceMeta: Identifiable {
+        let id: Int
+        let name: String
+        let directionName: String
+        let element: String
+        let mountainIndices: [Int]
+    }
+
+    private var palaceList: [PalaceMeta] {
+        switch lang.effectiveLanguage {
+        case .en:
+            return [
+                PalaceMeta(id: 1, name: "Kan Palace", directionName: "North", element: "Water", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "Gen Palace", directionName: "Northeast", element: "Earth", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "Zhen Palace", directionName: "East", element: "Wood", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "Xun Palace", directionName: "Southeast", element: "Wood", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "Li Palace", directionName: "South", element: "Fire", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "Kun Palace", directionName: "Southwest", element: "Earth", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "Dui Palace", directionName: "West", element: "Metal", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "Qian Palace", directionName: "Northwest", element: "Metal", mountainIndices: [21, 22, 23])
+            ]
+        case .zhHant:
+            return [
+                PalaceMeta(id: 1, name: "坎宮", directionName: "正北", element: "水", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "艮宮", directionName: "東北", element: "土", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "震宮", directionName: "正東", element: "木", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "巽宮", directionName: "東南", element: "木", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "離宮", directionName: "正南", element: "火", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "坤宮", directionName: "西南", element: "土", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "兌宮", directionName: "正西", element: "金", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "乾宮", directionName: "西北", element: "金", mountainIndices: [21, 22, 23])
+            ]
+        case .ja:
+            return [
+                PalaceMeta(id: 1, name: "坎宮", directionName: "正北", element: "水", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "艮宮", directionName: "北東", element: "土", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "震宮", directionName: "正東", element: "木", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "巽宮", directionName: "南東", element: "木", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "離宮", directionName: "正南", element: "火", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "坤宮", directionName: "南西", element: "土", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "兌宮", directionName: "正西", element: "金", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "乾宮", directionName: "北西", element: "金", mountainIndices: [21, 22, 23])
+            ]
+        case .ko:
+            return [
+                PalaceMeta(id: 1, name: "감궁", directionName: "정북", element: "수", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "간궁", directionName: "동북", element: "토", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "진궁", directionName: "정동", element: "목", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "손궁", directionName: "동남", element: "목", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "이궁", directionName: "정남", element: "화", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "곤궁", directionName: "남서", element: "토", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "태궁", directionName: "정서", element: "금", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "건궁", directionName: "북서", element: "금", mountainIndices: [21, 22, 23])
+            ]
+        case .vi:
+            return [
+                PalaceMeta(id: 1, name: "Cung Khảm", directionName: "Chính Bắc", element: "Thủy", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "Cung Cấn", directionName: "Đông Bắc", element: "Thổ", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "Cung Chấn", directionName: "Chính Đông", element: "Mộc", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "Cung Tốn", directionName: "Đông Nam", element: "Mộc", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "Cung Ly", directionName: "Chính Nam", element: "Hỏa", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "Cung Khôn", directionName: "Tây Nam", element: "Thổ", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "Cung Đoài", directionName: "Chính Tây", element: "Kim", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "Cung Càn", directionName: "Tây Bắc", element: "Kim", mountainIndices: [21, 22, 23])
+            ]
+        default:
+            return [
+                PalaceMeta(id: 1, name: "坎宫", directionName: "正北", element: "水", mountainIndices: [0, 1, 2]),
+                PalaceMeta(id: 2, name: "艮宫", directionName: "东北", element: "土", mountainIndices: [3, 4, 5]),
+                PalaceMeta(id: 3, name: "震宫", directionName: "正东", element: "木", mountainIndices: [6, 7, 8]),
+                PalaceMeta(id: 4, name: "巽宫", directionName: "东南", element: "木", mountainIndices: [9, 10, 11]),
+                PalaceMeta(id: 5, name: "离宫", directionName: "正南", element: "火", mountainIndices: [12, 13, 14]),
+                PalaceMeta(id: 6, name: "坤宫", directionName: "西南", element: "土", mountainIndices: [15, 16, 17]),
+                PalaceMeta(id: 7, name: "兑宫", directionName: "正西", element: "金", mountainIndices: [18, 19, 20]),
+                PalaceMeta(id: 8, name: "乾宫", directionName: "西北", element: "金", mountainIndices: [21, 22, 23])
+            ]
+        }
+    }
+
+    private var displayedPalaces: [PalaceMeta] {
+        if selectedPalaceFilter == 0 {
+            return palaceList
+        }
+        return palaceList.filter { $0.id == selectedPalaceFilter }
+    }
+
+    public var body: some View {
+        ZStack {
+            Color(red: 0.11, green: 0.11, blue: 0.15)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    // 1. 顶栏标题与关闭按钮
+                    HStack(spacing: 8) {
+                        Image(systemName: "dial.medium.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        Text(dialogTitle)
+                            .adaptiveFont(size: 15, weight: .bold)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Button(action: { isPresented = false }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.45))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+
+                    Text(dialogSubtitle)
+                        .adaptiveFont(size: 11)
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // 2. 当前坐山朝向与锁盘状态卡片
+                    currentSittingCard
+
+                    // 3. 向首度数微调控制 (支持正向/兼向测试)
+                    fineTuningSection
+
+                    // 4. 八宫分类快捷标签栏
+                    palaceFilterBar
+
+                    // 5. 二十四山宫位网格
+                    VStack(spacing: 12) {
+                        ForEach(displayedPalaces) { palace in
+                            palaceSection(palace: palace)
+                        }
+                    }
+
+                    // 6. 底部确认与关闭按钮
+                    Button(action: {
+                        isPresented = false
+                    }) {
+                        Text(confirmButtonText)
+                            .adaptiveFont(size: 14, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0.95, green: 0.8, blue: 0.35), Color(red: 0.75, green: 0.55, blue: 0.2)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundColor(.black)
+                            .cornerRadius(10)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.top, 4)
+                }
+                .padding(16)
+                .frame(maxWidth: 520)
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private var palaceFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                filterPill(id: 0, title: allPalacesText)
+                ForEach(palaceList) { p in
+                    filterPill(id: p.id, title: "\(p.name) · \(p.directionName)")
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func filterPill(id: Int, title: String) -> some View {
+        let isSelected = selectedPalaceFilter == id
+        return Button(action: {
+            selectedPalaceFilter = id
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }) {
+            Text(title)
+                .adaptiveFont(size: 11, weight: isSelected ? .bold : .medium)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.08))
+                .foregroundColor(isSelected ? .yanCyan : .white.opacity(0.85))
+                .cornerRadius(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(isSelected ? Color.yanCyan : Color.clear, lineWidth: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func palaceSection(palace: PalaceMeta) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(elementColor(for: palace.element))
+                    .frame(width: 6, height: 6)
+                Text("\(palace.name) （\(palace.directionName) · 五行属\(palace.element)）")
+                    .adaptiveFont(size: 12, weight: .bold)
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                ForEach(palace.mountainIndices, id: \.self) { idx in
+                    let m = Mountain24Data.shared.mountains[idx]
+                    mountainTile(mountain: m)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(8)
+    }
+
+    private func mountainTile(mountain m: Mountain24Item) -> some View {
+        let facingIdx = (m.id + 12) % 24
+        let facingM = Mountain24Data.shared.mountains[facingIdx]
+        let isSelected = motion.isLocked && motion.headingState.sittingMountain.id == m.id
+
+        return Button(action: {
+            motion.selectSittingMountain(m)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        }) {
+            VStack(spacing: 3) {
+                HStack(spacing: 2) {
+                    Text("\(m.localizedName)山\(facingM.localizedName)向")
+                        .adaptiveFont(size: 12, weight: .bold)
+                        .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    }
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+                Text("坐\(Int(m.centerAngle))° 向\(Int(facingM.centerAngle))°")
+                    .adaptiveFont(size: 9.5)
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(1)
+
+                Text("\(m.yuan) · \(m.polarity == 1 ? "阳" : "阴")")
+                    .adaptiveFont(size: 9)
+                    .foregroundColor(isSelected ? Color.yanCyan : .white.opacity(0.5))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .background(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2) : Color.white.opacity(0.06))
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12), lineWidth: isSelected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func elementColor(for elem: String) -> Color {
+        switch elem {
+        case "水": return Color.blue
+        case "木": return Color.green
+        case "火": return Color.red
+        case "土": return Color(red: 0.8, green: 0.6, blue: 0.3)
+        case "金": return Color(red: 0.95, green: 0.85, blue: 0.45)
+        default: return Color.white
+        }
+    }
+
+    private var currentSittingCard: some View {
+        let state = motion.headingState
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: motion.isLocked ? "lock.fill" : "location.north.line.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text(motion.isLocked ? lockedStatusText : liveSensorStatusText)
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+                Spacer()
+                if motion.isLocked {
+                    Button(action: {
+                        motion.toggleLock()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 10))
+                            Text(restoreSensorText)
+                                .adaptiveFont(size: 10.5, weight: .semibold)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.12))
+                        .foregroundColor(.white)
+                        .cornerRadius(5)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("【\(state.sittingMountain.localizedName)山\(state.facingMountain.localizedName)向】")
+                    .adaptiveFont(size: 18, weight: .bold, design: .serif)
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+
+                Text(state.isJianXiang ? state.fenJinDesc : directAlignmentText)
+                    .adaptiveFont(size: 11.5, weight: .medium)
+                    .foregroundColor(state.isJianXiang ? Color.orange : Color.green)
+
+                Spacer()
+
+                Text("向首 \(String(format: "%.1f°", state.facingAngle))")
+                    .adaptiveFont(size: 14, weight: .bold)
+                    .foregroundColor(.white)
+            }
+
+            Text("坐山方位: \(state.sittingMountain.localizedPalace)宫 · \(String(format: "%.1f°", state.sittingAngle)) · 对应八宅【\(state.sittingMountain.palace)宅】等智能分房与玄空盘")
+                .adaptiveFont(size: 10.5)
+                .foregroundColor(.white.opacity(0.75))
+        }
+        .padding(12)
+        .background(Color(red: 0.13, green: 0.14, blue: 0.19))
+        .cornerRadius(10)
+    }
+
+    private var fineTuningSection: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(fineTuneTitle)
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .foregroundColor(.white.opacity(0.85))
+                Spacer()
+                Text("向首: \(String(format: "%.1f°", motion.headingState.facingAngle))")
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .foregroundColor(Color.yanCyan)
+            }
+
+            HStack(spacing: 6) {
+                fineTuneButton(delta: -5, label: "-5°")
+                fineTuneButton(delta: -1, label: "-1°")
+                fineTuneButton(delta: -0.5, label: "-0.5°")
+                fineTuneButton(delta: +0.5, label: "+0.5°")
+                fineTuneButton(delta: +1, label: "+1°")
+                fineTuneButton(delta: +5, label: "+5°")
+            }
+        }
+        .padding(10)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(8)
+    }
+
+    private func fineTuneButton(delta: Double, label: String) -> some View {
+        Button(action: {
+            motion.adjustLockedAngle(delta: delta)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }) {
+            Text(label)
+                .adaptiveFont(size: 11, weight: .bold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.08))
+                .foregroundColor(.white.opacity(0.9))
+                .cornerRadius(5)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var dialogTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Pick 24 Mountains · Static Chart"
+        case .zhHant: return "二十四山精確選向 · 靜態排盤"
+        case .ja: return "24山・坐向指定（静的排盤）"
+        case .ko: return "24산 지정 및 정적 배반"
+        case .vi: return "Chọn 24 Sơn · Khóa Hướng"
+        case .th: return "เลือก 24 ขุนเขา · จัดฮวงจุ้ย"
+        case .id: return "Pilih 24 Gunung · Kunci Arah"
+        case .auto, .zhHans: return "二十四山精确选向 · 静态排盘"
+        }
+    }
+
+    private var dialogSubtitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Select any sitting mountain to lock heading for static analysis across Xuan Kong, Ba Zhai, Purple White and Qi Men."
+        case .zhHant: return "點擊任意坐向直接鎖定盤面。無論是勘察遠方戶型還是靜態推演，均可精準核算八宅明鏡、玄空九星、紫白飛星與奇門遁甲。"
+        case .ja: return "任意の坐向を選択して盤面を固定。玄空飛星・八宅・紫白・奇門遁甲を静的に診断できます。"
+        case .ko: return "좌향을 선택하여 나침반을 고정하고 현공구성, 팔택, 자백비성 및 기문둔갑을 분석하세요."
+        case .vi: return "Chọn tọa hướng bất kỳ để khóa la bàn, giải đoán Huyền Không, Bát Trạch, Tử Bạch và Kỳ Môn."
+        case .th: return "เลือกรหัส 24 ขุนเขาเพื่อล็อคทิศทาง วิเคราะห์ดาวบิน ฮวงจุ้ยแปดทิศ และฉีเหมิน"
+        case .id: return "Pilih arah 24 gunung untuk mengunci kompas dan menganalisis Xuan Kong, Ba Zhai, dan Qi Men."
+        case .auto, .zhHans: return "点击任意坐向直接锁定盘面。无论是勘察远方户型还是静态推演，均可精准核算八宅明镜、玄空九星、紫白飞星与奇门遁甲。"
+        }
+    }
+
+    private var lockedStatusText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Locked Static Chart"
+        case .zhHant: return "已鎖定靜態排盤"
+        case .ja: return "静的排盤固定中"
+        case .ko: return "정적 배반 고정됨"
+        case .vi: return "Đã Khóa Tĩnh"
+        case .th: return "ล็อคทิศทางแล้ว"
+        case .id: return "Terkunci Statis"
+        case .auto, .zhHans: return "已锁定静态排盘"
+        }
+    }
+
+    private var liveSensorStatusText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Live Sensor Active"
+        case .zhHant: return "傳感器實時聯動中"
+        case .ja: return "センサー連動中"
+        case .ko: return "센서 실시간 연동 중"
+        case .vi: return "Đang theo cảm biến"
+        case .th: return "เชื่อมต่อเซนเซอร์"
+        case .id: return "Sensor Aktif"
+        case .auto, .zhHans: return "传感器实时联动中"
+        }
+    }
+
+    private var restoreSensorText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Restore Sensor"
+        case .zhHant: return "恢復實時聯動"
+        case .ja: return "センサーに戻す"
+        case .ko: return "센서 연동 복구"
+        case .vi: return "Mở khóa cảm biến"
+        case .th: return "คืนค่าเซนเซอร์"
+        case .id: return "Buka Kunci Sensor"
+        case .auto, .zhHans: return "恢复实时联动"
+        }
+    }
+
+    private var directAlignmentText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Direct Alignment"
+        case .zhHant, .ja: return "正針下卦"
+        case .ko: return "정침하괘"
+        case .vi: return "Chính Châm Hạ Quái"
+        case .th: return "ทิศตรงหลัก"
+        case .id: return "Arah Lurus"
+        case .auto, .zhHans: return "正针下卦"
+        }
+    }
+
+    private var fineTuneTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Facing Angle Fine-Tuning"
+        case .zhHant: return "向首度數微調（正針下卦/兼向替卦測試）"
+        case .ja: return "向首角度の微調整（下卦・替卦テスト）"
+        case .ko: return "향수 각도 미세조정 (하괘/겸향 테스트)"
+        case .vi: return "Vi chỉnh góc hướng (Hạ quái / Thế quái)"
+        case .th: return "ปรับองศาอย่างละเอียด"
+        case .id: return "Penyesuaian Sudut Hadap"
+        case .auto, .zhHans: return "向首度数微调（正针下卦/兼向替卦测试）"
+        }
+    }
+
+    private var allPalacesText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "All 24 Mountains"
+        case .zhHant: return "全部（24山）"
+        case .ja: return "全24山"
+        case .ko: return "전체 (24산)"
+        case .vi: return "Tất cả (24 Sơn)"
+        case .th: return "ทั้งหมด (24 ขุนเขา)"
+        case .id: return "Semua (24 Gunung)"
+        case .auto, .zhHans: return "全部（24山）"
+        }
+    }
+
+    private var confirmButtonText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Confirm & View Charts"
+        case .zhHant: return "選定坐向並返回排盤"
+        case .ja: return "決定して排盤を確認"
+        case .ko: return "좌향 선택 및 배반 확인"
+        case .vi: return "Xác Nhận & Xem 排 Bàn"
+        case .th: return "ยืนยันและดูผลวิเคราะห์"
+        case .id: return "Konfirmasi & Lihat Bagan"
+        case .auto, .zhHans: return "选定坐向并返回排盘"
         }
     }
 }

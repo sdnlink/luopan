@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import simd
+import ARKit
 
 #if canImport(RoomPlan)
 import RoomPlan
@@ -36,19 +37,40 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     /// 结算页罗盘校准旋钮产生的朝向微调量（度），叠加到 initialCompassHeading 上
     @Published public var headingOffsetDegrees: Double = 0.0
     /// Coordinate baseline, used by the top-down blueprint.
-    private var coordinateHeading: Double {
-        let h = (initialCompassHeading + headingOffsetDegrees).truncatingRemainder(dividingBy: 360.0)
-        return h >= 0 ? h : h + 360.0
+    private var coordinateHeading: Double? {
+        initialCompassHeading.map { ($0 + headingOffsetDegrees + 360).truncatingRemainder(dividingBy: 360) }
     }
 
-    public var effectiveHeadingForDisplay: Double {
+    public var effectiveHeadingForDisplay: Double? {
         currentSpatialSurvey?.resolvedHouseFacing ?? coordinateHeading
     }
+    @Published public private(set) var hasHeadingReference = false
 
     private weak var captureView: RoomCaptureView?
     private var latestRoom: CapturedRoom?
     private var capturedRoomsHistory: [CapturedRoom] = []
-    private var initialCompassHeading: Double = 0.0
+    private var initialCompassHeading: Double?
+    @Published public private(set) var confirmedEntranceID: UUID?
+
+    public var entranceOptions: [SpatialOpening3D] {
+        Self.deduplicated(activeRooms.flatMap { $0.doors }, id: { $0.identifier }).map { door in
+            let p = door.transform.columns.3, n = door.transform.columns.2
+            return SpatialOpening3D(id: door.identifier, type: .entranceDoor,
+                                    position: SIMD3(p.x, p.y, p.z), normal: SIMD3(n.x, n.y, n.z),
+                                    width: door.dimensions.x, height: door.dimensions.y)
+        }
+    }
+
+    public var currentEntranceID: UUID? {
+        Self.resolveEntrance(from: activeRooms, preferredID: confirmedEntranceID)?.identifier
+    }
+
+    public func confirmEntrance(id: UUID) {
+        guard entranceOptions.contains(where: { $0.id == id }) else { return }
+        confirmedEntranceID = id
+        rebuildCompletedSurvey()
+    }
+
     private let roomBuilder = RoomBuilder(options: [.beautifyObjects])
     /// RoomCaptureSession callbacks can arrive after a segment is stopped or
     /// the SwiftUI page has disappeared.  A generation token makes those late
@@ -70,6 +92,25 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     private static func deduplicated<T>(_ values: [T], id: (T) -> UUID) -> [T] {
         var seen = Set<UUID>()
         return values.filter { seen.insert(id($0)).inserted }
+    }
+
+    private static func resolveEntrance(from rooms: [CapturedRoom], preferredID: UUID?) -> CapturedRoom.Surface? {
+        let doors = deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
+        if let preferredID, let door = doors.first(where: { $0.identifier == preferredID }) { return door }
+        let walls = deduplicated(rooms.flatMap { $0.walls }, id: { $0.identifier })
+        let endpoints = walls.flatMap { wall -> [SIMD2<Float>] in
+            let p = wall.transform.columns.3, axis = wall.transform.columns.0
+            let half = wall.dimensions.x * 0.5
+            return [SIMD2(p.x - axis.x * half, p.z - axis.z * half),
+                    SIMD2(p.x + axis.x * half, p.z + axis.z * half)]
+        }
+        let candidates = doors.map {
+            SpatialEntranceCandidate(id: $0.identifier,
+                                     position: SIMD2($0.transform.columns.3.x, $0.transform.columns.3.z),
+                                     width: $0.dimensions.x)
+        }
+        let id = GeometryUtils.entranceDoorID(wallEndpoints: endpoints, doors: candidates)
+        return doors.first { $0.identifier == id }
     }
 
     /// JSON cannot encode simd matrices directly. Keep all sixteen values in
@@ -174,7 +215,9 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         latestRoom = nil
         capturedRoomsHistory.removeAll()
         scannedRoomCount = 0
-        initialCompassHeading = CompassMotionManager.shared.headingState.facingAngle
+        initialCompassHeading = nil
+        confirmedEntranceID = nil
+        hasHeadingReference = false
         headingOffsetDegrees = 0
         estimatedWidthMeters = 0
         estimatedDepthMeters = 0
@@ -183,6 +226,18 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         didFinish = false
         errorMessage = nil
         view.captureSession.run(configuration: RoomCaptureSession.Configuration())
+    }
+
+    private func resolveCoordinateReference() {
+        guard initialCompassHeading == nil,
+              let frame = captureView?.captureSession.arSession.currentFrame,
+              case .normal = frame.camera.trackingState else { return }
+        let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x,
+                                   frame.camera.transform.columns.2.y,
+                                   frame.camera.transform.columns.2.z)
+        initialCompassHeading = SurveyCoordinateReference.heading(
+            cameraHeading: CompassMotionManager.shared.physicalHeading(), cameraForward: forward)
+        hasHeadingReference = initialCompassHeading != nil
     }
 
     public func startNextRoomSegment() {
@@ -322,6 +377,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     /// architectural blueprint image and normalized `[FloorplanRoom]` blocks, then syncs them
     /// directly to Tab 3 (`FloorplanView`) for Nine-Palace / Eight-Mansions audit.
     public func syncToFloorplan() -> Bool {
+        resolveCoordinateReference()
+        guard let coordinateHeading else { return false }
         let rooms = activeRooms
         guard !rooms.isEmpty,
               let envelope = Self.compute2DEnvelope(for: rooms) else {
@@ -345,13 +402,13 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
 
         var generatedRooms: [FloorplanRoom] = []
-        let allDoors = Self.deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
         let allOpenings = Self.deduplicated(rooms.flatMap { $0.openings }, id: { $0.identifier })
         let allObjects = Self.deduplicated(rooms.flatMap { $0.objects }, id: { $0.identifier })
         let allWalls = Self.deduplicated(rooms.flatMap { $0.walls }, id: { $0.identifier })
 
         // 1. Map doors (or openings if no doors) to `.door` blocks
-        let doorSurfaces = !allDoors.isEmpty ? allDoors : Array(allOpenings.prefix(1))
+        let doorSurfaces = Self.resolveEntrance(from: rooms, preferredID: confirmedEntranceID).map { [$0] }
+            ?? Array(allOpenings.prefix(1))
         for door in doorSurfaces.prefix(2) {
             let pos = door.transform.columns.3
             let rect = normalizeRect(
@@ -470,7 +527,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
 
         let blueprint = Self.render2DBlueprintImage(rooms: rooms, envelope: envelope)
-        FloorplanView.persistRoomPlanImport(
+        return FloorplanView.persistRoomPlanImport(
             rooms: generatedRooms,
             centroid: centroid,
             blueprintImage: blueprint,
@@ -478,7 +535,6 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             compassHeading: coordinateHeading,
             spatialSurvey: currentSpatialSurvey
         )
-        return true
     }
 
     /// Computes the true 2D floor polygon area and geometric centroid (PRD 6.7
@@ -688,7 +744,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
-    private static func computeSpatialFengshuiFindings(for rooms: [CapturedRoom]) -> [String] {
+    private static func computeSpatialFengshuiFindings(for rooms: [CapturedRoom], entranceID: UUID? = nil) -> [String] {
         var findings: [String] = []
         let allDoors = deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
         let allWindows = deduplicated(rooms.flatMap { $0.windows }, id: { $0.identifier })
@@ -696,24 +752,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
 
         // 1. 入户门宽鲁班尺吉凶判定 (42.9cm 门光尺)。与空间模型使用
         // 相同的外边界距离规则，避免把室内门当作入户门。
-        let mainDoor: CapturedRoom.Surface? = {
-            guard let envelope = compute2DEnvelope(for: rooms), !allDoors.isEmpty else {
-                return allDoors.first
-            }
-            func boundaryDistance(_ door: CapturedRoom.Surface) -> Float {
-                let p = door.transform.columns.3
-                return min(
-                    abs(p.x - envelope.minX), abs(p.x - envelope.maxX),
-                    abs(p.z - envelope.minZ), abs(p.z - envelope.maxZ)
-                )
-            }
-            return allDoors.min { lhs, rhs in
-                let ld = boundaryDistance(lhs)
-                let rd = boundaryDistance(rhs)
-                if abs(ld - rd) > 0.05 { return ld < rd }
-                return lhs.dimensions.x > rhs.dimensions.x
-            }
-        }()
+        let mainDoor = resolveEntrance(from: rooms, preferredID: entranceID)
         let lang = LocalizationManager.shared.effectiveLanguage
         if let mainDoor, Float(mainDoor.dimensions.x) > 0.45 {
             let doorWidth = Float(mainDoor.dimensions.x)
@@ -834,7 +873,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         return findings
     }
 
-    public static func buildSpatialSurvey(from rooms: [CapturedRoom], heading: Double) -> HouseSpatialSurvey? {
+    public static func buildSpatialSurvey(from rooms: [CapturedRoom], heading: Double, entranceID: UUID? = nil) -> HouseSpatialSurvey? {
         guard !rooms.isEmpty else { return nil }
         var walls3D: [SpatialWall3D] = []
         var openings3D: [SpatialOpening3D] = []
@@ -848,28 +887,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let uniqueOpenings = deduplicated(rooms.flatMap { $0.openings }, id: { $0.identifier })
         let uniqueObjects = deduplicated(rooms.flatMap { $0.objects }, id: { $0.identifier })
 
-        // RoomPlan does not expose an explicit “entrance” flag. Pick the door
-        // nearest the measured outer envelope, with the widest door breaking
-        // ties. This is safer than assuming the first room's first door is the
-        // entrance, while still allowing users to correct the heading later.
-        let entranceDoorID: UUID? = {
-            guard !uniqueDoors.isEmpty, let envelope = compute2DEnvelope(for: rooms) else {
-                return uniqueDoors.first?.identifier
-            }
-            func boundaryDistance(_ door: CapturedRoom.Surface) -> Float {
-                let p = door.transform.columns.3
-                return min(
-                    abs(p.x - envelope.minX), abs(p.x - envelope.maxX),
-                    abs(p.z - envelope.minZ), abs(p.z - envelope.maxZ)
-                )
-            }
-            return uniqueDoors.min { lhs, rhs in
-                let ld = boundaryDistance(lhs)
-                let rd = boundaryDistance(rhs)
-                if abs(ld - rd) > 0.05 { return ld < rd }
-                return lhs.dimensions.x > rhs.dimensions.x
-            }?.identifier
-        }()
+        let entranceDoorID = resolveEntrance(from: rooms, preferredID: entranceID)?.identifier
 
         for wall in uniqueWalls {
                 let c = wall.transform.columns.3
@@ -1029,6 +1047,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     private func updateMetrics(from room: CapturedRoom, commitToHistory: Bool = false) {
+        resolveCoordinateReference()
         let combined = capturedRoomsHistory + [room]
         let wallCount = Self.deduplicated(combined.flatMap { $0.walls }, id: { $0.identifier }).count
         let doorCount = Self.deduplicated(combined.flatMap { $0.doors }, id: { $0.identifier }).count
@@ -1040,8 +1059,8 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let depth = envelope.map { max(0, $0.maxZ - $0.minZ) } ?? 0
         let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
-        let findings = Self.computeSpatialFengshuiFindings(for: combined)
-        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading + headingOffsetDegrees)
+        let findings = Self.computeSpatialFengshuiFindings(for: combined, entranceID: confirmedEntranceID)
+        let survey = coordinateHeading.flatMap { Self.buildSpatialSurvey(from: combined, heading: $0, entranceID: confirmedEntranceID) }
         let apply: () -> Void = { [weak self] in
             guard let self = self else { return }
             self.latestRoom = room
@@ -1094,18 +1113,22 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     /// 结算页罗盘校准旋钮回调：以实测罗盘度数为准微调大门朝向，立即重算报告并同步全景档案
     public func applyHeadingOffset(_ offsetDegrees: Double) {
         headingOffsetDegrees = offsetDegrees
-        guard !capturedRoomsHistory.isEmpty else { return }
+        rebuildCompletedSurvey()
+    }
+
+    private func rebuildCompletedSurvey() {
+        guard !isCapturing, !capturedRoomsHistory.isEmpty else { return }
         let combined = capturedRoomsHistory
-        let survey = Self.buildSpatialSurvey(from: combined, heading: initialCompassHeading + headingOffsetDegrees)
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.currentSpatialSurvey = survey
-            if let survey, let data = try? JSONEncoder().encode(survey) {
-                UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
-                NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
-            }
-            ShaSurveyStore.shared.updateInterior(survey)
+        spatialFindings = Self.computeSpatialFengshuiFindings(for: combined, entranceID: confirmedEntranceID)
+        let survey = coordinateHeading.flatMap {
+            Self.buildSpatialSurvey(from: combined, heading: $0, entranceID: confirmedEntranceID)
         }
+        currentSpatialSurvey = survey
+        if let survey, let data = try? JSONEncoder().encode(survey) {
+            UserDefaults.standard.set(data, forKey: SpatialSurveyArchiveKeys.measured)
+            NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
+        }
+        ShaSurveyStore.shared.updateInterior(survey)
     }
 
     public func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData, error: Error?) {
@@ -1253,9 +1276,29 @@ public struct ARRoomPlanSurveyView: View {
                                     }
                                     .accessibilityLabel(lang.t("ar_3d_model_title"))
                                 }
+                                if !model.hasHeadingReference {
+                                    Text(lang.t("ar_survey_heading_pending"))
+                                        .adaptiveFont(size: 11).foregroundColor(.orange)
+                                }
+                                if model.entranceOptions.count > 1 {
+                                    Menu {
+                                        ForEach(Array(model.entranceOptions.enumerated()), id: \.element.id) { index, door in
+                                            Button(action: { model.confirmEntrance(id: door.id) }) {
+                                                let heading = HouseSpatialSurveyEngine.resolveHouseFacing(
+                                                    openings: [door], centroid: model.currentSpatialSurvey?.centroid ?? .zero,
+                                                    coordinateHeading: model.currentSpatialSurvey?.compassHeading ?? 0)
+                                                let angle = heading.map { String(format: "%.0f°", $0) } ?? "--"
+                                                Text("\(index + 1) · \(String(format: "%.2f m", door.width)) · \(angle)\(model.currentEntranceID == door.id ? " ✓" : "")")
+                                            }
+                                        }
+                                    } label: {
+                                        Label(lang.t("ar_roomplan_confirm_entrance"), systemImage: "door.left.hand.open")
+                                            .adaptiveFont(size: 11).foregroundColor(.yanGold)
+                                    }
+                                }
                                 // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
                                 VStack(spacing: 2) {
-                                    Text("\(lang.t(model.currentSpatialSurvey?.resolvedHouseFacing == nil ? "ar_roomplan_coordinate_heading" : "ar_roomplan_door_heading")) \(String(format: "%.1f°", model.effectiveHeadingForDisplay))")
+                                    Text("\(lang.t(model.currentSpatialSurvey?.resolvedHouseFacing == nil ? "ar_roomplan_coordinate_heading" : "ar_roomplan_door_heading")) \(model.effectiveHeadingForDisplay.map { String(format: "%.1f°", $0) } ?? "--")")
                                         .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                                         .foregroundColor(.white)
                                     HStack(spacing: 3) {

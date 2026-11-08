@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "此地圖缺少可靠的朝向基準，請重新掃描後儲存。";
 "ar_roomplan_coordinate_heading" = "測繪基準朝向";
+
+"ar_roomplan_confirm_entrance" = "確認入戶門";
+"ar_survey_heading_pending" = "正在校準方向，請保持手機穩定；校準後可產生方位分析。";

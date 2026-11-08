@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "แผนที่นี้ไม่มีทิศอ้างอิงที่เชื่อถือได้ โปรดสแกนและบันทึกแผนที่ใหม่";
 "ar_roomplan_coordinate_heading" = "ทิศอ้างอิงการสำรวจ";
+
+"ar_roomplan_confirm_entrance" = "ยืนยันประตูทางเข้าหลัก";
+"ar_survey_heading_pending" = "กำลังปรับเทียบทิศทาง โปรดถือโทรศัพท์ให้นิ่งเพื่อเปิดการวิเคราะห์ทิศทาง";

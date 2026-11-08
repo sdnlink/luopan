@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "이 지도에는 신뢰할 수 있는 기준 방향이 없습니다. 다시 스캔하여 저장하세요.";
 "ar_roomplan_coordinate_heading" = "측량 기준 방향";
+
+"ar_roomplan_confirm_entrance" = "주 출입문 확인";
+"ar_survey_heading_pending" = "방향을 보정하고 있습니다. 방향 분석을 위해 휴대폰을 안정적으로 유지하세요.";

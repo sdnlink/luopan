@@ -3,6 +3,20 @@ import CoreGraphics
 
 // MARK: - 户型空间立极与全屋风水体检引擎 (PRD 5.3 & 第7章)
 
+struct FloorplanAuditTimeKey: Equatable {
+    let year: Int
+    let solarTerm: Int
+    let utcOffset: Int
+
+    init(date: Date, timeZone: TimeZone = .current) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        year = calendar.component(.year, from: date)
+        solarTerm = SolarTimeCalculator.shared.solarTermIndex(for: date)
+        utcOffset = timeZone.secondsFromGMT(for: date)
+    }
+}
+
 public enum FloorplanRoomType: String, CaseIterable, Identifiable, Codable {
     case door = "大门"
     case livingRoom = "客厅"
@@ -435,7 +449,7 @@ public class FloorplanEngine {
     }
 
     // 根据户型重心立极点与罗盘朝向解算各房间八卦方位与全屋风水体检报告
-    public func auditFloorplan(rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, aspectRatio: CGFloat = 1) -> (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) {
+    public func auditFloorplan(rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, aspectRatio: CGFloat = 1, date: Date = Date()) -> (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) {
         var updatedRooms: [FloorplanRoom] = []
         var auditReport: [FloorplanAuditItem] = []
         
@@ -448,7 +462,7 @@ public class FloorplanEngine {
         let manualMissingGua = Set(rooms.filter { $0.type == .missingCorner }.map {
             palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading, aspectRatio: aspectRatio).gua
         })
-        let pwChart = PurpleWhiteEngine.shared.calculateChart(date: Date(), heading: heading)
+        let pwChart = PurpleWhiteEngine.shared.calculateChart(date: date, heading: heading)
         
         for room in rooms {
             var r = room

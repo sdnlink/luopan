@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "此地图缺少可靠的朝向基准，请重新扫描后保存。";
 "ar_roomplan_coordinate_heading" = "测绘基准朝向";
+
+"ar_roomplan_confirm_entrance" = "确认入户门";
+"ar_survey_heading_pending" = "正在校准方向，请保持手机稳定；校准后可生成方位分析。";

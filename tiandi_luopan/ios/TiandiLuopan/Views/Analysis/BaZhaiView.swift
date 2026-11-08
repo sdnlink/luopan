@@ -18,6 +18,7 @@ public struct BaZhaiView: View {
     @State private var showUpcomingDays: Bool = false
     @State private var showShichenTable: Bool = true
     @State private var showFamilySection: Bool = false
+    @State private var showAddFamilyMemberDialog: Bool = false
     @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
     @State private var cachedAnalysis: BaZhaiAnalysis?
     @State private var cachedWaterItems: [SanHeWaterItem]?
@@ -82,6 +83,24 @@ public struct BaZhaiView: View {
             guard isActive else { return }
             refreshAnalysis()
         }
+        .overlay(
+            Group {
+                if showAddFamilyMemberDialog {
+                    AddFamilyMemberDialog(
+                        isPresented: $showAddFamilyMemberDialog,
+                        ownerBirthYear: kua.birthYear,
+                        ownerIsMale: kua.isMale,
+                        onConfirm: { role, customName, year, isMale in
+                            kua.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
+                            withAnimation {
+                                showFamilySection = true
+                            }
+                            refreshAnalysis()
+                        }
+                    )
+                }
+            }
+        )
     }
 
     /// Build the expensive analysis only while the embedded sub-tab is
@@ -792,37 +811,55 @@ public struct BaZhaiView: View {
     private func familyMembersSection(maleLabel: String, femaleLabel: String) -> some View {
         let headerTitle: String
         let addHint: String
+        let emptyTitle: String
+        let emptySubtitle: String
         switch lang.effectiveLanguage {
         case .en:
             headerTitle = "Family Members Life Gua & Smart Room Fit (\(kua.familyMembers.count))"
             addHint = "+ Add Member"
+            emptyTitle = "No Family Members Added Yet"
+            emptySubtitle = "Tap to add spouse, parents, or children for life gua and room recommendations"
         case .zhHant:
             headerTitle = "全家成員命卦與智能分房檔案（\(kua.familyMembers.count)人）"
             addHint = "+ 添加家人"
+            emptyTitle = "暫未添加家庭成員"
+            emptySubtitle = "點擊添加配偶、父母或子女，智能推演全家本命卦與分房吉位"
         case .ja:
             headerTitle = "家族全員の本命卦・部屋割診断（\(kua.familyMembers.count)名）"
             addHint = "+ 家族追加"
+            emptyTitle = "家族メンバーが未登録です"
+            emptySubtitle = "タップして配偶者・両親・子供を追加し、部屋割を自動診断"
         case .ko:
             headerTitle = "가족 구성원 본명괘 및 방 배정 (\(kua.familyMembers.count)명)"
             addHint = "+ 가족 추가"
+            emptyTitle = "등록된 가족 구성원이 없습니다"
+            emptySubtitle = "터치하여 배우자, 부모, 자녀를 추가하고 최적의 방 배정을 확인하세요"
         case .vi:
             headerTitle = "Bản Mệnh Gia Đình & Phân Phòng (\(kua.familyMembers.count))"
             addHint = "+ Thêm người"
+            emptyTitle = "Chưa có thành viên gia đình"
+            emptySubtitle = "Nhấn để thêm vợ/chồng, cha mẹ, con cái và tự động gợi ý phòng"
         case .th:
             headerTitle = "รหัสชีวิตสมาชิกครอบครัว & จัดห้อง (\(kua.familyMembers.count))"
             addHint = "+ เพิ่มสมาชิก"
+            emptyTitle = "ยังไม่มีสมาชิกครอบครัว"
+            emptySubtitle = "แตะเพื่อเพิ่มคู่สมรส พ่อแม่ หรือบุตร เพื่อจัดห้องมงคล"
         case .id:
             headerTitle = "Gua Anggota Keluarga & Kamar (\(kua.familyMembers.count))"
             addHint = "+ Tambah"
+            emptyTitle = "Belum Ada Anggota Keluarga"
+            emptySubtitle = "Ketuk untuk menambah pasangan, orang tua, atau anak"
         case .auto, .zhHans:
             headerTitle = "全家成员命卦与智能分房档案（\(kua.familyMembers.count)人）"
             addHint = "+ 添加家人"
+            emptyTitle = "暂未添加家庭成员"
+            emptySubtitle = "点击添加配偶、父母或子女，智能推演全家本命卦与分房吉位"
         }
 
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Button(action: {
-                    withAnimation { showFamilySection.toggle() }
+                    withAnimation(.easeInOut(duration: 0.25)) { showFamilySection.toggle() }
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "person.2.fill")
@@ -836,34 +873,69 @@ public struct BaZhaiView: View {
                             .foregroundColor(.white.opacity(0.6))
                     }
                 }
+                .buttonStyle(PlainButtonStyle())
+
                 Spacer()
-                Menu {
-                    ForEach(FamilyRole.allCases) { role in
-                        Button(action: {
-                            let defaultYear = (role == .elder) ? 1965 : ((role == .spouse) ? kua.birthYear : 2015)
-                            kua.addOrUpdateFamilyMember(role: role, birthYear: defaultYear, isMale: role.defaultIsMale)
-                            showFamilySection = true
-                        }) {
-                            Text(role.localizedTitle)
-                        }
+
+                Button(action: {
+                    showAddFamilyMemberDialog = true
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 10))
+                        Text(addHint)
+                            .adaptiveFont(size: 10, weight: .bold)
                     }
-                } label: {
-                    Text(addHint)
-                        .adaptiveFont(size: 10, weight: .bold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(Color.yanCyan.opacity(0.18))
-                        .foregroundColor(.yanCyan)
-                        .cornerRadius(4)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3.5)
+                    .background(Color.yanCyan.opacity(0.22))
+                    .foregroundColor(.yanCyan)
+                    .cornerRadius(5)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
 
-            if showFamilySection && !kua.familyMembers.isEmpty {
+            if kua.familyMembers.isEmpty {
+                Button(action: {
+                    showAddFamilyMemberDialog = true
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 18))
+                            .foregroundColor(.yanCyan)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(emptyTitle)
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(.white)
+                            Text(emptySubtitle)
+                                .adaptiveFont(size: 9.5)
+                                .foregroundColor(.white.opacity(0.65))
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                            .foregroundColor(Color.yanCyan.opacity(0.35))
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.top, 2)
+            } else if showFamilySection {
                 VStack(spacing: 6) {
                     ForEach(kua.familyMembers) { member in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
-                                Text(member.role.localizedTitle)
+                                Text(member.displayName)
                                     .adaptiveFont(size: 11, weight: .bold)
                                     .foregroundColor(.white)
                                 Text("【\(member.localizedGuaBadge)】")
@@ -871,9 +943,9 @@ public struct BaZhaiView: View {
                                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 Spacer()
                                 Menu {
-                                    ForEach((1935...2026).reversed(), id: \.self) { yr in
+                                    ForEach((1930...2026).reversed(), id: \.self) { yr in
                                         Button(action: {
-                                            kua.addOrUpdateFamilyMember(role: member.role, birthYear: yr, isMale: member.isMale)
+                                            kua.updateFamilyMember(id: member.id, birthYear: yr)
                                         }) {
                                             Text("\(String(yr))")
                                         }
@@ -888,7 +960,7 @@ public struct BaZhaiView: View {
                                         .cornerRadius(4)
                                 }
                                 Button(action: {
-                                    kua.addOrUpdateFamilyMember(role: member.role, birthYear: member.birthYear, isMale: !member.isMale)
+                                    kua.updateFamilyMember(id: member.id, isMale: !member.isMale)
                                 }) {
                                     Text(member.isMale ? maleLabel : femaleLabel)
                                         .adaptiveFont(size: 10, weight: .bold)
@@ -898,13 +970,18 @@ public struct BaZhaiView: View {
                                         .foregroundColor(.yanCyan)
                                         .cornerRadius(4)
                                 }
+                                .buttonStyle(PlainButtonStyle())
+
                                 Button(action: {
-                                    kua.removeFamilyMember(role: member.role)
+                                    withAnimation {
+                                        kua.removeFamilyMember(id: member.id)
+                                    }
                                 }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 11))
+                                    Image(systemName: "trash.circle.fill")
+                                        .font(.system(size: 12))
                                         .foregroundColor(.white.opacity(0.45))
                                 }
+                                .buttonStyle(PlainButtonStyle())
                             }
                             Text(member.personalWealthAndStudySummary)
                                 .adaptiveFont(size: 10)
@@ -914,6 +991,24 @@ public struct BaZhaiView: View {
                         .background(Color.white.opacity(0.04))
                         .cornerRadius(6)
                     }
+
+                    Button(action: {
+                        showAddFamilyMemberDialog = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 9, weight: .bold))
+                            Text(addHint)
+                                .adaptiveFont(size: 10, weight: .semibold)
+                        }
+                        .foregroundColor(.yanCyan)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .background(Color.yanCyan.opacity(0.08))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.top, 2)
                 }
             }
         }
@@ -1461,6 +1556,451 @@ public struct BaZhaiView: View {
         case .th: return "ไปที่การตั้งค่า"
         case .id: return "Buka Pengaturan"
         case .auto, .zhHans: return "前往设置"
+        }
+    }
+}
+
+// MARK: - 添加家庭成员弹窗 (AddFamilyMemberDialog)
+
+struct AddFamilyMemberDialog: View {
+    @Binding var isPresented: Bool
+    let ownerBirthYear: Int
+    let ownerIsMale: Bool
+    let onConfirm: (FamilyRole, String?, Int, Bool) -> Void
+
+    @ObservedObject private var lang = LocalizationManager.shared
+    @State private var selectedRole: FamilyRole = .spouse
+    @State private var customName: String = ""
+    @State private var selectedYear: Int = 1990
+    @State private var selectedIsMale: Bool = false
+    @State private var isInitialized: Bool = false
+
+    private func initDefaults() {
+        guard !isInitialized else { return }
+        isInitialized = true
+        selectedRole = .spouse
+        selectedIsMale = !ownerIsMale
+        selectedYear = ownerBirthYear
+    }
+
+    private func applyRolePreset(_ role: FamilyRole) {
+        selectedRole = role
+        switch role {
+        case .spouse:
+            selectedIsMale = !ownerIsMale
+            selectedYear = ownerBirthYear
+        case .father:
+            selectedIsMale = true
+            selectedYear = max(1930, ownerBirthYear - 28)
+        case .mother:
+            selectedIsMale = false
+            selectedYear = max(1930, ownerBirthYear - 26)
+        case .elder:
+            selectedIsMale = true
+            selectedYear = max(1930, ownerBirthYear - 28)
+        case .son:
+            selectedIsMale = true
+            selectedYear = min(2026, max(1995, ownerBirthYear + 26))
+        case .daughter:
+            selectedIsMale = false
+            selectedYear = min(2026, max(1995, ownerBirthYear + 28))
+        case .child1:
+            selectedIsMale = true
+            selectedYear = min(2026, max(1995, ownerBirthYear + 26))
+        case .child2:
+            selectedIsMale = false
+            selectedYear = min(2026, max(1995, ownerBirthYear + 28))
+        case .other:
+            selectedIsMale = true
+            selectedYear = ownerBirthYear
+        }
+    }
+
+    private var previewGuaBadge: String {
+        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: selectedYear, isMale: selectedIsMale)
+        let guaKey = UserKuaProfileManager.guaKey(for: guaNum)
+        let isEast = [1, 3, 4, 9].contains(guaNum)
+        let guaItem = BaZhaiPalaceItem(id: 0, direction: "", guaName: guaKey, star: .fuWei)
+        switch lang.effectiveLanguage {
+        case .en:
+            return "\(guaItem.localizedGuaName) · \(isEast ? "East 4" : "West 4")"
+        case .zhHant, .ja:
+            return "\(guaItem.localizedGuaName)命·\(isEast ? "東四命" : "西四命")"
+        case .ko:
+            return "\(guaItem.localizedGuaName)명·\(isEast ? "동사명" : "서사명")"
+        case .vi:
+            return "Mệnh \(guaItem.localizedGuaName)·\(isEast ? "Đông Tứ" : "Tây Tứ")"
+        case .th:
+            return "ดวง\(guaItem.localizedGuaName)·\(isEast ? "ตะวันออก" : "ตะวันตก")"
+        case .id:
+            return "Gua \(guaItem.localizedGuaName)·\(isEast ? "Timur" : "Barat")"
+        case .auto, .zhHans:
+            return "\(guaItem.localizedGuaName)命·\(isEast ? "东四命" : "西四命")"
+        }
+    }
+
+    private var previewDirectionsSummary: String {
+        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: selectedYear, isMale: selectedIsMale)
+        let guaKey = UserKuaProfileManager.guaKey(for: guaNum)
+        let chart = BaZhaiEngine.shared.analyze(sittingPalace: guaKey, facingPalace: "离")
+        let wDir = chart.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "-"
+        let sDir = chart.items.first(where: { $0.star == .fuWei })?.localizedDirection ?? "-"
+        let hDir = chart.items.first(where: { $0.star == .tianYi })?.localizedDirection ?? "-"
+        switch lang.effectiveLanguage {
+        case .en:
+            return "Wealth: \(wDir) · Health: \(hDir) · Study: \(sDir)"
+        case .zhHant, .ja:
+            return "生氣財位:\(wDir) · 天醫康健:\(hDir) · 文昌伏位:\(sDir)"
+        case .ko:
+            return "생기:\(wDir) · 천의:\(hDir) · 문창:\(sDir)"
+        case .vi:
+            return "Sinh Khí:\(wDir) · Thiên Y:\(hDir) · Văn Xương:\(sDir)"
+        case .th:
+            return "โชคลาภ:\(wDir) · สุขภาพ:\(hDir) · การเรียน:\(sDir)"
+        case .id:
+            return "Rezeki:\(wDir) · Sehat:\(hDir) · Studi:\(sDir)"
+        case .auto, .zhHans:
+            return "生气财位:\(wDir) · 天医康健:\(hDir) · 文昌伏位:\(sDir)"
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.65)
+                .ignoresSafeArea()
+                .onTapGesture { isPresented = false }
+
+            VStack(spacing: 12) {
+                // 弹窗顶栏
+                HStack(spacing: 6) {
+                    Image(systemName: "person.crop.circle.badge.plus")
+                        .font(.system(size: 16))
+                        .foregroundColor(.yanCyan)
+                    Text(dialogTitle)
+                        .adaptiveFont(size: 15, weight: .bold)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button(action: { isPresented = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
+                Text(dialogSubtitle)
+                    .adaptiveFont(size: 11)
+                    .foregroundColor(.white.opacity(0.7))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // 身份关系网格
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(roleSectionTitle)
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], spacing: 6) {
+                        ForEach(FamilyRole.allCases) { role in
+                            Button(action: {
+                                applyRolePreset(role)
+                            }) {
+                                Text(role.localizedTitle)
+                                    .adaptiveFont(size: 11, weight: selectedRole == role ? .bold : .medium)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 6)
+                                    .background(selectedRole == role ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
+                                    .foregroundColor(selectedRole == role ? .yanCyan : .white.opacity(0.85))
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(selectedRole == role ? Color.yanCyan : Color.clear, lineWidth: 1)
+                                    )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                }
+
+                // 称呼/姓名（选填）
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(nameSectionTitle)
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .foregroundColor(.white.opacity(0.85))
+                    TextField(namePlaceholder, text: $customName)
+                        .adaptiveFont(size: 12)
+                        .padding(8)
+                        .background(Color.white.opacity(0.08))
+                        .foregroundColor(.white)
+                        .cornerRadius(6)
+                }
+
+                // 生辰年份与性别选择
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(birthYearSectionTitle)
+                            .adaptiveFont(size: 11, weight: .bold)
+                            .foregroundColor(.white.opacity(0.85))
+
+                        Menu {
+                            ForEach((1930...2026).reversed(), id: \.self) { yr in
+                                Button(action: { selectedYear = yr }) {
+                                    Text("\(String(yr))")
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("\(String(selectedYear))年")
+                                    .adaptiveFont(size: 12, weight: .bold)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(6)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(genderSectionTitle)
+                            .adaptiveFont(size: 11, weight: .bold)
+                            .foregroundColor(.white.opacity(0.85))
+
+                        HStack(spacing: 4) {
+                            Button(action: { selectedIsMale = true }) {
+                                Text(maleText)
+                                    .adaptiveFont(size: 11, weight: selectedIsMale ? .bold : .medium)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 7)
+                                    .background(selectedIsMale ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
+                                    .foregroundColor(selectedIsMale ? .yanCyan : .white.opacity(0.8))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Button(action: { selectedIsMale = false }) {
+                                Text(femaleText)
+                                    .adaptiveFont(size: 11, weight: !selectedIsMale ? .bold : .medium)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 7)
+                                    .background(!selectedIsMale ? Color.pink.opacity(0.28) : Color.white.opacity(0.06))
+                                    .foregroundColor(!selectedIsMale ? Color.pink : .white.opacity(0.8))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .frame(width: 100)
+                }
+
+                // 实时命卦排盘预览卡
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text("【\(previewGuaBadge)】")
+                            .adaptiveFont(size: 11, weight: .bold)
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        Spacer()
+                    }
+                    Text(previewDirectionsSummary)
+                        .adaptiveFont(size: 9.5)
+                        .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(6)
+
+                // 底部确认与取消按钮
+                HStack(spacing: 10) {
+                    Button(action: { isPresented = false }) {
+                        Text(cancelText)
+                            .adaptiveFont(size: 13, weight: .semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.white.opacity(0.1))
+                            .foregroundColor(.white.opacity(0.85))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: {
+                        let trimmed = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onConfirm(selectedRole, trimmed.isEmpty ? nil : trimmed, selectedYear, selectedIsMale)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        isPresented = false
+                    }) {
+                        Text(confirmText)
+                            .adaptiveFont(size: 13, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.yanCyan)
+                            .foregroundColor(.black)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.top, 4)
+            }
+            .padding(16)
+            .frame(maxWidth: 340)
+            .background(Color(red: 0.13, green: 0.13, blue: 0.17))
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.yanCyan.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .onAppear {
+            initDefaults()
+        }
+    }
+
+    // 多语言文案辅助
+    private var dialogTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Add Family Member"
+        case .zhHant: return "添加家庭成員"
+        case .ja: return "家族メンバー追加"
+        case .ko: return "가족 구성원 추가"
+        case .vi: return "Thêm Thành Viên"
+        case .th: return "เพิ่มสมาชิกครอบครัว"
+        case .id: return "Tambah Keluarga"
+        case .auto, .zhHans: return "添加家庭成员"
+        }
+    }
+
+    private var dialogSubtitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Enter birth details for life gua and room recommendations"
+        case .zhHant: return "錄入生辰以推演本命卦吉方與智能分房"
+        case .ja: return "生年を登録して本命卦と部屋割を診断"
+        case .ko: return "생년을 입력하여 본명괘와 방 배정을 확인하세요"
+        case .vi: return "Nhập năm sinh để xem bản mệnh và gợi ý phân phòng"
+        case .th: return "กรอกปีเกิดเพื่อตรวจดวงชะตาและจัดห้องมงคล"
+        case .id: return "Masukkan tahun lahir untuk cek gua & kamar"
+        case .auto, .zhHans: return "录入生辰以推演本命卦吉方与智能分房"
+        }
+    }
+
+    private var roleSectionTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Family Relationship"
+        case .zhHant: return "家庭關係/身份"
+        case .ja: return "家族関係・続柄"
+        case .ko: return "가족 관계/신분"
+        case .vi: return "Mối Quan Hệ"
+        case .th: return "ความสัมพันธ์"
+        case .id: return "Hubungan Keluarga"
+        case .auto, .zhHans: return "家庭关系/身份"
+        }
+    }
+
+    private var nameSectionTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Nickname / Remark (Optional)"
+        case .zhHant: return "稱謂/姓名（選填）"
+        case .ja: return "呼び名・名前（任意）"
+        case .ko: return "호칭/이름 (선택)"
+        case .vi: return "Tên / Xưng hô (tùy chọn)"
+        case .th: return "ชื่อ / คำเรียก (ไม่บังคับ)"
+        case .id: return "Nama / Panggilan (opsional)"
+        case .auto, .zhHans: return "称谓/姓名（选填）"
+        }
+    }
+
+    private var namePlaceholder: String {
+        switch lang.effectiveLanguage {
+        case .en: return "e.g. Mom, Alex, Daughter"
+        case .zhHant: return "例如：媽媽 / 大寶 / 哥哥"
+        case .ja: return "例：母、太郎、長女"
+        case .ko: return "예: 어머니, 첫째, 공주"
+        case .vi: return "Ví dụ: Mẹ, Bé Bự, Anh Hai"
+        case .th: return "เช่น คุณแม่, น้องบอส"
+        case .id: return "Misal: Ibu, Kakak, Adik"
+        case .auto, .zhHans: return "例如：妈妈 / 大宝 / 哥哥"
+        }
+    }
+
+    private var birthYearSectionTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Birth Year"
+        case .zhHant: return "出生年份"
+        case .ja: return "生年"
+        case .ko: return "출생연도"
+        case .vi: return "Năm sinh"
+        case .th: return "ปีเกิด"
+        case .id: return "Tahun Lahir"
+        case .auto, .zhHans: return "出生年份"
+        }
+    }
+
+    private var genderSectionTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Gender"
+        case .zhHant: return "性別"
+        case .ja: return "性別"
+        case .ko: return "성별"
+        case .vi: return "Giới tính"
+        case .th: return "เพศ"
+        case .id: return "Jenis Kelamin"
+        case .auto, .zhHans: return "性别"
+        }
+    }
+
+    private var maleText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Male"
+        case .zhHant, .ja: return "男"
+        case .ko: return "남"
+        case .vi: return "Nam"
+        case .th: return "ชาย"
+        case .id: return "Pria"
+        case .auto, .zhHans: return "男"
+        }
+    }
+
+    private var femaleText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Female"
+        case .zhHant, .ja: return "女"
+        case .ko: return "여"
+        case .vi: return "Nữ"
+        case .th: return "หญิง"
+        case .id: return "Wanita"
+        case .auto, .zhHans: return "女"
+        }
+    }
+
+    private var cancelText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Cancel"
+        case .zhHant: return "取消"
+        case .ja: return "キャンセル"
+        case .ko: return "취소"
+        case .vi: return "Hủy"
+        case .th: return "ยกเลิก"
+        case .id: return "Batal"
+        case .auto, .zhHans: return "取消"
+        }
+    }
+
+    private var confirmText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Confirm Add"
+        case .zhHant: return "確認添加"
+        case .ja: return "追加する"
+        case .ko: return "추가하기"
+        case .vi: return "Xác Nhận Thêm"
+        case .th: return "ยืนยันการเพิ่ม"
+        case .id: return "Tambahkan"
+        case .auto, .zhHans: return "确认添加"
         }
     }
 }

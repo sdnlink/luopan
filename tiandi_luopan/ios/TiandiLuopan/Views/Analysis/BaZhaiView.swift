@@ -10,16 +10,29 @@ public struct BaZhaiView: View {
     @ObservedObject var lang = LocalizationManager.shared
     @ObservedObject var kua = UserKuaProfileManager.shared
     @ObservedObject var retention = RetentionServiceManager.shared
+    public enum ActiveSheet: Identifiable {
+        case paywall
+        case dailySign
+        case addFamilyMember
+        case editOwnerKua
+
+        public var id: String {
+            switch self {
+            case .paywall: return "paywall"
+            case .dailySign: return "dailySign"
+            case .addFamilyMember: return "addFamilyMember"
+            case .editOwnerKua: return "editOwnerKua"
+            }
+        }
+    }
+
+    @State private var activeSheet: ActiveSheet? = nil
     @State private var selectedSubTab: Int = 0 // 0: 八宅明镜, 1: 三合水法
-    @State private var showPaywall: Bool = false
-    @State private var showDailySignSheet: Bool = false
     @State private var selectedDate: Date = Date()
     @State private var isUsingCustomDate: Bool = false
     @State private var showUpcomingDays: Bool = false
     @State private var showShichenTable: Bool = true
-    @State private var showFamilySection: Bool = false
-    @State private var showAddFamilyMemberDialog: Bool = false
-    @State private var showEditOwnerKuaDialog: Bool = false
+    @State private var showFamilySection: Bool = true
     @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
     @State private var cachedAnalysis: BaZhaiAnalysis?
     @State private var cachedWaterItems: [SanHeWaterItem]?
@@ -84,32 +97,6 @@ public struct BaZhaiView: View {
             guard isActive else { return }
             refreshAnalysis()
         }
-        .overlay(
-            Group {
-                if showAddFamilyMemberDialog {
-                    AddFamilyMemberDialog(
-                        isPresented: $showAddFamilyMemberDialog,
-                        ownerBirthYear: kua.birthYear,
-                        ownerIsMale: kua.isMale,
-                        onConfirm: { role, customName, year, isMale in
-                            kua.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
-                            withAnimation {
-                                showFamilySection = true
-                            }
-                            refreshAnalysis()
-                        }
-                    )
-                } else if showEditOwnerKuaDialog {
-                    EditOwnerKuaDialog(
-                        isPresented: $showEditOwnerKuaDialog,
-                        sittingPalace: state.sittingMountain.palace,
-                        onSaved: {
-                            refreshAnalysis()
-                        }
-                    )
-                }
-            }
-        )
     }
 
     /// Build the expensive analysis only while the embedded sub-tab is
@@ -137,11 +124,42 @@ public struct BaZhaiView: View {
         }
         .padding(.top, isEmbedded ? 0 : 12)
         .padding(.bottom, isEmbedded ? 0 : 24)
-        .sheet(isPresented: $showPaywall) {
-            VIPPaywallSheet(defaultProductId: .vipYearly)
-        }
-        .sheet(isPresented: $showDailySignSheet) {
-            DailyAuspiciousCardSheet(targetDate: effectiveDate)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .paywall:
+                VIPPaywallSheet(defaultProductId: .vipYearly)
+            case .dailySign:
+                DailyAuspiciousCardSheet(targetDate: effectiveDate)
+            case .addFamilyMember:
+                AddFamilyMemberDialog(
+                    isPresented: Binding(
+                        get: { activeSheet == .addFamilyMember },
+                        set: { if !$0 { activeSheet = nil } }
+                    ),
+                    ownerBirthYear: kua.birthYear,
+                    ownerIsMale: kua.isMale,
+                    onConfirm: { role, customName, year, isMale in
+                        kua.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
+                        withAnimation {
+                            showFamilySection = true
+                        }
+                        refreshAnalysis()
+                        activeSheet = nil
+                    }
+                )
+            case .editOwnerKua:
+                EditOwnerKuaDialog(
+                    isPresented: Binding(
+                        get: { activeSheet == .editOwnerKua },
+                        set: { if !$0 { activeSheet = nil } }
+                    ),
+                    sittingPalace: state.sittingMountain.palace,
+                    onSaved: {
+                        refreshAnalysis()
+                        activeSheet = nil
+                    }
+                )
+            }
         }
         .onChange(of: selectedDate) { _ in
             isUsingCustomDate = true
@@ -440,7 +458,7 @@ public struct BaZhaiView: View {
                     featureDesc: lang.t("privilege_sanhe_desc"),
                     badge: lang.t("vip_badge_title"),
                     targetProductId: .vipYearly,
-                    onUnlockTap: { showPaywall = true }
+                    onUnlockTap: { activeSheet = .paywall }
                 )
             } else {
                 // 1. 八路黄泉水法判据卡
@@ -634,7 +652,7 @@ public struct BaZhaiView: View {
 
             Spacer(minLength: 8)
 
-            Button(action: { showPaywall = true }) {
+            Button(action: { activeSheet = .paywall }) {
                 HStack {
                     Spacer()
                     Image(systemName: "crown.fill")
@@ -733,7 +751,8 @@ public struct BaZhaiView: View {
 
                 // 点击修改生辰日期与命卦按钮
                 Button(action: {
-                    showEditOwnerKuaDialog = true
+                    activeSheet = .editOwnerKua
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
@@ -771,7 +790,8 @@ public struct BaZhaiView: View {
 
             // 命卦画像展示与配对卡（点击也可直接唤起修改弹窗）
             Button(action: {
-                showEditOwnerKuaDialog = true
+                activeSheet = .editOwnerKua
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }) {
                 HStack(spacing: 8) {
                     Text("【\(compat.localizedOwnerGuaName) · \(compat.localizedLifeGroup) · \(compat.localizedZodiacName)】")
@@ -893,7 +913,8 @@ public struct BaZhaiView: View {
                 Spacer()
 
                 Button(action: {
-                    showAddFamilyMemberDialog = true
+                    activeSheet = .addFamilyMember
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: "plus.circle.fill")
@@ -912,7 +933,8 @@ public struct BaZhaiView: View {
 
             if kua.familyMembers.isEmpty {
                 Button(action: {
-                    showAddFamilyMemberDialog = true
+                    activeSheet = .addFamilyMember
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "person.crop.circle.badge.plus")
@@ -974,6 +996,7 @@ public struct BaZhaiView: View {
                                         .foregroundColor(.white)
                                         .cornerRadius(4)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                                 Button(action: {
                                     kua.updateFamilyMember(id: member.id, isMale: !member.isMale)
                                 }) {
@@ -1008,7 +1031,8 @@ public struct BaZhaiView: View {
                     }
 
                     Button(action: {
-                        showAddFamilyMemberDialog = true
+                        activeSheet = .addFamilyMember
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "plus")
@@ -1213,7 +1237,7 @@ public struct BaZhaiView: View {
             Spacer(minLength: 0)
 
             Button(action: {
-                showDailySignSheet = true
+                activeSheet = .dailySign
             }) {
                 HStack(spacing: 3) {
                     Image(systemName: "square.and.arrow.up")
@@ -1684,197 +1708,244 @@ struct AddFamilyMemberDialog: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.65)
+            Color(red: 0.11, green: 0.11, blue: 0.15)
                 .ignoresSafeArea()
-                .onTapGesture { isPresented = false }
 
-            VStack(spacing: 12) {
-                // 弹窗顶栏
-                HStack(spacing: 6) {
-                    Image(systemName: "person.crop.circle.badge.plus")
-                        .font(.system(size: 16))
-                        .foregroundColor(.yanCyan)
-                    Text(dialogTitle)
-                        .adaptiveFont(size: 15, weight: .bold)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Button(action: { isPresented = false }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.45))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-
-                Text(dialogSubtitle)
-                    .adaptiveFont(size: 11)
-                    .foregroundColor(.white.opacity(0.7))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // 身份关系网格
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(roleSectionTitle)
-                        .adaptiveFont(size: 11, weight: .bold)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], spacing: 6) {
-                        ForEach(FamilyRole.allCases) { role in
-                            Button(action: {
-                                applyRolePreset(role)
-                            }) {
-                                Text(role.localizedTitle)
-                                    .adaptiveFont(size: 11, weight: selectedRole == role ? .bold : .medium)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 6)
-                                    .background(selectedRole == role ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
-                                    .foregroundColor(selectedRole == role ? .yanCyan : .white.opacity(0.85))
-                                    .cornerRadius(6)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(selectedRole == role ? Color.yanCyan : Color.clear, lineWidth: 1)
-                                    )
-                            }
-                            .buttonStyle(PlainButtonStyle())
+            ScrollView {
+                VStack(spacing: 12) {
+                    // 弹窗顶栏
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 16))
+                            .foregroundColor(.yanCyan)
+                        Text(dialogTitle)
+                            .adaptiveFont(size: 15, weight: .bold)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Button(action: { isPresented = false }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white.opacity(0.45))
                         }
-                    }
-                }
-
-                // 称呼/姓名（选填）
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(nameSectionTitle)
-                        .adaptiveFont(size: 11, weight: .bold)
-                        .foregroundColor(.white.opacity(0.85))
-                    TextField(namePlaceholder, text: $customName)
-                        .adaptiveFont(size: 12)
-                        .padding(8)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(.white)
-                        .cornerRadius(6)
-                }
-
-                // 生辰年份与性别选择
-                HStack(spacing: 10) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(birthYearSectionTitle)
-                            .adaptiveFont(size: 11, weight: .bold)
-                            .foregroundColor(.white.opacity(0.85))
-
-                        Menu {
-                            ForEach((1930...2026).reversed(), id: \.self) { yr in
-                                Button(action: { selectedYear = yr }) {
-                                    Text("\(String(yr))")
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text("\(String(selectedYear))年")
-                                    .adaptiveFont(size: 12, weight: .bold)
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.6))
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .background(Color.white.opacity(0.08))
-                            .cornerRadius(6)
-                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(genderSectionTitle)
-                            .adaptiveFont(size: 11, weight: .bold)
-                            .foregroundColor(.white.opacity(0.85))
+                    Text(dialogSubtitle)
+                        .adaptiveFont(size: 11)
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        HStack(spacing: 4) {
-                            Button(action: { selectedIsMale = true }) {
-                                Text(maleText)
-                                    .adaptiveFont(size: 11, weight: selectedIsMale ? .bold : .medium)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 7)
-                                    .background(selectedIsMale ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
-                                    .foregroundColor(selectedIsMale ? .yanCyan : .white.opacity(0.8))
-                                    .cornerRadius(6)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-
-                            Button(action: { selectedIsMale = false }) {
-                                Text(femaleText)
-                                    .adaptiveFont(size: 11, weight: !selectedIsMale ? .bold : .medium)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 7)
-                                    .background(!selectedIsMale ? Color.pink.opacity(0.28) : Color.white.opacity(0.06))
-                                    .foregroundColor(!selectedIsMale ? Color.pink : .white.opacity(0.8))
-                                    .cornerRadius(6)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .frame(width: 100)
-                }
-
-                // 实时命卦排盘预览卡
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack {
-                        Text("【\(previewGuaBadge)】")
+                    // 身份关系网格
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(roleSectionTitle)
                             .adaptiveFont(size: 11, weight: .bold)
                             .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        Spacer()
-                    }
-                    Text(previewDirectionsSummary)
-                        .adaptiveFont(size: 9.5)
-                        .foregroundColor(.white.opacity(0.75))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(6)
 
-                // 底部确认与取消按钮
-                HStack(spacing: 10) {
-                    Button(action: { isPresented = false }) {
-                        Text(cancelText)
-                            .adaptiveFont(size: 13, weight: .semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .background(Color.white.opacity(0.1))
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 70), spacing: 6)], spacing: 6) {
+                            ForEach(FamilyRole.allCases) { role in
+                                Button(action: {
+                                    applyRolePreset(role)
+                                }) {
+                                    Text(role.localizedTitle)
+                                        .adaptiveFont(size: 11, weight: selectedRole == role ? .bold : .medium)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 6)
+                                        .background(selectedRole == role ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
+                                        .foregroundColor(selectedRole == role ? .yanCyan : .white.opacity(0.85))
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(selectedRole == role ? Color.yanCyan : Color.clear, lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+
+                    // 称呼/姓名（选填）
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(nameSectionTitle)
+                            .adaptiveFont(size: 11, weight: .bold)
                             .foregroundColor(.white.opacity(0.85))
-                            .cornerRadius(8)
+                        TextField(namePlaceholder, text: $customName)
+                            .adaptiveFont(size: 12)
+                            .padding(8)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
                     }
-                    .buttonStyle(PlainButtonStyle())
 
-                    Button(action: {
-                        let trimmed = customName.trimmingCharacters(in: .whitespacesAndNewlines)
-                        onConfirm(selectedRole, trimmed.isEmpty ? nil : trimmed, selectedYear, selectedIsMale)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        isPresented = false
-                    }) {
-                        Text(confirmText)
-                            .adaptiveFont(size: 13, weight: .bold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .background(Color.yanCyan)
-                            .foregroundColor(.black)
-                            .cornerRadius(8)
+                    // 生辰年份与性别选择
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(birthYearSectionTitle)
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(.white.opacity(0.85))
+
+                            HStack(spacing: 4) {
+                                Button(action: { selectedYear = max(1920, selectedYear - 10) }) {
+                                    Text("-10")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: { selectedYear = max(1920, selectedYear - 1) }) {
+                                    Text("-1")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Menu {
+                                    ForEach((1920...2026).reversed(), id: \.self) { yr in
+                                        Button(action: { selectedYear = yr }) {
+                                            HStack {
+                                                Text("\(String(yr))年")
+                                                if yr == selectedYear {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Text("\(String(selectedYear))年")
+                                            .adaptiveFont(size: 11, weight: .bold)
+                                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 7)
+                                    .background(Color.white.opacity(0.12))
+                                    .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: { selectedYear = min(2026, selectedYear + 1) }) {
+                                    Text("+1")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: { selectedYear = min(2026, selectedYear + 10) }) {
+                                    Text("+10")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(genderSectionTitle)
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(.white.opacity(0.85))
+
+                            HStack(spacing: 4) {
+                                Button(action: { selectedIsMale = true }) {
+                                    Text(maleText)
+                                        .adaptiveFont(size: 11, weight: selectedIsMale ? .bold : .medium)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .background(selectedIsMale ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
+                                        .foregroundColor(selectedIsMale ? .yanCyan : .white.opacity(0.8))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: { selectedIsMale = false }) {
+                                    Text(femaleText)
+                                        .adaptiveFont(size: 11, weight: !selectedIsMale ? .bold : .medium)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 7)
+                                        .background(!selectedIsMale ? Color.pink.opacity(0.28) : Color.white.opacity(0.06))
+                                        .foregroundColor(!selectedIsMale ? Color.pink : .white.opacity(0.8))
+                                        .cornerRadius(6)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .frame(width: 100)
                     }
-                    .buttonStyle(PlainButtonStyle())
+
+                    // 实时命卦排盘预览卡
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text("【\(previewGuaBadge)】")
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            Spacer()
+                        }
+                        Text(previewDirectionsSummary)
+                            .adaptiveFont(size: 9.5)
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(6)
+
+                    // 底部确认与取消按钮
+                    HStack(spacing: 10) {
+                        Button(action: { isPresented = false }) {
+                            Text(cancelText)
+                                .adaptiveFont(size: 13, weight: .semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .background(Color.white.opacity(0.1))
+                                .foregroundColor(.white.opacity(0.85))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        Button(action: {
+                            let trimmed = customName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            onConfirm(selectedRole, trimmed.isEmpty ? nil : trimmed, selectedYear, selectedIsMale)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            isPresented = false
+                        }) {
+                            Text(confirmText)
+                                .adaptiveFont(size: 13, weight: .bold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .background(Color.yanCyan)
+                                .foregroundColor(.black)
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    .padding(.top, 4)
                 }
-                .padding(.top, 4)
+                .padding(16)
+                .frame(maxWidth: 440)
             }
-            .padding(16)
-            .frame(maxWidth: 340)
-            .background(Color(red: 0.13, green: 0.13, blue: 0.17))
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.yanCyan.opacity(0.35), lineWidth: 1)
-            )
         }
+        .preferredColorScheme(.dark)
         .onAppear {
             initDefaults()
         }
@@ -2123,36 +2194,34 @@ public struct EditOwnerKuaDialog: View {
 
     public var body: some View {
         ZStack {
-            Color.black.opacity(0.7)
+            Color(red: 0.11, green: 0.11, blue: 0.15)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    isPresented = false
-                }
 
-            VStack(spacing: 12) {
-                // 1. 顶栏标题与关闭按钮
-                HStack(spacing: 8) {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text(dialogTitle)
-                        .adaptiveFont(size: 15, weight: .bold)
-                        .foregroundColor(.white)
-                    Spacer()
-                    Button(action: { isPresented = false }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.45))
+            ScrollView {
+                VStack(spacing: 12) {
+                    // 1. 顶栏标题与关闭按钮
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        Text(dialogTitle)
+                            .adaptiveFont(size: 15, weight: .bold)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Button(action: { isPresented = false }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.white.opacity(0.45))
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                }
 
-                // 2. 模式切换：精确公历日期 / 年份快速选择
-                Picker("", selection: $inputMode) {
-                    Text(modeDateLabel).tag(0)
-                    Text(modeYearLabel).tag(1)
-                }
-                .pickerStyle(SegmentedPickerStyle())
+                    // 2. 模式切换：精确公历日期 / 年份快速选择
+                    Picker("", selection: $inputMode) {
+                        Text(modeDateLabel).tag(0)
+                        Text(modeYearLabel).tag(1)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
 
                 // 3. 日期或年份选择内容
                 if inputMode == 0 {
@@ -2411,19 +2480,14 @@ public struct EditOwnerKuaDialog: View {
                 }
             }
             .padding(16)
-            .background(Color(red: 0.14, green: 0.14, blue: 0.19))
-            .cornerRadius(14)
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.35), lineWidth: 1)
-            )
-            .padding(.horizontal, 20)
             .frame(maxWidth: 480)
         }
-        .onAppear {
-            setupInitialValues()
-        }
     }
+    .preferredColorScheme(.dark)
+    .onAppear {
+        setupInitialValues()
+    }
+}
 
     private var auspiciousSummary: String {
         let chart = BaZhaiEngine.shared.analyze(sittingPalace: calculatedGuaKey, facingPalace: sittingPalace)

@@ -794,6 +794,7 @@ public final class UserKuaProfileManager: ObservableObject {
     public static let shared = UserKuaProfileManager()
 
     private let kBirthYearKey = "tiandi_owner_birth_year"
+    private let kBirthDateKey = "tiandi_owner_birth_date"
     private let kIsMaleKey = "tiandi_owner_is_male"
     private let kEnabledKey = "tiandi_owner_profile_enabled"
     private let kFamilyMembersKey = "tiandi_family_members_v1"
@@ -808,6 +809,14 @@ public final class UserKuaProfileManager: ObservableObject {
             UserDefaults.standard.set(birthYear, forKey: kBirthYearKey)
             LocalizationManager.sharedDefaults?.set(birthYear, forKey: kBirthYearKey)
             NSUbiquitousKeyValueStore.default.set(Int64(birthYear), forKey: kBirthYearKey)
+        }
+    }
+
+    @Published public var birthDate: Date {
+        didSet {
+            UserDefaults.standard.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
+            LocalizationManager.sharedDefaults?.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
+            NSUbiquitousKeyValueStore.default.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
         }
     }
 
@@ -845,13 +854,25 @@ public final class UserKuaProfileManager: ObservableObject {
             ?? (UserDefaults.standard.object(forKey: kBirthYearKey) as? Int)
             ?? (cloudYear > 0 ? Int(cloudYear) : nil)
             ?? 1990
+        let clampedYear = max(1920, min(2035, savedYear))
+        let savedTimestamp = (shared?.object(forKey: kBirthDateKey) as? Double)
+            ?? (UserDefaults.standard.object(forKey: kBirthDateKey) as? Double)
+            ?? {
+                var comp = DateComponents()
+                comp.year = clampedYear
+                comp.month = 6
+                comp.day = 15
+                return Calendar.current.date(from: comp)?.timeIntervalSince1970
+            }()
+            ?? Date().timeIntervalSince1970
         let savedMale = (shared?.object(forKey: kIsMaleKey) as? Bool)
             ?? (UserDefaults.standard.object(forKey: kIsMaleKey) as? Bool)
             ?? true
         let savedEnabled = (shared?.object(forKey: kEnabledKey) as? Bool)
             ?? (UserDefaults.standard.object(forKey: kEnabledKey) as? Bool)
             ?? true
-        self.birthYear = max(1920, min(2035, savedYear))
+        self.birthYear = clampedYear
+        self.birthDate = Date(timeIntervalSince1970: savedTimestamp)
         self.isMale = savedMale
         self.isProfileEnabled = savedEnabled
         if let fData = (shared?.data(forKey: kFamilyMembersKey))
@@ -859,6 +880,38 @@ public final class UserKuaProfileManager: ObservableObject {
             ?? cloud.data(forKey: kFamilyMembersKey),
            let decoded = try? JSONDecoder().decode([FamilyMemberProfile].self, from: fData) {
             self.familyMembers = decoded
+        }
+    }
+
+    /// 根据公历日期精确推算所属风水流年（以每年公历约2月4日立春交节为界）
+    public static func fengShuiYear(for date: Date) -> Int {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: date)
+        let month = cal.component(.month, from: date)
+        let day = cal.component(.day, from: date)
+        // 立春公历约在 2 月 4 日（偶为 2 月 3 或 5 日），立春前按上一干支岁次核算
+        if month < 2 || (month == 2 && day < 4) {
+            return max(1920, min(2035, year - 1))
+        }
+        return max(1920, min(2035, year))
+    }
+
+    /// 统一更新宅主生辰日期（支持年月日公历日期）与性别
+    public func updateOwnerBirth(date: Date, isMale: Bool) {
+        self.birthDate = date
+        self.birthYear = Self.fengShuiYear(for: date)
+        self.isMale = isMale
+    }
+
+    /// 统一更新宅主出生年份与性别
+    public func updateOwnerBirthYear(_ year: Int, isMale: Bool) {
+        let clamped = max(1920, min(2035, year))
+        self.birthYear = clamped
+        self.isMale = isMale
+        var comp = Calendar.current.dateComponents([.year, .month, .day], from: self.birthDate)
+        comp.year = clamped
+        if let newDate = Calendar.current.date(from: comp) {
+            self.birthDate = newDate
         }
     }
 

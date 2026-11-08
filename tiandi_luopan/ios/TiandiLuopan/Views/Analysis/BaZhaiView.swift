@@ -19,6 +19,7 @@ public struct BaZhaiView: View {
     @State private var showShichenTable: Bool = true
     @State private var showFamilySection: Bool = false
     @State private var showAddFamilyMemberDialog: Bool = false
+    @State private var showEditOwnerKuaDialog: Bool = false
     @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
     @State private var cachedAnalysis: BaZhaiAnalysis?
     @State private var cachedWaterItems: [SanHeWaterItem]?
@@ -95,6 +96,14 @@ public struct BaZhaiView: View {
                             withAnimation {
                                 showFamilySection = true
                             }
+                            refreshAnalysis()
+                        }
+                    )
+                } else if showEditOwnerKuaDialog {
+                    EditOwnerKuaDialog(
+                        isPresented: $showEditOwnerKuaDialog,
+                        sittingPalace: state.sittingMountain.palace,
+                        onSaved: {
                             refreshAnalysis()
                         }
                     )
@@ -721,32 +730,27 @@ public struct BaZhaiView: View {
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 Spacer()
 
-                // 出生年份下拉选择
-                Menu {
-                    ForEach((1940...2025).reversed(), id: \.self) { yr in
-                        Button(action: {
-                            kua.birthYear = yr
-                            refreshAnalysis()
-                        }) {
-                            HStack {
-                                Text("\(String(yr))")
-                                if yr == kua.birthYear { Image(systemName: "checkmark") }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
+                // 点击修改生辰日期与命卦按钮
+                Button(action: {
+                    showEditOwnerKuaDialog = true
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 9))
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         Text("\(yearPrefix) \(String(kua.birthYear))")
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 9, weight: .bold))
+                        Image(systemName: "pencil")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
                     }
                     .adaptiveFont(size: 11, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.1))
+                    .background(Color.white.opacity(0.12))
                     .foregroundColor(.white)
                     .cornerRadius(6)
                 }
+                .buttonStyle(PlainButtonStyle())
 
                 // 性别切换
                 Button(action: {
@@ -761,21 +765,31 @@ public struct BaZhaiView: View {
                         .foregroundColor(Color.yanCyan)
                         .cornerRadius(6)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
 
-            HStack(spacing: 8) {
-                Text("【\(compat.localizedOwnerGuaName) · \(compat.localizedLifeGroup) · \(compat.localizedZodiacName)】")
-                    .adaptiveFont(size: 12, weight: .bold)
-                    .foregroundColor(Color.yanCyan)
-                Spacer()
-                Text(compat.matchBadgeTitle)
-                    .adaptiveFont(size: 10, weight: .bold)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background((compat.isMatchedWithHouse ? Color.green : Color.orange).opacity(0.2))
-                    .foregroundColor(compat.isMatchedWithHouse ? Color.green : Color.orange)
-                    .cornerRadius(4)
+            // 命卦画像展示与配对卡（点击也可直接唤起修改弹窗）
+            Button(action: {
+                showEditOwnerKuaDialog = true
+            }) {
+                HStack(spacing: 8) {
+                    Text("【\(compat.localizedOwnerGuaName) · \(compat.localizedLifeGroup) · \(compat.localizedZodiacName)】")
+                        .adaptiveFont(size: 12, weight: .bold)
+                        .foregroundColor(Color.yanCyan)
+                    Spacer()
+                    Text(compat.matchBadgeTitle)
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background((compat.isMatchedWithHouse ? Color.green : Color.orange).opacity(0.2))
+                        .foregroundColor(compat.isMatchedWithHouse ? Color.green : Color.orange)
+                        .cornerRadius(4)
+                    Image(systemName: "pencil.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.85))
+                }
             }
+            .buttonStyle(PlainButtonStyle())
 
             Text(compat.matchAdvice)
                 .adaptiveFont(size: 11)
@@ -2001,6 +2015,676 @@ struct AddFamilyMemberDialog: View {
         case .th: return "ยืนยันการเพิ่ม"
         case .id: return "Tambahkan"
         case .auto, .zhHans: return "确认添加"
+        }
+    }
+}
+
+// MARK: - 宅主生辰日期与命卦修改弹窗 (EditOwnerKuaDialog)
+
+public struct EditOwnerKuaDialog: View {
+    @Binding var isPresented: Bool
+    public var sittingPalace: String = "坎"
+    public var onSaved: (() -> Void)? = nil
+
+    @ObservedObject var kua = UserKuaProfileManager.shared
+    @ObservedObject var lang = LocalizationManager.shared
+
+    @State private var inputMode: Int = 0 // 0: 精确公历日期, 1: 年份快速选择
+    @State private var selectedDate: Date = Date()
+    @State private var selectedYear: Int = 1990
+    @State private var selectedIsMale: Bool = true
+    @State private var isInitialized: Bool = false
+
+    public init(isPresented: Binding<Bool>, sittingPalace: String = "坎", onSaved: (() -> Void)? = nil) {
+        self._isPresented = isPresented
+        self.sittingPalace = sittingPalace
+        self.onSaved = onSaved
+    }
+
+    private var effectiveFengShuiYear: Int {
+        if inputMode == 0 {
+            return UserKuaProfileManager.fengShuiYear(for: selectedDate)
+        } else {
+            return selectedYear
+        }
+    }
+
+    private var calculatedGuaNumber: Int {
+        UserKuaProfileManager.calcGuaNumber(birthYear: effectiveFengShuiYear, isMale: selectedIsMale)
+    }
+
+    private var calculatedGuaKey: String {
+        UserKuaProfileManager.guaKey(for: calculatedGuaNumber)
+    }
+
+    private var isEastLife: Bool {
+        [1, 3, 4, 9].contains(calculatedGuaNumber)
+    }
+
+    private var houseIsEast: Bool {
+        ["坎", "震", "巽", "离"].contains(sittingPalace)
+    }
+
+    private var isMatched: Bool {
+        isEastLife == houseIsEast
+    }
+
+    private var ganzhiAndZodiac: String {
+        let y = effectiveFengShuiYear
+        let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
+        let branches = ["子鼠", "丑牛", "寅虎", "卯兔", "辰龙", "巳蛇", "午马", "未羊", "申猴", "酉鸡", "戌狗", "亥猪"]
+        let s = stems[((y - 4) % 10 + 10) % 10]
+        let b = branches[((y - 4) % 12 + 12) % 12]
+        return "\(s)\(b)年"
+    }
+
+    private var isDateBeforeLiChun: Bool {
+        if inputMode != 0 { return false }
+        let cal = Calendar.current
+        let m = cal.component(.month, from: selectedDate)
+        let d = cal.component(.day, from: selectedDate)
+        return m < 2 || (m == 2 && d < 4)
+    }
+
+    private var dateRange: ClosedRange<Date> {
+        let cal = Calendar.current
+        var startComp = DateComponents()
+        startComp.year = 1920
+        startComp.month = 1
+        startComp.day = 1
+        let start = cal.date(from: startComp) ?? Date(timeIntervalSince1970: 0)
+        var endComp = DateComponents()
+        endComp.year = 2030
+        endComp.month = 12
+        endComp.day = 31
+        let end = cal.date(from: endComp) ?? Date()
+        return start...end
+    }
+
+    private func setupInitialValues() {
+        guard !isInitialized else { return }
+        isInitialized = true
+        selectedYear = kua.birthYear
+        selectedIsMale = kua.isMale
+        selectedDate = kua.birthDate
+        let cal = Calendar.current
+        if cal.component(.year, from: selectedDate) != selectedYear {
+            var comp = cal.dateComponents([.year, .month, .day], from: selectedDate)
+            comp.year = selectedYear
+            if let valid = cal.date(from: comp) {
+                selectedDate = valid
+            }
+        }
+    }
+
+    public var body: some View {
+        ZStack {
+            Color.black.opacity(0.7)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    isPresented = false
+                }
+
+            VStack(spacing: 12) {
+                // 1. 顶栏标题与关闭按钮
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.badge.checkmark")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text(dialogTitle)
+                        .adaptiveFont(size: 15, weight: .bold)
+                        .foregroundColor(.white)
+                    Spacer()
+                    Button(action: { isPresented = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
+                // 2. 模式切换：精确公历日期 / 年份快速选择
+                Picker("", selection: $inputMode) {
+                    Text(modeDateLabel).tag(0)
+                    Text(modeYearLabel).tag(1)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+
+                // 3. 日期或年份选择内容
+                if inputMode == 0 {
+                    // 精确公历日期选择器
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text(datePickerHint)
+                                .adaptiveFont(size: 12, weight: .semibold)
+                                .foregroundColor(.white.opacity(0.85))
+                            Spacer()
+                            DatePicker(
+                                "",
+                                selection: $selectedDate,
+                                in: dateRange,
+                                displayedComponents: [.date]
+                            )
+                            .labelsHidden()
+                            .colorScheme(.dark)
+                        }
+                        .padding(10)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(8)
+
+                        // 立春换年解释或流年确认卡
+                        HStack(spacing: 6) {
+                            Image(systemName: isDateBeforeLiChun ? "info.circle.fill" : "sparkles")
+                                .font(.system(size: 11))
+                                .foregroundColor(isDateBeforeLiChun ? .orange : Color.yanCyan)
+                            Text(liChunExplanationText)
+                                .adaptiveFont(size: 10.5)
+                                .foregroundColor(isDateBeforeLiChun ? .orange : .white.opacity(0.8))
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 4)
+                    }
+                } else {
+                    // 年份快速选择器
+                    VStack(spacing: 6) {
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                selectedYear = max(1920, selectedYear - 10)
+                            }) {
+                                Text("-10")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.08))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Button(action: {
+                                selectedYear = max(1920, selectedYear - 1)
+                            }) {
+                                Text("-1")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.08))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Spacer()
+
+                            Menu {
+                                ForEach((1920...2026).reversed(), id: \.self) { yr in
+                                    Button(action: { selectedYear = yr }) {
+                                        HStack {
+                                            Text("\(String(yr))年")
+                                            if yr == selectedYear {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text("\(String(selectedYear))年")
+                                        .adaptiveFont(size: 14, weight: .bold)
+                                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.12))
+                                .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Spacer()
+
+                            Button(action: {
+                                selectedYear = min(2026, selectedYear + 1)
+                            }) {
+                                Text("+1")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.08))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+
+                            Button(action: {
+                                selectedYear = min(2026, selectedYear + 10)
+                            }) {
+                                Text("+10")
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(Color.white.opacity(0.08))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(8)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(8)
+                }
+
+                // 4. 乾造 (男) / 坤造 (女) 选择
+                HStack(spacing: 10) {
+                    Button(action: { selectedIsMale = true }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "figure.stand")
+                            Text(maleTitle)
+                        }
+                        .adaptiveFont(size: 12, weight: selectedIsMale ? .bold : .medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(selectedIsMale ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
+                        .foregroundColor(selectedIsMale ? .yanCyan : .white.opacity(0.75))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(selectedIsMale ? Color.yanCyan : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: { selectedIsMale = false }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "figure.stand.dress")
+                            Text(femaleTitle)
+                        }
+                        .adaptiveFont(size: 12, weight: !selectedIsMale ? .bold : .medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(!selectedIsMale ? Color(red: 0.95, green: 0.5, blue: 0.7).opacity(0.28) : Color.white.opacity(0.06))
+                        .foregroundColor(!selectedIsMale ? Color(red: 0.95, green: 0.5, blue: 0.7) : .white.opacity(0.75))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(!selectedIsMale ? Color(red: 0.95, green: 0.5, blue: 0.7) : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+
+                // 5. 实时命卦与人宅合一配对卡
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("【\(calculatedGuaKey)卦 · \(isEastLife ? eastLifeText : westLifeText) · \(ganzhiAndZodiac)】")
+                            .adaptiveFont(size: 12, weight: .bold)
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        Spacer()
+                        Text(isMatched ? matchedBadgeText : unmatchedBadgeText)
+                            .adaptiveFont(size: 10, weight: .bold)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background((isMatched ? Color.green : Color.orange).opacity(0.25))
+                            .foregroundColor(isMatched ? .green : .orange)
+                            .cornerRadius(4)
+                    }
+
+                    Text(isMatched ? matchedAdviceText : unmatchedAdviceText)
+                        .adaptiveFont(size: 10.5)
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineSpacing(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Divider().background(Color.white.opacity(0.1))
+
+                    // 四大吉方与四大凶方方位速查
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(auspiciousHeader)
+                                .adaptiveFont(size: 9.5, weight: .semibold)
+                                .foregroundColor(.green.opacity(0.9))
+                            Text(auspiciousSummary)
+                                .adaptiveFont(size: 10)
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(inauspiciousHeader)
+                                .adaptiveFont(size: 9.5, weight: .semibold)
+                                .foregroundColor(.red.opacity(0.9))
+                            Text(inauspiciousSummary)
+                                .adaptiveFont(size: 10)
+                                .foregroundColor(.white.opacity(0.85))
+                        }
+                    }
+                }
+                .padding(10)
+                .background(Color(red: 0.12, green: 0.13, blue: 0.18))
+                .cornerRadius(8)
+
+                // 6. 底部操作按钮
+                HStack(spacing: 10) {
+                    Button(action: { isPresented = false }) {
+                        Text(cancelTitle)
+                            .adaptiveFont(size: 13)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.white.opacity(0.85))
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: {
+                        if inputMode == 0 {
+                            kua.updateOwnerBirth(date: selectedDate, isMale: selectedIsMale)
+                        } else {
+                            kua.updateOwnerBirthYear(selectedYear, isMale: selectedIsMale)
+                        }
+                        onSaved?()
+                        isPresented = false
+                    }) {
+                        Text(saveButtonTitle)
+                            .adaptiveFont(size: 13, weight: .bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(red: 0.95, green: 0.8, blue: 0.35), Color(red: 0.75, green: 0.55, blue: 0.2)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .foregroundColor(.black)
+                            .cornerRadius(8)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(16)
+            .background(Color(red: 0.14, green: 0.14, blue: 0.19))
+            .cornerRadius(14)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.35), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+            .frame(maxWidth: 480)
+        }
+        .onAppear {
+            setupInitialValues()
+        }
+    }
+
+    private var auspiciousSummary: String {
+        let chart = BaZhaiEngine.shared.analyze(sittingPalace: calculatedGuaKey, facingPalace: sittingPalace)
+        let shengQi = chart.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "-"
+        let yanNian = chart.items.first(where: { $0.star == .yanNian })?.localizedDirection ?? "-"
+        let tianYi = chart.items.first(where: { $0.star == .tianYi })?.localizedDirection ?? "-"
+        let fuWei = chart.items.first(where: { $0.star == .fuWei })?.localizedDirection ?? "-"
+        switch lang.effectiveLanguage {
+        case .en:
+            return "Wealth:\(shengQi) · Health:\(tianYi) · Harmony:\(yanNian)"
+        default:
+            return "财位:\(shengQi) · 康健:\(tianYi) · 合谐:\(yanNian) · 文昌:\(fuWei)"
+        }
+    }
+
+    private var inauspiciousSummary: String {
+        let chart = BaZhaiEngine.shared.analyze(sittingPalace: calculatedGuaKey, facingPalace: sittingPalace)
+        let jueMing = chart.items.first(where: { $0.star == .jueMing })?.localizedDirection ?? "-"
+        let wuGui = chart.items.first(where: { $0.star == .wuGui })?.localizedDirection ?? "-"
+        let liuSha = chart.items.first(where: { $0.star == .liuSha })?.localizedDirection ?? "-"
+        let huoHai = chart.items.first(where: { $0.star == .huoHai })?.localizedDirection ?? "-"
+        switch lang.effectiveLanguage {
+        case .en:
+            return "Fatal:\(jueMing) · Ghost:\(wuGui) · Mishap:\(huoHai)"
+        default:
+            return "绝命:\(jueMing) · 五鬼:\(wuGui) · 六煞:\(liuSha) · 祸害:\(huoHai)"
+        }
+    }
+
+    private var liChunExplanationText: String {
+        let y = effectiveFengShuiYear
+        if isDateBeforeLiChun {
+            switch lang.effectiveLanguage {
+            case .en:
+                return "Born before Li Chun (Feb 4). Life Gua calculated using previous Feng Shui year (\(y))."
+            case .zhHant, .ja:
+                return "公曆立春（約2月4日）前出生，依風水歲首以立春前一年【\(ganzhiAndZodiac)】（\(y)年）核算命卦。"
+            default:
+                return "公历立春（约2月4日）前出生，依风水岁首以立春前一年【\(ganzhiAndZodiac)】（\(y)年）核算命卦。"
+            }
+        } else {
+            switch lang.effectiveLanguage {
+            case .en:
+                return "Feng Shui year: \(ganzhiAndZodiac) (\(y))."
+            default:
+                return "对应风水流年：\(ganzhiAndZodiac)（\(y)年）。"
+            }
+        }
+    }
+
+    private var dialogTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Edit House Master Life Gua & Birth Date"
+        case .zhHant: return "修改宅主生辰日期與命卦"
+        case .ja: return "家主の生年月日・本命卦を変更"
+        case .ko: return "건축주 생년월일 및 본명괘 수정"
+        case .vi: return "Sửa Ngày Sinh & Bản Mệnh Trạch Chủ"
+        case .th: return "แก้ไขวันเกิดและรหัสชีวิตเจ้าของบ้าน"
+        case .id: return "Ubah Tanggal Lahir & Gua Pemilik"
+        case .auto, .zhHans: return "修改宅主生辰日期与命卦"
+        }
+    }
+
+    private var modeDateLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Exact Birth Date"
+        case .zhHant: return "公曆年月日"
+        case .ja: return "生年月日"
+        case .ko: return "생년월일"
+        case .vi: return "Ngày sinh"
+        case .th: return "วันเกิด"
+        case .id: return "Tanggal Lahir"
+        case .auto, .zhHans: return "公历年月日"
+        }
+    }
+
+    private var modeYearLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Birth Year"
+        case .zhHant: return "出生年份"
+        case .ja: return "生まれ年"
+        case .ko: return "출생연도"
+        case .vi: return "Năm sinh"
+        case .th: return "ปีเกิด"
+        case .id: return "Tahun Lahir"
+        case .auto, .zhHans: return "出生年份"
+        }
+    }
+
+    private var datePickerHint: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Select Birthday:"
+        case .zhHant: return "選擇公曆生日："
+        case .ja: return "誕生日を選択："
+        case .ko: return "생년월일 선택:"
+        case .vi: return "Chọn ngày sinh:"
+        case .th: return "เลือกวันเกิด:"
+        case .id: return "Pilih Tanggal Lahir:"
+        case .auto, .zhHans: return "选择公历生日："
+        }
+    }
+
+    private var maleTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Male"
+        case .zhHant, .ja: return "乾造 (男)"
+        case .ko: return "건조 (남)"
+        case .vi: return "Càn Tạo (Nam)"
+        case .th: return "ชาย"
+        case .id: return "Pria"
+        case .auto, .zhHans: return "乾造 (男)"
+        }
+    }
+
+    private var femaleTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Female"
+        case .zhHant, .ja: return "坤造 (女)"
+        case .ko: return "곤조 (여)"
+        case .vi: return "Khôn Tạo (Nữ)"
+        case .th: return "หญิง"
+        case .id: return "Wanita"
+        case .auto, .zhHans: return "坤造 (女)"
+        }
+    }
+
+    private var eastLifeText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "East 4 Life"
+        case .zhHant, .ja: return "東四命"
+        case .ko: return "동사명"
+        case .vi: return "Đông Tứ Mệnh"
+        case .th: return "ดวงตะวันออก"
+        case .id: return "Gua Timur"
+        case .auto, .zhHans: return "东四命"
+        }
+    }
+
+    private var westLifeText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "West 4 Life"
+        case .zhHant, .ja: return "西四命"
+        case .ko: return "서사명"
+        case .vi: return "Tây Tứ Mệnh"
+        case .th: return "ดวงตะวันตก"
+        case .id: return "Gua Barat"
+        case .auto, .zhHans: return "西四命"
+        }
+    }
+
+    private var matchedBadgeText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "House & Master Matched"
+        case .zhHant: return "宅命相配 · 人宅合一"
+        case .ja: return "宅命相配・人宅合一"
+        case .ko: return "택명상배 · 인택합일"
+        case .vi: return "Trạch Mệnh Tương Phối"
+        case .th: return "สมดุลคนและบ้าน"
+        case .id: return "Selaras Manusia & Rumah"
+        case .auto, .zhHans: return "宅命相配 · 人宅合一"
+        }
+    }
+
+    private var unmatchedBadgeText: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Different Groups"
+        case .zhHant: return "宅命不同組 · 宜起吉方"
+        case .ja: return "宅命異組・吉方調候"
+        case .ko: return "택명상이 · 길방조후"
+        case .vi: return "Khác Cung · Dùng Cát Phương"
+        case .th: return "คนละกลุ่ม · ปรับทิศมงคล"
+        case .id: return "Beda Kelompok · Gunakan Arah Baik"
+        case .auto, .zhHans: return "宅命不同组 · 宜起吉方"
+        }
+    }
+
+    private var matchedAdviceText: String {
+        switch lang.effectiveLanguage {
+        case .en:
+            return "Auspicious! The owner's life group matches the house's sitting energy, producing harmonious qi and fortune."
+        case .zhHant:
+            return "大吉！宅主命卦與宅盤五行同組相生，同氣相求，宅氣與人氣和諧共振，人宅兩旺。"
+        case .ja:
+            return "大吉！家主の本命卦と建物の座向が同組となり、人と家の気が調和して繁栄をもたらします。"
+        case .ko:
+            return "대길! 건축주의 본명괘와 건물의 좌향이 동조를 이루어 사람과 집의 기운이 조화롭게 번영합니다."
+        case .vi:
+            return "Đại cát! Mệnh quái trạch chủ đồng khí với trạch quái, nhân trạch hòa hợp, tài vận hanh thông."
+        case .th:
+            return "มงคลยิ่ง! รหัสชีวิตเจ้าของบ้านสมดุลกับทิศบ้าน พลังคนและบ้านสอดคล้อง นำพาความเจริญ"
+        case .id:
+            return "Sangat menguntungkan! Energi pemilik selaras dengan energi rumah, menghasilkan harmoni dan rezeki."
+        case .auto, .zhHans:
+            return "大吉！宅主命卦与宅盘五行同组相生，同气相求，宅气与人气和谐共振，人宅两旺。"
+        }
+    }
+
+    private var unmatchedAdviceText: String {
+        switch lang.effectiveLanguage {
+        case .en:
+            return "The owner and house belong to different groups. Prioritize placing the master bedroom and study in the owner's auspicious directions to balance the energy."
+        case .zhHant:
+            return "宅主與宅盤分屬不同組。建議將主臥室、辦公桌或書房安放於宅主本命之吉方（生氣、延年、天醫），以本命真氣調候宅氣。"
+        case .ja:
+            return "家主と建物が異なる組です。主寝室や書斎を家主の本命吉方位（生気・延年・天医）に配置して気を調和させましょう。"
+        case .ko:
+            return "건축주와 건물이 다른 조에 속합니다. 안방이나 서재를 본명 길방(생기·연년·천의)에 배치하여 기운을 조화롭게 다스리십시오."
+        case .vi:
+            return "Trạch chủ và nhà khác nhóm. Nên bố trí phòng ngủ chính hoặc bàn làm việc tại phương vị cát của bản mệnh để điều hòa."
+        case .th:
+            return "เจ้าของบ้านและบ้านอยู่คนละกลุ่ม แนะนำจัดห้องนอนหรือโต๊ะทำงานในทิศมงคลของเจ้าของบ้านเพื่อปรับสมดุลพลัง"
+        case .id:
+            return "Pemilik dan rumah berbeda kelompok. Tempatkan kamar utama atau ruang kerja di arah keberuntungan pemilik untuk menyeimbangkan energi."
+        case .auto, .zhHans:
+            return "宅主与宅盘分属不同组。建议将主卧室、办公桌或书房安放于宅主本命之吉方（生气、延年、天医），以本命真气调候宅气。"
+        }
+    }
+
+    private var auspiciousHeader: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Auspicious Directions"
+        case .zhHant, .ja: return "四大吉方"
+        case .ko: return "4대 길방"
+        case .vi: return "Tứ Đại Cát Phương"
+        case .th: return "4 ทิศมงคล"
+        case .id: return "4 Arah Baik"
+        case .auto, .zhHans: return "四大吉方"
+        }
+    }
+
+    private var inauspiciousHeader: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Inauspicious Directions"
+        case .zhHant, .ja: return "四大凶方"
+        case .ko: return "4대 흉방"
+        case .vi: return "Tứ Đại Hung Phương"
+        case .th: return "4 ทิศอัปมงคล"
+        case .id: return "4 Arah Buruk"
+        case .auto, .zhHans: return "四大凶方"
+        }
+    }
+
+    private var cancelTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Cancel"
+        case .zhHant: return "取消"
+        case .ja: return "キャンセル"
+        case .ko: return "취소"
+        case .vi: return "Hủy"
+        case .th: return "ยกเลิก"
+        case .id: return "Batal"
+        case .auto, .zhHans: return "取消"
+        }
+    }
+
+    private var saveButtonTitle: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Save & Update Life Gua"
+        case .zhHant: return "保存生辰並更新命卦"
+        case .ja: return "保存して本命卦を更新"
+        case .ko: return "저장 및 본명괘 업데이트"
+        case .vi: return "Lưu & Cập nhật Bản mệnh"
+        case .th: return "บันทึกและอัปเดตรหัสชีวิต"
+        case .id: return "Simpan & Perbarui Gua"
+        case .auto, .zhHans: return "保存生辰并更新命卦"
         }
     }
 }

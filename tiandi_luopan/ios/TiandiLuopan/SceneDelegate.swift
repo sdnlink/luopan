@@ -179,6 +179,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         StoreKitIAPManager.shared.refreshProductsIfNeeded()
         CompassMotionManager.shared.resumeIfSensorsEnabled()
         CompassMotionManager.shared.refreshTimeAndSolarTerm()
+        RetentionServiceManager.shared.syncNotificationAuthorizationStatus()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {

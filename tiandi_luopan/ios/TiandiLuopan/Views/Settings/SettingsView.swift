@@ -476,6 +476,21 @@ public struct SettingsView: View {
                         onConfirm: { showTestFlightRateTip = false },
                         onCancel: { showTestFlightRateTip = false }
                     )
+                } else if retention.showNotificationPermissionDeniedAlert {
+                    FloorplanConfirmDialog(
+                        title: notificationPermissionDeniedTitle(),
+                        message: notificationPermissionDeniedMessage(),
+                        confirmTitle: goToSettingsTitle(),
+                        cancelTitle: lang.t("cancel"),
+                        confirmColor: Color.yanCyan,
+                        onConfirm: {
+                            retention.showNotificationPermissionDeniedAlert = false
+                            retention.openSystemNotificationSettings()
+                        },
+                        onCancel: {
+                            retention.showNotificationPermissionDeniedAlert = false
+                        }
+                    )
                 }
             }
         )
@@ -716,6 +731,53 @@ public struct SettingsView: View {
             return "Anda saat ini menggunakan versi beta TestFlight. Berdasarkan kebijakan Apple, tombol 'Kirim' dinonaktifkan pada versi beta. Ulasan akan dibuka penuh setelah rilis resmi di App Store. Untuk memberikan saran, silakan gunakan 'Kirim Masukan' di aplikasi TestFlight."
         case .auto, .zhHans:
             return "当前处于 TestFlight 测试环境。按苹果官方规则，测试版应用弹出的评分弹窗中「提交」按钮会被系统强制置灰，无法向 App Store 提交公开评分。正式上架后将全面开放评价！您可在 TestFlight 中点击「发送反馈」向我们提出宝贵建议。"
+        }
+    }
+
+    private func notificationPermissionDeniedTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Notification Permission Disabled"
+        case .zhHant: return "通知權限未開啟"
+        case .ja: return "通知が許可されていません"
+        case .ko: return "알림 권한이 비활성화됨"
+        case .vi: return "Chưa Bật Quyền Thông Báo"
+        case .th: return "ยังไม่ได้เปิดการอนุญาตแจ้งเตือน"
+        case .id: return "Izin Notifikasi Belum Diaktifkan"
+        case .auto, .zhHans: return "通知权限未开启"
+        }
+    }
+
+    private func notificationPermissionDeniedMessage() -> String {
+        switch lang.effectiveLanguage {
+        case .en:
+            return "You previously chose 'Don't Allow' for notifications. iOS requires you to enable notifications in the Settings app. Please go to Settings to enable alerts for 24 solar terms and monthly Flying Stars."
+        case .zhHant:
+            return "檢測到您之前點擊了「不允許」通知，iOS 系統限制應用無法再次直接彈窗請求授權。請前往系統「設定」中為「天機演象」開啟通知權限，以便及時接收二十四節氣交節與九星換月提醒。"
+        case .ja:
+            return "以前「許可しない」を選択されたため、iOSの制約によりアプリ内から再要求できません。「設定」アプリを開き、天地羅盤の通知をオンにして節気交節や九星換月の通知を受け取れるようにしてください。"
+        case .ko:
+            return "이전에 알림을 '허용 안 함'으로 설정하여 iOS 정책상 앱에서 바로 권한을 재요청할 수 없습니다. 시스템 '설정'에서 알림을 허용하시면 24절기 교절 및 자백구성 환월 알림을 받으실 수 있습니다."
+        case .vi:
+            return "Bạn đã chọn 'Không cho phép' thông báo trước đó. Vui lòng vào 'Cài đặt' của thiết bị để bật thông báo cho Thiên Địa La Bàn nhằm nhận nhắc nhở giao tiết khí và Cửu Tinh đổi cục."
+        case .th:
+            return "คุณเคยเลือก 'ไม่อนุญาต' การแจ้งเตือนไว้ ระบบ iOS กำหนดให้ต้องเปิดในแอปการตั้งค่าของเครื่อง โปรดไปที่ 'การตั้งค่า' เพื่อเปิดการแจ้งเตือนสำหรับสารท 24 절기 และดาวบินรายเดือน"
+        case .id:
+            return "Anda sebelumnya memilih 'Jangan Izinkan' notifikasi. Silakan buka 'Pengaturan' perangkat dan aktifkan notifikasi untuk menerima pengingat pergantian musim dan Bintang Terbang."
+        case .auto, .zhHans:
+            return "检测到您之前点击了「不允许」通知，iOS 系统限制应用无法再次直接弹窗请求授权。请前往系统「设置」中为「天机演象」开启通知权限，以便及时接收二十四节气交节与九星换月提醒。"
+        }
+    }
+
+    private func goToSettingsTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Go to Settings"
+        case .zhHant: return "前往設定"
+        case .ja: return "設定へ移動"
+        case .ko: return "설정으로 이동"
+        case .vi: return "Đi đến Cài Đặt"
+        case .th: return "ไปที่การตั้งค่า"
+        case .id: return "Buka Pengaturan"
+        case .auto, .zhHans: return "前往设置"
         }
     }
 }

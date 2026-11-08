@@ -1039,13 +1039,9 @@ public final class RetentionServiceManager: ObservableObject {
     @Published public var solarTermNotificationsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(solarTermNotificationsEnabled, forKey: kSolarTermNotifyKey)
-            if solarTermNotificationsEnabled {
-                requestAndScheduleSolarTermNotifications()
-            } else {
-                UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
-            }
         }
     }
+    @Published public var showNotificationPermissionDeniedAlert: Bool = false
 
     @Published public private(set) var scheduledDayIDs: Set<String> = []
     @Published public var remedyTasks: [FengshuiRemedyTask] = [] {
@@ -1228,7 +1224,72 @@ public final class RetentionServiceManager: ObservableObject {
     }
 
     public func setSolarTermNotifications(enabled: Bool) {
-        self.solarTermNotificationsEnabled = enabled
+        if !enabled {
+            self.solarTermNotificationsEnabled = false
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
+            return
+        }
+
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { [weak self] settings in
+            guard let self = self else { return }
+            switch settings.authorizationStatus {
+            case .denied:
+                DispatchQueue.main.async {
+                    self.solarTermNotificationsEnabled = false
+                    self.showNotificationPermissionDeniedAlert = true
+                }
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+                    DispatchQueue.main.async {
+                        if granted {
+                            self.solarTermNotificationsEnabled = true
+                            self.scheduleSolarTermNotificationPayload()
+                        } else {
+                            self.solarTermNotificationsEnabled = false
+                        }
+                    }
+                }
+            case .authorized, .provisional, .ephemeral:
+                DispatchQueue.main.async {
+                    self.solarTermNotificationsEnabled = true
+                    self.scheduleSolarTermNotificationPayload()
+                }
+            @unknown default:
+                DispatchQueue.main.async {
+                    self.solarTermNotificationsEnabled = false
+                }
+            }
+        }
+    }
+
+    /// 跳转至 iOS 系统设置开启本 App 的通知权限
+    public func openSystemNotificationSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString),
+              UIApplication.shared.canOpenURL(url) else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
+
+    /// 同步最新的系统通知授权状态（从后台回前台或从系统设置切回时调用）
+    public func syncNotificationAuthorizationStatus() {
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { [weak self] settings in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                if settings.authorizationStatus == .denied {
+                    if self.solarTermNotificationsEnabled {
+                        self.solarTermNotificationsEnabled = false
+                        center.removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
+                    }
+                } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
+                    let savedPref = UserDefaults.standard.bool(forKey: self.kSolarTermNotifyKey)
+                    if savedPref && !self.solarTermNotificationsEnabled {
+                        self.solarTermNotificationsEnabled = true
+                        self.scheduleSolarTermNotificationPayload()
+                    }
+                }
+            }
+        }
     }
 
     public func requestImmediateReview() {
@@ -1239,63 +1300,59 @@ public final class RetentionServiceManager: ObservableObject {
         }
     }
 
-    /// 开启并排程下一节气交节与流月飞星换局提醒
+    /// 开启并排程下一节气交节与流月飞星换局提醒（兼容旧调用）
     public func requestAndScheduleSolarTermNotifications() {
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            guard granted else {
-                DispatchQueue.main.async {
-                    self.solarTermNotificationsEnabled = false
-                }
-                return
-            }
-            let solar = SolarTimeCalculator.shared
-            let now = Date()
-            let elapsed = solar.solarTermProgress(for: now)
-            let termDays = 15.0 / 0.98564736
-            let daysLeft = max(1, Int(ceil(termDays - elapsed)))
-            var cal = Calendar.current
-            cal.timeZone = .current
-            guard let targetDay = cal.date(byAdding: .day, value: daysLeft, to: now),
-                  let fireDate = cal.date(bySettingHour: 8, minute: 30, second: 0, of: targetDay) else { return }
+        setSolarTermNotifications(enabled: true)
+    }
 
-            let nextIndex = (solar.solarTermIndex(for: now) + 1) % 24
-            let nextTermName = SolarTermsData.shared.terms[safe: nextIndex]?.localizedName ?? ""
+    /// 执行下一节气提醒排程
+    public func scheduleSolarTermNotificationPayload() {
+        let solar = SolarTimeCalculator.shared
+        let now = Date()
+        let elapsed = solar.solarTermProgress(for: now)
+        let termDays = 15.0 / 0.98564736
+        let daysLeft = max(1, Int(ceil(termDays - elapsed)))
+        var cal = Calendar.current
+        cal.timeZone = .current
+        guard let targetDay = cal.date(byAdding: .day, value: daysLeft, to: now),
+              let fireDate = cal.date(bySettingHour: 8, minute: 30, second: 0, of: targetDay) else { return }
 
-            let content = UNMutableNotificationContent()
-            switch LocalizationManager.shared.effectiveLanguage {
-            case .en:
-                content.title = "Solar Term Transition · \(nextTermName)"
-                content.body = "Monthly Flying Stars and Qi shift today. Open Tiandi Luopan to check your home's auspicious directions."
-            case .zhHant:
-                content.title = "節氣交節提醒 · 今日【\(nextTermName)】"
-                content.body = "節氣更迭，流月紫白九星氣場今日換局，點擊查看本宅最新流月財位與吉凶宜忌。"
-            case .ja:
-                content.title = "節気交節リマインダー・本日【\(nextTermName)】"
-                content.body = "節気が切り替わり、流月紫白九星の気場が更新されました。今月の財位と吉凶方位を確認しましょう。"
-            case .ko:
-                content.title = "절기 교절 알림 · 오늘 【\(nextTermName)】"
-                content.body = "절기가 바뀌며 유월 자백구성 기장이 전환되었습니다. 이달의 재물방과 길흉 방위를 확인하세요."
-            case .vi:
-                content.title = "Nhắc Nhở Giao Tiết Khí · Hôm Nay 【\(nextTermName)】"
-                content.body = "Tiết khí chuyển giao, Cửu Tinh lưu nguyệt đổi cục hôm nay. Mở ứng dụng để xem tài vị và hướng tốt."
-            case .th:
-                content.title = "แจ้งเตือนเปลี่ยน절기 · วันนี้ 【\(nextTermName)】"
-                content.body = "เปลี่ยนสาร์ท절기 ดาวบินประจำเดือนเปลี่ยน局วันนี้ เปิดแอปเพื่อตรวจทิศโชคลาภและฤกษ์มงคล"
-            case .id:
-                content.title = "Pengingat Pergantian Musim · Hari Ini 【\(nextTermName)】"
-                content.body = "Bintang Terbang bulanan berganti hari ini. Buka Tiandi Luopan untuk memeriksa arah keberuntungan rumah Anda."
-            case .auto, .zhHans:
-                content.title = "节气交节提醒 · 今日【\(nextTermName)】"
-                content.body = "节气更迭，流月紫白九星气场今日换局，点击查看本宅最新流月财位与吉凶宜忌。"
-            }
-            content.sound = .default
+        let nextIndex = (solar.solarTermIndex(for: now) + 1) % 24
+        let nextTermName = SolarTermsData.shared.terms[safe: nextIndex]?.localizedName ?? ""
 
-            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
-            let req = UNNotificationRequest(identifier: "tiandi_next_solar_term", content: content, trigger: trigger)
-            center.add(req, withCompletionHandler: nil)
+        let content = UNMutableNotificationContent()
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            content.title = "Solar Term Transition · \(nextTermName)"
+            content.body = "Monthly Flying Stars and Qi shift today. Open Tiandi Luopan to check your home's auspicious directions."
+        case .zhHant:
+            content.title = "節氣交節提醒 · 今日【\(nextTermName)】"
+            content.body = "節氣更迭，流月紫白九星氣場今日換局，點擊查看本宅最新流月財位與吉凶宜忌。"
+        case .ja:
+            content.title = "節気交節リマインダー・本日【\(nextTermName)】"
+            content.body = "節気が切り替わり、流月紫白九星の気場が更新されました。今月の財位と吉凶方位を確認しましょう。"
+        case .ko:
+            content.title = "절기 교절 알림 · 오늘 【\(nextTermName)】"
+            content.body = "절기가 바뀌며 유월 자백구성 기장이 전환되었습니다. 이달의 재물방과 길흉 방위를 확인하세요."
+        case .vi:
+            content.title = "Nhắc Nhở Giao Tiết Khí · Hôm Nay 【\(nextTermName)】"
+            content.body = "Tiết khí chuyển giao, Cửu Tinh lưu nguyệt đổi cục hôm nay. Mở ứng dụng để xem tài vị và hướng tốt."
+        case .th:
+            content.title = "แจ้งเตือนเปลี่ยน절기 · วันนี้ 【\(nextTermName)】"
+            content.body = "เปลี่ยนสาร์ท절기 ดาวบินประจำเดือนเปลี่ยน局วันนี้ เปิดแอปเพื่อตรวจทิศโชคลาภและฤกษ์มงคล"
+        case .id:
+            content.title = "Pengingat Pergantian Musim · Hari Ini 【\(nextTermName)】"
+            content.body = "Bintang Terbang bulanan berganti hari ini. Buka Tiandi Luopan untuk memeriksa arah keberuntungan rumah Anda."
+        case .auto, .zhHans:
+            content.title = "节气交节提醒 · 今日【\(nextTermName)】"
+            content.body = "节气更迭，流月紫白九星气场今日换局，点击查看本宅最新流月财位与吉凶宜忌。"
         }
+        content.sound = .default
+
+        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let req = UNNotificationRequest(identifier: "tiandi_next_solar_term", content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
     }
 
     /// 为用户选定的吉日设置当天早晨 08:00 动土/入宅/出行提醒
@@ -1309,50 +1366,76 @@ public final class RetentionServiceManager: ObservableObject {
             return
         }
 
-        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            guard granted else { return }
-            var cal = Calendar.current
-            cal.timeZone = .current
-            let now = Date()
-            var fireDate = cal.date(bySettingHour: 8, minute: 0, second: 0, of: day.date) ?? day.date
-            if fireDate <= now {
-                fireDate = now.addingTimeInterval(10)
-            }
-            let content = UNMutableNotificationContent()
-            switch LocalizationManager.shared.effectiveLanguage {
-            case .en:
-                content.title = "Auspicious Day Reminder · \(day.localizedDayPillar)"
-                content.body = "\(day.dateLabel) (\(sittingName)): Good for \(day.yiSummary)."
-            case .zhHant:
-                content.title = "黃道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
-                content.body = "本宅【\(sittingName)】今日無歲破月破衝山，宜：\(day.yiSummary)。"
-            case .ja:
-                content.title = "吉日リマインダー・\(day.dateLabel) (\(day.localizedDayPillar)日)"
-                content.body = "本宅【\(sittingName)】本日は歳破・月破の沖山なし。宜：\(day.yiSummary)。"
-            case .ko:
-                content.title = "황도길일 알림 · \(day.dateLabel) (\(day.localizedDayPillar)일)"
-                content.body = "본택【\(sittingName)】 오늘은 세파·월파 충산이 없는 길일입니다. 마땅함: \(day.yiSummary)."
-            case .vi:
-                content.title = "Nhắc Nhở Ngày Hoàng Đạo · \(day.dateLabel) (\(day.localizedDayPillar))"
-                content.body = "Bản trạch 【\(sittingName)】 hôm nay không phạm Tuế Phá/Nguyệt Phá. Nên: \(day.yiSummary)."
-            case .th:
-                content.title = "แจ้งเตือนวันธงชัย · \(day.dateLabel) (\(day.localizedDayPillar))"
-                content.body = "บ้าน【\(sittingName)】วันนี้ไม่ชงทิศหลังบ้าน เหมาะสำหรับ: \(day.yiSummary)"
-            case .id:
-                content.title = "Pengingat Hari Baik · \(day.dateLabel) (\(day.localizedDayPillar))"
-                content.body = "Rumah 【\(sittingName)】 bebas bentrokan hari ini. Baik untuk: \(day.yiSummary)."
-            case .auto, .zhHans:
-                content.title = "黄道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
-                content.body = "本宅【\(sittingName)】今日无岁破月破冲山，宜：\(day.yiSummary)。"
-            }
-            content.sound = .default
-            let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
-            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
-            let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
-            center.add(req) { _ in
+        center.getNotificationSettings { [weak self] settings in
+            guard let self = self else { return }
+            switch settings.authorizationStatus {
+            case .denied:
                 DispatchQueue.main.async {
-                    self.scheduledDayIDs.insert(day.id)
-                    UserDefaults.standard.set(Array(self.scheduledDayIDs), forKey: self.kScheduledDaysKey)
+                    self.showNotificationPermissionDeniedAlert = true
+                }
+            case .notDetermined:
+                center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+                    DispatchQueue.main.async {
+                        if granted {
+                            self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName)
+                        }
+                    }
+                }
+            case .authorized, .provisional, .ephemeral:
+                DispatchQueue.main.async {
+                    self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName)
+                }
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func scheduleAuspiciousDayPayload(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String) {
+        let reqID = "tiandi_zeri_\(day.id)"
+        var cal = Calendar.current
+        cal.timeZone = .current
+        let now = Date()
+        var fireDate = cal.date(bySettingHour: 8, minute: 0, second: 0, of: day.date) ?? day.date
+        if fireDate <= now {
+            fireDate = now.addingTimeInterval(10)
+        }
+        let content = UNMutableNotificationContent()
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            content.title = "Auspicious Day Reminder · \(day.localizedDayPillar)"
+            content.body = "\(day.dateLabel) (\(sittingName)): Good for \(day.yiSummary)."
+        case .zhHant:
+            content.title = "黃道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
+            content.body = "本宅【\(sittingName)】今日無歲破月破衝山，宜：\(day.yiSummary)。"
+        case .ja:
+            content.title = "吉日リマインダー・\(day.dateLabel) (\(day.localizedDayPillar)日)"
+            content.body = "本宅【\(sittingName)】本日は歳破・月破の沖山なし。宜：\(day.yiSummary)。"
+        case .ko:
+            content.title = "황도길일 알림 · \(day.dateLabel) (\(day.localizedDayPillar)일)"
+            content.body = "본택【\(sittingName)】 오늘은 세파·월파 충산이 없는 길일입니다. 마땅함: \(day.yiSummary)."
+        case .vi:
+            content.title = "Nhắc Nhở Ngày Hoàng Đạo · \(day.dateLabel) (\(day.localizedDayPillar))"
+            content.body = "Bản trạch 【\(sittingName)】 hôm nay không phạm Tuế Phá/Nguyệt Phá. Nên: \(day.yiSummary)."
+        case .th:
+            content.title = "แจ้งเตือนวันธงชัย · \(day.dateLabel) (\(day.localizedDayPillar))"
+            content.body = "บ้าน【\(sittingName)】วันนี้ไม่ชงทิศหลังบ้าน เหมาะสำหรับ: \(day.yiSummary)"
+        case .id:
+            content.title = "Pengingat Hari Baik · \(day.dateLabel) (\(day.localizedDayPillar))"
+            content.body = "Rumah 【\(sittingName)】 bebas bentrokan hari ini. Baik untuk: \(day.yiSummary)."
+        case .auto, .zhHans:
+            content.title = "黄道吉日提醒 · \(day.dateLabel) (\(day.localizedDayPillar)日)"
+            content.body = "本宅【\(sittingName)】今日无岁破月破冲山，宜：\(day.yiSummary)。"
+        }
+        content.sound = .default
+        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(req) { [weak self] error in
+            if error == nil {
+                DispatchQueue.main.async {
+                    self?.scheduledDayIDs.insert(day.id)
+                    UserDefaults.standard.set(Array(self?.scheduledDayIDs ?? []), forKey: self?.kScheduledDaysKey ?? "tiandi_scheduled_auspicious_days")
                 }
             }
         }

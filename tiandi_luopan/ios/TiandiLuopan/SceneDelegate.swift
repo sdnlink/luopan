@@ -113,7 +113,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     public static func routeShortcutType(_ type: String) {
         switch type {
-        case "com.yanxiang.compass.shortcut.dailycard":
+        case "com.yanxiang.compass.shortcut.dailygods":
+            CompassLayerManager.shared.showDailyGodMarkers = true
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
+        case "com.yanxiang.compass.shortcut.dailycard", "com.yanxiang.compass.shortcut.dailysign":
             CompassLayerManager.shared.showDailyGodMarkers = true
             AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
         case "com.yanxiang.compass.shortcut.zeri":
@@ -134,11 +137,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         switch id {
         case "spotlight.zeri":
             AppNavigationRouter.shared.requestAlmanac()
+        case "tiandiluopan://compass?guide=dailyGods":
+            CompassLayerManager.shared.showDailyGodMarkers = true
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
+        case "tiandiluopan://compass?sheet=dailySign":
+            CompassLayerManager.shared.showDailyGodMarkers = true
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
         case "spotlight.bazhai":
             AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 1, openDailyCard: false)
-        case "spotlight.qimen":
+        case "spotlight.qimen", "tiandiluopan://tab?index=2&sub=qimen":
             AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
-        case "spotlight.floorplan":
+        case "spotlight.floorplan", "tiandiluopan://tab?index=3":
             AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
         default:
             return

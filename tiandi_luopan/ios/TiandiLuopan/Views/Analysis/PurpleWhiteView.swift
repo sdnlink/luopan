@@ -400,7 +400,7 @@ public struct PurpleWhiteView: View {
                     .foregroundColor(isDanger ? .red : Color.yanCyan)
                 Spacer()
                 let remedyId = "pw_\(item.palaceId)"
-                let inRemedy = retention.isRemedySaved(id: remedyId)
+                let inRemedy = retention.remedyTasks.contains(where: { $0.id == remedyId })
                 let addRemedyLabel: String = {
                     switch lang.effectiveLanguage {
                     case .en: return inRemedy ? "Tracked" : "+ Track"
@@ -416,9 +416,9 @@ public struct PurpleWhiteView: View {
                 Button(action: {
                     retention.toggleRemedyTask(
                         id: remedyId,
-                        palaceTitle: "\(item.palaceName)·\(item.starName)",
-                        actionSummary: plainSummary,
-                        isSha: isDanger
+                        palaceDirection: item.palaceName,
+                        title: item.starName,
+                        remedyAction: plainSummary
                     )
                 }) {
                     HStack(spacing: 3) {

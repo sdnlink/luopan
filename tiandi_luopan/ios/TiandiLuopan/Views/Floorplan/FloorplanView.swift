@@ -1086,7 +1086,7 @@ public struct FloorplanView: View {
         let ausp = audit.report.filter { $0.severity == .auspicious }.count
         let warn = audit.report.filter { $0.severity == .warning }.count
         let sev  = audit.report.filter { $0.severity == .severe }.count
-        let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (compat.isMatch ? 8 : -4)
+        let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (compat.isMatchedWithHouse ? 8 : -4)
         let clampedScore = max(38, min(99, rawScore))
         let sitLabel = "\(sitMtn.localizedName)\(lang.t("mountain_suffix"))\(faceMtn.localizedName)\(lang.t("facing_suffix"))"
         return PropertyPKMetric(
@@ -1094,7 +1094,7 @@ public struct FloorplanView: View {
             title: title,
             sittingText: sitLabel,
             score: clampedScore,
-            isKuaMatch: compat.isMatch,
+            isKuaMatch: compat.isMatchedWithHouse,
             kuaBadge: compat.matchBadgeTitle,
             auspiciousCount: ausp,
             shaCount: warn + sev,

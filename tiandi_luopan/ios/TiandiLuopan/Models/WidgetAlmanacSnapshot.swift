@@ -62,7 +62,7 @@ public enum WidgetAlmanacBuilder {
     /// 月建口径与 ZeRiEngine 一致（小寒大寒仍属丑月，立春起寅月）。
     /// 简化：传统通书在节气交接当日会「重复」前一日值神，此处按自然日顺行，
     /// 因此仅作历法参考标注，不用于任何择日或吉凶判断。
-    private static func resolveDayOfficerIndex(for date: Date, dayPillar: String) -> Int {
+    public static func resolveDayOfficerIndex(for date: Date, dayPillar: String) -> Int {
         let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
         let monthBranchIdx = termIndex < 2 ? 1 : (2 + (termIndex - 2) / 2) % 12
         let dayBranch = String(dayPillar.suffix(1))
@@ -232,5 +232,248 @@ public enum WidgetAlmanacBuilder {
             }
         }
         return high
+    }
+}
+
+// MARK: - 天星择日 · 动土安门日课自检小组件快照与构建器
+
+public struct ZeRiWidgetSnapshot {
+    public let date: Date
+    public let localizedDayPillar: String
+    public let fourPillarsText: String
+    public let sittingTitle: String
+    public let sittingShortName: String
+    public let isGeneralDay: Bool
+    public let overallStatus: String
+    public let isAuspicious: Bool
+
+    // 三大核心神煞自检
+    public let hasSuiPo: Bool
+    public let suiPoText: String
+    public let hasYuePo: Bool
+    public let yuePoText: String
+    public let hasSittingClash: Bool
+    public let sittingClashText: String
+
+    // 动土与安门专项宜忌
+    public let canGroundbreak: Bool
+    public let canInstallDoor: Bool
+    public let groundbreakBadge: String
+    public let installDoorBadge: String
+
+    public let detailsText: String
+    public let yiActivities: [String]
+    public let jiActivities: [String]
+    public let dayOfficerIndex: Int
+    public let wealthJoyBadge: String
+}
+
+public enum ZeRiWidgetBuilder {
+
+    public static func make(for date: Date = Date()) -> ZeRiWidgetSnapshot {
+        LocalizationManager.shared.syncFromSharedDefaults()
+        let lang = LocalizationManager.shared.effectiveLanguage
+
+        let shared = LocalizationManager.sharedDefaults
+        let isLocked = (shared?.object(forKey: "compass_is_locked") as? Bool)
+            ?? UserDefaults.standard.bool(forKey: "compass_is_locked")
+        let savedMountainID = (shared?.object(forKey: "saved_sitting_mountain_id") as? Int)
+            ?? (UserDefaults.standard.object(forKey: "saved_sitting_mountain_id") as? Int)
+        let lockedMountain: Mountain24Item? = {
+            guard isLocked, let id = savedMountainID else { return nil }
+            return Mountain24Data.shared.mountains.first { $0.id == id }
+        }()
+
+        let dayCourse: ZeRiAnalysis
+        let sittingTitle: String
+        let sittingShortName: String
+        let isGeneral: Bool
+
+        if let mountain = lockedMountain {
+            dayCourse = ZeRiEngine.shared.analyze(date: date, sitting: mountain)
+            let mountains = Mountain24Data.shared.mountains
+            let facing = mountains.first { $0.id == (mountain.id + 12) % 24 } ?? mountain
+            isGeneral = false
+            sittingShortName = "\(mountain.localizedName)山"
+            switch lang {
+            case .en:
+                sittingTitle = "\(mountain.localizedName) Mt. · \(facing.localizedName) Facing"
+            case .zhHant, .ja:
+                sittingTitle = "\(mountain.localizedName)山\(facing.localizedName)向"
+            case .ko:
+                sittingTitle = "\(mountain.localizedName)산 \(facing.localizedName)향"
+            case .vi:
+                sittingTitle = "Tọa \(mountain.localizedName) Hướng \(facing.localizedName)"
+            case .th:
+                sittingTitle = "พิง\(mountain.localizedName) หัน\(facing.localizedName)"
+            case .id:
+                sittingTitle = "Duduk \(mountain.localizedName) Hadap \(facing.localizedName)"
+            case .zhHans, .auto:
+                sittingTitle = "\(mountain.localizedName)山\(facing.localizedName)向"
+            }
+        } else {
+            dayCourse = ZeRiEngine.shared.analyzeGeneralDay(date: date)
+            isGeneral = true
+            switch lang {
+            case .en:
+                sittingTitle = "General (No Mountain Locked)"
+                sittingShortName = "General"
+            case .zhHant:
+                sittingTitle = "通用日課 · 未鎖坐山"
+                sittingShortName = "通用日課"
+            case .ja:
+                sittingTitle = "通用日課 · 坐山未設定"
+                sittingShortName = "汎用"
+            case .ko:
+                sittingTitle = "일반 일과 · 좌산 미설정"
+                sittingShortName = "일반"
+            case .vi:
+                sittingTitle = "Nhật khóa chung · Chưa khóa tọa"
+                sittingShortName = "Chung"
+            case .th:
+                sittingTitle = "ฤกษ์ทั่วไป · ไม่ได้ล็อกทิศพิง"
+                sittingShortName = "ทั่วไป"
+            case .id:
+                sittingTitle = "Hari Umum · Arah Belum Dikunci"
+                sittingShortName = "Umum"
+            case .zhHans, .auto:
+                sittingTitle = "通用日课 · 未锁坐山"
+                sittingShortName = "通用日课"
+            }
+        }
+
+        let hasSuiPo = dayCourse.suiPoWarning != nil
+        let hasYuePo = dayCourse.yuePoWarning != nil
+        let hasSittingClash = dayCourse.sittingClashWarning != nil
+        let isAuspicious = dayCourse.isAuspicious
+
+        let canGroundbreak = !hasSuiPo && !hasYuePo && !hasSittingClash
+        let canInstallDoor = !hasSuiPo && !hasYuePo && !hasSittingClash
+
+        let suiPoText: String
+        switch lang {
+        case .en: suiPoText = hasSuiPo ? "Year Clash" : "No Year Clash"
+        case .zhHant: suiPoText = hasSuiPo ? "犯歲破" : "無歲破"
+        case .ja: suiPoText = hasSuiPo ? "歳破あり" : "歳破なし"
+        case .ko: suiPoText = hasSuiPo ? "세파 범함" : "세파 없음"
+        case .vi: suiPoText = hasSuiPo ? "Phạm Tuế Phá" : "Không Tuế Phá"
+        case .th: suiPoText = hasSuiPo ? "ติดส่วยพั่ว" : "ไร้ส่วยพั่ว"
+        case .id: suiPoText = hasSuiPo ? "Kena Sui Po" : "Bebas Sui Po"
+        case .zhHans, .auto: suiPoText = hasSuiPo ? "犯岁破" : "无岁破"
+        }
+
+        let yuePoText: String
+        switch lang {
+        case .en: yuePoText = hasYuePo ? "Month Clash" : "No Month Clash"
+        case .zhHant: yuePoText = hasYuePo ? "犯月破" : "無月破"
+        case .ja: yuePoText = hasYuePo ? "月破あり" : "月破なし"
+        case .ko: yuePoText = hasYuePo ? "월파 범함" : "월파 없음"
+        case .vi: yuePoText = hasYuePo ? "Phạm Nguyệt Phá" : "Không Nguyệt Phá"
+        case .th: yuePoText = hasYuePo ? "ติดเยว่พั่ว" : "ไร้เยว่พั่ว"
+        case .id: yuePoText = hasYuePo ? "Kena Yue Po" : "Bebas Yue Po"
+        case .zhHans, .auto: yuePoText = hasYuePo ? "犯月破" : "无月破"
+        }
+
+        let sittingClashText: String
+        if isGeneral {
+            switch lang {
+            case .en: sittingClashText = "General"
+            case .zhHant: sittingClashText = "未設坐山"
+            case .ja: sittingClashText = "坐山未設定"
+            case .ko: sittingClashText = "좌산 미설정"
+            case .vi: sittingClashText = "Chưa xét tọa"
+            case .th: sittingClashText = "ไม่ระบุทิศ"
+            case .id: sittingClashText = "Tanpa arah"
+            case .zhHans, .auto: sittingClashText = "未设坐山"
+            }
+        } else {
+            switch lang {
+            case .en: sittingClashText = hasSittingClash ? "Sitting Clash" : "Sitting Safe"
+            case .zhHant: sittingClashText = hasSittingClash ? "犯衝山" : "坐山吉"
+            case .ja: sittingClashText = hasSittingClash ? "衝山あり" : "坐山吉"
+            case .ko: sittingClashText = hasSittingClash ? "좌산 충" : "좌산 길"
+            case .vi: sittingClashText = hasSittingClash ? "Phạm Xung Sơn" : "Tọa Sơn Cát"
+            case .th: sittingClashText = hasSittingClash ? "ชงทิศพิง" : "ทิศพิงมงคล"
+            case .id: sittingClashText = hasSittingClash ? "Bentrok Duduk" : "Aman Duduk"
+            case .zhHans, .auto: sittingClashText = hasSittingClash ? "犯冲山" : "坐山吉"
+            }
+        }
+
+        let gbBadge: String
+        switch lang {
+        case .en: gbBadge = canGroundbreak ? "Groundbreak: Good" : "Groundbreak: Avoid"
+        case .zhHant: gbBadge = canGroundbreak ? "宜修造動土" : "忌動土起造"
+        case .ja: gbBadge = canGroundbreak ? "動土: 吉" : "動土: 忌"
+        case .ko: gbBadge = canGroundbreak ? "동토: 길" : "동토: 흉"
+        case .vi: gbBadge = canGroundbreak ? "Động thổ: Cát" : "Động thổ: Kỵ"
+        case .th: gbBadge = canGroundbreak ? "ลงเสาเอก: ควร" : "ลงเสาเอก: ห้าม"
+        case .id: gbBadge = canGroundbreak ? "Renovasi: Baik" : "Renovasi: Hindari"
+        case .zhHans, .auto: gbBadge = canGroundbreak ? "宜修造动土" : "忌动土起造"
+        }
+
+        let doorBadge: String
+        switch lang {
+        case .en: doorBadge = canInstallDoor ? "Door: Good" : "Door: Avoid"
+        case .zhHant: doorBadge = canInstallDoor ? "宜安門立向" : "忌安門修方"
+        case .ja: doorBadge = canInstallDoor ? "安門: 吉" : "安門: 忌"
+        case .ko: doorBadge = canInstallDoor ? "안문: 길" : "안문: 흉"
+        case .vi: doorBadge = canInstallDoor ? "An môn: Cát" : "An môn: Kỵ"
+        case .th: doorBadge = canInstallDoor ? "ตั้งประตู: ควร" : "ตั้งประตู: ห้าม"
+        case .id: doorBadge = canInstallDoor ? "Pasang Pintu: Baik" : "Pasang Pintu: Hindari"
+        case .zhHans, .auto: doorBadge = canInstallDoor ? "宜安门立向" : "忌安门修方"
+        }
+
+        let dailyGods = ZeRiEngine.shared.dailyCompassDirections(for: date)
+        let wjBadge: String
+        switch lang {
+        case .en:
+            wjBadge = "Wealth:\(dailyGods.wealthDirection) · Joy:\(dailyGods.joyDirection)"
+        case .zhHant:
+            wjBadge = "財神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        case .ja:
+            wjBadge = "財神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        case .ko:
+            wjBadge = "재신:\(dailyGods.wealthDirection) · 희신:\(dailyGods.joyDirection)"
+        case .vi:
+            wjBadge = "Tài:\(dailyGods.wealthDirection) · Hỷ:\(dailyGods.joyDirection)"
+        case .th:
+            wjBadge = "โชค:\(dailyGods.wealthDirection) · มงคล:\(dailyGods.joyDirection)"
+        case .id:
+            wjBadge = "Rezeki:\(dailyGods.wealthDirection) · Hoki:\(dailyGods.joyDirection)"
+        case .zhHans, .auto:
+            wjBadge = "财神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        }
+
+        let officerIdx = WidgetAlmanacBuilder.resolveDayOfficerIndex(for: date, dayPillar: dayCourse.dayPillar)
+
+        return ZeRiWidgetSnapshot(
+            date: date,
+            localizedDayPillar: dayCourse.localizedDayPillar,
+            fourPillarsText: dayCourse.fourPillarsText,
+            sittingTitle: sittingTitle,
+            sittingShortName: sittingShortName,
+            isGeneralDay: isGeneral,
+            overallStatus: dayCourse.overallStatus,
+            isAuspicious: isAuspicious,
+            hasSuiPo: hasSuiPo,
+            suiPoText: suiPoText,
+            hasYuePo: hasYuePo,
+            yuePoText: yuePoText,
+            hasSittingClash: hasSittingClash,
+            sittingClashText: sittingClashText,
+            canGroundbreak: canGroundbreak,
+            canInstallDoor: canInstallDoor,
+            groundbreakBadge: gbBadge,
+            installDoorBadge: doorBadge,
+            detailsText: dayCourse.detailsText,
+            yiActivities: dayCourse.yiActivities,
+            jiActivities: dayCourse.jiActivities,
+            dayOfficerIndex: officerIdx,
+            wealthJoyBadge: wjBadge
+        )
+    }
+
+    public static func refreshDates(from now: Date, days: Int = 1) -> [Date] {
+        return WidgetAlmanacBuilder.refreshDates(from: now, days: days)
     }
 }

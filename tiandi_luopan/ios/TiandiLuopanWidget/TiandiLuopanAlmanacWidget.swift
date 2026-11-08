@@ -68,5 +68,57 @@ struct TiandiLuopanAlmanacWidget: Widget {
 struct TiandiLuopanWidgets: WidgetBundle {
     var body: some Widget {
         TiandiLuopanAlmanacWidget()
+        TiandiLuopanZeRiWidget()
+    }
+}
+
+// MARK: - 天星择日 · 动土安门日课自检小组件
+
+struct ZeRiWidgetEntry: TimelineEntry {
+    let date: Date
+    let snapshot: ZeRiWidgetSnapshot
+}
+
+struct ZeRiWidgetProvider: TimelineProvider {
+
+    func placeholder(in context: Context) -> ZeRiWidgetEntry {
+        ZeRiWidgetEntry(date: Date(), snapshot: ZeRiWidgetBuilder.make())
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (ZeRiWidgetEntry) -> Void) {
+        completion(ZeRiWidgetEntry(date: Date(), snapshot: ZeRiWidgetBuilder.make()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<ZeRiWidgetEntry>) -> Void) {
+        let now = Date()
+        let dates = ZeRiWidgetBuilder.refreshDates(from: now)
+        let entries = dates.map { ZeRiWidgetEntry(date: $0, snapshot: ZeRiWidgetBuilder.make(for: $0)) }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let last = entries.last?.date ?? now
+        let nextMidnight = calendar.date(byAdding: .day, value: 1,
+                                         to: calendar.startOfDay(for: now)) ?? last
+        let earliest = last.addingTimeInterval(60)
+        let reload = max(nextMidnight, earliest)
+        completion(Timeline(entries: entries, policy: .after(reload)))
+    }
+}
+
+struct TiandiLuopanZeRiWidget: Widget {
+    let kind: String = "TiandiLuopanZeRiWidget"
+
+    var body: some WidgetConfiguration {
+        let displayName: String = "天地罗盘 · \(WidgetZeRiText.displayName.string())"
+        let summary: String = WidgetZeRiText.description.string()
+        return StaticConfiguration(kind: kind, provider: ZeRiWidgetProvider()) { entry in
+            ZeRiWidgetRootView(entry: entry)
+        }
+        .configurationDisplayName(displayName)
+        .description(summary)
+        .supportedFamilies([
+            .systemSmall, .systemMedium, .systemLarge,
+            .accessoryInline, .accessoryRectangular
+        ])
     }
 }

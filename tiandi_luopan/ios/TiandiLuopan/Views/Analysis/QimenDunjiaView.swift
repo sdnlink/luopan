@@ -10,6 +10,8 @@ public struct QimenDunjiaView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var showPaywall: Bool = false
+    @State private var selectedDate: Date = Date()
+    @State private var isUsingCustomDate: Bool = false
     @State private var cachedChart: QimenChart?
     @State private var selectedPalaceId: Int? = nil
     @State private var lastChartHeading: Double?
@@ -48,11 +50,12 @@ public struct QimenDunjiaView: View {
     public var body: some View {
         return Group {
             if isActive {
+                let effectiveDate = isUsingCustomDate ? selectedDate : Date()
                 // Motion publishes tilt and magnetic-field samples
                 // independently of the heading. Reuse the chart across
                 // those updates; Qimen only needs a new result when the
                 // heading or language changes.
-                let chart = cachedChart ?? QimenEngine.shared.calculateChart(heading: motion.headingState.facingAngle)
+                let chart = cachedChart ?? QimenEngine.shared.calculateChart(date: effectiveDate, heading: motion.headingState.facingAngle)
 
                 // iPhone Duo 展开态双栏：左栏 = 奇门九宫方阵（主交互），
                 // 右栏 = 选中宫门星神摘要与出行动身方位导航（分析解释）；折叠态保持原单列纵排。
@@ -75,38 +78,29 @@ public struct QimenDunjiaView: View {
                     .minimumScaleFactor(0.7)
             }
             .padding(.horizontal, 16)
+
+            // P0.3 时辰穿越控制栏（每 2 小时换一局，支持提前推演谈判/出行时辰）
+            qimenTimeControlBar()
+                .padding(.horizontal, 16)
             
-            if !iap.hasUnlockedVIP {
-                VIPLockCardView(
-                    title: lang.t("privilege_qimen_title"),
-                    featureDesc: lang.t("privilege_qimen_desc"),
-                    badge: lang.t("vip_badge_title"),
-                    targetProductId: .vipYearly,
-                    onUnlockTap: { showPaywall = true }
-                )
-                .sheet(isPresented: $showPaywall) {
-                    VIPPaywallSheet(defaultProductId: .vipYearly)
+            // P0.2 开放 3x3 奇门九宫方阵预览 (天地人神四盘可点选查看八门九星)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(chart.cells) { cell in
+                    let defaultId = chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6
+                    let activeId = selectedPalaceId ?? defaultId
+                    qimenCellView(cell: cell, isSelected: cell.palaceId == activeId)
+                        .onTapGesture {
+                            selectedPalaceId = cell.palaceId
+                        }
                 }
-            } else {
-                // 3x3 奇门九宫方阵 (天地人神四盘)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                    ForEach(chart.cells) { cell in
-                        let defaultId = chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6
-                        let activeId = selectedPalaceId ?? defaultId
-                        qimenCellView(cell: cell, isSelected: cell.palaceId == activeId)
-                            .onTapGesture {
-                                selectedPalaceId = cell.palaceId
-                            }
-                    }
-                }
-                // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
-                .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
-                .padding(.horizontal, isLargeLayout ? 0 : 16)
-                }
-                }
-                } analysis: {
-                // 选中宫门星神摘要与出行动身方位导航（展开态右栏 / 折叠态底部）
-                if iap.hasUnlockedVIP {
+            }
+            // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
+            .frame(maxWidth: isSplitLayout ? .infinity : (isLargeLayout ? 580 : .infinity))
+            .padding(.horizontal, isLargeLayout ? 0 : 16)
+            }
+            } analysis: {
+            // 选中宫门星神摘要与出行动身方位导航（展开态右栏 / 折叠态底部）
+            VStack(spacing: 12) {
                 if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
                     HStack(spacing: 8) {
@@ -117,11 +111,6 @@ public struct QimenDunjiaView: View {
                             .adaptiveFont(size: 11, weight: .semibold)
                             .foregroundColor(activeCell.isDoorAuspicious ? .green : (activeCell.isDoorInauspicious ? .red : Color(red: 0.95, green: 0.85, blue: 0.45)))
                         Spacer()
-                        Text(doorObj.localizedLore)
-                            .adaptiveFont(size: 10)
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
                     }
                     .padding(.vertical, 6)
                     .padding(.horizontal, 10)
@@ -129,48 +118,54 @@ public struct QimenDunjiaView: View {
                     .cornerRadius(8)
                     .padding(.horizontal, 16)
                 }
-                
-                // 出行动身方位导航卡
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Image(systemName: "location.north.circle.fill")
-                            .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
-                        Text(lang.t("qimen_travel_best"))
-                            .adaptiveFont(size: 12, weight: .bold)
-                            .foregroundColor(.white)
-                        Spacer()
-                        Text(lang.t("qimen_pattern_best"))
-                            .adaptiveFont(size: 10)
-                            .foregroundColor(.green)
-                    }
-                    
-                    Text("\(lang.t("qimen_best_nav"))【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
-                        .adaptiveFont(size: 11)
-                        .foregroundColor(Color.green)
-                        .lineLimit(2)
-                    
-                    if !chart.tabooDirections.isEmpty {
-                        Text("\(lang.t("qimen_taboo_nav"))【\(chart.tabooDirections)】\(lang.t("qimen_taboo_suffix"))")
+
+                if iap.hasUnlockedVIP {
+                    // 出行动身方位导航卡
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "location.north.circle.fill")
+                                .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
+                            Text(lang.t("qimen_travel_best"))
+                                .adaptiveFont(size: 12, weight: .bold)
+                                .foregroundColor(.white)
+                            Spacer()
+                            Text(lang.t("qimen_pattern_best"))
+                                .adaptiveFont(size: 10)
+                                .foregroundColor(.green)
+                        }
+                        
+                        Text("\(lang.t("qimen_best_nav"))【\(chart.bestNavDirection)】！\(chart.bestNavReason)")
                             .adaptiveFont(size: 11)
-                            .foregroundColor(Color.orange)
+                            .foregroundColor(Color.green)
                             .lineLimit(2)
+                        
+                        if !chart.tabooDirections.isEmpty {
+                            Text("\(lang.t("qimen_taboo_nav"))【\(chart.tabooDirections)】\(lang.t("qimen_taboo_suffix"))")
+                                .adaptiveFont(size: 11)
+                                .foregroundColor(Color.orange)
+                                .lineLimit(2)
+                        }
                     }
-                }
-                .padding(10)
-                .background(Color(red: 0.12, green: 0.12, blue: 0.16))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
-                )
-                .padding(.horizontal, 16)
-                } else if isSplitLayout {
+                    .padding(10)
+                    .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.2), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+                } else {
                     qimenVIPPreviewCard()
+                        .padding(.horizontal, 16)
                 }
+            }
             }
             } else {
                 Color.clear
             }
+        }
+        .sheet(isPresented: $showPaywall) {
+            VIPPaywallSheet(defaultProductId: .vipYearly)
         }
         .onAppear {
             refreshChart(force: true)
@@ -192,10 +187,93 @@ public struct QimenDunjiaView: View {
         }
     }
 
+    private func qimenTimeControlBar() -> some View {
+        let prevLabel: String
+        let nextLabel: String
+        let nowLabel: String
+        switch lang.effectiveLanguage {
+        case .en:
+            prevLabel = "-2h"; nextLabel = "+2h"; nowLabel = "Now"
+        case .zhHant:
+            prevLabel = "上一時辰"; nextLabel = "下一時辰"; nowLabel = "回到此刻"
+        case .ja:
+            prevLabel = "-2時間(前刻)"; nextLabel = "+2時間(次刻)"; nowLabel = "現在へ"
+        case .ko:
+            prevLabel = "이전 시진(-2h)"; nextLabel = "다음 시진(+2h)"; nowLabel = "현재"
+        case .vi:
+            prevLabel = "-2 giờ"; nextLabel = "+2 giờ"; nowLabel = "Hiện tại"
+        case .th:
+            prevLabel = "-2 ชม."; nextLabel = "+2 ชม."; nowLabel = "ตอนนี้"
+        case .id:
+            prevLabel = "-2 Jam"; nextLabel = "+2 Jam"; nowLabel = "Sekarang"
+        case .auto, .zhHans:
+            prevLabel = "上一时辰"; nextLabel = "下一时辰"; nowLabel = "回到此刻"
+        }
+
+        return HStack(spacing: 8) {
+            Button(action: {
+                let base = isUsingCustomDate ? selectedDate : Date()
+                selectedDate = Calendar.current.date(byAdding: .hour, value: -2, to: base) ?? base
+                isUsingCustomDate = true
+                refreshChart(force: true)
+            }) {
+                Text(prevLabel)
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+            }
+
+            DatePicker("", selection: $selectedDate, displayedComponents: [.date, .hourAndMinute])
+                .labelsHidden()
+                .colorScheme(.dark)
+                .scaleEffect(0.88)
+                .onChange(of: selectedDate) { _ in
+                    isUsingCustomDate = true
+                    refreshChart(force: true)
+                }
+
+            Button(action: {
+                let base = isUsingCustomDate ? selectedDate : Date()
+                selectedDate = Calendar.current.date(byAdding: .hour, value: 2, to: base) ?? base
+                isUsingCustomDate = true
+                refreshChart(force: true)
+            }) {
+                Text(nextLabel)
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.08))
+                    .foregroundColor(.white)
+                    .cornerRadius(6)
+            }
+
+            if isUsingCustomDate {
+                Button(action: {
+                    isUsingCustomDate = false
+                    selectedDate = Date()
+                    refreshChart(force: true)
+                }) {
+                    Text(nowLabel)
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(Color.yanCyan.opacity(0.2))
+                        .foregroundColor(Color.yanCyan)
+                        .cornerRadius(6)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
     private func refreshChart(force: Bool = false) {
         guard isActive else { return }
         let heading = motion.headingState.facingAngle
-        let now = Date()
+        let now = isUsingCustomDate ? selectedDate : Date()
         let components = Calendar.current.dateComponents([.year, .month, .day, .hour], from: now)
         let timeKey = (components.year ?? 0) * 1_000_000
             + (components.month ?? 0) * 10_000
@@ -213,7 +291,7 @@ public struct QimenDunjiaView: View {
         }
         lastChartHeading = heading
         lastChartTimeKey = timeKey
-        cachedChart = QimenEngine.shared.calculateChart(heading: heading)
+        cachedChart = QimenEngine.shared.calculateChart(date: now, heading: heading)
     }
     
     private func qimenCellView(cell: QimenPalaceCell, isSelected: Bool = false) -> some View {

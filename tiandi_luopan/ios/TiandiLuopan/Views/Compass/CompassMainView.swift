@@ -9,6 +9,7 @@ public struct CompassMainView: View {
     /// 布局环境值：iPad 横屏与 Duo 内屏一样走右栏研判工作台，竖屏回底部状态卡。
     @Environment(\.adaptiveLayoutForm) private var layoutForm
     @ObservedObject var motion = CompassMotionManager.shared
+    @ObservedObject var layers = CompassLayerManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     
     // 弹窗状态
@@ -17,6 +18,7 @@ public struct CompassMainView: View {
     @State private var showPalaceSheet = false
     @State private var showLayerSheet = false
     @State private var showCalibSheet = false
+    @State private var showDailySignSheet = false
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -63,9 +65,15 @@ public struct CompassMainView: View {
                             }
                         }
                         
-                        // 2. 罗盘快捷辅助工具条 (锁定朝向 / 分金详勘 / 空亡诊断 / 八方全鉴)
+                        // 2. 罗盘快捷辅助工具条 (锁定朝向 / 分金详勘 / 空亡诊断 / 八方全鉴 / 吉方导引)
                         compassToolBar()
                             .padding(.top, 2)
+                        
+                        if layers.showDailyGodMarkers {
+                            dailyDirectionBanner()
+                                .padding(.horizontal, 16)
+                                .transition(.opacity)
+                        }
                         
                         Spacer(minLength: 4)
                         
@@ -115,6 +123,9 @@ public struct CompassMainView: View {
         }
         .sheet(isPresented: $showCalibSheet) {
             CalibrationSheet()
+        }
+        .sheet(isPresented: $showDailySignSheet) {
+            DailyAuspiciousCardSheet(sittingMountain: motion.headingState.sittingMountain)
         }
         .onAppear {
             motion.refreshTimeAndSolarTerm()
@@ -228,13 +239,220 @@ public struct CompassMainView: View {
                 }
                 .adaptiveFont(size: 11, weight: .medium)
                 .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.vertical, 7)
                 .background(Color.white.opacity(0.08))
                 .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 .cornerRadius(6)
             }
+            
+            // 今日吉方导引开关 (财神/喜神/奇门吉方 + 盘面金标联动)
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    layers.showDailyGodMarkers.toggle()
+                }
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "location.north.line.fill")
+                    Text(dailyGuideButtonTitle())
+                }
+                .adaptiveFont(size: 11, weight: .bold)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .background(layers.showDailyGodMarkers ? Color.green.opacity(0.22) : Color.white.opacity(0.08))
+                .foregroundColor(layers.showDailyGodMarkers ? .green : Color(red: 0.95, green: 0.85, blue: 0.45))
+                .cornerRadius(6)
+            }
+            
+            // 今日吉签海报
+            Button(action: {
+                showDailySignSheet = true
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "sparkles.rectangle.stack.fill")
+                    Text(dailySignShortTitle())
+                }
+                .adaptiveFont(size: 11, weight: .bold)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .background(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.18))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .cornerRadius(6)
+            }
             }
             .padding(.horizontal, 16)
+        }
+    }
+    
+    // MARK: - 今日吉方导引条 (财神/喜神/奇门实时比对)
+    private func dailyDirectionBanner() -> some View {
+        let dirs = ZeRiEngine.shared.dailyCompassDirections(for: Date())
+        let currentFacing = motion.headingState.facingAngle
+        let qimen = QimenEngine.shared.calculateChart(date: Date(), heading: currentFacing)
+        let diffToWealth = abs(shortestAngleDelta(from: currentFacing, to: dirs.wealthAngle))
+        let isAlignedWealth = diffToWealth <= 22.5
+        
+        return HStack(spacing: 8) {
+            Image(systemName: isAlignedWealth ? "checkmark.seal.fill" : "safari.fill")
+                .adaptiveFont(size: 13)
+                .foregroundColor(isAlignedWealth ? .green : Color(red: 0.95, green: 0.85, blue: 0.45))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("\(wealthLabel()): \(dirs.wealthDirection) (\(Int(dirs.wealthAngle))°)")
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .foregroundColor(isAlignedWealth ? .green : Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text("\(joyLabel()): \(dirs.joyDirection)")
+                        .adaptiveFont(size: 10, weight: .semibold)
+                        .foregroundColor(.yanCyan)
+                }
+                Text("\(qimenBestDoorPrefix()): \(qimen.bestNavDirection) · \(isAlignedWealth ? alignedWealthHint() : turnToWealthHint(deg: dirs.wealthAngle))")
+                    .adaptiveFont(size: 10)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Spacer(minLength: 4)
+            
+            Button(action: {
+                motion.lockAtFacingAngle(dirs.wealthAngle)
+            }) {
+                Text(lockWealthBtnTitle())
+                    .adaptiveFont(size: 10, weight: .bold)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.22))
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    .cornerRadius(5)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(red: 0.12, green: 0.13, blue: 0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isAlignedWealth ? Color.green.opacity(0.5) : Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private func shortestAngleDelta(from a: Double, to b: Double) -> Double {
+        var diff = (b - a).truncatingRemainder(dividingBy: 360.0)
+        if diff > 180.0 { diff -= 360.0 }
+        if diff < -180.0 { diff += 360.0 }
+        return diff
+    }
+    
+    private func dailyGuideButtonTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "吉方导引"
+        case .zhHant: return "吉方導引"
+        case .en: return "Lucky Dir"
+        case .ja: return "吉方ガイド"
+        case .ko: return "길방가이드"
+        case .vi: return "Hướng Cát"
+        case .th: return "ทิศมงคล"
+        case .id: return "Arah Hoki"
+        default: return "吉方导引"
+        }
+    }
+    
+    private func dailySignShortTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "吉签"
+        case .zhHant: return "吉籤"
+        case .en: return "Sign"
+        case .ja: return "吉籤"
+        case .ko: return "길첨"
+        case .vi: return "Thẻ Cát"
+        case .th: return "เซียมซี"
+        case .id: return "Kartu"
+        default: return "吉签"
+        }
+    }
+    
+    private func wealthLabel() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "今日财神"
+        case .zhHant: return "今日財神"
+        case .en: return "Wealth"
+        case .ja: return "本日財神"
+        case .ko: return "오늘 재신"
+        case .vi: return "Thần Tài"
+        case .th: return "เทพโชคลาภ"
+        case .id: return "Arah Rejeki"
+        default: return "今日财神"
+        }
+    }
+    
+    private func joyLabel() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "喜神"
+        case .zhHant: return "喜神"
+        case .en: return "Joy"
+        case .ja: return "喜神"
+        case .ko: return "희신"
+        case .vi: return "Hỷ Thần"
+        case .th: return "เทพมงคล"
+        case .id: return "Sukacita"
+        default: return "喜神"
+        }
+    }
+    
+    private func qimenBestDoorPrefix() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "时家奇门吉方"
+        case .zhHant: return "時家奇門吉方"
+        case .en: return "Qimen Best"
+        case .ja: return "奇門吉方"
+        case .ko: return "기문길방"
+        case .vi: return "Kỳ Môn Cát"
+        case .th: return "ฉีเหมิน"
+        case .id: return "Qimen Terbaik"
+        default: return "时家奇门吉方"
+        }
+    }
+    
+    private func alignedWealthHint() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "当前向首正对今日财神吉位"
+        case .zhHant: return "當前向首正對今日財神吉位"
+        case .en: return "Aligned with Today's Wealth Direction"
+        case .ja: return "現在の向首は本日の財神吉方位と一致"
+        case .ko: return "현재 향수가 오늘의 재신 길방과 일치"
+        case .vi: return "Đang hướng thẳng về cung Thần Tài hôm nay"
+        case .th: return "หันตรงกับทิศเทพโชคลาภวันนี้"
+        case .id: return "Sejajar dengan Arah Rejeki Hari Ini"
+        default: return "当前向首正对今日财神吉位"
+        }
+    }
+    
+    private func turnToWealthHint(deg: Double) -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return String(format: "转向 %.0f° 即对准财神位", deg)
+        case .zhHant: return String(format: "轉向 %.0f° 即對準財神位", deg)
+        case .en: return String(format: "Turn to %.0f° for Wealth Dir", deg)
+        case .ja: return String(format: "%.0f° へ向けると財神方位", deg)
+        case .ko: return String(format: "%.0f° 방향으로 돌리면 재신방", deg)
+        case .vi: return String(format: "Xoay về %.0f° để đón Thần Tài", deg)
+        case .th: return String(format: "หันไปที่ %.0f° เพื่อรับโชคลาภ", deg)
+        case .id: return String(format: "Putar ke %.0f° untuk Arah Rejeki", deg)
+        default: return String(format: "转向 %.0f° 即对准财神位", deg)
+        }
+    }
+    
+    private func lockWealthBtnTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "定位于财神"
+        case .zhHant: return "定位於財神"
+        case .en: return "Point Wealth"
+        case .ja: return "財神へ固定"
+        case .ko: return "재신 고정"
+        case .vi: return "Khóa Thần Tài"
+        case .th: return "ล็อกทิศโชค"
+        case .id: return "Kunci Rejeki"
+        default: return "定位于财神"
         }
     }
     
@@ -443,6 +661,9 @@ public struct CompassMainView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(analysisPanelBackground())
 
+            // 4.5 今日出行吉方导引（财神 / 喜神 / 奇门吉门）
+            dailyDirectionBanner()
+
             // 5. 快捷工具入口
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -457,9 +678,9 @@ public struct CompassMainView: View {
                     analysisPanelToolButton(title: lang.t("btn_palace_all"),
                                             systemImage: "square.grid.2x2",
                                             tint: Color(red: 0.83, green: 0.68, blue: 0.21)) { showPalaceSheet = true }
-                    analysisPanelToolButton(title: lang.t("btn_calib"),
-                                            systemImage: "safari.fill",
-                                            tint: motion.isDistorted ? Color.orange : Color(red: 0.95, green: 0.82, blue: 0.4)) { showCalibSheet = true }
+                    analysisPanelToolButton(title: dailySignShortTitle(),
+                                            systemImage: "sparkles.rectangle.stack.fill",
+                                            tint: Color(red: 0.95, green: 0.85, blue: 0.45)) { showDailySignSheet = true }
                 }
             }
         }

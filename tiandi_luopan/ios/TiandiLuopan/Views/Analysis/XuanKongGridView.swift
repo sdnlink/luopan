@@ -16,6 +16,7 @@ public struct XuanKongGridView: View {
     // 换坐/向山后重置回跟随，避免用户已看清的盘被高频传感器样本突然改写。
     @State private var manualTiGuaOverride: Bool? = nil
     @State private var showTianJiShuSheet: Bool = false
+    @State private var showDailySignSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var cachedChart: XuanKongChart?
     @State private var selectedPalaceIdx: Int = 4
@@ -72,6 +73,10 @@ public struct XuanKongGridView: View {
                 VStack(spacing: 14) {
                 // 1. 四大学派理气子 Tab 切换条
                 subTabBar()
+
+                // 1.5 常驻坐向锁定与 24 山手动选山控制栏 (P0.1 解决跨 Tab 看盘传感器晃动跳变痛点)
+                sittingControlHeader()
+                    .padding(.horizontal, isLargeLayout ? 0 : 16)
                 
                 // 2. 天机书长卷一键生成入口 Banner
                 tianJiShuBanner()
@@ -102,6 +107,9 @@ public struct XuanKongGridView: View {
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         .sheet(isPresented: $showTianJiShuSheet) {
             TianJiShuView()
+        }
+        .sheet(isPresented: $showDailySignSheet) {
+            DailyAuspiciousCardSheet()
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
@@ -193,6 +201,122 @@ public struct XuanKongGridView: View {
         }
     }
     
+    // MARK: - P0.1 常驻立极坐向锁定与 24 山手选控制栏 + 今日吉签入口
+    private func sittingControlHeader() -> some View {
+        let state = motion.headingState
+        let pickLabel: String
+        let signLabel: String
+        switch lang.effectiveLanguage {
+        case .en:
+            pickLabel = "Pick 24 Mountains"
+            signLabel = "Daily Sign"
+        case .zhHant:
+            pickLabel = "手選24山"
+            signLabel = "今日吉籤"
+        case .ja:
+            pickLabel = "24山選択"
+            signLabel = "本日吉籤"
+        case .ko:
+            pickLabel = "24산 선택"
+            signLabel = "오늘 길첨"
+        case .vi:
+            pickLabel = "Chọn 24 Sơn"
+            signLabel = "Thẻ Cát"
+        case .th:
+            pickLabel = "เลือก 24 ขุนเขา"
+            signLabel = "เซียมซี"
+        case .id:
+            pickLabel = "Pilih 24 Gunung"
+            signLabel = "Kartu Hoki"
+        case .auto, .zhHans:
+            pickLabel = "手选24山"
+            signLabel = "今日吉签"
+        }
+
+        return HStack(spacing: 8) {
+            // 当前坐山朝向与度数
+            HStack(spacing: 4) {
+                Image(systemName: motion.isLocked ? "lock.fill" : "location.north.line.fill")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", state.facingAngle))")
+                    .adaptiveFont(size: 12, weight: .bold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+
+            Spacer(minLength: 4)
+
+            // 锁定 / 解锁盘面按钮
+            Button(action: {
+                motion.toggleLock()
+            }) {
+                Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(motion.isLocked ? Color.red.opacity(0.22) : Color.white.opacity(0.1))
+                    .foregroundColor(motion.isLocked ? .red : .white)
+                    .cornerRadius(6)
+            }
+
+            // 24 山下拉快速选向（无需转动手机即可静态排盘任意坐向）
+            Menu {
+                ForEach(Mountain24Data.shared.mountains) { m in
+                    let facingIdx = (m.id + 12) % 24
+                    let facingM = Mountain24Data.shared.mountains[facingIdx]
+                    Button(action: {
+                        motion.selectSittingMountain(m)
+                    }) {
+                        HStack {
+                            Text("\(m.localizedName)\(lang.t("mountain_suffix"))\(facingM.localizedName)\(lang.t("facing_suffix")) (\(Int(m.centerAngle))°)")
+                            if m.id == state.sittingMountain.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "dial.medium.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(pickLabel)
+                        .adaptiveFont(size: 11, weight: .semibold)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color.yanCyan.opacity(0.18))
+                .foregroundColor(Color.yanCyan)
+                .cornerRadius(6)
+            }
+
+            // 今日吉方日签海报按钮
+            Button(action: {
+                showDailySignSheet = true
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "sparkles.rectangle.stack.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(signLabel)
+                        .adaptiveFont(size: 11, weight: .semibold)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.2))
+                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                .cornerRadius(6)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+        .cornerRadius(8)
+    }
+
     // MARK: - 天机书宣纸长卷 Banner
     private func tianJiShuBanner() -> some View {
         HStack {
@@ -460,21 +584,30 @@ public struct XuanKongGridView: View {
             
             if chart.palaces.indices.contains(selectedPalaceIdx) {
                 let sel = chart.palaces[selectedPalaceIdx]
-                HStack(spacing: 6) {
-                    Text("【\(sel.localizedPalaceName)】")
-                        .adaptiveFont(size: 12, weight: .bold)
-                        .foregroundColor(Color.yanCyan)
-                    Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
-                        .adaptiveFont(size: 11, weight: .semibold, design: .monospaced)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Spacer()
-                    Text(sel.localizedEvaluation)
-                        .adaptiveFont(size: 11, weight: .medium)
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                let isDanger25 = (sel.sittingStar == 2 && sel.facingStar == 5) || (sel.sittingStar == 5 && sel.facingStar == 2) || sel.sittingStar == 5 || sel.facingStar == 5
+                let isWang = (sel.sittingStar == sel.activePeriod || sel.facingStar == sel.activePeriod || sel.facingStar == 1 || sel.facingStar == 8 || sel.facingStar == 9)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 6) {
+                        Text("【\(sel.localizedPalaceName)】")
+                            .adaptiveFont(size: 12, weight: .bold)
+                            .foregroundColor(Color.yanCyan)
+                        Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
+                            .adaptiveFont(size: 11, weight: .semibold, design: .monospaced)
+                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                        Spacer()
+                        Text(sel.localizedEvaluation)
+                            .adaptiveFont(size: 11, weight: .medium)
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+
+                    Text(plainXuanKongSummary(sel: sel, isDanger25: isDanger25, isWang: isWang))
+                        .adaptiveFont(size: 11, weight: .semibold)
+                        .foregroundColor(isDanger25 ? Color.orange : (isWang ? Color.green : Color.white.opacity(0.85)))
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 6)
                 .padding(.horizontal, 8)
                 .background(Color.white.opacity(0.05))
                 .cornerRadius(6)
@@ -518,6 +651,75 @@ public struct XuanKongGridView: View {
         case .th: return "ชีซิงต่าเจี๋ย (ผังเจ็ดดาวมงคลใหญ่)"
         case .id: return "Formasi Qi Xing Da Jie"
         case .auto, .zhHans: return "七星打劫大吉局"
+        }
+    }
+
+    private func plainXuanKongSummary(sel: XuanKongPalace, isDanger25: Bool, isWang: Bool) -> String {
+        switch lang.effectiveLanguage {
+        case .en:
+            if isDanger25 {
+                return "⚠️ Plain Summary: 2-Black/5-Yellow Sha present here. Keep quiet, avoid red decor or drilling, and hang a 6-coin brass cure."
+            } else if isWang {
+                return "✅ Plain Summary: Prosperous Mountain/Facing stars (\(sel.sittingStar)-\(sel.facingStar)). Ideal for main door, master bed, or work desk."
+            } else {
+                return "💡 Plain Summary: Balanced sector (\(sel.sittingStar)-\(sel.facingStar)). Keep bright, ventilated, and tidy."
+            }
+        case .zhHant:
+            if isDanger25 {
+                return "⚠️ 【白話速斷】本宮見二黑/五黃煞氣（山\(sel.sittingStar)向\(sel.facingStar)），宜靜不宜動，忌放紅色或動土，建議懸掛六帝銅錢或銅葫蘆化煞。"
+            } else if isWang {
+                return "✅ 【白話速斷】本宮得當令旺生吉星（山\(sel.sittingStar)向\(sel.facingStar)），氣場生旺，極宜設為入戶門、主臥安床或書桌財位。"
+            } else {
+                return "💡 【白話速斷】本宮星氣平穩（山\(sel.sittingStar)向\(sel.facingStar)），日常保持採光通風與整潔即可。"
+            }
+        case .ja:
+            if isDanger25 {
+                return "⚠️ 【平易解説】二黒・五黄の凶星（山\(sel.sittingStar)・向\(sel.facingStar)）が巡っています。動土や赤い装飾を避け、六帝古銭や銅製ひょうたんで化殺してください。"
+            } else if isWang {
+                return "✅ 【平易解説】当運の旺星（山\(sel.sittingStar)・向\(sel.facingStar)）が巡る大吉方位です。玄関・主寝室・書斎デスクの配置に最適です。"
+            } else {
+                return "💡 【平易解説】気場が安定した方位（山\(sel.sittingStar)・向\(sel.facingStar)）です。採光と風通しを良くし清潔に保ちましょう。"
+            }
+        case .ko:
+            if isDanger25 {
+                return "⚠️ [쉬운 해설] 이흑·오황 살기(산\(sel.sittingStar)·향\(sel.facingStar))가 비임했습니다. 공사와 붉은색 장식을 피하고 육제동전이나 동호리병으로 화살하세요."
+            } else if isWang {
+                return "✅ [쉬운 해설] 당령 왕성 길성(산\(sel.sittingStar)·향\(sel.facingStar))이 모인 대길 방위입니다. 현관문, 안방 침대, 책상 재물자리로 매우 좋습니다."
+            } else {
+                return "💡 [쉬운 해설] 기운이 평온한 방위(산\(sel.sittingStar)·향\(sel.facingStar))입니다. 채광과 환기를 유지하고 정돈해 두세요."
+            }
+        case .vi:
+            if isDanger25 {
+                return "⚠️ [Tóm tắt dễ hiểu] Cung này gặp Nhị Hắc/Ngũ Hoàng sát (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), kỵ động thổ hoặc đồ màu đỏ; nên treo tiền đồng Lục Đế hoặc hồ lô đồng."
+            } else if isWang {
+                return "✅ [Tóm tắt dễ hiểu] Cung này đón sao đương vượng (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), rất tốt để đặt cửa chính, giường ngủ hoặc bàn làm việc."
+            } else {
+                return "💡 [Tóm tắt dễ hiểu] Khí trường bình ổn (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), chỉ cần giữ thoáng sáng và gọn gàng."
+            }
+        case .th:
+            if isDanger25 {
+                return "⚠️ [สรุปเข้าใจง่าย] วังนี้มีดาวร้าย ٢ดำ/٥เหลือง (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) งดเจาะทุบหรือใช้สีแดง แนะนำแขวนเหรียญจีน ٦ จักรพรรดิหรือน้ำเต้าทองเหลือง"
+            } else if isWang {
+                return "✅ [สรุปเข้าใจง่าย] วังนี้ได้ดาวมงคลประจำยุค (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) เหมาะตั้งประตูหลัก เตียงนอน หรือโต๊ะทำงาน"
+            } else {
+                return "💡 [สรุปเข้าใจง่าย] พลังดาวสมดุล (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) เพียงรักษาความสะอาดและเปิดรับแสงลม"
+            }
+        case .id:
+            if isDanger25 {
+                return "⚠️ [Ringkasan] Sektor ini terkena Sha 2-Hitam/5-Kuning (\(sel.sittingStar)-\(sel.facingStar)). Hindari renovasi & warna merah; gunakan 6 koin logam/labu kuningan."
+            } else if isWang {
+                return "✅ [Ringkasan] Bintang makmur (\(sel.sittingStar)-\(sel.facingStar)) hadir di sini. Sangat baik untuk pintu utama, ranjang utama, atau meja kerja."
+            } else {
+                return "💡 [Ringkasan] Energi sektor stabil (\(sel.sittingStar)-\(sel.facingStar)). Jaga tetap terang, rapi, dan berventilasi baik."
+            }
+        case .auto, .zhHans:
+            if isDanger25 {
+                return "⚠️ 【白话速断】本宫见二黑/五黄煞气（山\(sel.sittingStar)向\(sel.facingStar)），宜静不宜动，忌放红色或动土，建议悬挂六帝铜钱或铜葫芦化煞。"
+            } else if isWang {
+                return "✅ 【白话速断】本宫得当令旺生吉星（山\(sel.sittingStar)向\(sel.facingStar)），气场生旺，极宜设为入户门、主卧安床或书桌财位。"
+            } else {
+                return "💡 【白话速断】本宫星气平稳（山\(sel.sittingStar)向\(sel.facingStar)），日常保持采光通风与整洁即可。"
+            }
         }
     }
 }

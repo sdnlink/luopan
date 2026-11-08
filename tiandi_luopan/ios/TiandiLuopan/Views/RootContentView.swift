@@ -551,6 +551,7 @@ public struct RootContentView: View {
     /// 理气页的子 Tab（0 玄空九星 / 1 八宅三合日课 / 2 紫白 / 3 奇门）。
     /// 由根视图持有，小组件深链可把日课子页一并定位。
     @State private var analysisSubTab: Int = 0
+    @State private var showOnboarding: Bool = false
     // 读取 size class 建立环境依赖：折叠/展开（或 iPad 分屏拖动）切换时本视图
     // 重渲染并级联子视图 body 重算，使 Font.adaptive 的静态查询同步刷新
     //（配合 body 尾部 onChange 一起生效）。
@@ -743,6 +744,12 @@ public struct RootContentView: View {
             Self.applyTabBarAppearance(isLargeLayout: horizontalSizeClass == .regular)
             motion.start()
             updateResourceUsage()
+            if OnboardingGuideSheet.shouldPresentOnLaunch() {
+                showOnboarding = true
+            }
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingGuideSheet()
         }
         .onChange(of: selectedTab) { _ in
             updateResourceUsage()

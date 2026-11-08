@@ -48,6 +48,7 @@ public struct LayerSettingsSheet: View {
                 Section(header: Text(lang.t("tianchi_section"))) {
                     Toggle(lang.t("layer_true_north"), isOn: $layers.showTrueNorthNeedle)
                     Toggle(lang.t("layer_level_bubble"), isOn: $layers.showLevelBubble)
+                    Toggle(dailyGodLayerTitle(), isOn: $layers.showDailyGodMarkers)
                 }
             }
             .listStyle(InsetGroupedListStyle())
@@ -57,5 +58,19 @@ public struct LayerSettingsSheet: View {
             })
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+
+    private func dailyGodLayerTitle() -> String {
+        switch lang.effectiveLanguage {
+        case .zhHans: return "今日财神/喜神方位金标"
+        case .zhHant: return "今日財神/喜神方位金標"
+        case .en: return "Daily Wealth & Joy Direction Markers"
+        case .ja: return "本日の財神・喜神方位マーカー"
+        case .ko: return "오늘의 재신·희신 방위 마커"
+        case .vi: return "Đánh Dấu Hướng Thần Tài & Hỷ Thần"
+        case .th: return "เครื่องหมายทิศเทพโชคลาภและเทพมงคล"
+        case .id: return "Penanda Arah Rezeki & Sukacita Harian"
+        default: return "今日财神/喜神方位金标"
+        }
     }
 }

@@ -403,6 +403,18 @@ private struct MediumView: View {
                         .padding(.vertical, 2)
                         .background(Palette.cyan.opacity(0.16))
                         .cornerRadius(4)
+
+                    if let badge = s.sittingMountainBadge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(s.hasSittingClash ? Palette.red : Palette.gold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background((s.hasSittingClash ? Palette.red : Palette.gold).opacity(0.16))
+                            .cornerRadius(4)
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -530,6 +542,18 @@ private struct LargeView: View {
                         .padding(.vertical, 2)
                         .background(Palette.cyan.opacity(0.16))
                         .cornerRadius(4)
+
+                    if let badge = s.sittingMountainBadge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(s.hasSittingClash ? Palette.red : Palette.gold)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background((s.hasSittingClash ? Palette.red : Palette.gold).opacity(0.16))
+                            .cornerRadius(4)
+                    }
                 }
 
                 Spacer(minLength: 8)

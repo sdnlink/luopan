@@ -524,6 +524,16 @@ public struct ARVisionView: View {
         self.isActive = isActive
     }
     
+    /// AR 实景镜头实时朝向：当真机传感器有实时航向时，即使主罗盘已锁定家宅坐向（motion.isLocked == true），
+    /// 镜头环视四周仍使用实时传感器航向，确保「锁好家宅坐山后，举起手机环视各扇窗测形煞与吉位」流畅可用；
+    /// 模拟器无传感器航向时回退到 motion.headingState.facingAngle。
+    private var arCameraFacingAngle: Double {
+        if motion.hasLiveSensorHeading {
+            return motion.liveSensorHeading
+        }
+        return motion.headingState.facingAngle
+    }
+
     // 计算靶心拖拽后的相对目标偏角与二十四山
     private var targetCalculatedHeading: Double {
         // Vision returns a normalized horizontal location. Keep that
@@ -532,7 +542,7 @@ public struct ARVisionView: View {
         let normalizedHorizontalOffset = (targetNormalizedPoint.x + manualTargetNormalizedOffset - 0.5) * 2.0
         let halfFOVRadians = targetHorizontalFOV * .pi / 360.0
         let detectedAngleDelta = atan(normalizedHorizontalOffset * tan(halfFOVRadians)) * 180.0 / .pi
-        let raw = motion.headingState.facingAngle + detectedAngleDelta
+        let raw = arCameraFacingAngle + detectedAngleDelta
         return (raw.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
     }
     
@@ -1029,7 +1039,7 @@ public struct ARVisionView: View {
                 .fill(Color.yanCyan.opacity(0.6))
                 .frame(width: 180, height: 1)
             
-            Text("\(String(format: "%.1f", motion.headingState.facingAngle))° · \(String(format: "%+.1f°", elevDeg))")
+            Text("\(String(format: "%.1f", arCameraFacingAngle))° · \(String(format: "%+.1f°", elevDeg))")
                 .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                 .foregroundColor(isHorizontalLevel ? .yanCyan : .orange)
                 .lineLimit(1)
@@ -1187,7 +1197,9 @@ public struct ARVisionView: View {
                     Text(lang.t("ar_title"))
                         .adaptiveFont(size: 15, weight: .bold)
                         .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    Text("\(lang.t("ar_physical_facing")): \(motion.headingState.facingMountain.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", motion.headingState.facingAngle))°)")
+                    let liveFacingM = Mountain24Data.shared.mountain(for: arCameraFacingAngle)
+                    let sittingSuffix = motion.isLocked ? " · 🏠\(motion.headingState.sittingMountain.localizedName)\(lang.t("mountain_suffix"))" : ""
+                    Text("\(lang.t("ar_physical_facing")): \(liveFacingM.localizedName)\(lang.t("mountain_suffix")) (\(String(format: "%.1f", arCameraFacingAngle))°)\(sittingSuffix)")
                         .adaptiveFont(size: 11)
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
@@ -1333,22 +1345,43 @@ public struct ARVisionView: View {
         .cornerRadius(10)
     }
 
-    // MARK: - 全景天际二十四山与杨公十二长生消砂纳水标尺 (PRD 5.2 & 13)
+    // MARK: - 全景天际二十四山与杨公十二长生消砂纳水标尺 (PRD 5.2 & 13 + 今日吉神与本命财位实景投射)
     private func horizonCompassRibbon() -> some View {
-        let baseHeading = motion.headingState.facingAngle
+        let baseHeading = arCameraFacingAngle
         let sitting = motion.headingState.sittingMountain
-        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting, facing: motion.headingState.facingMountain)
+        let liveFacingMountain = Mountain24Data.shared.mountain(for: baseHeading)
+        let waterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: sitting, facing: liveFacingMountain)
         let baShaZhi = SanHeWaterEngine.shared.resolveBaSha(sitting: sitting).shaZhi
+        let gods = ZeRiEngine.shared.dailyCompassDirections(for: Date())
+        let kuaProfile = UserKuaProfileManager.shared
+        let ownerCompatibility = kuaProfile.isProfileEnabled
+            ? kuaProfile.evaluateCompatibility(sittingPalace: sitting.palace)
+            : nil
+        let ownerPalaces: [BaZhaiPalaceItem] = ownerCompatibility.map {
+            BaZhaiEngine.shared.analyze(sittingPalace: $0.ownerGua, facingPalace: sitting.palace).items
+        } ?? []
         let offsets: [Double] = [-30.0, -15.0, 0.0, 15.0, 30.0]
 
-        // 煞位前缀按语言本地化：中文 煞·、日文 煞・、韩文 살·，
-        // 其余语言用风水术语拼音音译 Sha ·（避免非中文环境显示中文硬编码）。
         let shaPrefix: String
+        let wealthTag: String
+        let joyTag: String
         switch lang.effectiveLanguage {
-        case .zhHant, .zhHans: shaPrefix = "煞·"
-        case .ja: shaPrefix = "煞・"
-        case .ko: shaPrefix = "살·"
-        default: shaPrefix = "Sha · "
+        case .en:
+            shaPrefix = "Sha · "; wealthTag = "💰Wealth"; joyTag = "🎉Joy"
+        case .zhHant:
+            shaPrefix = "煞·"; wealthTag = "💰財神"; joyTag = "🎉喜神"
+        case .ja:
+            shaPrefix = "煞・"; wealthTag = "💰財神"; joyTag = "🎉喜神"
+        case .ko:
+            shaPrefix = "살·"; wealthTag = "💰재신"; joyTag = "🎉희신"
+        case .vi:
+            shaPrefix = "Sát · "; wealthTag = "💰Tài"; joyTag = "🎉Hỷ"
+        case .th:
+            shaPrefix = "ชง·"; wealthTag = "💰โชค"; joyTag = "🎉ยินดี"
+        case .id:
+            shaPrefix = "Sha · "; wealthTag = "💰Rezeki"; joyTag = "🎉Bahagia"
+        case .auto, .zhHans:
+            shaPrefix = "煞·"; wealthTag = "💰财神"; joyTag = "🎉喜神"
         }
 
         return HStack(spacing: 6) {
@@ -1359,6 +1392,11 @@ public struct ARVisionView: View {
                 let isCenter = abs(delta) < 0.1
                 let isBaSha = (m.name == baShaZhi)
                 let isHQ = (water?.isHuangQuanSha == true)
+                let rawWealthDiff = abs(angle - gods.wealthAngle)
+                let isWealthGod = min(rawWealthDiff, 360.0 - rawWealthDiff) <= 12.0
+                let rawJoyDiff = abs(angle - gods.joyAngle)
+                let isJoyGod = !isWealthGod && min(rawJoyDiff, 360.0 - rawJoyDiff) <= 12.0
+                let ownerStar = ownerPalaces.first(where: { $0.guaName == m.palace && $0.star.isAuspicious })
 
                 VStack(spacing: 1) {
                     Text("\(m.localizedName)\(isCenter ? "▲" : "")")
@@ -1372,6 +1410,25 @@ public struct ARVisionView: View {
                             .foregroundColor((isBaSha || isHQ) ? .red : (water.isAuspicious ? .green : .white.opacity(0.72)))
                             .lineLimit(1)
                     }
+                    if isWealthGod {
+                        Text(wealthTag)
+                            .adaptiveFont(size: 7.5, weight: .bold)
+                            .foregroundColor(Color(red: 0.98, green: 0.85, blue: 0.35))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    } else if isJoyGod {
+                        Text(joyTag)
+                            .adaptiveFont(size: 7.5, weight: .bold)
+                            .foregroundColor(Color(red: 0.98, green: 0.48, blue: 0.58))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    } else if let star = ownerStar {
+                        Text("🌟\(star.star.localizedName)")
+                            .adaptiveFont(size: 7.5, weight: .semibold)
+                            .foregroundColor(.yanCyan)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
@@ -1379,7 +1436,7 @@ public struct ARVisionView: View {
                 .cornerRadius(6)
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
-                        .stroke(isCenter ? Color.yanCyan.opacity(0.75) : Color.clear, lineWidth: 1)
+                        .stroke(isCenter ? Color.yanCyan.opacity(0.75) : (isWealthGod ? Color(red: 0.95, green: 0.82, blue: 0.35).opacity(0.55) : Color.clear), lineWidth: 1)
                 )
             }
         }

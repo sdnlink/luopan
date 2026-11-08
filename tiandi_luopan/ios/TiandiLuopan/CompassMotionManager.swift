@@ -4,6 +4,9 @@ import CoreMotion
 import Combine
 import UIKit
 import QuartzCore
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 public protocol CompassMotionManagerDelegate: AnyObject {
     func didUpdateHeading(magneticHeading: Double, trueHeading: Double, accuracy: Double)
@@ -36,6 +39,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     @Published public var continuousMagneticHeading: Double = 0.0 // 连续地磁北角度
     @Published public var magneticHeading: Double = 0.0
     @Published public var trueHeading: Double = 0.0
+    /// 即使主罗盘已锁定家宅坐向（isLocked == true），仍持续输出传感器实时方位角，供 AR 实景环视镜头使用
+    @Published public private(set) var liveSensorHeading: Double = 0.0
+    @Published public private(set) var hasLiveSensorHeading: Bool = false
     @Published public var currentDeclination: Double = 0.0
     @Published public var hasDeclination: Bool = false
     
@@ -106,6 +112,18 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         if let saved = UserDefaults.standard.string(forKey: "compass_north_reference"),
            let reference = CompassNorthReference(rawValue: saved) {
             northReference = reference
+        }
+        // 恢复上次锁盘状态与坐向度数（跨会话持久化，并同步给小组件）
+        let savedLocked = UserDefaults.standard.bool(forKey: "compass_is_locked")
+        if savedLocked, UserDefaults.standard.object(forKey: "compass_locked_facing_angle") != nil {
+            let savedFacing = UserDefaults.standard.double(forKey: "compass_locked_facing_angle")
+            let normalized = (savedFacing.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+            self.isLocked = true
+            self.heading = normalized
+            self.continuousHeading = normalized
+            self.manualOffset = 0.0
+            self.headingState = Mountain24Data.shared.resolveHeadingState(heading: normalized)
+            Self.syncSittingMountainToWidget(isLocked: true, sittingMountainID: self.headingState.sittingMountain.id)
         }
         setupLocationManager()
         locationAuthorizationStatus = locationManager.authorizationStatus
@@ -377,14 +395,75 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     public func toggleLock() {
         DispatchQueue.main.async {
             self.isLocked.toggle()
+            if !self.isLocked {
+                // 解锁恢复实时陀螺仪时清除手动选山产生的偏移，立即回到传感器实时方位
+                self.manualOffset = 0.0
+                let liveHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : self.magneticHeading
+                if liveHeading > 0 || self.hasLocationFix {
+                    self.heading = liveHeading
+                    self.continuousHeading = liveHeading
+                }
+                self.updateResolvedState(force: true)
+            }
+            self.persistLockState()
+            if self.isLocked {
+                RetentionServiceManager.shared.recordMilestone(reason: "lock_compass")
+            }
             self.hapticLevel.impactOccurred()
         }
+    }
+
+    /// 直接指定某一个二十四山作为「坐山」并自动锁定盘面（供理气页/罗盘页 24 山快捷选向使用）
+    public func selectSittingMountain(_ mountain: Mountain24Item) {
+        let facing = (mountain.centerAngle + 180.0).truncatingRemainder(dividingBy: 360.0)
+        lockAtFacingAngle(facing)
+    }
+
+    /// 锁定到指定的向首角度（0 ~ 360°）并持久化到 UserDefaults 与 App Group 小组件
+    public func lockAtFacingAngle(_ facingAngle: Double) {
+        DispatchQueue.main.async {
+            let normalized = (facingAngle.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+            self.isLocked = true
+            self.manualOffset = (normalized - self.heading + 360.0).truncatingRemainder(dividingBy: 360.0)
+            self.updateResolvedState(force: true)
+            self.persistLockState()
+            RetentionServiceManager.shared.recordMilestone(reason: "select_mountain")
+            self.hapticLevel.impactOccurred()
+        }
+    }
+
+    private func persistLockState() {
+        let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
+        UserDefaults.standard.set(isLocked, forKey: "compass_is_locked")
+        if isLocked {
+            UserDefaults.standard.set(effective, forKey: "compass_locked_facing_angle")
+        }
+        Self.syncSittingMountainToWidget(isLocked: isLocked, sittingMountainID: headingState.sittingMountain.id)
+    }
+
+    private static func syncSittingMountainToWidget(isLocked: Bool, sittingMountainID: Int) {
+        let shared = LocalizationManager.sharedDefaults
+        UserDefaults.standard.set(isLocked, forKey: "compass_is_locked")
+        shared?.set(isLocked, forKey: "compass_is_locked")
+        if isLocked {
+            UserDefaults.standard.set(sittingMountainID, forKey: "saved_sitting_mountain_id")
+            shared?.set(sittingMountainID, forKey: "saved_sitting_mountain_id")
+        } else {
+            UserDefaults.standard.removeObject(forKey: "saved_sitting_mountain_id")
+            shared?.removeObject(forKey: "saved_sitting_mountain_id")
+        }
+        #if canImport(WidgetKit)
+        if #available(iOS 14.0, *) {
+            WidgetCenter.shared.reloadTimelines(ofKind: "TiandiLuopanAlmanacWidget")
+        }
+        #endif
     }
     
     public func resetManualOffset() {
         DispatchQueue.main.async {
             self.manualOffset = 0.0
             self.updateResolvedState(force: true)
+            self.persistLockState()
             self.hapticLevel.impactOccurred()
         }
     }
@@ -408,6 +487,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.locationManager.startUpdatingHeading()
             }
             self.updateResolvedState(force: true)
+            self.persistLockState()
         }
     }
     
@@ -415,6 +495,9 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         DispatchQueue.main.async {
             self.manualOffset = (self.manualOffset + degrees).truncatingRemainder(dividingBy: 360.0)
             self.updateResolvedState(force: true)
+            if self.isLocked {
+                self.persistLockState()
+            }
         }
     }
     
@@ -735,9 +818,14 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.trueHeading = mag
             }
             
+            let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
+            let normalizedLive = (referenceHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
+            if !self.hasLiveSensorHeading || abs(normalizedLive - self.liveSensorHeading) >= 0.15 {
+                self.liveSensorHeading = normalizedLive
+                self.hasLiveSensorHeading = true
+            }
             if !self.isLocked {
                 self.updateContinuousMagneticHeading(newHeading: mag)
-                let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
                 self.updateContinuousHeading(newHeading: referenceHeading)
                 self.updateResolvedState()
             }

@@ -448,6 +448,7 @@ public class FloorplanEngine {
         let manualMissingGua = Set(rooms.filter { $0.type == .missingCorner }.map {
             palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading).gua
         })
+        let pwChart = PurpleWhiteEngine.shared.calculateChart(date: Date(), heading: heading)
         
         for room in rooms {
             var r = room
@@ -500,12 +501,14 @@ public class FloorplanEngine {
                 continue
             }
 
-            // 风水动态研判
+            // 风水动态研判（叠加宅主本命卦四吉四凶 + 流年紫白飞星交叉断事）
             let audit = evaluateRoom(type: r.type, palaceGua: palace.gua, palaceDir: palace.dir)
+            let crossSuffix = crossModuleLoreSuffix(palaceGua: palace.gua, pwChart: pwChart)
+            let combinedLore = crossSuffix.isEmpty ? audit.lore : "\(audit.lore)\n\(crossSuffix)"
             r.name = r.type.localizedName
             r.inspectionTitle = audit.title
             r.inspectionLevel = audit.level
-            r.inspectionLore = audit.lore
+            r.inspectionLore = combinedLore
             r.inspectionAdvice = audit.advice
             
             updatedRooms.append(r)
@@ -519,7 +522,7 @@ public class FloorplanEngine {
                 title: "\(r.type.localizedName) · \(audit.title)",
                 palace: r.palaceName,
                 severity: audit.level,
-                lore: audit.lore,
+                lore: combinedLore,
                 solution: audit.advice
             ))
         }
@@ -787,6 +790,81 @@ public class FloorplanEngine {
         case .id: return id
         case .auto, .zhHans: return hans
         }
+    }
+
+    /// 跨模块交叉断事：将「流年紫白飞星落宫」与「宅主本命卦四吉四凶」注入户型房间体检结果
+    private func crossModuleLoreSuffix(palaceGua: String, pwChart: PurpleWhiteChart) -> String {
+        let canonGua: String
+        let palaceId: Int
+        switch palaceGua {
+        case "坎", "Kan", "감", "Khảm", "ข่าน":
+            canonGua = "坎"; palaceId = 1
+        case "坤", "Kun", "곤", "Khôn", "คุน":
+            canonGua = "坤"; palaceId = 2
+        case "震", "Zhen", "진", "Chấn", "เจิ้น":
+            canonGua = "震"; palaceId = 3
+        case "巽", "Xun", "손", "Tốn", "ซวิ่น":
+            canonGua = "巽"; palaceId = 4
+        case "乾", "Qian", "건", "Càn", "เฉียน":
+            canonGua = "乾"; palaceId = 6
+        case "兑", "兌", "Dui", "태", "Đoài", "ตุ้ย":
+            canonGua = "兑"; palaceId = 7
+        case "艮", "Gen", "간", "Cấn", "เกิ่น":
+            canonGua = "艮"; palaceId = 8
+        case "离", "離", "Li", "이", "Ly", "หลี":
+            canonGua = "离"; palaceId = 9
+        default:
+            canonGua = "中"; palaceId = 5
+        }
+
+        var parts: [String] = []
+        if let pwItem = pwChart.palaceItems.first(where: { $0.palaceId == palaceId }) {
+            let starTitle = pwItem.starName
+            let shaWarn: String
+            if pwItem.isTaiSui {
+                shaWarn = tr8("（犯流年太岁）", "（犯流年太歲）", " (Annual Tai Sui)", "（流年太歳）", " (유년 태세)", " (Phạm Thái Tuế)", " (ไท่ส่วยประจำปี)", " (Tai Sui Tahunan)")
+            } else if pwItem.isSuiPo {
+                shaWarn = tr8("（犯岁破）", "（犯歲破）", " (Year Breaker)", "（歳破）", " (세파)", " (Tuế Phá)", " (ส่วยพั่ว)", " (Sui Po)")
+            } else if pwItem.isSanSha {
+                shaWarn = tr8("（犯三煞）", "（犯三煞）", " (Three Killings)", "（三煞）", " (삼살)", " (Tam Sát)", " (ซานซา)", " (Tiga Sha)")
+            } else {
+                shaWarn = ""
+            }
+            parts.append(
+                tr8(
+                    "【流年紫白】\(starTitle)\(shaWarn)",
+                    "【流年紫白】\(starTitle)\(shaWarn)",
+                    "[Annual Star] \(starTitle)\(shaWarn)",
+                    "【流年紫白】\(starTitle)\(shaWarn)",
+                    "[유년자백] \(starTitle)\(shaWarn)",
+                    "[Lưu Niên] \(starTitle)\(shaWarn)",
+                    "[ดาวประจำปี] \(starTitle)\(shaWarn)",
+                    "[Bintang Tahunan] \(starTitle)\(shaWarn)"
+                )
+            )
+        }
+
+        let kuaProfile = UserKuaProfileManager.shared
+        if kuaProfile.isProfileEnabled && canonGua != "中" {
+            let ownerBz = BaZhaiEngine.shared.analyze(sittingPalace: kuaProfile.ownerGuaKey, facingPalace: "离")
+            if let ownerItem = ownerBz.items.first(where: { $0.guaName == canonGua }) {
+                let sName = ownerItem.star.localizedName
+                parts.append(
+                    tr8(
+                        "【宅主本命】落\(sName)",
+                        "【宅主本命】落\(sName)",
+                        "[Owner Life Gua] \(sName)",
+                        "【家主本命】\(sName)",
+                        "[건축주 본명] \(sName)",
+                        "[Bản Mệnh Chủ] \(sName)",
+                        "[รหัสชีวิตเจ้าของ] \(sName)",
+                        "[Gua Pemilik] \(sName)"
+                    )
+                )
+            }
+        }
+
+        return parts.joined(separator: " · ")
     }
 
     /// Adds the classical source and plain-language context to the two

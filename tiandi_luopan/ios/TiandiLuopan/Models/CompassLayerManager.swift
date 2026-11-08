@@ -53,6 +53,10 @@ public class CompassLayerManager: ObservableObject {
     @Published public var showLevelBubble: Bool = CompassLayerManager.storedBool("compass_layer_level_bubble", default: true) {
         didSet { Self.defaults.set(showLevelBubble, forKey: "compass_layer_level_bubble") }
     }
+    /// 今日财神/喜神吉方盘面金标导引（默认关闭，用户点击罗盘工具条「吉方导引」或图层设置时开启）
+    @Published public var showDailyGodMarkers: Bool = CompassLayerManager.storedBool("compass_layer_daily_gods", default: false) {
+        didSet { Self.defaults.set(showDailyGodMarkers, forKey: "compass_layer_daily_gods") }
+    }
     /// 当前实际生效的预设：依据各图层开关实时推导（手动切换单层后也能正确反映），
     /// 而非持久化一个易过时的“上次应用预设”。视图层统一使用此计算属性。
     public var activePreset: CompassPreset? {

@@ -81,10 +81,15 @@ public struct CompassDialView: View {
                         eightGuaLayer(radius: radius * 0.46, grow: dialGrow)
                     }
 
+                    // 今日财神与喜神方位盘面金标
+                    if layers.showDailyGodMarkers {
+                        dailyGodMarkersLayer(radius: radius * 0.54, grow: dialGrow)
+                    }
+
                     // 天池底盘与海底红线 (南北指向校准线)
                     tianChiLayer(radius: radius * 0.28)
                 }
-                .id("dial-canvas-\(motion.currentSolarTermName)-\(lang.effectiveLanguage.rawValue)")
+                .id("dial-canvas-\(motion.currentSolarTermName)-\(lang.effectiveLanguage.rawValue)-\(layers.showDailyGodMarkers)")
                 .frame(width: dialCanvasSize, height: dialCanvasSize)
                 .drawingGroup() // 启用 Metal GPU 纹理光栅化，彻底消除旋转时几百个图层的 CPU 测量与重绘负荷
                 .rotationEffect(.degrees(-motion.continuousHeading - motion.manualOffset - currentDragDelta))
@@ -411,6 +416,65 @@ public struct CompassDialView: View {
                 .offset(y: -radius + 12 * grow)
                 .rotationEffect(.degrees(item.angle))
         }
+    }
+
+    // MARK: - 今日财神与喜神盘面金标导引层
+    private func dailyGodMarkersLayer(radius: CGFloat, grow: CGFloat = 1.0) -> some View {
+        let dirs = ZeRiEngine.shared.dailyCompassDirections(for: Date())
+        let sameAngle = abs(dirs.wealthAngle - dirs.joyAngle) < 1.0
+        let wealthTag: String
+        let joyTag: String
+        switch lang.effectiveLanguage {
+        case .en:
+            wealthTag = "W$"
+            joyTag = "JOY"
+        case .ko:
+            wealthTag = "재신"
+            joyTag = "희신"
+        case .vi:
+            wealthTag = "Tài"
+            joyTag = "Hỷ"
+        case .th:
+            wealthTag = "โชค"
+            joyTag = "มงคล"
+        case .id:
+            wealthTag = "Hoki"
+            joyTag = "Suka"
+        case .zhHant, .ja:
+            wealthTag = "財神"
+            joyTag = "喜神"
+        case .auto, .zhHans:
+            wealthTag = "财神"
+            joyTag = "喜神"
+        }
+
+        return ZStack {
+            // 财神金标
+            Text(sameAngle ? "\(wealthTag)·\(joyTag)" : wealthTag)
+                .adaptiveFont(size: 8.5 * grow, weight: .bold)
+                .padding(.horizontal, 5 * grow)
+                .padding(.vertical, 2 * grow)
+                .background(Color(red: 0.95, green: 0.78, blue: 0.22))
+                .foregroundColor(.black)
+                .cornerRadius(4 * grow)
+                .offset(y: -radius)
+                .rotationEffect(.degrees(dirs.wealthAngle))
+
+            // 喜神青朱标（若与财神不同宫则独立标注）
+            if !sameAngle {
+                Text(joyTag)
+                    .adaptiveFont(size: 8.5 * grow, weight: .bold)
+                    .padding(.horizontal, 5 * grow)
+                    .padding(.vertical, 2 * grow)
+                    .background(Color.yanCyan)
+                    .foregroundColor(.black)
+                    .cornerRadius(4 * grow)
+                    .offset(y: -radius)
+                    .rotationEffect(.degrees(dirs.joyAngle))
+            }
+        }
+        .frame(width: radius * 2, height: radius * 2)
+        .allowsHitTesting(false)
     }
     
     // MARK: - 天池海底红线

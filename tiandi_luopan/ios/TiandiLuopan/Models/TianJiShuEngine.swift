@@ -272,6 +272,69 @@ public class TianJiShuEngine {
                 font: bodyFont,
                 color: UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0),
                 minimumHeight: 80
+            ) + 12
+
+            // 1.5 宅主本命卦人宅配卦与当日财神喜神吉位 (P1.1 & P2.1 全案长卷集成)
+            let kuaMgr = UserKuaProfileManager.shared
+            let compat = kuaMgr.evaluateCompatibility(sittingPalace: mSitting.palace)
+            let dailyGods = ZeRiEngine.shared.dailyCompassDirections(for: reportDate)
+            let p1KuaText: String
+            switch renderLanguage {
+            case .en:
+                p1KuaText = """
+                • Owner Life Gua: \(kuaMgr.birthYear) (\(compat.localizedZodiacName)) · \(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup)) · [\(compat.matchBadgeTitle)]
+                • Personal 4 Auspicious Sectors: Wealth \(compat.wealthDirection) · Health \(compat.healthDirection) · Harmony \(compat.harmonyDirection) · Study \(compat.studyDirection)
+                • Daily Auspicious Bearings: God of Wealth \(dailyGods.wealthDirection) (\(Int(dailyGods.wealthAngle))°) · God of Joy \(dailyGods.joyDirection) (\(Int(dailyGods.joyAngle))°)
+                """
+            case .zhHant:
+                p1KuaText = """
+                • 宅主本命配卦：\(kuaMgr.birthYear)年（\(compat.localizedZodiacName)）· \(compat.localizedOwnerGuaName)（\(compat.localizedLifeGroup)）· 【\(compat.matchBadgeTitle)】
+                • 宅主本命四吉方：生氣財位【\(compat.wealthDirection)】· 天醫祛病位【\(compat.healthDirection)】· 延年和合位【\(compat.harmonyDirection)】· 伏位文昌【\(compat.studyDirection)】
+                • 當日出行納吉方：今日財神正位【\(dailyGods.wealthDirection)（\(Int(dailyGods.wealthAngle))°）】· 今日喜神吉位【\(dailyGods.joyDirection)（\(Int(dailyGods.joyAngle))°）】
+                """
+            case .ja:
+                p1KuaText = """
+                • 家主本命配卦：\(kuaMgr.birthYear)年（\(compat.localizedZodiacName)）· \(compat.localizedOwnerGuaName)（\(compat.localizedLifeGroup)）· 【\(compat.matchBadgeTitle)】
+                • 本命四吉方位：生気財位【\(compat.wealthDirection)】· 天医健康位【\(compat.healthDirection)】· 延年和合位【\(compat.harmonyDirection)】· 伏位文昌【\(compat.studyDirection)】
+                • 本日の吉方位：財神【\(dailyGods.wealthDirection)（\(Int(dailyGods.wealthAngle))°）】· 喜神【\(dailyGods.joyDirection)（\(Int(dailyGods.joyAngle))°）】
+                """
+            case .ko:
+                p1KuaText = """
+                • 건축주 본명배괘: \(kuaMgr.birthYear)년 (\(compat.localizedZodiacName)) · \(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup)) · 【\(compat.matchBadgeTitle)】
+                • 본명 4길방: 생기재위【\(compat.wealthDirection)】· 천의건강위【\(compat.healthDirection)】· 연년화합위【\(compat.harmonyDirection)】· 복위문창【\(compat.studyDirection)】
+                • 당일 출행 길방: 오늘의 재신방【\(dailyGods.wealthDirection) (\(Int(dailyGods.wealthAngle))°)】· 희신방【\(dailyGods.joyDirection) (\(Int(dailyGods.joyAngle))°)】
+                """
+            case .vi:
+                p1KuaText = """
+                • Bản mệnh Trạch chủ: Năm \(kuaMgr.birthYear) (\(compat.localizedZodiacName)) · \(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup)) · 【\(compat.matchBadgeTitle)】
+                • Tứ cát phương bản mệnh: Sinh Khí 【\(compat.wealthDirection)】 · Thiên Y 【\(compat.healthDirection)】 · Diên Niên 【\(compat.harmonyDirection)】 · Phục Vị 【\(compat.studyDirection)】
+                • Cát phương xuất hành: Thần Tài 【\(dailyGods.wealthDirection) (\(Int(dailyGods.wealthAngle))°)】 · Hỷ Thần 【\(dailyGods.joyDirection) (\(Int(dailyGods.joyAngle))°)】
+                """
+            case .th:
+                p1KuaText = """
+                • รหัสชีวิตเจ้าของบ้าน: ปี \(kuaMgr.birthYear) (\(compat.localizedZodiacName)) · \(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup)) · 【\(compat.matchBadgeTitle)】
+                • ๔ ทิศมงคลประจำตัว: โชคลาภ【\(compat.wealthDirection)】· สุขภาพ【\(compat.healthDirection)】· ความปรองดอง【\(compat.harmonyDirection)】· การศึกษา【\(compat.studyDirection)】
+                • ทิศมงคลประจำวัน: เทพโชคลาภ【\(dailyGods.wealthDirection) (\(Int(dailyGods.wealthAngle))°)】· เทพมงคล【\(dailyGods.joyDirection) (\(Int(dailyGods.joyAngle))°)】
+                """
+            case .id:
+                p1KuaText = """
+                • Gua Pemilik Rumah: \(kuaMgr.birthYear) (\(compat.localizedZodiacName)) · \(compat.localizedOwnerGuaName) (\(compat.localizedLifeGroup)) · [\(compat.matchBadgeTitle)]
+                • 4 Sektor Keberuntungan: Rezeki \(compat.wealthDirection) · Kesehatan \(compat.healthDirection) · Harmoni \(compat.harmonyDirection) · Studi \(compat.studyDirection)
+                • Arah Hoki Harian: Dewa Rezeki \(dailyGods.wealthDirection) (\(Int(dailyGods.wealthAngle))°) · Dewa Sukacita \(dailyGods.joyDirection) (\(Int(dailyGods.joyAngle))°)
+                """
+            case .auto, .zhHans:
+                p1KuaText = """
+                • 宅主本命配卦：\(kuaMgr.birthYear)年（\(compat.localizedZodiacName)）· \(compat.localizedOwnerGuaName)（\(compat.localizedLifeGroup)）· 【\(compat.matchBadgeTitle)】
+                • 宅主本命四吉方：生气财位【\(compat.wealthDirection)】· 天医祛病位【\(compat.healthDirection)】· 延年和合位【\(compat.harmonyDirection)】· 伏位文昌【\(compat.studyDirection)】
+                • 当日出行纳吉方：今日财神正位【\(dailyGods.wealthDirection)（\(Int(dailyGods.wealthAngle))°）】· 今日喜神吉位【\(dailyGods.joyDirection)（\(Int(dailyGods.joyAngle))°）】
+                """
+            }
+            curY += drawMeasuredText(
+                p1KuaText,
+                atY: curY,
+                font: bodyFont,
+                color: vermilion,
+                minimumHeight: 60
             ) + 20
             
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)

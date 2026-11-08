@@ -1604,11 +1604,23 @@ public struct BaZhaiView: View {
 
 // MARK: - 添加家庭成员弹窗 (AddFamilyMemberDialog)
 
-struct AddFamilyMemberDialog: View {
+public struct AddFamilyMemberDialog: View {
     @Binding var isPresented: Bool
     let ownerBirthYear: Int
     let ownerIsMale: Bool
     let onConfirm: (FamilyRole, String?, Int, Bool) -> Void
+
+    public init(
+        isPresented: Binding<Bool>,
+        ownerBirthYear: Int,
+        ownerIsMale: Bool,
+        onConfirm: @escaping (FamilyRole, String?, Int, Bool) -> Void
+    ) {
+        self._isPresented = isPresented
+        self.ownerBirthYear = ownerBirthYear
+        self.ownerIsMale = ownerIsMale
+        self.onConfirm = onConfirm
+    }
 
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedRole: FamilyRole = .spouse

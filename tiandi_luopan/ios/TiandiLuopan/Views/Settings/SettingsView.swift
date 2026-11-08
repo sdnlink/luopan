@@ -120,6 +120,58 @@ enum SettingsLocalizationHelpers {
         }
     }
 
+    static func familySectionTitle(_ lang: LocalizationManager, count: Int) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Family Members Life Gua (\(count))"
+        case .zhHant: return "全家成員命卦檔案（\(count)人）"
+        case .ja: return "家族全員の本命卦（\(count)名）"
+        case .ko: return "가족 구성원 본명괘 (\(count)명)"
+        case .vi: return "Bản Mệnh Gia Đình (\(count))"
+        case .th: return "รหัสชีวิตสมาชิกครอบครัว (\(count))"
+        case .id: return "Gua Anggota Keluarga (\(count))"
+        default: return "全家成员命卦档案（\(count)人）"
+        }
+    }
+
+    static func addFamilyMemberButton(_ lang: LocalizationManager) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "+ Add Member"
+        case .zhHant: return "+ 添加家庭成員"
+        case .ja: return "+ 家族追加"
+        case .ko: return "+ 가족 추가"
+        case .vi: return "+ Thêm người"
+        case .th: return "+ เพิ่มสมาชิก"
+        case .id: return "+ Tambah"
+        default: return "+ 添加家人"
+        }
+    }
+
+    static func emptyFamilyTitle(_ lang: LocalizationManager) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "No family members added yet"
+        case .zhHant: return "暫未添加家庭成員"
+        case .ja: return "家族メンバーが未登録です"
+        case .ko: return "등록된 가족 구성원이 없습니다"
+        case .vi: return "Chưa có thành viên gia đình"
+        case .th: return "ยังไม่มีสมาชิกครอบครัว"
+        case .id: return "Belum ada anggota keluarga"
+        default: return "暂未添加家庭成员"
+        }
+    }
+
+    static func emptyFamilySubtitle(_ lang: LocalizationManager) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Tap to add spouse, parents, or children for life gua and smart room fit"
+        case .zhHant: return "點擊添加配偶、父母或子女，智能推演全家本命卦與分房吉位"
+        case .ja: return "タップして配偶者・両親・子供を追加し、部屋割を自動診断"
+        case .ko: return "터치하여 배우자, 부모, 자녀를 추가하고 최적의 방 배정을 확인하세요"
+        case .vi: return "Nhấn để thêm vợ/chồng, cha mẹ, con cái và tự động gợi ý phòng"
+        case .th: return "แตะเพื่อเพิ่มคู่สมรส พ่อแม่ หรือบุตร เพื่อจัดห้องมงคล"
+        case .id: return "Ketuk untuk menambah pasangan, orang tua, atau anak"
+        default: return "点击添加配偶、父母或子女，智能推演全家本命卦与分房吉位"
+        }
+    }
+
     static func solarTermNotifyDesc(_ lang: LocalizationManager) -> String {
         switch lang.effectiveLanguage {
         case .zhHans: return "系统将于二十四节气交节当日及九星换月当日早 08:30 自动向您推送节气气候与当月飞星吉凶提示。"
@@ -719,7 +771,20 @@ public struct OwnerKuaReminderPageView: View {
     @ObservedObject var kuaProfile = UserKuaProfileManager.shared
     @ObservedObject var retention = RetentionServiceManager.shared
     @ObservedObject var lang = LocalizationManager.shared
-    @State private var showEditOwnerKuaDialog: Bool = false
+
+    public enum ActiveSheet: Identifiable {
+        case editOwnerKua
+        case addFamilyMember
+
+        public var id: String {
+            switch self {
+            case .editOwnerKua: return "editOwnerKua"
+            case .addFamilyMember: return "addFamilyMember"
+            }
+        }
+    }
+
+    @State private var activeSheet: ActiveSheet? = nil
 
     public init() {}
 
@@ -734,7 +799,8 @@ public struct OwnerKuaReminderPageView: View {
                         Text(SettingsLocalizationHelpers.ownerBirthYearTitle(lang))
                         Spacer()
                         Button(action: {
-                            showEditOwnerKuaDialog = true
+                            activeSheet = .editOwnerKua
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }) {
                             HStack(spacing: 4) {
                                 Text("\(kuaProfile.birthYear) · \(kuaProfile.localizedZodiac(language: lang.effectiveLanguage)) · \(kuaProfile.localizedLifeKuaName(language: lang.effectiveLanguage))")
@@ -756,7 +822,8 @@ public struct OwnerKuaReminderPageView: View {
 
                     // 本命卦吉凶方位简卡（点击也可直接修改生辰）
                     Button(action: {
-                        showEditOwnerKuaDialog = true
+                        activeSheet = .editOwnerKua
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }) {
                         kuaInfoCard
                     }
@@ -764,7 +831,151 @@ public struct OwnerKuaReminderPageView: View {
                 }
             }
 
-            // 2. 二十四节气交节与九星换月提醒
+            // 2. 全家成员命卦档案与智能分房 (Family Members Section)
+            if kuaProfile.isProfileEnabled {
+                Section(
+                    header: HStack {
+                        Text(SettingsLocalizationHelpers.familySectionTitle(lang, count: kuaProfile.familyMembers.count))
+                        Spacer()
+                        Button(action: {
+                            activeSheet = .addFamilyMember
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 11))
+                                Text(SettingsLocalizationHelpers.addFamilyMemberButton(lang))
+                                    .adaptiveFont(size: 11, weight: .bold)
+                            }
+                            .foregroundColor(.yanCyan)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                ) {
+                    if kuaProfile.familyMembers.isEmpty {
+                        Button(action: {
+                            activeSheet = .addFamilyMember
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.yanCyan)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(SettingsLocalizationHelpers.emptyFamilyTitle(lang))
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.white)
+                                    Text(SettingsLocalizationHelpers.emptyFamilySubtitle(lang))
+                                        .adaptiveFont(size: 11)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    } else {
+                        ForEach(kuaProfile.familyMembers) { member in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    Text(member.displayName)
+                                        .adaptiveFont(size: 13, weight: .bold)
+                                        .foregroundColor(.white)
+                                    Text("【\(member.localizedGuaBadge)】")
+                                        .adaptiveFont(size: 11, weight: .bold)
+                                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                    Spacer()
+
+                                    // 出生年份微调菜单
+                                    Menu {
+                                        ForEach((1920...2026).reversed(), id: \.self) { yr in
+                                            Button(action: {
+                                                kuaProfile.updateFamilyMember(id: member.id, birthYear: yr)
+                                            }) {
+                                                HStack {
+                                                    Text("\(String(yr))年")
+                                                    if yr == member.birthYear {
+                                                        Image(systemName: "checkmark")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(spacing: 2) {
+                                            Text("\(String(member.birthYear))年")
+                                                .adaptiveFont(size: 11, weight: .semibold)
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 8, weight: .bold))
+                                        }
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(5)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+
+                                    // 性别切换
+                                    Button(action: {
+                                        kuaProfile.updateFamilyMember(id: member.id, isMale: !member.isMale)
+                                    }) {
+                                        Text(member.isMale ? SettingsLocalizationHelpers.maleLabel(lang) : SettingsLocalizationHelpers.femaleLabel(lang))
+                                            .adaptiveFont(size: 11, weight: .bold)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 3)
+                                            .background(Color.yanCyan.opacity(0.18))
+                                            .foregroundColor(.yanCyan)
+                                            .cornerRadius(5)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+
+                                    // 删除按钮
+                                    Button(action: {
+                                        withAnimation {
+                                            kuaProfile.removeFamilyMember(id: member.id)
+                                        }
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    }) {
+                                        Image(systemName: "trash.circle.fill")
+                                            .font(.system(size: 15))
+                                            .foregroundColor(.white.opacity(0.45))
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
+
+                                Text(member.personalWealthAndStudySummary)
+                                    .adaptiveFont(size: 11)
+                                    .foregroundColor(.white.opacity(0.75))
+                            }
+                            .padding(.vertical, 4)
+                        }
+
+                        // 底部“+ 添加家庭成员”按钮行
+                        Button(action: {
+                            activeSheet = .addFamilyMember
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        }) {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text(SettingsLocalizationHelpers.addFamilyMemberButton(lang))
+                                    .adaptiveFont(size: 13, weight: .bold)
+                                Spacer()
+                            }
+                            .foregroundColor(.yanCyan)
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+
+            // 3. 二十四节气交节与九星换月提醒
             Section(
                 header: Text(SettingsLocalizationHelpers.solarTermNotifyTitle(lang)),
                 footer: Text(SettingsLocalizationHelpers.solarTermNotifyDesc(lang))
@@ -783,12 +994,31 @@ public struct OwnerKuaReminderPageView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationBarTitle(lang.t("settings_menu_kua_reminder"), displayMode: .inline)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showEditOwnerKuaDialog) {
-            EditOwnerKuaDialog(
-                isPresented: $showEditOwnerKuaDialog,
-                sittingPalace: "坎",
-                onSaved: {}
-            )
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .editOwnerKua:
+                EditOwnerKuaDialog(
+                    isPresented: Binding(
+                        get: { activeSheet == .editOwnerKua },
+                        set: { if !$0 { activeSheet = nil } }
+                    ),
+                    sittingPalace: "坎",
+                    onSaved: {}
+                )
+            case .addFamilyMember:
+                AddFamilyMemberDialog(
+                    isPresented: Binding(
+                        get: { activeSheet == .addFamilyMember },
+                        set: { if !$0 { activeSheet = nil } }
+                    ),
+                    ownerBirthYear: kuaProfile.birthYear,
+                    ownerIsMale: kuaProfile.isMale,
+                    onConfirm: { role, customName, year, isMale in
+                        kuaProfile.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
+                        activeSheet = nil
+                    }
+                )
+            }
         }
     }
 

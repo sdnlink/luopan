@@ -719,6 +719,7 @@ public struct OwnerKuaReminderPageView: View {
     @ObservedObject var kuaProfile = UserKuaProfileManager.shared
     @ObservedObject var retention = RetentionServiceManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @State private var showEditOwnerKuaDialog: Bool = false
 
     public init() {}
 
@@ -732,22 +733,19 @@ public struct OwnerKuaReminderPageView: View {
                     HStack {
                         Text(SettingsLocalizationHelpers.ownerBirthYearTitle(lang))
                         Spacer()
-                        Menu {
-                            ForEach((1930...2026).reversed(), id: \.self) { yr in
-                                Button("\(yr)") {
-                                    kuaProfile.birthYear = yr
-                                }
-                            }
-                        } label: {
+                        Button(action: {
+                            showEditOwnerKuaDialog = true
+                        }) {
                             HStack(spacing: 4) {
                                 Text("\(kuaProfile.birthYear) · \(kuaProfile.localizedZodiac(language: lang.effectiveLanguage)) · \(kuaProfile.localizedLifeKuaName(language: lang.effectiveLanguage))")
                                     .adaptiveFont(size: 12, weight: .bold)
                                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .adaptiveFont(size: 10)
-                                    .foregroundColor(.secondary)
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color.yanCyan)
                             }
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
 
                     Picker(SettingsLocalizationHelpers.ownerGenderTitle(lang), selection: $kuaProfile.isMale) {
@@ -756,8 +754,13 @@ public struct OwnerKuaReminderPageView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
 
-                    // 本命卦吉凶方位简卡
-                    kuaInfoCard
+                    // 本命卦吉凶方位简卡（点击也可直接修改生辰）
+                    Button(action: {
+                        showEditOwnerKuaDialog = true
+                    }) {
+                        kuaInfoCard
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
 
@@ -780,6 +783,17 @@ public struct OwnerKuaReminderPageView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationBarTitle(lang.t("settings_menu_kua_reminder"), displayMode: .inline)
         .preferredColorScheme(.dark)
+        .overlay(
+            Group {
+                if showEditOwnerKuaDialog {
+                    EditOwnerKuaDialog(
+                        isPresented: $showEditOwnerKuaDialog,
+                        sittingPalace: "坎",
+                        onSaved: {}
+                    )
+                }
+            }
+        )
     }
 
     private var kuaInfoCard: some View {

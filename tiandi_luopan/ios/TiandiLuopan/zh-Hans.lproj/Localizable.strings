@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "优先选用纯铜、天然黑曜石、黄玉等天然材质器物；避免塑料电镀仿品。";
 "ar_sha_talisman_hang_title" = "悬挂要领";
 "ar_sha_talisman_hang_desc" = "镜面朝外、微下倾3-5度；八卦镜、山海镇等避免直照邻家门窗，保持邻里和睦。";
+
+"ar_spatial_map_orientation_missing" = "此地图缺少可靠的朝向基准，请重新扫描后保存。";
+"ar_roomplan_coordinate_heading" = "测绘基准朝向";

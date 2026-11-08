@@ -1103,7 +1103,7 @@ public struct BaZhaiView: View {
             }
 
             ForEach(retention.remedyTasks) { task in
-                let elapsedDays = max(1, min(21, (Calendar.current.dateComponents([.day], from: task.createdAt, to: Date()).day ?? 0) + 1))
+                let elapsedDays = max(1, min(21, (UserKuaProfileManager.gregorianCalendar().dateComponents([.day], from: task.createdAt, to: Date()).day ?? 0) + 1))
                 HStack(alignment: .top, spacing: 8) {
                     Button(action: {
                         retention.toggleRemedyCompletion(id: task.id)
@@ -1181,7 +1181,7 @@ public struct BaZhaiView: View {
         return HStack(spacing: 6) {
             Button(action: {
                 let base = isUsingCustomDate ? selectedDate : Date()
-                selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: base) ?? base
+                selectedDate = UserKuaProfileManager.gregorianCalendar().date(byAdding: .day, value: -1, to: base) ?? base
                 isUsingCustomDate = true
                 refreshAnalysis()
             }) {
@@ -1205,7 +1205,7 @@ public struct BaZhaiView: View {
 
             Button(action: {
                 let base = isUsingCustomDate ? selectedDate : Date()
-                selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: base) ?? base
+                selectedDate = UserKuaProfileManager.gregorianCalendar().date(byAdding: .day, value: 1, to: base) ?? base
                 isUsingCustomDate = true
                 refreshAnalysis()
             }) {
@@ -1261,7 +1261,7 @@ public struct BaZhaiView: View {
             for: effectiveDate,
             ownerBirthYear: kua.isProfileEnabled ? kua.birthYear : nil
         )
-        let currentHour = Calendar.current.component(.hour, from: effectiveDate)
+        let currentHour = UserKuaProfileManager.gregorianCalendar().component(.hour, from: effectiveDate)
         let currentBranchIdx = ((currentHour + 1) / 2) % 12
 
         let titleText: String
@@ -1342,7 +1342,7 @@ public struct BaZhaiView: View {
                     ForEach(shichenList) { item in
                         let isSelectedHour = item.branchIndex == currentBranchIdx
                         Button(action: {
-                            var cal = Calendar.current
+                            var cal = UserKuaProfileManager.gregorianCalendar()
                             cal.timeZone = .current
                             var comps = cal.dateComponents([.year, .month, .day], from: effectiveDate)
                             comps.hour = item.branchIndex == 0 ? 0 : (item.branchIndex * 2 - 1)
@@ -1646,8 +1646,7 @@ public struct AddFamilyMemberDialog: View {
     @State private var isInitialized: Bool = false
 
     private var dateRange: ClosedRange<Date> {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
+        let cal = UserKuaProfileManager.gregorianCalendar()
         let start = cal.date(from: DateComponents(year: 1920, month: 1, day: 1)) ?? Date(timeIntervalSince1970: -1577923200)
         let end = cal.date(from: DateComponents(year: 2026, month: 12, day: 31)) ?? Date()
         return start...end
@@ -1662,18 +1661,11 @@ public struct AddFamilyMemberDialog: View {
     }
 
     private var isDateBeforeLiChun: Bool {
-        guard inputMode == 0 else { return false }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
-        let m = cal.component(.month, from: selectedDate)
-        let d = cal.component(.day, from: selectedDate)
-        let calYear = cal.component(.year, from: selectedDate)
-        let fsYear = UserKuaProfileManager.fengShuiYear(for: selectedDate)
-        return (m < 2 || (m == 2 && d < 4)) && fsYear < calYear
+        inputMode == 0 && SolarTimeCalculator.shared.isBeforeLiChun(for: selectedDate)
     }
 
     private var selectedDateFormatted: String {
-        let cal = Calendar.current
+        let cal = UserKuaProfileManager.gregorianCalendar()
         let y = cal.component(.year, from: selectedDate)
         let m = cal.component(.month, from: selectedDate)
         let d = cal.component(.day, from: selectedDate)
@@ -1681,9 +1673,8 @@ public struct AddFamilyMemberDialog: View {
     }
 
     private func dateForYear(_ yr: Int) -> Date {
-        var comp = Calendar.current.dateComponents([.month, .day], from: selectedDate)
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
+        let cal = UserKuaProfileManager.gregorianCalendar()
+        let comp = cal.dateComponents([.month, .day], from: selectedDate)
         var newComp = DateComponents()
         newComp.year = yr
         newComp.month = comp.month ?? 6
@@ -1926,12 +1917,13 @@ public struct AddFamilyMemberDialog: View {
                                 displayedComponents: [.date]
                             )
                             .datePickerStyle(WheelDatePickerStyle())
+                        .environment(\.calendar, UserKuaProfileManager.gregorianCalendar())
                             .labelsHidden()
                             .frame(maxHeight: 140)
                             .clipped()
                             .colorScheme(.dark)
                             .onChange(of: selectedDate) { newDate in
-                                selectedYear = Calendar.current.component(.year, from: newDate)
+                                selectedYear = UserKuaProfileManager.gregorianCalendar().component(.year, from: newDate)
                             }
 
                             // 立春换年解释或流年确认卡
@@ -2372,15 +2364,11 @@ public struct EditOwnerKuaDialog: View {
     }
 
     private var isDateBeforeLiChun: Bool {
-        if inputMode != 0 { return false }
-        let cal = Calendar.current
-        let m = cal.component(.month, from: selectedDate)
-        let d = cal.component(.day, from: selectedDate)
-        return m < 2 || (m == 2 && d < 4)
+        inputMode == 0 && SolarTimeCalculator.shared.isBeforeLiChun(for: selectedDate)
     }
 
     private var dateRange: ClosedRange<Date> {
-        let cal = Calendar.current
+        let cal = UserKuaProfileManager.gregorianCalendar()
         var startComp = DateComponents()
         startComp.year = 1920
         startComp.month = 1
@@ -2397,21 +2385,14 @@ public struct EditOwnerKuaDialog: View {
     private func setupInitialValues() {
         guard !isInitialized else { return }
         isInitialized = true
-        selectedYear = kua.birthYear
+        let draft = BirthDateEditorState(date: kua.birthDate)
+        selectedDate = draft.date
+        selectedYear = draft.year
         selectedIsMale = kua.isMale
-        selectedDate = kua.birthDate
-        let cal = Calendar.current
-        if cal.component(.year, from: selectedDate) != selectedYear {
-            var comp = cal.dateComponents([.year, .month, .day], from: selectedDate)
-            comp.year = selectedYear
-            if let valid = cal.date(from: comp) {
-                selectedDate = valid
-            }
-        }
     }
 
     private var selectedDateFormatted: String {
-        let cal = Calendar.current
+        let cal = UserKuaProfileManager.gregorianCalendar()
         let y = cal.component(.year, from: selectedDate)
         let m = cal.component(.month, from: selectedDate)
         let d = cal.component(.day, from: selectedDate)
@@ -2473,12 +2454,13 @@ public struct EditOwnerKuaDialog: View {
                             displayedComponents: [.date]
                         )
                         .datePickerStyle(WheelDatePickerStyle())
+                        .environment(\.calendar, UserKuaProfileManager.gregorianCalendar())
                         .labelsHidden()
                         .frame(maxHeight: 140)
                         .clipped()
                         .colorScheme(.dark)
                         .onChange(of: selectedDate) { newDate in
-                            selectedYear = Calendar.current.component(.year, from: newDate)
+                            selectedYear = UserKuaProfileManager.gregorianCalendar().component(.year, from: newDate)
                         }
 
                         // 立春换年解释或流年确认卡

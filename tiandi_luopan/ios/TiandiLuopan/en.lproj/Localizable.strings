@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "Prefer natural materials such as solid brass, natural obsidian, or topaz/jade; avoid electroplated plastic imitations.";
 "ar_sha_talisman_hang_title" = "Hanging Etiquette";
 "ar_sha_talisman_hang_desc" = "Angle reflective surfaces outward and 3–5° downward; never point Bagua mirrors or plaques directly at neighbors' doors or windows.";
+
+"ar_spatial_map_orientation_missing" = "This map has no reliable north reference. Scan again and save a new map.";
+"ar_roomplan_coordinate_heading" = "Survey Reference Heading";

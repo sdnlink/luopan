@@ -1,6 +1,30 @@
 import UIKit
 import Photos
 
+public struct TianJiAnalysisSnapshot {
+    public let heading: Double
+    public let period: Int
+    public let useTiGua: Bool
+    public let reportDate: Date
+
+    public init(heading: Double, period: Int? = nil, useTiGua: Bool? = nil, reportDate: Date = Date()) {
+        self.heading = heading
+        self.period = min(9, max(1, period ?? FlyingStarsEngine.shared.currentPeriod(for: reportDate)))
+        self.useTiGua = useTiGua ?? Mountain24Data.shared.resolveHeadingState(heading: heading).isJianXiang
+        self.reportDate = reportDate
+    }
+
+    public func flyingStarsChart() -> XuanKongChart {
+        FlyingStarsEngine.shared.calculateChart(
+            period: period,
+            sitting: Mountain24Data.shared.mountain(for: (heading + 180).truncatingRemainder(dividingBy: 360)),
+            facing: Mountain24Data.shared.mountain(for: heading),
+            useTiGua: useTiGua,
+            date: reportDate
+        )
+    }
+}
+
 // MARK: - 福宅天机书 · 古典宣纸朱丝栏全案长卷导出引擎 (PRD 第14章)
 
 public class TianJiShuEngine {
@@ -10,15 +34,19 @@ public class TianJiShuEngine {
     
     // 生成高清古典宣纸长卷勘测报告图
     public func generateScrollImage(
-        heading: Double,
+        heading inputHeading: Double,
         coordsDesc: String,
         solarTimeDesc: String,
         language: AppLanguage? = nil,
         isPro: Bool = true,
         floorplanReport: [FloorplanAuditItem] = [],
         panoramaArchive: PanoramaFengShuiArchive? = nil,
-        reportDate: Date = Date()
+        reportDate inputDate: Date = Date(),
+        analysis: TianJiAnalysisSnapshot? = nil
     ) -> UIImage {
+        let snapshot = analysis ?? TianJiAnalysisSnapshot(heading: inputHeading, reportDate: inputDate)
+        let heading = snapshot.heading
+        let reportDate = snapshot.reportDate
         // The canvas is extra tall because the scroll renders the full
         // harmonization suite: orientation, flying stars, water method,
         // qimen & eight mansions, purple-white guest stars, injurious
@@ -205,11 +233,6 @@ public class TianJiShuEngine {
             let mSitting = Mountain24Data.shared.mountain(for: sitAngle)
             let fenjin = Fenjin120Data.shared.resolveFenjin(for: heading)
             let hex = Hexagram64Data.shared.hexagram(for: heading)
-            // 与玄空盘页一致的兼向替卦判定：向首山偏差 > 3° 即按替卦排盘
-            // （Mountain24Data.resolveHeadingState 的 isJianXiang 同口径）。
-            let facingDelta = ((heading - mFacing.centerAngle).truncatingRemainder(dividingBy: 360.0) + 540.0)
-                .truncatingRemainder(dividingBy: 360.0) - 180.0
-            let useTiGua = abs(facingDelta) > 3.0
             
             let p1Text: String
             switch renderLanguage {
@@ -358,7 +381,7 @@ public class TianJiShuEngine {
             ) + 20
             
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
-            let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: mSitting, facing: mFacing, useTiGua: useTiGua, date: reportDate)
+            let xkChart = snapshot.flyingStarsChart()
             let meta = xkChart.periodMeta
             
             let sec2Title = tr8(

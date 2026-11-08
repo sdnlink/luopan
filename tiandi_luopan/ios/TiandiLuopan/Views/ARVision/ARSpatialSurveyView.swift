@@ -27,6 +27,35 @@ public enum ARSpatialSurveyError: Error, Equatable {
     case mapUnavailable
     case archiveFailed
     case storageUnavailable
+    case mapOrientationUnavailable
+}
+
+/// Map and north reference are persisted atomically, so restoration cannot
+/// combine an old world coordinate system with the phone's current bearing.
+struct SpatialWorldMapArchive: Codable {
+    let version: Int
+    let mapData: Data
+    let coordinateHeading: Double
+
+    init(mapData: Data, coordinateHeading: Double) throws {
+        guard !mapData.isEmpty, coordinateHeading.isFinite else {
+            throw ARSpatialSurveyError.mapOrientationUnavailable
+        }
+        self.version = 1
+        self.mapData = mapData
+        self.coordinateHeading = (coordinateHeading.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    static func decode(_ data: Data) throws -> SpatialWorldMapArchive {
+        // Legacy raw ARWorldMaps contain no north reference. Re-scanning is
+        // required instead of silently applying a different orientation.
+        guard let archive = try? JSONDecoder().decode(Self.self, from: data) else {
+            throw ARSpatialSurveyError.mapOrientationUnavailable
+        }
+        guard archive.version == 1, archive.coordinateHeading.isFinite,
+              !archive.mapData.isEmpty else { throw ARSpatialSurveyError.archiveFailed }
+        return archive
+    }
 }
 
 /// Traditional Lu Ban Ruler (门光尺 42.9 cm & 丁兰尺 39.0 cm) evaluation for 3D AR point-to-point measurements.
@@ -288,6 +317,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var cornerPinNodes: [SCNNode] = []
     private var cornerRooms: [SpatialRoom3D] = []
     private var surveyHeadingDegrees: Double?
+    private var sessionGeneration = 0
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastSemanticUpdateTimestamp: TimeInterval = 0
     private var lastMeshGeometryUpdate: [UUID: TimeInterval] = [:]
@@ -429,6 +459,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         savedAnchorCount = 0
         estimatedRoomHeightMeters = nil
         hasLowBeamWarning = false
+        sessionGeneration += 1
         surveyHeadingDegrees = CompassMotionManager.shared.headingState.facingAngle
         clearLubanPoints()
         clearCornerRooms()
@@ -1557,8 +1588,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                 completion(.failure(ARSpatialSurveyError.mapUnavailable))
                 return
             }
-            let data = try Data(contentsOf: mapURL)
-            guard let worldMap = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) else {
+            let archive = try SpatialWorldMapArchive.decode(Data(contentsOf: mapURL))
+            guard let worldMap = try NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: archive.mapData) else {
                 completion(.failure(ARSpatialSurveyError.archiveFailed))
                 return
             }
@@ -1569,6 +1600,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             clearLubanPoints()
             clearCornerRooms()
             clearGroundBaguaOverlay()
+            sessionGeneration += 1
+            surveyHeadingDegrees = archive.coordinateHeading
             configuration.initialWorldMap = worldMap
             trackingState = .initializing
             mappingState = .extending
@@ -1684,17 +1717,28 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             return
         }
 
+        guard let coordinateHeading = surveyHeadingDegrees, coordinateHeading.isFinite else {
+            completion(.failure(ARSpatialSurveyError.mapOrientationUnavailable))
+            return
+        }
+        let generation = sessionGeneration
         session.getCurrentWorldMap { worldMap, error in
             DispatchQueue.main.async {
+                guard self.sessionGeneration == generation else {
+                    completion(.failure(ARSpatialSurveyError.sessionUnavailable))
+                    return
+                }
                 guard let worldMap = worldMap, error == nil else {
                     completion(.failure(error ?? ARSpatialSurveyError.mapUnavailable))
                     return
                 }
                 do {
-                    let data = try NSKeyedArchiver.archivedData(
+                    let mapData = try NSKeyedArchiver.archivedData(
                         withRootObject: worldMap,
-                        requiringSecureCoding: false
+                        requiringSecureCoding: true
                     )
+                    let archive = try SpatialWorldMapArchive(mapData: mapData, coordinateHeading: coordinateHeading)
+                    let data = try JSONEncoder().encode(archive)
                     let name = "TianJiYanXiang-\(UUID().uuidString).arworldmap"
                     let directory = try Self.worldMapDirectory()
                     let url = directory.appendingPathComponent(name)
@@ -1710,6 +1754,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func stop() {
+        sessionGeneration += 1
         clearLubanPoints()
         clearCornerRooms()
         clearGroundBaguaOverlay()
@@ -3008,8 +3053,12 @@ public struct ARSpatialSurveyView: View {
             switch result {
             case .success:
                 saveMessage = lang.t("ar_spatial_map_ready")
-            case .failure:
-                saveMessage = lang.t("ar_spatial_save_failed")
+            case .failure(let error):
+                if error as? ARSpatialSurveyError == .mapOrientationUnavailable {
+                    saveMessage = lang.t("ar_spatial_map_orientation_missing")
+                } else {
+                    saveMessage = lang.t("ar_spatial_save_failed")
+                }
             }
         }
     }

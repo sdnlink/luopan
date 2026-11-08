@@ -743,7 +743,7 @@ public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
 
     public var formattedBirth: String {
         if let d = birthDate {
-            let cal = Calendar.current
+            let cal = UserKuaProfileManager.gregorianCalendar()
             let y = cal.component(.year, from: d)
             let m = cal.component(.month, from: d)
             let day = cal.component(.day, from: d)
@@ -816,6 +816,18 @@ public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
     }
 }
 
+/// Raw birthday values used by the editor. A derived Feng Shui year must
+/// never replace the Gregorian year of the date being edited.
+struct BirthDateEditorState {
+    let date: Date
+    let year: Int
+
+    init(date: Date, calendar: Calendar = .current) {
+        self.date = date
+        self.year = UserKuaProfileManager.gregorianCalendar(timeZone: calendar.timeZone).component(.year, from: date)
+    }
+}
+
 public final class UserKuaProfileManager: ObservableObject {
     public static let shared = UserKuaProfileManager()
 
@@ -827,7 +839,7 @@ public final class UserKuaProfileManager: ObservableObject {
 
     @Published public var birthYear: Int {
         didSet {
-            let clamped = max(1920, min(2035, birthYear))
+            let clamped = max(1919, min(2035, birthYear))
             if birthYear != clamped {
                 birthYear = clamped
                 return
@@ -888,7 +900,7 @@ public final class UserKuaProfileManager: ObservableObject {
                 comp.year = clampedYear
                 comp.month = 6
                 comp.day = 15
-                return Calendar.current.date(from: comp)?.timeIntervalSince1970
+                return Self.gregorianCalendar().date(from: comp)?.timeIntervalSince1970
             }()
             ?? Date().timeIntervalSince1970
         let savedMale = (shared?.object(forKey: kIsMaleKey) as? Bool)
@@ -897,8 +909,8 @@ public final class UserKuaProfileManager: ObservableObject {
         let savedEnabled = (shared?.object(forKey: kEnabledKey) as? Bool)
             ?? (UserDefaults.standard.object(forKey: kEnabledKey) as? Bool)
             ?? true
-        self.birthYear = clampedYear
         self.birthDate = Date(timeIntervalSince1970: savedTimestamp)
+        self.birthYear = Self.fengShuiYear(for: Date(timeIntervalSince1970: savedTimestamp))
         self.isMale = savedMale
         self.isProfileEnabled = savedEnabled
         if let fData = (shared?.data(forKey: kFamilyMembersKey))
@@ -909,17 +921,18 @@ public final class UserKuaProfileManager: ObservableObject {
         }
     }
 
-    /// 根据公历日期精确推算所属风水流年（以每年公历约2月4日立春交节为界）
-    public static func fengShuiYear(for date: Date) -> Int {
-        let cal = Calendar.current
-        let year = cal.component(.year, from: date)
-        let month = cal.component(.month, from: date)
-        let day = cal.component(.day, from: date)
-        // 立春公历约在 2 月 4 日（偶为 2 月 3 或 5 日），立春前按上一干支岁次核算
-        if month < 2 || (month == 2 && day < 4) {
-            return max(1920, min(2035, year - 1))
-        }
-        return max(1920, min(2035, year))
+    public static func gregorianCalendar(timeZone: TimeZone = .current) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
+
+    /// The user's preferred calendar contributes only its time zone. Year
+    /// boundaries follow the same astronomical Li Chun instant as the charts.
+    public static func fengShuiYear(for date: Date, calendar: Calendar = .current) -> Int {
+        let year = gregorianCalendar(timeZone: calendar.timeZone).component(.year, from: date)
+        let before = SolarTimeCalculator.shared.isBeforeLiChun(for: date, timeZone: calendar.timeZone)
+        return year - (before ? 1 : 0)
     }
 
     /// 统一更新宅主生辰日期（支持年月日公历日期）与性别
@@ -931,13 +944,12 @@ public final class UserKuaProfileManager: ObservableObject {
 
     /// 统一更新宅主出生年份与性别
     public func updateOwnerBirthYear(_ year: Int, isMale: Bool) {
+        // Year-only input has no exact birthday. Use a neutral date after
+        // Li Chun, matching the migration of older year-only profiles.
         let clamped = max(1920, min(2035, year))
-        self.birthYear = clamped
-        self.isMale = isMale
-        var comp = Calendar.current.dateComponents([.year, .month, .day], from: self.birthDate)
-        comp.year = clamped
-        if let newDate = Calendar.current.date(from: comp) {
-            self.birthDate = newDate
+        let calendar = Self.gregorianCalendar()
+        if let date = calendar.date(from: DateComponents(year: clamped, month: 6, day: 15)) {
+            updateOwnerBirth(date: date, isMale: isMale)
         }
     }
 
@@ -1221,6 +1233,8 @@ public final class RetentionServiceManager: ObservableObject {
 
     private let kMilestoneCountKey = "tiandi_review_milestone_count"
     private let kLastReviewPromptTimeKey = "tiandi_last_review_prompt_ts"
+    private var solarNotificationGeneration = 0
+    private let solarNotificationPrefix = "tiandi_solar_term_"
     private let kSolarTermNotifyKey = "tiandi_solar_term_notify_enabled"
     private let kScheduledDaysKey = "tiandi_scheduled_auspicious_days"
     private let kRemedyTasksKey = "tiandi_remedy_tasks_v1"
@@ -1413,9 +1427,11 @@ public final class RetentionServiceManager: ObservableObject {
     }
 
     public func setSolarTermNotifications(enabled: Bool) {
+        solarNotificationGeneration += 1
+        let requestGeneration = solarNotificationGeneration
         if !enabled {
             self.solarTermNotificationsEnabled = false
-            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
+            cancelSolarTermNotifications()
             return
         }
 
@@ -1425,12 +1441,14 @@ public final class RetentionServiceManager: ObservableObject {
             switch settings.authorizationStatus {
             case .denied:
                 DispatchQueue.main.async {
+                    guard self.solarNotificationGeneration == requestGeneration else { return }
                     self.solarTermNotificationsEnabled = false
                     self.showNotificationPermissionDeniedAlert = true
                 }
             case .notDetermined:
                 center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
                     DispatchQueue.main.async {
+                        guard self.solarNotificationGeneration == requestGeneration else { return }
                         if granted {
                             self.solarTermNotificationsEnabled = true
                             self.scheduleSolarTermNotificationPayload()
@@ -1441,11 +1459,13 @@ public final class RetentionServiceManager: ObservableObject {
                 }
             case .authorized, .provisional, .ephemeral:
                 DispatchQueue.main.async {
+                    guard self.solarNotificationGeneration == requestGeneration else { return }
                     self.solarTermNotificationsEnabled = true
                     self.scheduleSolarTermNotificationPayload()
                 }
             @unknown default:
                 DispatchQueue.main.async {
+                    guard self.solarNotificationGeneration == requestGeneration else { return }
                     self.solarTermNotificationsEnabled = false
                 }
             }
@@ -1461,21 +1481,25 @@ public final class RetentionServiceManager: ObservableObject {
 
     /// 同步最新的系统通知授权状态（从后台回前台或从系统设置切回时调用）
     public func syncNotificationAuthorizationStatus() {
+        let generation = solarNotificationGeneration
         let center = UNUserNotificationCenter.current()
         center.getNotificationSettings { [weak self] settings in
             guard let self = self else { return }
             DispatchQueue.main.async {
+                guard self.solarNotificationGeneration == generation else { return }
+                let savedPref = UserDefaults.standard.bool(forKey: self.kSolarTermNotifyKey)
+                guard savedPref else {
+                    self.cancelSolarTermNotifications()
+                    return
+                }
                 if settings.authorizationStatus == .denied {
                     if self.solarTermNotificationsEnabled {
                         self.solarTermNotificationsEnabled = false
-                        center.removePendingNotificationRequests(withIdentifiers: ["tiandi_next_solar_term"])
+                        self.cancelSolarTermNotifications()
                     }
-                } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
-                    let savedPref = UserDefaults.standard.bool(forKey: self.kSolarTermNotifyKey)
-                    if savedPref && !self.solarTermNotificationsEnabled {
-                        self.solarTermNotificationsEnabled = true
-                        self.scheduleSolarTermNotificationPayload()
-                    }
+                } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional || settings.authorizationStatus == .ephemeral {
+                    self.solarTermNotificationsEnabled = true
+                    self.scheduleSolarTermNotificationPayload()
                 }
             }
         }
@@ -1494,21 +1518,56 @@ public final class RetentionServiceManager: ObservableObject {
         setSolarTermNotifications(enabled: true)
     }
 
-    /// 执行下一节气提醒排程
+    private func isSolarTermRequest(_ identifier: String) -> Bool {
+        identifier == "tiandi_next_solar_term" || identifier.hasPrefix(solarNotificationPrefix)
+    }
+
+    private func cancelSolarTermNotifications() {
+        solarNotificationGeneration += 1
+        let generation = solarNotificationGeneration
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { [weak self] requests in
+            DispatchQueue.main.async {
+                guard let self, self.solarNotificationGeneration == generation else { return }
+                center.removePendingNotificationRequests(withIdentifiers:
+                    requests.filter { self.isSolarTermRequest($0.identifier) }.map(\.identifier))
+            }
+        }
+    }
+
+    /// Refill a year of upcoming transitions at launch, foreground, and delivery.
     public func scheduleSolarTermNotificationPayload() {
-        let solar = SolarTimeCalculator.shared
-        let now = Date()
-        let elapsed = solar.solarTermProgress(for: now)
-        let termDays = 15.0 / 0.98564736
-        let daysLeft = max(1, Int(ceil(termDays - elapsed)))
-        var cal = Calendar.current
-        cal.timeZone = .current
-        guard let targetDay = cal.date(byAdding: .day, value: daysLeft, to: now),
-              let fireDate = cal.date(bySettingHour: 8, minute: 30, second: 0, of: targetDay) else { return }
+        guard solarTermNotificationsEnabled else { return }
+        solarNotificationGeneration += 1
+        let generation = solarNotificationGeneration
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { [weak self] requests in
+            DispatchQueue.main.async {
+                guard let self, self.solarNotificationGeneration == generation,
+                      self.solarTermNotificationsEnabled else { return }
+                let oldRequests = requests.filter { self.isSolarTermRequest($0.identifier) }
+                center.removePendingNotificationRequests(withIdentifiers: oldRequests.map(\.identifier))
+                // Leave capacity for the independently scheduled auspicious days.
+                let available = max(0, 60 - (requests.count - oldRequests.count))
+                let transitions = SolarTimeCalculator.shared.upcomingSolarTerms(after: Date(), count: min(24, available))
+                let cal = UserKuaProfileManager.gregorianCalendar()
+                for transition in transitions {
+                    let nextTermName = SolarTermsData.shared.terms.first(where: { $0.name == transition.name })?.localizedName ?? transition.name
+                    let content = self.solarTermNotificationContent(name: nextTermName)
+                    // Round up so notification delivery cannot precede the crossing.
+                    let fireDate = Date(timeIntervalSince1970: ceil(transition.date.timeIntervalSince1970))
+                    var comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
+                    comps.calendar = cal
+                    comps.timeZone = cal.timeZone
+                    let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+                    let identifier = self.solarNotificationPrefix + String(Int(fireDate.timeIntervalSince1970))
+                    center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: trigger))
+                }
+            }
+        }
+    }
 
-        let nextIndex = (solar.solarTermIndex(for: now) + 1) % 24
-        let nextTermName = SolarTermsData.shared.terms[safe: nextIndex]?.localizedName ?? ""
-
+    private func solarTermNotificationContent(name nextTermName: String) -> UNMutableNotificationContent {
         let content = UNMutableNotificationContent()
         switch LocalizationManager.shared.effectiveLanguage {
         case .en:
@@ -1538,10 +1597,7 @@ public final class RetentionServiceManager: ObservableObject {
         }
         content.sound = .default
 
-        let comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
-        let req = UNNotificationRequest(identifier: "tiandi_next_solar_term", content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+        return content
     }
 
     /// 为用户选定的吉日设置当天早晨 08:00 动土/入宅/出行提醒
@@ -2072,7 +2128,10 @@ public struct OnboardingGuideSheet: View {
                                     .adaptiveFont(size: 13, weight: .semibold)
                                     .foregroundColor(.white)
                                 Spacer()
-                                Picker("", selection: $kua.birthYear) {
+                                Picker("", selection: Binding(
+                                    get: { BirthDateEditorState(date: kua.birthDate).year },
+                                    set: { kua.updateOwnerBirthYear($0, isMale: kua.isMale) }
+                                )) {
                                     ForEach(1940...2025, id: \.self) { yr in
                                         Text("\(String(yr))").tag(yr)
                                     }

@@ -6,6 +6,28 @@ import simd
 // 本视图在归一化俯视画布上摆放房间、大门与窗，生成 HouseSpatialSurvey，
 // 复用统一分析引擎（15 类形煞检测）与 3D 查看器。
 
+/// Coordinate parameters captured when entering the virtual editor.
+struct VRSurveyReference {
+    let coordinateHeading: Double
+    let houseFacingDegrees: Double?
+    let normalizedCentroid: CGPoint?
+    let yaw: Float
+
+    func worldPoint(x: Float, z: Float, width: Float, depth: Float) -> SIMD3<Float> {
+        let angle = yaw.isFinite ? yaw : 0
+        let dx = x - width * 0.5
+        let dz = z - depth * 0.5
+        return SIMD3<Float>(width * 0.5 + dx * cos(angle) - dz * sin(angle), 0,
+                            depth * 0.5 + dx * sin(angle) + dz * cos(angle))
+    }
+
+    func centroid(width: Float, depth: Float) -> SIMD3<Float>? {
+        normalizedCentroid.map {
+            worldPoint(x: Float($0.x) * width, z: Float($0.y) * depth, width: width, depth: depth)
+        }
+    }
+}
+
 public struct VRSpatialSurveyView: View {
     @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) private var presentationMode
@@ -43,8 +65,7 @@ public struct VRSpatialSurveyView: View {
     /// Preserve the measured survey heading when the editor is opened from a
     /// RoomPlan/AR result. A VR correction should not silently switch to the
     /// phone's current facing direction after the user turns around.
-    private let initialSurveyHeading: Double?
-    private let initialSurveyYaw: Float
+    @State private var surveyReference: VRSurveyReference
 
     private var metersW: CGFloat { boundedMeters(widthMetersText, fallback: 12.0) }
     private var metersD: CGFloat { boundedMeters(depthMetersText, fallback: 10.0) }
@@ -67,18 +88,31 @@ public struct VRSpatialSurveyView: View {
         initialSurvey: HouseSpatialSurvey? = nil,
         initialWidthMeters: CGFloat? = nil,
         initialDepthMeters: CGFloat? = nil,
-        initialCeilingMeters: CGFloat? = nil
+        initialCeilingMeters: CGFloat? = nil,
+        initialCoordinateHeading: Double? = nil,
+        initialHouseFacingDegrees: Double? = nil,
+        initialCentroid: CGPoint? = nil
     ) {
-        self.initialSurveyHeading = initialSurvey?.compassHeading
-        self.initialSurveyYaw = initialSurvey.map(Self.primaryAxisAngle(from:)) ?? 0
         if let initialSurvey {
             let seeded = Self.seededItems(from: initialSurvey)
+            self._surveyReference = State(initialValue: VRSurveyReference(
+                coordinateHeading: initialSurvey.compassHeading,
+                houseFacingDegrees: initialSurvey.resolvedHouseFacing,
+                normalizedCentroid: seeded.centroid,
+                yaw: Self.primaryAxisAngle(from: initialSurvey)
+            ))
             self._rooms = State(initialValue: seeded.rooms)
             self._openings = State(initialValue: seeded.openings)
             self._widthMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.totalWidth))
             self._depthMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.totalDepth))
             self._ceilingMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.ceilingHeight))
         } else {
+            self._surveyReference = State(initialValue: VRSurveyReference(
+                coordinateHeading: initialCoordinateHeading ?? CompassMotionManager.shared.headingState.facingAngle,
+                houseFacingDegrees: initialHouseFacingDegrees,
+                normalizedCentroid: initialCentroid,
+                yaw: 0
+            ))
             let seededRooms = initialFloorplanRooms
                 .filter { $0.type != .missingCorner }
                 .map { VRRoomItem(type: $0.type, rect: Self.clampedRect($0.rect)) }
@@ -185,7 +219,7 @@ public struct VRSpatialSurveyView: View {
                     }
             )
         }
-        .aspectRatio(6.0 / 5.0, contentMode: .fit)
+        .aspectRatio(metersW / metersD, contentMode: .fit)
         .background(Color(red: 0.05, green: 0.07, blue: 0.10))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.12), lineWidth: 1))
@@ -518,17 +552,11 @@ public struct VRSpatialSurveyView: View {
             return
         }
 
-        let yaw = initialSurveyYaw.isFinite ? initialSurveyYaw : 0
+        let yaw = surveyReference.yaw.isFinite ? surveyReference.yaw : 0
         let cosYaw = cos(yaw)
         let sinYaw = sin(yaw)
         func worldPoint(_ x: Float, _ z: Float) -> SIMD3<Float> {
-            let dx = x - Float(width) * 0.5
-            let dz = z - Float(depth) * 0.5
-            return SIMD3<Float>(
-                Float(width) * 0.5 + dx * cosYaw - dz * sinYaw,
-                0,
-                Float(depth) * 0.5 + dx * sinYaw + dz * cosYaw
-            )
+            surveyReference.worldPoint(x: x, z: z, width: Float(width), depth: Float(depth))
         }
         func worldNormal(_ n: SIMD3<Float>) -> SIMD3<Float> {
             SIMD3<Float>(n.x * cosYaw - n.z * sinYaw, 0, n.x * sinYaw + n.z * cosYaw)
@@ -612,7 +640,7 @@ public struct VRSpatialSurveyView: View {
             ))
         }
 
-        let heading = initialSurveyHeading ?? CompassMotionManager.shared.headingState.facingAngle
+        let heading = surveyReference.coordinateHeading
         let scanMethodTitle: String
         switch LocalizationManager.shared.effectiveLanguage {
         case .zhHans, .auto: scanMethodTitle = "VR 仿真测绘"
@@ -631,7 +659,9 @@ public struct VRSpatialSurveyView: View {
             beams: [],
             rooms: rooms3D,
             objects: [],
-            compassHeading: heading
+            compassHeading: heading,
+            centroidOverride: surveyReference.centroid(width: Float(width), depth: Float(depth)),
+            houseFacingDegrees: surveyReference.houseFacingDegrees
         )
         // Keep virtual output separate from the measured archive. A VR edit is
         // a correction/planning result and must never replace the latest
@@ -680,7 +710,7 @@ public struct VRSpatialSurveyView: View {
     /// Project a completed AR/RoomPlan survey into the editor's normalized
     /// canvas. This keeps the VR path useful for correcting a scan instead of
     /// silently replacing a real scan with an empty synthetic layout.
-    private static func seededItems(from survey: HouseSpatialSurvey) -> (rooms: [VRRoomItem], openings: [VROpeningItem]) {
+    private static func seededItems(from survey: HouseSpatialSurvey) -> (rooms: [VRRoomItem], openings: [VROpeningItem], centroid: CGPoint) {
         let yaw = primaryAxisAngle(from: survey)
         let cosYaw = cos(yaw)
         let sinYaw = sin(yaw)
@@ -766,7 +796,10 @@ public struct VRSpatialSurveyView: View {
             }
             return VROpeningItem(isDoor: opening.type == .entranceDoor || opening.type == .interiorDoor, rect: Self.clampedRect(rect))
         }
-        return (roomItems, openingItems)
+        let localCentroid = localPoint(survey.centroidX, survey.centroidZ)
+        let centroid = CGPoint(x: CGFloat((localCentroid.x - minX) / spanX),
+                               y: CGFloat((localCentroid.y - minZ) / spanZ))
+        return (roomItems, openingItems, centroid)
     }
 
     private static func primaryAxisAngle(from survey: HouseSpatialSurvey) -> Float {

@@ -6,7 +6,6 @@ import Combine
 // MARK: - 福宅天机宣纸勘测长卷预览与导出视图 (TianJiShu View - PRD 第14章)
 
 public struct TianJiShuView: View {
-    @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @Environment(\.presentationMode) var presentationMode
@@ -20,7 +19,9 @@ public struct TianJiShuView: View {
     @State private var showShareSheet: Bool = false
     @State private var showPaywall: Bool = false
     @State private var isExporting: Bool = false
+    @State private var photoWriteInFlight = false
     @State private var reservedTianjiCredit: String?
+    @State private var shareCreditLease: TianjiExportCreditLease?
     @State private var exportImage: UIImage?
     // Invalidated whenever a new render starts or the view disappears, so a
     // late background result cannot overwrite current or dismissed state.
@@ -30,7 +31,20 @@ public struct TianJiShuView: View {
     @State private var customMasterName: String = UserDefaults.standard.string(forKey: "tianjishu_custom_master") ?? ""
     @State private var customSealText: String = UserDefaults.standard.string(forKey: "tianjishu_custom_seal") ?? ""
     
-    public init() {}
+    @State private var analysis: TianJiAnalysisSnapshot
+    @State private var capturedCoordsDesc: String
+    @State private var capturedSolarTimeDesc: String
+    @State private var capturedFloorplanReport: [FloorplanAuditItem]
+    @State private var capturedPanoramaArchive: PanoramaFengShuiArchive?
+
+    public init(analysis: TianJiAnalysisSnapshot? = nil) {
+        let motion = CompassMotionManager.shared
+        self._analysis = State(initialValue: analysis ?? TianJiAnalysisSnapshot(heading: motion.headingState.facingAngle))
+        self._capturedCoordsDesc = State(initialValue: motion.coordsDesc)
+        self._capturedSolarTimeDesc = State(initialValue: motion.solarTimeDesc)
+        self._capturedFloorplanReport = State(initialValue: FloorplanAuditStore.shared.latestReport)
+        self._capturedPanoramaArchive = State(initialValue: ShaSurveyStore.shared.archive)
+    }
     
     public var body: some View {
         NavigationView {
@@ -96,25 +110,27 @@ public struct TianJiShuView: View {
                                     prepareExportImage { exportImage in
                                         guard let exportImage = exportImage else {
                                             isExporting = false
-                                            releaseReservedTianjiCredit()
+                                            releaseReservedTianjiCredit(reservation)
                                             saveErrorMessage = lang.t("save_failed")
                                             showSaveError = true
                                             return
                                         }
+                                        photoWriteInFlight = true
                                         TianJiShuEngine.shared.saveToPhotoLibrary(image: exportImage) { success, message in
                                             DispatchQueue.main.async {
+                                                photoWriteInFlight = false
                                                 isExporting = false
                                                 if success {
                                                     // The credit is committed only
                                                     // after the photo write succeeds.
-                                                    commitReservedTianjiCredit()
+                                                    commitReservedTianjiCredit(reservation)
                                                     RetentionServiceManager.shared.recordMilestone(reason: "save_tianjishu")
                                                     withAnimation { showSavedToast = true }
                                                     DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                                                         withAnimation { showSavedToast = false }
                                                     }
                                                 } else {
-                                                    releaseReservedTianjiCredit()
+                                                    releaseReservedTianjiCredit(reservation)
                                                     saveErrorMessage = message ?? lang.t("save_failed")
                                                     let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
                                                     showPhotoSettings = status == .denied || status == .restricted
@@ -164,11 +180,17 @@ public struct TianJiShuView: View {
                                     prepareExportImage { exportImage in
                                         guard let exportImage = exportImage else {
                                             isExporting = false
-                                            releaseReservedTianjiCredit()
+                                            releaseReservedTianjiCredit(reservation)
                                             saveErrorMessage = lang.t("save_failed")
                                             showSaveError = true
                                             return
                                         }
+                                        shareCreditLease = TianjiExportCreditLease { [exportManager = iap] success in
+                                            guard let reservation else { return }
+                                            if success { exportManager.commitTianjiCreditReservation(reservation) }
+                                            else { exportManager.refundTianjiCreditReservation(reservation) }
+                                        }
+                                        reservedTianjiCredit = nil
                                         self.exportImage = exportImage
                                         // Keep only one long image in memory while
                                         // the share controller is presented.
@@ -224,14 +246,6 @@ public struct TianJiShuView: View {
                 // language change so the page never mixes two locales.
                 beginRendering()
             }
-            .onChange(of: motion.headingState.facingMountain.id) { _ in
-                // A long scroll captures the measured sitting/facing
-                // direction. Refresh when the device crosses a 24-mountain
-                // boundary so an export cannot silently contain a previous
-                // orientation while the report sheet remains open.
-                guard !isExporting else { return }
-                beginRendering()
-            }
             .onReceive(iap.$tianjiCreditsCount.dropFirst()) { _ in
                 guard !isExporting else { return }
                 beginRendering()
@@ -241,18 +255,16 @@ public struct TianJiShuView: View {
                 beginRendering()
             }
             .onDisappear {
-                // SwiftUI may dismiss the page while the worker is still
-                // rendering. The manager keeps the in-flight slot bounded and
-                // the durable credit is only committed after success, so a
-                // terminated process cannot permanently lose the credit.
                 renderGeneration += 1
-                isExporting = false
+                if !showShareSheet && !photoWriteInFlight {
+                    releaseReservedTianjiCredit(reservedTianjiCredit)
+                    isExporting = false
+                }
             }
             .sheet(isPresented: $showShareSheet, onDismiss: {
-                // The activity controller completion callback is the source of
-                // truth for commit/refund. If iOS interrupts the sheet before
-                // invoking it, the manager's reservation timeout releases the
-                // in-flight slot without debiting the credit.
+                // The controller's callback still owns the lease if settlement
+                // is pending; teardown without a callback cancels it on deinit.
+                shareCreditLease = nil
                 isExporting = false
                 exportImage = nil
                 if scrollImage == nil {
@@ -260,18 +272,10 @@ public struct TianJiShuView: View {
                 }
             }) {
                 if let exportImage {
+                    let lease = shareCreditLease
                     TianJiActivityViewController(activityItems: [exportImage]) { completed in
-                        DispatchQueue.main.async {
-                            isExporting = false
-                            if completed {
-                                // Commit exactly once after the share operation
-                                // reports success. The manager makes repeated
-                                // callbacks harmless.
-                                commitReservedTianjiCredit()
-                            } else {
-                                releaseReservedTianjiCredit()
-                            }
-                        }
+                        lease?.complete(success: completed)
+                        isExporting = false
                     }
                 }
             }
@@ -306,15 +310,15 @@ public struct TianJiShuView: View {
         )
     }
 
-    private func releaseReservedTianjiCredit() {
-        guard let token = reservedTianjiCredit else { return }
-        reservedTianjiCredit = nil
+    private func releaseReservedTianjiCredit(_ reservation: String?) {
+        guard let token = reservation else { return }
+        if reservedTianjiCredit == token { reservedTianjiCredit = nil }
         iap.refundTianjiCreditReservation(token)
     }
 
-    private func commitReservedTianjiCredit() {
-        guard let token = reservedTianjiCredit else { return }
-        reservedTianjiCredit = nil
+    private func commitReservedTianjiCredit(_ reservation: String?) {
+        guard let token = reservation else { return }
+        if reservedTianjiCredit == token { reservedTianjiCredit = nil }
         iap.commitTianjiCreditReservation(token)
     }
 
@@ -448,13 +452,15 @@ public struct TianJiShuView: View {
     /// operation. The on-screen preview remains watermarked for single-credit
     /// users, preventing screenshots from bypassing the one-export rule.
     private func prepareExportImage(completion: @escaping (UIImage?) -> Void) {
-        let heading = motion.headingState.facingAngle
-        let coordsDesc = motion.coordsDesc
-        let solarTimeDesc = motion.solarTimeDesc
+        let generation = renderGeneration
+        let reportAnalysis = analysis
+        let heading = reportAnalysis.heading
+        let coordsDesc = capturedCoordsDesc
+        let solarTimeDesc = capturedSolarTimeDesc
         let language = lang.effectiveLanguage
-        let panoramaArchive = ShaSurveyStore.shared.archive
-        let floorplanReport = FloorplanAuditStore.shared.latestReport
-        let reportDate = Date()
+        let panoramaArchive = capturedPanoramaArchive
+        let floorplanReport = capturedFloorplanReport
+        let reportDate = reportAnalysis.reportDate
         DispatchQueue.global(qos: .userInitiated).async {
             let image = TianJiShuEngine.shared.generateScrollImage(
                 heading: heading,
@@ -464,55 +470,59 @@ public struct TianJiShuView: View {
                 isPro: true,
                 floorplanReport: floorplanReport,
                 panoramaArchive: panoramaArchive,
-                reportDate: reportDate
+                reportDate: reportDate,
+                analysis: reportAnalysis
             )
             DispatchQueue.main.async {
+                guard renderGeneration == generation else {
+                    completion(nil)
+                    return
+                }
                 completion(image)
             }
         }
     }
 
     private func beginRendering() {
-                renderGeneration += 1
-                let generation = renderGeneration
-                // Capture all observable sensor values on the main thread
-                // before moving the expensive renderer to a worker queue.
-                // Reading @Published state from the background closure could
-                // otherwise mix headings, coordinates and solar time from
-                // different updates.
-                let heading = motion.headingState.facingAngle
-                let coordsDesc = motion.coordsDesc
-                let solarTimeDesc = motion.solarTimeDesc
-                let language = lang.effectiveLanguage
-                // Freeze the current indoor/outdoor survey archive together
-                // with the compass values. The renderer runs off the main
-                // queue, so reading the live store inside it could mix a new
-                // record with an older heading.
-                let panoramaArchive = ShaSurveyStore.shared.archive
-                let floorplanReport = FloorplanAuditStore.shared.latestReport
-                let reportDate = Date()
-                // A single credit authorizes one actual export. Keep the
-                // preview watermarked until that export is committed; VIP and
-                // lifetime users receive the clean preview immediately.
-                let hasExportEntitlement = iap.hasUnlockedVIP
-                isGenerating = true
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let img = TianJiShuEngine.shared.generateScrollImage(
-                        heading: heading,
-                        coordsDesc: coordsDesc,
-                        solarTimeDesc: solarTimeDesc,
-                        language: language,
-                        isPro: hasExportEntitlement,
-                        floorplanReport: floorplanReport,
-                        panoramaArchive: panoramaArchive,
-                        reportDate: reportDate
-                    )
-                    DispatchQueue.main.async {
-                        guard self.renderGeneration == generation else { return }
-                        self.scrollImage = img
-                        self.isGenerating = false
-                    }
-                }
+        renderGeneration += 1
+        let generation = renderGeneration
+        // Re-render the captured report context when appearance or entitlement
+        // changes; the chart parameters stay fixed for this report.
+        let reportAnalysis = analysis
+        let heading = reportAnalysis.heading
+        let coordsDesc = capturedCoordsDesc
+        let solarTimeDesc = capturedSolarTimeDesc
+        let language = lang.effectiveLanguage
+        // Freeze the current indoor/outdoor survey archive together
+        // with the compass values. The renderer runs off the main
+        // queue, so reading the live store inside it could mix a new
+        // record with an older heading.
+        let panoramaArchive = capturedPanoramaArchive
+        let floorplanReport = capturedFloorplanReport
+        let reportDate = reportAnalysis.reportDate
+        // A single credit authorizes one actual export. Keep the
+        // preview watermarked until that export is committed; VIP and
+        // lifetime users receive the clean preview immediately.
+        let hasExportEntitlement = iap.hasUnlockedVIP
+        isGenerating = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let img = TianJiShuEngine.shared.generateScrollImage(
+                heading: heading,
+                coordsDesc: coordsDesc,
+                solarTimeDesc: solarTimeDesc,
+                language: language,
+                isPro: hasExportEntitlement,
+                floorplanReport: floorplanReport,
+                panoramaArchive: panoramaArchive,
+                reportDate: reportDate,
+                analysis: reportAnalysis
+            )
+            DispatchQueue.main.async {
+                guard self.renderGeneration == generation else { return }
+                self.scrollImage = img
+                self.isGenerating = false
+            }
+        }
     }
 }
 
@@ -535,7 +545,11 @@ public struct TianJiActivityViewController: UIViewControllerRepresentable {
             popover.permittedArrowDirections = []
         }
         controller.completionWithItemsHandler = { _, completed, _, _ in
-            onCompletion?(completed)
+            if Thread.isMainThread {
+                onCompletion?(completed)
+            } else {
+                DispatchQueue.main.async { onCompletion?(completed) }
+            }
         }
         return controller
     }

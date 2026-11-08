@@ -295,6 +295,15 @@ public struct QimenChart {
     public let tabooDirections: String       // 避忌凶方
 }
 
+struct QimenChartTimeKey: Equatable {
+    let year: Int
+    let month: Int
+    let day: Int
+    let hour: Int
+    let solarTerm: Int
+    let utcOffset: Int
+}
+
 public class QimenEngine {
     public static let shared = QimenEngine()
     
@@ -369,9 +378,9 @@ public class QimenEngine {
     }
 
     /// 日干支序号 (0..59)。与 SolarTimeCalculator 的 (JDN+49)%60 口径一致。
-    private func dayGanZhiIndex(for date: Date) -> Int {
+    private func dayGanZhiIndex(for date: Date, timeZone: TimeZone) -> Int {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .current
+        cal.timeZone = timeZone
         let comps = cal.dateComponents([.year, .month, .day], from: date)
         let y = comps.year ?? 2000, m = comps.month ?? 1, d = comps.day ?? 1
         let a = Int((14 - m) / 12)
@@ -381,9 +390,19 @@ public class QimenEngine {
         return ((jdn + 49) % 60 + 60) % 60
     }
 
-    public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> QimenChart {
+    func chartTimeKey(for date: Date, timeZone: TimeZone = .current) -> QimenChartTimeKey {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day, .hour], from: date)
+        return QimenChartTimeKey(year: parts.year ?? 0, month: parts.month ?? 0,
+                                 day: parts.day ?? 0, hour: parts.hour ?? 0,
+                                 solarTerm: SolarTimeCalculator.shared.solarTermIndex(for: date),
+                                 utcOffset: timeZone.secondsFromGMT(for: date))
+    }
+
+    public func calculateChart(date: Date = Date(), heading: Double = 0.0, timeZone: TimeZone = .current) -> QimenChart {
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = .current
+        cal.timeZone = timeZone
         let hour = cal.component(.hour, from: date)
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
 
@@ -406,7 +425,10 @@ public class QimenEngine {
 
         // 2. 拆补法定局：以"符头"（甲/己日）确定上/中/下元。
         //    符头干支 % 15：0→上元，5→下元，10→中元。
-        let dayGz = dayGanZhiIndex(for: date)
+        // The effective Ganzhi day starts at 23:00 for both the bureau and
+        // hour pillars. Civil midnight must not split one Zi hour in two.
+        let dayRef = hour >= 23 ? (cal.date(byAdding: .day, value: 1, to: date) ?? date) : date
+        let dayGz = dayGanZhiIndex(for: dayRef, timeZone: timeZone)
         let fuHead = dayGz - (dayGz % 5)
         let yuanIndex: Int
         switch fuHead % 15 {
@@ -452,8 +474,7 @@ public class QimenEngine {
         }
 
         // 3. 时辰干支（晚子时 23:00 归次日，与八字日柱口径一致）。
-        let dayRef = cal.date(byAdding: .hour, value: 1, to: date) ?? date
-        let effDayGz = dayGanZhiIndex(for: dayRef)
+        let effDayGz = dayGz
         let dayStem = effDayGz % 10
         let hourBranch = ((hour + 1) / 2) % 12
         let hourStem = ((dayStem % 5) * 2 + hourBranch) % 10

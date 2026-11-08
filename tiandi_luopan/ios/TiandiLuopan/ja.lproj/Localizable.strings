@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "純銅、天然黒曜石、黄玉などの自然素材を優先し、プラスチックメッキの模造品は避けてください。";
 "ar_sha_talisman_hang_title" = "設置時のマナー";
 "ar_sha_talisman_hang_desc" = "鏡面は外向きで3〜5度下向きに傾け、八卦鏡や山海鎮が隣家の玄関・窓を直照しないよう近隣との調和を保ってください。";
+
+"ar_spatial_map_orientation_missing" = "このマップには信頼できる方位基準がありません。再スキャンして保存してください。";
+"ar_roomplan_coordinate_heading" = "測量基準方位";

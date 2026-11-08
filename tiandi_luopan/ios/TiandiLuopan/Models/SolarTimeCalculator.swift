@@ -21,6 +21,11 @@ public struct SolarTimeResult {
     }
 }
 
+struct SolarTermTransition: Equatable {
+    let date: Date
+    let name: String
+}
+
 public final class SolarTimeCalculator {
     public static let shared = SolarTimeCalculator()
 
@@ -140,6 +145,26 @@ public final class SolarTimeCalculator {
     /// bucket.  The compass maps this name to its own north-based ring order.
     public func solarTermName(for date: Date = Date()) -> String {
         solarTerms[solarTermIndex(for: date)]
+    }
+
+    /// Find actual 15-degree crossings using the same ephemeris as the chart.
+    /// A batch covers a year even while the app is not running.
+    func upcomingSolarTerms(after date: Date, count: Int = 24) -> [SolarTermTransition] {
+        var cursor = date
+        var result: [SolarTermTransition] = []
+        for _ in 0..<max(0, min(48, count)) {
+            let currentIndex = solarTermIndex(for: cursor)
+            var low = cursor
+            var high = cursor.addingTimeInterval(20 * 86400)
+            while high.timeIntervalSince(low) > 0.1 {
+                let middle = low.addingTimeInterval(high.timeIntervalSince(low) / 2)
+                if solarTermIndex(for: middle) == currentIndex { low = middle }
+                else { high = middle }
+            }
+            result.append(SolarTermTransition(date: high, name: solarTermName(for: high)))
+            cursor = high.addingTimeInterval(1)
+        }
+        return result
     }
 
     /// Whether the instant is before the traditional Li Chun year boundary.

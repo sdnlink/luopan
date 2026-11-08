@@ -561,19 +561,29 @@ public struct HouseKuaCompatibility {
 }
 
 public enum FamilyRole: String, Codable, CaseIterable, Identifiable {
-    case spouse = "spouse"
-    case elder  = "elder"
-    case child1 = "child1"
-    case child2 = "child2"
+    case spouse   = "spouse"   // 配偶/伴侣
+    case father   = "father"   // 父亲
+    case mother   = "mother"   // 母亲
+    case elder    = "elder"    // 父母/长辈
+    case son      = "son"      // 儿子
+    case daughter = "daughter" // 女儿
+    case child1   = "child1"   // 长子/长女
+    case child2   = "child2"   // 次子/次女
+    case other    = "other"    // 其他家人
 
     public var id: String { rawValue }
 
     public var defaultIsMale: Bool {
         switch self {
-        case .spouse: return false
-        case .elder:  return true
-        case .child1: return true
-        case .child2: return false
+        case .spouse:   return !UserKuaProfileManager.shared.isMale
+        case .father:   return true
+        case .mother:   return false
+        case .elder:    return true
+        case .son:      return true
+        case .daughter: return false
+        case .child1:   return true
+        case .child2:   return false
+        case .other:    return true
         }
     }
 
@@ -581,74 +591,146 @@ public enum FamilyRole: String, Codable, CaseIterable, Identifiable {
         switch LocalizationManager.shared.effectiveLanguage {
         case .en:
             switch self {
-            case .spouse: return "Spouse"
-            case .elder:  return "Parent/Elder"
-            case .child1: return "Child 1"
-            case .child2: return "Child 2"
+            case .spouse:   return "Spouse"
+            case .father:   return "Father"
+            case .mother:   return "Mother"
+            case .elder:    return "Parent/Elder"
+            case .son:      return "Son"
+            case .daughter: return "Daughter"
+            case .child1:   return "Child 1"
+            case .child2:   return "Child 2"
+            case .other:    return "Other Family"
             }
         case .zhHant:
             switch self {
-            case .spouse: return "配偶/伴侶"
-            case .elder:  return "父母/長輩"
-            case .child1: return "長子/長女"
-            case .child2: return "次子/次女"
+            case .spouse:   return "配偶/伴侶"
+            case .father:   return "父親"
+            case .mother:   return "母親"
+            case .elder:    return "父母/長輩"
+            case .son:      return "兒子"
+            case .daughter: return "女兒"
+            case .child1:   return "長子/長女"
+            case .child2:   return "次子/次女"
+            case .other:    return "其他家人"
             }
         case .ja:
             switch self {
-            case .spouse: return "配偶者"
-            case .elder:  return "両親・年長者"
-            case .child1: return "第一子"
-            case .child2: return "第二子"
+            case .spouse:   return "配偶者"
+            case .father:   return "父親"
+            case .mother:   return "母親"
+            case .elder:    return "両親・年長者"
+            case .son:      return "息子"
+            case .daughter: return "娘"
+            case .child1:   return "第一子"
+            case .child2:   return "第二子"
+            case .other:    return "その他家族"
             }
         case .ko:
             switch self {
-            case .spouse: return "배우자"
-            case .elder:  return "부모/어르신"
-            case .child1: return "자녀 1"
-            case .child2: return "자녀 2"
+            case .spouse:   return "배우자"
+            case .father:   return "아버지"
+            case .mother:   return "어머니"
+            case .elder:    return "부모/어르신"
+            case .son:      return "아들"
+            case .daughter: return "딸"
+            case .child1:   return "자녀 1"
+            case .child2:   return "자녀 2"
+            case .other:    return "기타 가족"
             }
         case .vi:
             switch self {
-            case .spouse: return "Vợ/Chồng"
-            case .elder:  return "Ông Bà/Cha Mẹ"
-            case .child1: return "Con thứ 1"
-            case .child2: return "Con thứ 2"
+            case .spouse:   return "Vợ/Chồng"
+            case .father:   return "Cha"
+            case .mother:   return "Mẹ"
+            case .elder:    return "Ông Bà/Cha Mẹ"
+            case .son:      return "Con trai"
+            case .daughter: return "Con gái"
+            case .child1:   return "Con thứ 1"
+            case .child2:   return "Con thứ 2"
+            case .other:    return "Người thân khác"
             }
         case .th:
             switch self {
-            case .spouse: return "คู่สมรส"
-            case .elder:  return "ผู้สูงอายุ"
-            case .child1: return "บุตรคนที่ 1"
-            case .child2: return "บุตรคนที่ 2"
+            case .spouse:   return "คู่สมรส"
+            case .father:   return "บิดา/พ่อ"
+            case .mother:   return "มารดา/แม่"
+            case .elder:    return "ผู้สูงอายุ"
+            case .son:      return "บุตรชาย"
+            case .daughter: return "บุตรสาว"
+            case .child1:   return "บุตรคนที่ 1"
+            case .child2:   return "บุตรคนที่ 2"
+            case .other:    return "สมาชิกอื่นๆ"
             }
         case .id:
             switch self {
-            case .spouse: return "Pasangan"
-            case .elder:  return "Orang Tua"
-            case .child1: return "Anak 1"
-            case .child2: return "Anak 2"
+            case .spouse:   return "Pasangan"
+            case .father:   return "Ayah"
+            case .mother:   return "Ibu"
+            case .elder:    return "Orang Tua"
+            case .son:      return "Anak Laki-laki"
+            case .daughter: return "Anak Perempuan"
+            case .child1:   return "Anak 1"
+            case .child2:   return "Anak 2"
+            case .other:    return "Keluarga Lain"
             }
         case .auto, .zhHans:
             switch self {
-            case .spouse: return "配偶/伴侣"
-            case .elder:  return "父母/长辈"
-            case .child1: return "长子/长女"
-            case .child2: return "次子/次女"
+            case .spouse:   return "配偶/伴侣"
+            case .father:   return "父亲"
+            case .mother:   return "母亲"
+            case .elder:    return "父母/长辈"
+            case .son:      return "儿子"
+            case .daughter: return "女儿"
+            case .child1:   return "长子/长女"
+            case .child2:   return "次子/次女"
+            case .other:    return "其他家人"
             }
         }
     }
 }
 
 public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
-    public var id: String { role.rawValue }
-    public let role: FamilyRole
+    public var id: String
+    public var role: FamilyRole
+    public var customName: String?
     public var birthYear: Int
     public var isMale: Bool
 
-    public init(role: FamilyRole, birthYear: Int, isMale: Bool) {
+    public init(id: String = UUID().uuidString, role: FamilyRole, customName: String? = nil, birthYear: Int, isMale: Bool) {
+        self.id = id
         self.role = role
+        self.customName = customName
         self.birthYear = max(1920, min(2035, birthYear))
         self.isMale = isMale
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, role, customName, birthYear, isMale
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.role = try container.decode(FamilyRole.self, forKey: .role)
+        self.customName = try container.decodeIfPresent(String.self, forKey: .customName)
+        self.birthYear = try container.decode(Int.self, forKey: .birthYear)
+        self.isMale = try container.decode(Bool.self, forKey: .isMale)
+        self.id = (try? container.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(role, forKey: .role)
+        try container.encodeIfPresent(customName, forKey: .customName)
+        try container.encode(birthYear, forKey: .birthYear)
+        try container.encode(isMale, forKey: .isMale)
+    }
+
+    public var displayName: String {
+        if let name = customName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return name
+        }
+        return role.localizedTitle
     }
 
     public var lifeGuaNumber: Int {
@@ -818,12 +900,31 @@ public final class UserKuaProfileManager: ObservableObject {
         }
     }
 
+    public func addFamilyMember(role: FamilyRole, customName: String? = nil, birthYear: Int, isMale: Bool) {
+        let profile = FamilyMemberProfile(role: role, customName: customName, birthYear: birthYear, isMale: isMale)
+        familyMembers.append(profile)
+    }
+
+    public func updateFamilyMember(id: String, role: FamilyRole? = nil, customName: String? = nil, birthYear: Int? = nil, isMale: Bool? = nil) {
+        guard let idx = familyMembers.firstIndex(where: { $0.id == id }) else { return }
+        var m = familyMembers[idx]
+        if let role = role { m.role = role }
+        if let customName = customName { m.customName = customName }
+        if let birthYear = birthYear { m.birthYear = max(1920, min(2035, birthYear)) }
+        if let isMale = isMale { m.isMale = isMale }
+        familyMembers[idx] = m
+    }
+
+    public func removeFamilyMember(id: String) {
+        familyMembers.removeAll { $0.id == id }
+    }
+
     public func addOrUpdateFamilyMember(role: FamilyRole, birthYear: Int, isMale: Bool) {
-        let profile = FamilyMemberProfile(role: role, birthYear: birthYear, isMale: isMale)
         if let idx = familyMembers.firstIndex(where: { $0.role == role }) {
-            familyMembers[idx] = profile
+            familyMembers[idx].birthYear = birthYear
+            familyMembers[idx].isMale = isMale
         } else {
-            familyMembers.append(profile)
+            addFamilyMember(role: role, birthYear: birthYear, isMale: isMale)
         }
     }
 
@@ -840,21 +941,21 @@ public final class UserKuaProfileManager: ObservableObject {
                 let sName = item.star.localizedName
                 switch LocalizationManager.shared.effectiveLanguage {
                 case .en:
-                    return "[Smart Room Fit] Best for \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                    return "[Smart Room Fit] Best for \(member.displayName) (\(member.birthYear), \(sName))"
                 case .zhHant:
-                    return "【智能分房推薦】極利「\(member.role.localizedTitle)（\(member.birthYear)年）」居住或學習（落其本命\(sName)）"
+                    return "【智能分房推薦】極利「\(member.displayName)（\(member.birthYear)年）」居住或學習（落其本命\(sName)）"
                 case .ja:
-                    return "【部屋割推奨】「\(member.role.localizedTitle)（\(member.birthYear)年）」に最適（本命\(sName)）"
+                    return "【部屋割推奨】「\(member.displayName)（\(member.birthYear)年）」に最適（本命\(sName)）"
                 case .ko:
-                    return "[맞춤 방 추천] '\(member.role.localizedTitle)(\(member.birthYear)년)'에게 최적 (본명 \(sName))"
+                    return "[맞춤 방 추천] '\(member.displayName)(\(member.birthYear)년)'에게 최적 (본명 \(sName))"
                 case .vi:
-                    return "[Gợi Ý Phân Phòng] Rất hợp cho \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                    return "[Gợi Ý Phân Phòng] Rất hợp cho \(member.displayName) (\(member.birthYear), \(sName))"
                 case .th:
-                    return "[แนะนำจัดห้อง] เหมาะกับ\(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                    return "[แนะนำจัดห้อง] เหมาะกับ\(member.displayName) (\(member.birthYear), \(sName))"
                 case .id:
-                    return "[Rekomendasi Kamar] Cocok untuk \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                    return "[Rekomendasi Kamar] Cocok untuk \(member.displayName) (\(member.birthYear), \(sName))"
                 case .auto, .zhHans:
-                    return "【智能分房推荐】极利「\(member.role.localizedTitle)（\(member.birthYear)年）」居住或学习（落其本命\(sName)）"
+                    return "【智能分房推荐】极利「\(member.displayName)（\(member.birthYear)年）」居住或学习（落其本命\(sName)）"
                 }
             }
         }

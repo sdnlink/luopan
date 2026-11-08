@@ -23,6 +23,15 @@ public struct TianJiAnalysisSnapshot {
             date: reportDate
         )
     }
+
+    public func ganzhiYear(timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let year = calendar.component(.year, from: reportDate)
+            - (SolarTimeCalculator.shared.isBeforeLiChun(for: reportDate, timeZone: timeZone) ? 1 : 0)
+        let offset = ((year - 4) % 60 + 60) % 60
+        return "\(Array("甲乙丙丁戊己庚辛壬癸")[offset % 10])\(Array("子丑寅卯辰巳午未申酉戌亥")[offset % 12])"
+    }
 }
 
 // MARK: - 福宅天机书 · 古典宣纸朱丝栏全案长卷导出引擎 (PRD 第14章)
@@ -718,15 +727,7 @@ public class TianJiShuEngine {
             sealText.draw(in: sealRect.insetBy(dx: 14, dy: 24), withAttributes: sealAttr)
             
             // 岁次干支天文学立春动态推导
-            let calendar = Calendar.current
-            let now = reportDate
-            let y = calendar.component(.year, from: now)
-            let isBeforeLichun = SolarTimeCalculator.shared.isBeforeLiChun(for: now)
-            let gzYear = isBeforeLichun ? (y - 1) : y
-            let stems = ["甲", "乙", "丙", "丁", "戊", "己", "庚", "辛", "壬", "癸"]
-            let branches = ["子", "丑", "寅", "卯", "辰", "巳", "午", "未", "申", "酉", "戌", "亥"]
-            let yOffset = ((gzYear - 4) % 60 + 60) % 60
-            let curGzYear = "\(stems[yOffset % 10])\(branches[yOffset % 12])"
+            let curGzYear = snapshot.ganzhiYear()
             
             let customMasterRaw = (UserDefaults.standard.string(forKey: "tianjishu_custom_master") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let signText: String

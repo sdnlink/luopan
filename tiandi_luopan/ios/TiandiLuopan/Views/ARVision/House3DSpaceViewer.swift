@@ -6,6 +6,7 @@ import UIKit
 // MARK: - 全屋 3D 空间测绘立体布局与形煞全息查看器
 
 public struct House3DSpaceViewer: View {
+    @State private var propertyID: UUID
     @ObservedObject private var lang = LocalizationManager.shared
     @State public var survey: HouseSpatialSurvey
     @Environment(\.presentationMode) private var presentationMode
@@ -46,8 +47,9 @@ public struct House3DSpaceViewer: View {
         case off = "隐藏理气"
     }
 
-    public init(survey: HouseSpatialSurvey) {
+    public init(survey: HouseSpatialSurvey, propertyID: UUID = ShaSurveyStore.shared.propertyID) {
         self._survey = State(initialValue: survey)
+        self._propertyID = State(initialValue: propertyID)
     }
 
     public var body: some View {
@@ -121,6 +123,9 @@ public struct House3DSpaceViewer: View {
         .onAppear {
             refreshSurveyForActiveLanguage()
         }
+        .onReceive(ShaSurveyStore.shared.$propertyID) { id in
+            if id != propertyID { presentationMode.wrappedValue.dismiss() }
+        }
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshSurveyForActiveLanguage()
         }
@@ -148,6 +153,7 @@ public struct House3DSpaceViewer: View {
             compassHeading: survey.compassHeading,
             centroidOverride: survey.centroidWasExplicit == true ? survey.centroid : nil,
             houseFacingDegrees: survey.houseFacingDegrees,
+            houseFacingWasExplicit: survey.houseFacingWasExplicit ?? (survey.fixedHouseFacing != nil),
             analysisDate: survey.timestamp
         )
         survey = rebuilt
@@ -421,6 +427,7 @@ public struct House3DSpaceViewer: View {
 
     /// 将房间改为指定类型并即时重跑全屋形煞分析，刷新 3D 模型与报告
     private func applyRoomType(_ type: FloorplanRoomType, for room: SpatialRoom3D) {
+        guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return }
         var updatedRooms = survey.rooms
         if let idx = updatedRooms.firstIndex(where: { $0.id == room.id }) {
             updatedRooms[idx] = SpatialRoom3D(
@@ -443,6 +450,7 @@ public struct House3DSpaceViewer: View {
             compassHeading: survey.compassHeading,
             centroidOverride: survey.centroidWasExplicit == true ? survey.centroid : nil,
             houseFacingDegrees: survey.houseFacingDegrees,
+            houseFacingWasExplicit: survey.houseFacingWasExplicit ?? (survey.fixedHouseFacing != nil),
             analysisDate: survey.timestamp
         )
         survey = rebuilt
@@ -457,12 +465,8 @@ public struct House3DSpaceViewer: View {
         } else {
             archiveKey = nil
         }
-        if let archiveKey, let data = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(data, forKey: archiveKey)
-            let notification: Notification.Name = archiveKey == SpatialSurveyArchiveKeys.virtual
-                ? .didUpdateHouseSpatialSurvey
-                : .didUpdateMeasuredSpatialSurvey
-            NotificationCenter.default.post(name: notification, object: nil)
+        if let archiveKey {
+            ShaSurveyStore.shared.saveSurvey(survey, key: archiveKey, propertyID: propertyID)
         }
     }
 

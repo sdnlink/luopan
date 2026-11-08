@@ -25,6 +25,7 @@ struct SavedFloorplanLayout: Codable {
     var widthMeters: Double? = nil
     var depthMeters: Double? = nil
     var houseFacingDegrees: Double? = nil
+    var houseFacingWasExplicit: Bool? = nil
 }
 
 /// P1.2 多套户型宅谱档案记录（支持保存多套房源/客户户型、关联 3D 空间测绘模型及各自的已购解锁凭证）
@@ -133,6 +134,7 @@ final class FloorplanCaseStore: ObservableObject {
 
 struct FloorplanWorkspaceSnapshot {
     let revision: UInt64
+    let propertyID: UUID
     let writerID: UUID?
     let layout: SavedFloorplanLayout?
     let image: UIImage?
@@ -160,17 +162,18 @@ final class FloorplanWorkspaceStore: ObservableObject {
             try? JSONDecoder().decode(SavedFloorplanLayout.self, from: $0)
         }
         encodedLayout = layout.flatMap { try? Self.encode($0) }
-        snapshot = FloorplanWorkspaceSnapshot(revision: 0, writerID: nil, layout: layout,
+        snapshot = FloorplanWorkspaceSnapshot(revision: 0, propertyID: ShaSurveyStore.shared.propertyID, writerID: nil, layout: layout,
                                               image: resolvedImageURL.flatMap { UIImage(contentsOfFile: $0.path) })
     }
 
     @discardableResult
     func save(layout: SavedFloorplanLayout, image: UIImage?, writerID: UUID,
-              expectedRevision: UInt64? = nil) throws -> Bool {
+              expectedRevision: UInt64? = nil, expectedPropertyID: UUID? = nil) throws -> Bool {
         if let expectedRevision, expectedRevision != snapshot.revision { return false }
+        if let expectedPropertyID, !ShaSurveyStore.shared.isCurrentProperty(expectedPropertyID) { return false }
         let data = try Self.encode(layout)
         let sameImage = image === snapshot.image
-        guard data != encodedLayout || !sameImage else { return true }
+        guard data != encodedLayout || !sameImage || snapshot.propertyID != ShaSurveyStore.shared.propertyID else { return true }
         if !sameImage {
             guard let imageURL else { throw CocoaError(.fileWriteNoPermission) }
             if let image {
@@ -184,7 +187,8 @@ final class FloorplanWorkspaceStore: ObservableObject {
         }
         defaults.set(data, forKey: Self.layoutKey)
         encodedLayout = data
-        snapshot = FloorplanWorkspaceSnapshot(revision: snapshot.revision &+ 1, writerID: writerID,
+        snapshot = FloorplanWorkspaceSnapshot(revision: snapshot.revision &+ 1,
+                                              propertyID: ShaSurveyStore.shared.propertyID, writerID: writerID,
                                               layout: layout, image: image)
         return true
     }
@@ -244,9 +248,9 @@ public struct FloorplanView: View {
     @State private var showResetConfirmation: Bool = false
     @State private var isEditingRooms: Bool = false
     @State private var activeRoomDragID: String? = nil
-    @State private var activeRoomStartRect: CGRect? = nil
+    @State private var activeRoomStartGeometry: FloorplanRoom? = nil
     @State private var activeRoomScaleID: String? = nil
-    @State private var activeRoomScaleStartRect: CGRect? = nil
+    @State private var activeRoomScaleStartGeometry: FloorplanRoom? = nil
     @State private var roomWasDragged = false
     @State private var selectedEditingRoomID: String?
     @State private var showEditingRoomDeleteConfirmation = false
@@ -288,7 +292,9 @@ public struct FloorplanView: View {
     @ObservedObject private var workspaceStore = FloorplanWorkspaceStore.shared
     @State private var workspaceWriterID = UUID()
     @State private var workspaceRevision: UInt64 = 0
+    @State private var workspacePropertyID = ShaSurveyStore.shared.propertyID
     @State private var houseFacingOffset: Double?
+    @State private var houseFacingWasExplicit: Bool?
     private var savedCases: [FloorplanCaseRecord] { caseStore.records }
     @State private var showCaseArchiveSheet: Bool = false
     @State private var newCaseTitleInput: String = ""
@@ -540,6 +546,7 @@ public struct FloorplanView: View {
                 calibratedWidthText = ""
                 calibratedDepthText = ""
                 houseFacingOffset = nil
+                houseFacingWasExplicit = nil
                 restoredAspectRatio = 1
                 replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
                 floorplanImageBeforePicker = nil
@@ -553,7 +560,7 @@ public struct FloorplanView: View {
         .sheet(isPresented: $showARSpatialSurvey) {
             // 相机闸门：另一个窗口正在用相机时不构造采集会话，改为提示卡。
             CameraExclusiveGate {
-                ARSpatialSurveyView()
+                ARSpatialSurveyView(propertyID: workspacePropertyID)
             }
         }
         .fullScreenCover(isPresented: $showVRSpatialSurvey) {
@@ -567,7 +574,9 @@ public struct FloorplanView: View {
                 initialDepthMeters: projectionDimensions.height,
                 initialCoordinateHeading: effectiveHeading,
                 initialHouseFacingDegrees: houseFacingDegrees,
-                initialCentroid: centroid
+                initialHouseFacingWasExplicit: houseFacingWasExplicit,
+                initialCentroid: centroid,
+                propertyID: workspacePropertyID
             )
         }
         .sheet(isPresented: $showReportShareSheet) {
@@ -577,17 +586,17 @@ public struct FloorplanView: View {
         }
         .sheet(isPresented: $show3DSpaceViewer) {
             if let s = persistedSpatialSurvey {
-                House3DSpaceViewer(survey: s)
+                House3DSpaceViewer(survey: s, propertyID: workspacePropertyID)
             }
         }
         .sheet(isPresented: $showVirtualSpaceViewer) {
             if let s = persistedVirtualSpatialSurvey {
-                House3DSpaceViewer(survey: s)
+                House3DSpaceViewer(survey: s, propertyID: workspacePropertyID)
             }
         }
         .sheet(isPresented: $showCurrentFloorplan3D) {
             if let s = currentFloorplanSurvey {
-                House3DSpaceViewer(survey: s)
+                House3DSpaceViewer(survey: s, propertyID: workspacePropertyID)
             }
         }
         .sheet(isPresented: $showCaseArchiveSheet) {
@@ -688,9 +697,11 @@ public struct FloorplanView: View {
         rooms: [FloorplanRoom],
         centroid: CGPoint,
         blueprintImage: UIImage?,
+        propertyID: UUID,
         compassHeading: Double? = nil,
         spatialSurvey: HouseSpatialSurvey? = nil
     ) -> Bool {
+        guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return false }
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
         let resolvedHeading = compassHeading.map { normalizedHeading($0) } ?? CompassMotionManager.shared.headingState.facingAngle
         let previousGrant: (Bool, String?, String?) = {
@@ -728,12 +739,15 @@ public struct FloorplanView: View {
             floorplanAccessGrantID: previousGrant.1,
             floorplanAccessGrantSignature: previousGrant.2,
             aspectRatio: blueprintImage.map { Double($0.size.width / max(1, $0.size.height)) },
-            houseFacingDegrees: spatialSurvey?.resolvedHouseFacing
+            houseFacingDegrees: spatialSurvey?.resolvedHouseFacing,
+            houseFacingWasExplicit: spatialSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
         )
         do {
-            try FloorplanWorkspaceStore.shared.save(layout: saved, image: blueprintImage, writerID: UUID())
+            guard try FloorplanWorkspaceStore.shared.save(layout: saved, image: blueprintImage, writerID: UUID(),
+                                                          expectedPropertyID: propertyID) else { return false }
             ShaSurveyStore.shared.replaceProperty(measured: spatialSurvey, virtual: nil,
-                                                  exterior: ShaSurveyStore.shared.records)
+                                                  exterior: ShaSurveyStore.shared.records,
+                                                  expectedPropertyID: propertyID)
             NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
             return true
         } catch {
@@ -753,6 +767,7 @@ public struct FloorplanView: View {
 
     private func applyWorkspaceSnapshot(_ snapshot: FloorplanWorkspaceSnapshot) {
         workspaceRevision = snapshot.revision
+        workspacePropertyID = snapshot.propertyID
         roomDetectionGeneration &+= 1
         reportExportGeneration &+= 1
         isDetectingRooms = false
@@ -791,7 +806,9 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
-        let savedFacing = saved.houseFacingDegrees ?? persistedSpatialSurvey?.resolvedHouseFacing ?? persistedVirtualSpatialSurvey?.resolvedHouseFacing
+        let sourceSurvey = persistedSpatialSurvey ?? persistedVirtualSpatialSurvey
+        houseFacingWasExplicit = saved.houseFacingWasExplicit ?? sourceSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
+        let savedFacing = saved.houseFacingDegrees ?? sourceSurvey?.resolvedHouseFacing
         houseFacingOffset = FloorplanOrientation(coordinateHeading: saved.compassRotation,
                                                 houseFacingDegrees: savedFacing).relativeFacing
         restoreDimensions(saved)
@@ -858,6 +875,7 @@ public struct FloorplanView: View {
     private func replaceSpatialArchives(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord]) {
         reportExportGeneration &+= 1
         ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior)
+        workspacePropertyID = ShaSurveyStore.shared.propertyID
         persistedSpatialSurvey = measured
         persistedVirtualSpatialSurvey = virtual
         currentFloorplanSurvey = nil
@@ -890,12 +908,14 @@ public struct FloorplanView: View {
             aspectRatio: Double(floorplanAspectRatio),
             widthMeters: calibratedWidthMeters.map { Double($0) },
             depthMeters: calibratedDepthMeters.map { Double($0) },
-            houseFacingDegrees: houseFacingDegrees
+            houseFacingDegrees: houseFacingDegrees,
+            houseFacingWasExplicit: houseFacingWasExplicit
         )
         guard didRestorePersistedLayout else { return }
         do {
             let accepted = try workspaceStore.save(layout: saved, image: userFloorplanImage,
-                                                    writerID: workspaceWriterID, expectedRevision: workspaceRevision)
+                                                    writerID: workspaceWriterID, expectedRevision: workspaceRevision,
+                                                    expectedPropertyID: workspacePropertyID)
             if accepted { workspaceRevision = workspaceStore.snapshot.revision }
             else { applyWorkspaceSnapshot(workspaceStore.snapshot) }
         } catch {
@@ -967,7 +987,8 @@ public struct FloorplanView: View {
             aspectRatio: Double(floorplanAspectRatio),
             widthMeters: calibratedWidthMeters.map { Double($0) },
             depthMeters: calibratedDepthMeters.map { Double($0) },
-            houseFacingDegrees: houseFacingDegrees
+            houseFacingDegrees: houseFacingDegrees,
+            houseFacingWasExplicit: houseFacingWasExplicit
         )
 
         let record = FloorplanCaseRecord(
@@ -1007,7 +1028,9 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
-        let savedFacing = saved.houseFacingDegrees ?? record.spatialSurvey?.resolvedHouseFacing ?? record.virtualSpatialSurvey?.resolvedHouseFacing
+        let sourceSurvey = record.spatialSurvey ?? record.virtualSpatialSurvey
+        houseFacingWasExplicit = saved.houseFacingWasExplicit ?? sourceSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
+        let savedFacing = saved.houseFacingDegrees ?? sourceSurvey?.resolvedHouseFacing
         houseFacingOffset = FloorplanOrientation(coordinateHeading: saved.compassRotation,
                                                 houseFacingDegrees: savedFacing).relativeFacing
         restoreDimensions(saved)
@@ -1698,9 +1721,9 @@ public struct FloorplanView: View {
             Button(action: {
                 isEditingRooms.toggle()
                 activeRoomDragID = nil
-                activeRoomStartRect = nil
+                activeRoomStartGeometry = nil
                 activeRoomScaleID = nil
-                activeRoomScaleStartRect = nil
+                activeRoomScaleStartGeometry = nil
                 roomWasDragged = false
                 if !isEditingRooms {
                     selectedEditingRoomID = nil
@@ -1731,7 +1754,7 @@ public struct FloorplanView: View {
                 currentFloorplanSurvey = survey
                 // Make the exact snapshot shown by this button available to
                 // 福宅天机长卷 and the AR archive while keeping its推演来源标记.
-                ShaSurveyStore.shared.updateInterior(survey)
+                guard ShaSurveyStore.shared.updateInterior(survey, propertyID: workspacePropertyID) else { return }
                 showCurrentFloorplan3D = true
             }) {
                 HStack(spacing: 3) {
@@ -2150,6 +2173,7 @@ public struct FloorplanView: View {
     private func resetToSampleLayout() {
         workspaceRevision = workspaceStore.snapshot.revision
         houseFacingOffset = nil
+        houseFacingWasExplicit = nil
         userFloorplanImage = nil
         calibratedWidthText = ""
         calibratedDepthText = ""
@@ -2163,9 +2187,9 @@ public struct FloorplanView: View {
         roomDetectionMessage = nil
         isEditingRooms = false
         activeRoomDragID = nil
-        activeRoomStartRect = nil
+        activeRoomStartGeometry = nil
         activeRoomScaleID = nil
-        activeRoomScaleStartRect = nil
+        activeRoomScaleStartGeometry = nil
         roomWasDragged = false
         selectedRoom = nil
         selectedEditingRoomID = nil
@@ -2272,7 +2296,8 @@ public struct FloorplanView: View {
             objects: [],
             compassHeading: effectiveHeading,
             centroidOverride: SIMD3<Float>(Float(centroid.x) * width, 0, Float(centroid.y) * depth),
-            houseFacingDegrees: houseFacingDegrees
+            houseFacingDegrees: houseFacingDegrees,
+            houseFacingWasExplicit: houseFacingWasExplicit
         )
     }
 
@@ -2780,13 +2805,13 @@ public struct FloorplanView: View {
                     Path { path in
                         let first = pts[0]
                         path.move(to: CGPoint(
-                            x: layoutRect.minX + first.x * layoutRect.width,
-                            y: layoutRect.minY + first.y * layoutRect.height
+                            x: (first.x - room.rect.minX) * layoutRect.width,
+                            y: (first.y - room.rect.minY) * layoutRect.height
                         ))
                         for p in pts.dropFirst() {
                             path.addLine(to: CGPoint(
-                                x: layoutRect.minX + p.x * layoutRect.width,
-                                y: layoutRect.minY + p.y * layoutRect.height
+                                x: (p.x - room.rect.minX) * layoutRect.width,
+                                y: (p.y - room.rect.minY) * layoutRect.height
                             ))
                         }
                         path.closeSubpath()
@@ -2796,13 +2821,13 @@ public struct FloorplanView: View {
                         Path { path in
                             let first = pts[0]
                             path.move(to: CGPoint(
-                                x: layoutRect.minX + first.x * layoutRect.width,
-                                y: layoutRect.minY + first.y * layoutRect.height
+                                x: (first.x - room.rect.minX) * layoutRect.width,
+                                y: (first.y - room.rect.minY) * layoutRect.height
                             ))
                             for p in pts.dropFirst() {
                                 path.addLine(to: CGPoint(
-                                    x: layoutRect.minX + p.x * layoutRect.width,
-                                    y: layoutRect.minY + p.y * layoutRect.height
+                                    x: (p.x - room.rect.minX) * layoutRect.width,
+                                    y: (p.y - room.rect.minY) * layoutRect.height
                                 ))
                             }
                             path.closeSubpath()
@@ -2870,11 +2895,12 @@ public struct FloorplanView: View {
 
                     if activeRoomDragID != room.id {
                         activeRoomDragID = room.id
-                        activeRoomStartRect = room.rect
+                        activeRoomStartGeometry = room
                     }
-                    guard let startRect = activeRoomStartRect,
+                    guard let startRoom = activeRoomStartGeometry,
                           let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }
 
+                    let startRect = startRoom.rect
                     let dx = value.translation.width / max(layoutRect.width, 1)
                     let dy = value.translation.height / max(layoutRect.height, 1)
                     let maxX = max(0.0, 1.0 - startRect.width)
@@ -2882,6 +2908,7 @@ public struct FloorplanView: View {
                     var updated = rooms[index]
                     updated.rect.origin.x = max(0.0, min(maxX, startRect.origin.x + dx))
                     updated.rect.origin.y = max(0.0, min(maxY, startRect.origin.y + dy))
+                    updated = startRoom.transformed(to: updated.rect)
                     rooms[index] = updated
 
                     // Keep the dragged rectangle responsive without rerunning
@@ -2890,12 +2917,13 @@ public struct FloorplanView: View {
                     if let auditedIndex = auditedRooms.firstIndex(where: { $0.id == room.id }) {
                         var audited = auditedRooms[auditedIndex]
                         audited.rect = updated.rect
+                        audited.polygonPoints = updated.polygonPoints
                         auditedRooms[auditedIndex] = audited
                     }
                 }
                 .onEnded { _ in
                     activeRoomDragID = nil
-                    activeRoomStartRect = nil
+                    activeRoomStartGeometry = nil
                     // Let a Button action from the same touch cycle observe
                     // the drag marker, then clear it for the next gesture.
                     DispatchQueue.main.async {
@@ -2912,13 +2940,14 @@ public struct FloorplanView: View {
                     roomWasDragged = true
                     if activeRoomScaleID != room.id {
                         activeRoomScaleID = room.id
-                        activeRoomScaleStartRect = room.rect
+                        activeRoomScaleStartGeometry = room
                         activeRoomDragID = nil
-                        activeRoomStartRect = nil
+                        activeRoomStartGeometry = nil
                     }
-                    guard let startRect = activeRoomScaleStartRect,
+                    guard let startRoom = activeRoomScaleStartGeometry,
                           let index = rooms.firstIndex(where: { $0.id == room.id }) else { return }
 
+                    let startRect = startRoom.rect
                     let minWidth: CGFloat = 0.08
                     let minHeight: CGFloat = 0.06
                     let newWidth = max(minWidth, min(0.9, startRect.width * scale))
@@ -2932,16 +2961,18 @@ public struct FloorplanView: View {
                         width: newWidth,
                         height: newHeight
                     )
+                    updated = startRoom.transformed(to: updated.rect)
                     rooms[index] = updated
                     if let auditedIndex = auditedRooms.firstIndex(where: { $0.id == room.id }) {
                         var audited = auditedRooms[auditedIndex]
                         audited.rect = updated.rect
+                        audited.polygonPoints = updated.polygonPoints
                         auditedRooms[auditedIndex] = audited
                     }
                 }
                 .onEnded { _ in
                     activeRoomScaleID = nil
-                    activeRoomScaleStartRect = nil
+                    activeRoomScaleStartGeometry = nil
                     persistLayout()
                     refreshAudit(force: true)
                 }
@@ -3249,7 +3280,7 @@ public struct FloorplanView: View {
     }
 
     // MARK: - 一键导出全屋户型立极与堪舆全案长图 (PRD 5.3)
-    private func exportFloorplanReport(report: [FloorplanAuditItem]) {
+    private func exportFloorplanReport() {
         // 主线程快照渲染所需状态，绘制移到后台队列，避免 1080×1920 全页
         // 同步渲染（含全尺寸户型图）阻塞主线程导致点击导出卡顿。
         reportExportGeneration &+= 1
@@ -3391,9 +3422,21 @@ public struct FloorplanView: View {
                     ? UIColor(red: 1.0, green: 0.32, blue: 0.32, alpha: 0.9)
                     : (room.isGood ? UIColor(red: 0.25, green: 0.90, blue: 0.55, alpha: 0.9) : UIColor.white.withAlphaComponent(0.45))
                 strokeCol.withAlphaComponent(0.18).setFill()
-                UIBezierPath(roundedRect: rRect, cornerRadius: 10).fill()
+                let rPath: UIBezierPath
+                if let points = room.polygonPoints, points.count >= 3 {
+                    rPath = UIBezierPath()
+                    rPath.move(to: CGPoint(x: innerBox.minX + points[0].x * innerBox.width,
+                                          y: innerBox.minY + points[0].y * innerBox.height))
+                    for point in points.dropFirst() {
+                        rPath.addLine(to: CGPoint(x: innerBox.minX + point.x * innerBox.width,
+                                                 y: innerBox.minY + point.y * innerBox.height))
+                    }
+                    rPath.close()
+                } else {
+                    rPath = UIBezierPath(roundedRect: rRect, cornerRadius: 10)
+                }
+                rPath.fill()
                 strokeCol.setStroke()
-                let rPath = UIBezierPath(roundedRect: rRect, cornerRadius: 10)
                 rPath.lineWidth = 2.5
                 rPath.stroke()
 

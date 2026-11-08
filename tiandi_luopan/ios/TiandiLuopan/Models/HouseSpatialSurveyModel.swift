@@ -645,7 +645,22 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
     public let compassHeading: Double
     /// Actual house facing; independent of the AR session's starting direction.
     public let houseFacingDegrees: Double?
+    public let houseFacingWasExplicit: Bool?
     public let centroidWasExplicit: Bool?
+
+    /// An automatically derived bearing must be recomputed after editing doors.
+    public var fixedHouseFacing: Double? {
+        if let houseFacingWasExplicit { return houseFacingWasExplicit ? houseFacingDegrees : nil }
+        // Older engines persisted the derived angle without its source. A
+        // matching entrance bearing is the only evidence available to migrate.
+        if let saved = houseFacingDegrees,
+           let derived = HouseSpatialSurveyEngine.resolveHouseFacing(openings: openings, centroid: centroid,
+                                                                      coordinateHeading: compassHeading) {
+            let delta = abs(saved - derived).truncatingRemainder(dividingBy: 360)
+            if min(delta, 360 - delta) < 0.01 { return nil }
+        }
+        return houseFacingDegrees
+    }
 
     public var resolvedHouseFacing: Double? {
         HouseSpatialSurveyEngine.resolveHouseFacing(openings: openings, centroid: centroid,
@@ -681,6 +696,7 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         fengshuiScore: Int,
         isCentroidIndirect: Bool? = nil,
         houseFacingDegrees: Double? = nil,
+        houseFacingWasExplicit: Bool? = nil,
         centroidWasExplicit: Bool? = nil
     ) {
         self.id = id
@@ -697,6 +713,7 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         self.centroidZ = centroid.z
         self.compassHeading = compassHeading
         self.houseFacingDegrees = houseFacingDegrees
+        self.houseFacingWasExplicit = houseFacingWasExplicit
         self.centroidWasExplicit = centroidWasExplicit
         self.shaItems = shaItems
         self.fengshuiScore = max(0, min(100, fengshuiScore))
@@ -737,6 +754,7 @@ public enum HouseSpatialSurveyEngine {
         compassHeading: Double,
         centroidOverride: SIMD3<Float>? = nil,
         houseFacingDegrees: Double? = nil,
+        houseFacingWasExplicit: Bool? = nil,
         analysisDate: Date = Date()
     ) -> HouseSpatialSurvey {
         // 1. 计算全屋物理边界包围盒
@@ -2387,6 +2405,7 @@ public enum HouseSpatialSurveyEngine {
             fengshuiScore: score,
             isCentroidIndirect: isCentroidIndirect,
             houseFacingDegrees: resolvedFacing,
+            houseFacingWasExplicit: houseFacingWasExplicit ?? (houseFacingDegrees?.isFinite == true),
             centroidWasExplicit: centroidOverride != nil
         )
     }

@@ -1,5 +1,7 @@
 import XCTest
 import UIKit
+import Combine
+import simd
 @testable import TiandiLuopan
 
 final class FunctionalRegressionTests: XCTestCase {
@@ -683,7 +685,7 @@ final class FunctionalRegressionTests: XCTestCase {
         let frame = ARCapturedFrame(image: UIImage(), pose: captured, depth: depth, capturedAt: date)
         let record = try XCTUnwrap(frame.exteriorRecord(shaID: "tianzhan", point: CGPoint(x: 0.5, y: 0.5), confidence: 0.8, source: .ai, note: nil))
         XCTAssertEqual(record.bearingDegrees, 90)
-        XCTAssertEqual(record.elevationDegrees, 5)
+        XCTAssertEqual(record.elevationDegrees, 5, accuracy: 0.000001)
         XCTAssertEqual(record.distanceMeters, 6)
         XCTAssertEqual(record.capturedHeadingDegrees, 90)
         XCTAssertEqual(record.capturedAt, date)
@@ -738,4 +740,290 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertEqual(new.date, after)
     }
 
+    @MainActor
+    func testOldCaptureCannotReplaceEitherArchiveAfterPropertySwitch() throws {
+        let suite = "property-capture-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults)
+        let oldID = store.propertyID
+        let measuredB = survey("RoomPlan B"), virtualB = survey("VR B")
+        store.replaceProperty(measured: measuredB, virtual: virtualB, exterior: [])
+        let measuredBytes = defaults.data(forKey: SpatialSurveyArchiveKeys.measured)
+        let virtualBytes = defaults.data(forKey: SpatialSurveyArchiveKeys.virtual)
+        XCTAssertFalse(store.saveSurvey(survey("RoomPlan A"), key: SpatialSurveyArchiveKeys.measured, propertyID: oldID))
+        XCTAssertFalse(store.saveSurvey(survey("VR A"), key: SpatialSurveyArchiveKeys.virtual, propertyID: oldID))
+        XCTAssertFalse(store.updateInterior(survey("projection A"), propertyID: oldID))
+        XCTAssertEqual(defaults.data(forKey: SpatialSurveyArchiveKeys.measured), measuredBytes)
+        XCTAssertEqual(defaults.data(forKey: SpatialSurveyArchiveKeys.virtual), virtualBytes)
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).latestInterior?.id, measuredB.id)
+    }
+
+    @MainActor
+    func testRepeatedCapturesAndImportsForOnePropertyKeepTheirAuthority() throws {
+        let suite = "property-edit-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults)
+        let id = store.propertyID
+        XCTAssertTrue(store.saveSurvey(survey("RoomPlan 1"), key: SpatialSurveyArchiveKeys.measured, propertyID: id))
+        XCTAssertTrue(store.replaceProperty(measured: survey("RoomPlan 2"), virtual: nil, exterior: [], expectedPropertyID: id))
+        XCTAssertEqual(store.propertyID, id)
+        XCTAssertTrue(store.saveSurvey(survey("VR 3"), key: SpatialSurveyArchiveKeys.virtual, propertyID: id))
+        store.replaceProperty(measured: nil, virtual: nil, exterior: [])
+        XCTAssertNotEqual(store.propertyID, id)
+        XCTAssertFalse(store.replaceProperty(measured: survey("late import"), virtual: nil, exterior: [], expectedPropertyID: id))
+        XCTAssertNil(store.archive)
+    }
+
+    @MainActor
+    func testOldExteriorCaptureCannotAppendToTheNewProperty() throws {
+        let suite = "property-exterior-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults)
+        let oldID = store.propertyID
+        let recordB = ExteriorShaRecord(shaID: "B", bearingDegrees: 180)
+        store.replaceProperty(measured: nil, virtual: nil, exterior: [recordB])
+        XCTAssertFalse(store.addRecord(ExteriorShaRecord(shaID: "A", bearingDegrees: 90), propertyID: oldID))
+        XCTAssertEqual(store.records.map(\.id), [recordB.id])
+    }
+
+    @MainActor
+    func testStaleRoomPlanImportDoesNotChangeTheWorkspaceOrItsGrant() {
+        let store = FloorplanWorkspaceStore.shared
+        let revision = store.snapshot.revision
+        let id = ShaSurveyStore.shared.propertyID
+        let data = UserDefaults.standard.data(forKey: FloorplanWorkspaceStore.layoutKey)
+        XCTAssertFalse(FloorplanView.persistRoomPlanImport(rooms: [], centroid: .zero, blueprintImage: nil,
+                                                         propertyID: UUID(), spatialSurvey: survey("old scan")))
+        XCTAssertEqual(store.snapshot.revision, revision)
+        XCTAssertEqual(ShaSurveyStore.shared.propertyID, id)
+        XCTAssertEqual(UserDefaults.standard.data(forKey: FloorplanWorkspaceStore.layoutKey), data)
+    }
+
+    @MainActor
+    func testWorkspaceRejectsAStalePropertyEvenWhenItsEditRevisionMatches() throws {
+        let suite = "property-workspace-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: directory) }
+        let store = FloorplanWorkspaceStore(defaults: defaults, directory: directory)
+        XCTAssertFalse(try store.save(layout: record(image: nil).layout, image: nil, writerID: UUID(),
+                                      expectedRevision: store.snapshot.revision, expectedPropertyID: UUID()))
+        XCTAssertNil(defaults.data(forKey: FloorplanWorkspaceStore.layoutKey))
+        XCTAssertEqual(store.snapshot.revision, 0)
+    }
+
+    func testWorldMapRoundTripPreservesHandPinnedRoomsAndOrderedAnnotations() throws {
+        let room = SpatialRoom3D(name: "manual", type: .study, center: SIMD3(3, 1.4, 4),
+                                 size: SIMD3(4, 2.8, 3), rotationY: Float.pi / 4)
+        let points: [SIMD3<Float>] = [SIMD3(1, 0, 2), SIMD3(4, 0, 2)]
+        let archive = try SpatialWorldMapArchive(mapData: Data([1, 2]), coordinateHeading: 90,
+            annotations: SpatialMapAnnotations(cornerRooms: [room], cornerPoints: points, lubanPoints: Array(points.reversed())))
+        let restored = try SpatialWorldMapArchive.decode(JSONEncoder().encode(archive))
+        let annotations = try XCTUnwrap(restored.annotations)
+        XCTAssertEqual(annotations.cornerRooms.map(\.id), [room.id])
+        XCTAssertEqual(annotations.cornerRooms.first?.rotationY, room.rotationY)
+        XCTAssertEqual(annotations.cornerRooms.first?.center, room.center)
+        XCTAssertEqual(annotations.cornerPoints.map(\.position), points)
+        XCTAssertEqual(annotations.lubanPoints.map(\.position), Array(points.reversed()))
+        let anchors = annotations.makeAnchors()
+        XCTAssertEqual(anchors.map(\.name), ["corner-pin", "corner-pin", "luban-anchor", "luban-anchor"])
+        XCTAssertEqual(anchors[0].transform.columns.3.x, points[0].x)
+        XCTAssertEqual(anchors[2].transform.columns.3.z, points[1].z)
+        XCTAssertEqual(restored.coordinateHeading, 90)
+    }
+
+    func testVersionOneWorldMapsStillRestoreWithoutInventingManualRooms() throws {
+        let archive = try SpatialWorldMapArchive(mapData: Data([1]), coordinateHeading: 270)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(archive)) as? [String: Any])
+        json["version"] = 1
+        json.removeValue(forKey: "annotations")
+        let restored = try SpatialWorldMapArchive.decode(JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(restored.annotations)
+        XCTAssertEqual(restored.coordinateHeading, 270)
+    }
+
+    @MainActor
+    func testReturningParentMustOwnItsLeaseBeforeAnotherCameraCanRun() {
+        let leases = CameraExclusivity()
+        let parent = CameraLeaseToken(), child = CameraLeaseToken(), other = CameraLeaseToken()
+        let sceneA = NSObject(), sceneB = NSObject()
+        XCTAssertTrue(leases.acquire(parent, sceneID: ObjectIdentifier(sceneA)))
+        XCTAssertTrue(leases.acquire(child, sceneID: ObjectIdentifier(sceneA)))
+        leases.release(parent)
+        XCTAssertFalse(leases.owns(parent))
+        XCTAssertTrue(leases.owns(child))
+        leases.release(child)
+        XCTAssertTrue(leases.acquire(other, sceneID: ObjectIdentifier(sceneB)))
+        XCTAssertFalse(leases.acquire(parent, sceneID: ObjectIdentifier(sceneA)))
+        XCTAssertFalse(leases.owns(parent))
+        leases.release(other)
+        XCTAssertTrue(leases.acquire(parent, sceneID: ObjectIdentifier(sceneA)))
+        XCTAssertTrue(leases.owns(parent))
+    }
+
+    @MainActor
+    func testLeaseReacquisitionFromAPublisherDoesNotRepublishRecursively() {
+        let leases = CameraExclusivity()
+        let token = CameraLeaseToken(), scene = NSObject()
+        let sceneID = ObjectIdentifier(scene)
+        var publications = 0
+        let subscription = leases.$holderSceneID.sink { _ in
+            publications += 1
+            if leases.owns(token) { XCTAssertTrue(leases.acquire(token, sceneID: sceneID)) }
+        }
+        XCTAssertTrue(leases.acquire(token, sceneID: sceneID))
+        XCTAssertTrue(leases.acquire(token, sceneID: sceneID))
+        XCTAssertEqual(publications, 2) // initial nil and the actual acquisition
+        withExtendedLifetime(subscription) { leases.release(token) }
+    }
+
+    func testDraggingARecognizedRoomMovesItsRealCentroidAndKeepsItsArea() throws {
+        let rect = CGRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2)
+        let room = FloorplanRoom(name: "room", type: .study, rect: rect,
+            polygonPoints: [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.3, y: 0.1), CGPoint(x: 0.3, y: 0.3), CGPoint(x: 0.1, y: 0.3)])
+        let moved = room.transformed(to: rect.offsetBy(dx: 0.4, dy: 0.2))
+        let center = FloorplanEngine.roomCentroid(moved)
+        XCTAssertEqual(center.x, 0.6, accuracy: 0.000001)
+        XCTAssertEqual(center.y, 0.4, accuracy: 0.000001)
+        XCTAssertEqual(FloorplanEngine.roomArea(moved), FloorplanEngine.roomArea(room), accuracy: 0.000001)
+        XCTAssertTrue(FloorplanEngine.roomContains(moved, point: center))
+        let saved = try JSONDecoder().decode(FloorplanRoom.self, from: JSONEncoder().encode(moved))
+        XCTAssertEqual(saved.polygonPoints, moved.polygonPoints)
+    }
+
+    func testScalingAConcaveRoomAppliesTheSameAffineTransformToItsOutline() throws {
+        let points = [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.6, y: 0.1), CGPoint(x: 0.6, y: 0.3),
+                      CGPoint(x: 0.3, y: 0.3), CGPoint(x: 0.3, y: 0.6), CGPoint(x: 0.1, y: 0.6)]
+        let room = FloorplanRoom(name: "L", type: .study, rect: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), polygonPoints: points)
+        let edited = room.transformed(to: CGRect(x: 0.05, y: 0.05, width: 0.8, height: 0.4))
+        XCTAssertEqual(FloorplanEngine.roomArea(edited), FloorplanEngine.roomArea(room) * 1.6 * 0.8, accuracy: 0.000001)
+        let bounds = try XCTUnwrap(GeometryUtils.polygonBounds(try XCTUnwrap(edited.polygonPoints)))
+        XCTAssertEqual(bounds.minX, edited.rect.minX, accuracy: 0.000001)
+        XCTAssertEqual(bounds.maxY, edited.rect.maxY, accuracy: 0.000001)
+        XCTAssertTrue(FloorplanEngine.roomContains(edited, point: CGPoint(x: 0.05, y: 0.2))) // boundary
+        XCTAssertFalse(FloorplanEngine.roomContains(edited, point: CGPoint(x: 0.8, y: 0.4))) // notch
+    }
+
+    @MainActor
+    func testConcaveBoundingBoxCannotStealTheCentralRoom() {
+        let language = LocalizationManager.shared.effectiveLanguage
+        defer { LocalizationManager.shared.effectiveLanguage = language }
+        LocalizationManager.shared.effectiveLanguage = .zhHans
+        let points = [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.6, y: 0.1), CGPoint(x: 0.6, y: 0.3),
+                      CGPoint(x: 0.3, y: 0.3), CGPoint(x: 0.3, y: 0.6), CGPoint(x: 0.1, y: 0.6)]
+        let concave = FloorplanRoom(id: "L", name: "L", type: .study,
+            rect: CGRect(x: 0.1, y: 0.1, width: 0.5, height: 0.5), polygonPoints: points)
+        let actual = FloorplanRoom(id: "actual", name: "actual", type: .livingRoom,
+            rect: CGRect(x: 0.3, y: 0.3, width: 0.65, height: 0.65))
+        let result = FloorplanEngine.shared.auditFloorplan(rooms: [concave, actual], centroid: CGPoint(x: 0.5, y: 0.5), heading: 0)
+        XCTAssertFalse(result.auditedRooms[0].palaceName.contains("中央"))
+        XCTAssertTrue(result.auditedRooms[1].palaceName.contains("中央"))
+    }
+
+    @MainActor
+    func testPolygonPalaceUsesItsActualCentroid() {
+        let language = LocalizationManager.shared.effectiveLanguage
+        defer { LocalizationManager.shared.effectiveLanguage = language }
+        LocalizationManager.shared.effectiveLanguage = .zhHans
+        let room = FloorplanRoom(name: "triangle", type: .study, rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8),
+            polygonPoints: [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 0.9, y: 0.1), CGPoint(x: 0.1, y: 0.9)])
+        let result = FloorplanEngine.shared.auditFloorplan(rooms: [room], centroid: CGPoint(x: 0.5, y: 0.6), heading: 0)
+        XCTAssertTrue(result.auditedRooms[0].palaceName.contains("西北"))
+    }
+
+    private func facingSurvey(door: SpatialOpening3D, explicit: Double? = nil) -> HouseSpatialSurvey {
+        HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "VR", walls: [], openings: [door], beams: [],
+            rooms: [SpatialRoom3D(name: "room", type: .study, center: SIMD3(0, 1.4, 0), size: SIMD3(10, 2.8, 8))],
+            objects: [], compassHeading: 0, centroidOverride: .zero, houseFacingDegrees: explicit)
+    }
+
+    func testVirtualEntranceCorrectionRecomputesAnAutomaticFacing() throws {
+        let old = facingSurvey(door: entrance(position: SIMD3(5, 1, 0), normal: SIMD3(1, 0, 0)))
+        let restored = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONEncoder().encode(old))
+        XCTAssertEqual(restored.houseFacingWasExplicit, false)
+        XCTAssertNil(restored.fixedHouseFacing)
+        let corrected = facingSurvey(door: entrance(position: SIMD3(0, 1, 4), normal: SIMD3(0, 0, 1)), explicit: restored.fixedHouseFacing)
+        XCTAssertEqual(old.resolvedHouseFacing, 90)
+        XCTAssertEqual(corrected.resolvedHouseFacing, 180)
+    }
+
+    func testVirtualEntranceCorrectionPreservesAnExplicitFacing() throws {
+        let old = facingSurvey(door: entrance(position: SIMD3(5, 1, 0), normal: SIMD3(1, 0, 0)), explicit: 270)
+        let restored = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONEncoder().encode(old))
+        XCTAssertEqual(restored.houseFacingWasExplicit, true)
+        let corrected = facingSurvey(door: entrance(position: SIMD3(0, 1, 4), normal: SIMD3(0, 0, 1)), explicit: restored.fixedHouseFacing)
+        XCTAssertEqual(corrected.resolvedHouseFacing, 270)
+    }
+
+    func testLegacyFacingSourceIsInferredFromItsOriginalEntrance() throws {
+        let original = facingSurvey(door: entrance(position: SIMD3(5, 1, 0), normal: SIMD3(1, 0, 0)))
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        json.removeValue(forKey: "houseFacingWasExplicit")
+        let restored = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(restored.fixedHouseFacing)
+        json["houseFacingDegrees"] = 270
+        let fixed = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(fixed.fixedHouseFacing, 270)
+        var layout = record(image: nil).layout
+        layout.houseFacingWasExplicit = false
+        XCTAssertEqual(try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONEncoder().encode(layout)).houseFacingWasExplicit, false)
+    }
+
+    func testRolledCameraProjectsTheTargetThroughAllThreeAxes() {
+        let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5)
+        let pose = ARCapturePose(heading: 0, elevation: 0, projection: projection, roll: 45)
+        let point = CGPoint(x: 0.5, y: 0.25)
+        XCTAssertEqual(pose.bearing(point: point), 18.248902383, accuracy: 0.00001)
+        XCTAssertEqual(pose.elevation(point: point), 17.387718335, accuracy: 0.00001)
+        let side = ARCapturePose(heading: 0, elevation: 0, projection: projection, roll: 90)
+        XCTAssertEqual(side.bearing(point: point), 25, accuracy: 0.000001)
+        XCTAssertEqual(side.elevation(point: point), 0, accuracy: 0.000001)
+    }
+
+    func testAiConsensusRejectsRollWithoutAChangeInHeadingOrPitch() {
+        let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5)
+        let first = ARCapturePose(heading: 0, elevation: 10, projection: projection, roll: 0)
+        XCTAssertFalse(first.isCompatible(with: ARCapturePose(heading: 0, elevation: 10, projection: projection, roll: 10)))
+        XCTAssertTrue(first.isCompatible(with: ARCapturePose(heading: 0, elevation: 10, projection: projection, roll: 2)))
+    }
+
+    func testWorldCameraPosePreservesPitchRollAndGeographicNorth() {
+        let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5)
+        let local = ARCapturePose(heading: 100, elevation: 20, projection: projection, roll: 45)
+        func column(_ vector: SIMD3<Double>) -> SIMD4<Float> { SIMD4(Float(vector.x), Float(vector.y), Float(vector.z), 0) }
+        let matrix = simd_float4x4(columns: (column(local.right), column(local.up), column(-local.forward), SIMD4(0, 0, 0, 1)))
+        let captured = ARCapturePose(worldFromCamera: matrix, coordinateHeading: 17, projection: projection)
+        let expected = ARCapturePose(heading: 117, elevation: 20, projection: projection, roll: 45)
+        for point in [CGPoint(x: 0.5, y: 0.5), CGPoint(x: 0.8, y: 0.2), CGPoint(x: 0.2, y: 0.7)] {
+            XCTAssertEqual(captured.bearing(point: point), expected.bearing(point: point), accuracy: 0.00001)
+            XCTAssertEqual(captured.elevation(point: point), expected.elevation(point: point), accuracy: 0.00001)
+        }
+    }
+
+    func testOffAxisBearingAccountsForCameraPitch() {
+        let projection = ARTargetProjection(horizontalFOVDegrees: 60, aspectRatio: 1)
+        let pose = ARCapturePose(heading: 0, elevation: 60, projection: projection)
+        let rightEdge = CGPoint(x: 1, y: 0.5)
+        XCTAssertEqual(pose.bearing(point: rightEdge), atan2(tan(Double.pi / 6), 0.5) * 180 / .pi, accuracy: 0.000001)
+        XCTAssertLessThan(pose.elevation(point: rightEdge), pose.elevation)
+    }
+
+    func testReportGanzhiUsesGregorianYearsForBuddhistCalendarDates() {
+        let date = instant("2026-11-08T04:00:00Z")
+        let zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = zone
+        XCTAssertEqual(buddhist.component(.year, from: date), 2569)
+        XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: date).ganzhiYear(timeZone: zone), "丙午")
+    }
+
+    func testReportGanzhiChangesAtLiChunAndKeepsPreviousYearInJanuary() {
+        let boundary = liChunBoundary(), zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: boundary.addingTimeInterval(-1)).ganzhiYear(timeZone: zone), "乙巳")
+        XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: boundary.addingTimeInterval(1)).ganzhiYear(timeZone: zone), "丙午")
+        XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: instant("2026-01-01T04:00:00Z")).ganzhiYear(timeZone: zone), "乙巳")
+    }
 }

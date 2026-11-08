@@ -203,6 +203,10 @@ public struct PanoramaFengShuiArchive: Identifiable, Codable {
 public final class ShaSurveyStore: ObservableObject {
     public static let shared = ShaSurveyStore()
 
+    /// Changes only when the active property changes, not on ordinary edits.
+    /// Every open capture/editor holds its original ID until it is dismissed.
+    @Published public private(set) var propertyID = UUID()
+
     /// 外部形煞标注（按采集顺序）
     @Published public private(set) var records: [ExteriorShaRecord] = []
     /// 最近一次室内体检（RoomPlan/LiDAR/户型图路径）
@@ -232,22 +236,52 @@ public final class ShaSurveyStore: ObservableObject {
 
     /// A property switch replaces the entire archive, including empty slots.
     /// Updating one slot in isolation would retain another property's model.
-    public func replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord]) {
+    @discardableResult
+    public func replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
+                                expectedPropertyID: UUID? = nil) -> Bool {
+        if let expectedPropertyID, !isCurrentProperty(expectedPropertyID) { return false }
+        if expectedPropertyID == nil { propertyID = UUID() }
         defaults.set(measured.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.measured)
         defaults.set(virtual.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.virtual)
         records = exterior
         latestInterior = measured ?? virtual
         persist()
+        return true
     }
 
-    public func addRecord(_ record: ExteriorShaRecord) {
+    public func isCurrentProperty(_ id: UUID) -> Bool { propertyID == id }
+
+    /// UI and capture completions call this on the main thread. Validate before
+    /// touching either archive slot or the combined panorama snapshot.
+    @discardableResult
+    public func saveSurvey(_ survey: HouseSpatialSurvey, key: String, propertyID: UUID) -> Bool {
+        guard isCurrentProperty(propertyID),
+              key == SpatialSurveyArchiveKeys.measured || key == SpatialSurveyArchiveKeys.virtual,
+              let data = try? JSONEncoder().encode(survey) else { return false }
+        defaults.set(data, forKey: key)
+        if key == SpatialSurveyArchiveKeys.measured || latestInterior == nil {
+            latestInterior = survey
+            persist()
+        }
+        NotificationCenter.default.post(name: key == SpatialSurveyArchiveKeys.measured
+                                       ? .didUpdateMeasuredSpatialSurvey : .didUpdateHouseSpatialSurvey, object: nil)
+        return true
+    }
+
+    @discardableResult
+    public func addRecord(_ record: ExteriorShaRecord, propertyID: UUID) -> Bool {
+        guard isCurrentProperty(propertyID) else { return false }
         records.append(record)
         persist()
+        return true
     }
 
-    public func updateInterior(_ survey: HouseSpatialSurvey?) {
+    @discardableResult
+    public func updateInterior(_ survey: HouseSpatialSurvey?, propertyID: UUID) -> Bool {
+        guard isCurrentProperty(propertyID) else { return false }
         latestInterior = survey
         persist()
+        return true
     }
 
     public func clearRecords() {

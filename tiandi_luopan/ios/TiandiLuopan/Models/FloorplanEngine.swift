@@ -170,6 +170,19 @@ public struct FloorplanRoom: Identifiable, Codable {
         self.inspectionLore = inspectionLore
         self.inspectionAdvice = inspectionAdvice
     }
+    /// Apply one affine edit to both representations of the room geometry.
+    public func transformed(to target: CGRect) -> FloorplanRoom {
+        var result = self
+        if let points = polygonPoints, rect.width > 0, rect.height > 0 {
+            result.polygonPoints = points.map {
+                CGPoint(x: target.minX + ($0.x - rect.minX) * target.width / rect.width,
+                        y: target.minY + ($0.y - rect.minY) * target.height / rect.height)
+            }
+        }
+        result.rect = target
+        return result
+    }
+
     public var isSevere: Bool {
         inspectionLevel.contains("严重") || inspectionLevel.contains("大凶") ||
         inspectionLevel.localizedCaseInsensitiveContains("severe") ||
@@ -393,6 +406,13 @@ public class FloorplanEngine {
         return room.rect.width * room.rect.height
     }
 
+    public static func roomContains(_ room: FloorplanRoom, point: CGPoint) -> Bool {
+        if let points = room.polygonPoints, points.count >= 3 {
+            return GeometryUtils.polygonContains(point, points: points)
+        }
+        return room.rect.contains(point)
+    }
+
     /// 房间几何质心（优先多边形质心，退化回矩形中心）
     public static func roomCentroid(_ room: FloorplanRoom) -> CGPoint {
         if let pts = room.polygonPoints, pts.count >= 3 {
@@ -455,12 +475,12 @@ public class FloorplanEngine {
         
         let language = LocalizationManager.shared.effectiveLanguage
         let centralRoomID = rooms
-            .filter { $0.type != .missingCorner && $0.rect.contains(centroid) }
+            .filter { $0.type != .missingCorner && Self.roomContains($0, point: centroid) }
             .min {
-                ($0.rect.width * $0.rect.height) < ($1.rect.width * $1.rect.height)
+                Self.roomArea($0) < Self.roomArea($1)
             }?.id
         let manualMissingGua = Set(rooms.filter { $0.type == .missingCorner }.map {
-            palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading, aspectRatio: aspectRatio).gua
+            palaceForPoint(Self.roomCentroid($0), centroid: centroid, heading: heading, aspectRatio: aspectRatio).gua
         })
         let pwChart = PurpleWhiteEngine.shared.calculateChart(date: date, heading: heading)
         
@@ -480,7 +500,7 @@ public class FloorplanEngine {
                 }
             } else {
                 palace = palaceForPoint(
-                    CGPoint(x: room.rect.midX, y: room.rect.midY),
+                    Self.roomCentroid(room),
                     centroid: centroid,
                     heading: heading,
                     aspectRatio: aspectRatio

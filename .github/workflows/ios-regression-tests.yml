@@ -1,0 +1,57 @@
+name: iOS Functional Regression Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'tiandi_luopan/ios/**'
+      - '.github/workflows/ios-regression-tests.yml'
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-simulator-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  functional-tests:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests on an available iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list devices available -j > "$RUNNER_TEMP/ios-regression-devices.json"
+          TEST_DEVICE_ID="$(python3 - "$RUNNER_TEMP/ios-regression-devices.json" <<'PY'
+          import json, sys
+          with open(sys.argv[1]) as stream:
+              devices = json.load(stream)['devices']
+          candidates = [device for runtime, rows in devices.items() if '.iOS-' in runtime
+                        for device in rows if device.get('isAvailable') and 'iPhone' in device['name']]
+          if not candidates:
+              raise SystemExit('No available iPhone simulator')
+          print(next((device for device in candidates if device['state'] == 'Booted'), candidates[0])['udid'])
+          PY
+          )"
+          mkdir -p build
+          xcodebuild test \
+            -project tiandi_luopan/ios/TiandiLuopan.xcodeproj \
+            -scheme TiandiLuopan \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$TEST_DEVICE_ID" \
+            -parallel-testing-enabled NO \
+            -resultBundlePath build/ios-regression.xcresult \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/ios-regression.log
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-functional-regression-results
+          path: |
+            build/ios-regression.xcresult
+            build/ios-regression.log
+          if-no-files-found: ignore

@@ -1032,8 +1032,11 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
 
         // Render top-down blueprint image of all scanned horizontal & vertical planes
-        let canvasSize = CGSize(width: 900, height: 900)
-        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        let canvasSize = GeometryUtils.aspectFitRect(aspectRatio: totalX / totalZ,
+                                                    in: CGRect(x: 0, y: 0, width: 900, height: 900)).size
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
         let blueprint = renderer.image { ctx in
             let cg = ctx.cgContext
             UIColor(red: 0.06, green: 0.08, blue: 0.12, alpha: 1.0).setFill()
@@ -1042,11 +1045,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             // Subtle grid
             cg.setStrokeColor(UIColor.white.withAlphaComponent(0.06).cgColor)
             cg.setLineWidth(1)
-            for step in stride(from: CGFloat(60), through: 840, by: 60) {
-                cg.move(to: CGPoint(x: step, y: 0))
-                cg.addLine(to: CGPoint(x: step, y: 900))
-                cg.move(to: CGPoint(x: 0, y: step))
-                cg.addLine(to: CGPoint(x: 900, y: step))
+            for step in 1..<15 {
+                let x = CGFloat(step) * canvasSize.width / 15
+                let y = CGFloat(step) * canvasSize.height / 15
+                cg.move(to: CGPoint(x: x, y: 0))
+                cg.addLine(to: CGPoint(x: x, y: canvasSize.height))
+                cg.move(to: CGPoint(x: 0, y: y))
+                cg.addLine(to: CGPoint(x: canvasSize.width, y: y))
             }
             cg.strokePath()
 
@@ -1077,7 +1082,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             rooms: floorplanRooms,
             centroid: CGPoint(x: weightedX, y: weightedY),
             blueprintImage: blueprint,
-            compassHeading: CompassMotionManager.shared.headingState.facingAngle,
+            compassHeading: surveyHeadingDegrees,
             spatialSurvey: currentSurvey
         )
         return true

@@ -7,6 +7,25 @@ import CoreGraphics
 
 public enum GeometryUtils {
 
+    /// A normalized x/y pair has different units on a rectangular plan.
+    /// Restore its aspect ratio before resolving a clockwise bearing.
+    public static func bearing(from origin: CGPoint, to point: CGPoint, aspectRatio: CGFloat = 1) -> Double {
+        let ratio = aspectRatio.isFinite && aspectRatio > 0 ? aspectRatio : 1
+        let dx = Double((point.x - origin.x) * ratio)
+        let dy = Double(point.y - origin.y)
+        let angle = atan2(dx, -dy) * 180.0 / .pi
+        return (angle + 360.0).truncatingRemainder(dividingBy: 360.0)
+    }
+
+    public static func aspectFitRect(aspectRatio: CGFloat, in bounds: CGRect) -> CGRect {
+        guard bounds.width > 0, bounds.height > 0 else { return .zero }
+        let ratio = aspectRatio.isFinite && aspectRatio > 0 ? aspectRatio : 1
+        let width = min(bounds.width, bounds.height * ratio)
+        let height = width / ratio
+        return CGRect(x: bounds.midX - width / 2, y: bounds.midY - height / 2,
+                      width: width, height: height)
+    }
+
     /// 多边形有向面积（鞋带公式，单位与输入一致；逆时针为正）。
     public static func polygonArea(_ points: [CGPoint]) -> CGFloat {
         guard points.count >= 3 else { return 0 }

@@ -435,7 +435,7 @@ public class FloorplanEngine {
     }
 
     // 根据户型重心立极点与罗盘朝向解算各房间八卦方位与全屋风水体检报告
-    public func auditFloorplan(rooms: [FloorplanRoom], centroid: CGPoint, heading: Double) -> (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) {
+    public func auditFloorplan(rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, aspectRatio: CGFloat = 1) -> (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) {
         var updatedRooms: [FloorplanRoom] = []
         var auditReport: [FloorplanAuditItem] = []
         
@@ -446,7 +446,7 @@ public class FloorplanEngine {
                 ($0.rect.width * $0.rect.height) < ($1.rect.width * $1.rect.height)
             }?.id
         let manualMissingGua = Set(rooms.filter { $0.type == .missingCorner }.map {
-            palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading).gua
+            palaceForPoint(CGPoint(x: $0.rect.midX, y: $0.rect.midY), centroid: centroid, heading: heading, aspectRatio: aspectRatio).gua
         })
         let pwChart = PurpleWhiteEngine.shared.calculateChart(date: Date(), heading: heading)
         
@@ -468,7 +468,8 @@ public class FloorplanEngine {
                 palace = palaceForPoint(
                     CGPoint(x: room.rect.midX, y: room.rect.midY),
                     centroid: centroid,
-                    heading: heading
+                    heading: heading,
+                    aspectRatio: aspectRatio
                 )
             }
             switch language {
@@ -531,6 +532,7 @@ public class FloorplanEngine {
             rooms: rooms,
             centroid: centroid,
             heading: heading,
+            aspectRatio: aspectRatio,
             excludingGua: manualMissingGua
         ))
         
@@ -643,11 +645,8 @@ public class FloorplanEngine {
         return (updatedRooms, auditReport)
     }
 
-    private func palaceForPoint(_ point: CGPoint, centroid: CGPoint, heading: Double) -> (dir: String, gua: String) {
-        let dx = Double(point.x - centroid.x)
-        let dy = Double(point.y - centroid.y)
-        var screenAngle = atan2(dx, -dy) * 180.0 / Double.pi
-        if screenAngle < 0 { screenAngle += 360.0 }
+    private func palaceForPoint(_ point: CGPoint, centroid: CGPoint, heading: Double, aspectRatio: CGFloat) -> (dir: String, gua: String) {
+        let screenAngle = GeometryUtils.bearing(from: centroid, to: point, aspectRatio: aspectRatio)
         let geoAngle = (screenAngle + heading).truncatingRemainder(dividingBy: 360.0)
         return resolvePalace(geoAngle: geoAngle < 0 ? geoAngle + 360.0 : geoAngle)
     }
@@ -656,6 +655,7 @@ public class FloorplanEngine {
         rooms: [FloorplanRoom],
         centroid: CGPoint,
         heading: Double,
+        aspectRatio: CGFloat,
         excludingGua: Set<String>
     ) -> [FloorplanAuditItem] {
         let footprintRooms = rooms.filter {
@@ -700,7 +700,7 @@ public class FloorplanEngine {
             guard !occupied else { continue }
 
             let center = CGPoint(x: sector.midX, y: sector.midY)
-            let palace = palaceForPoint(center, centroid: centroid, heading: heading)
+            let palace = palaceForPoint(center, centroid: centroid, heading: heading, aspectRatio: aspectRatio)
             guard !emittedGua.contains(palace.gua) else { continue }
             emittedGua.insert(palace.gua)
             let content = missingCornerContent(gua: palace.gua)

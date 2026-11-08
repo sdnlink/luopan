@@ -95,6 +95,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var deviceMotionEnabled: Bool = true
     private var headingUpdatesEnabled: Bool = true
     private var hasCoreLocationTrueHeading: Bool = false
+    private var offlineDeclination: Double?
     private var lastSolarCalcTime: TimeInterval = 0
     private var solarCalculationInFlight: Bool = false
     private var solarCalculationGeneration: Int = 0
@@ -764,6 +765,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.locationAuthorizationStatus = status
             if status == .denied || status == .restricted {
                 self.hasLocationFix = false
+                self.offlineDeclination = nil
                 self.hasDeclination = false
                 self.hasCoreLocationTrueHeading = false
                 self.currentDeclination = 0.0
@@ -821,14 +823,15 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
                 self.hasDeclination = true
                 self.hasCoreLocationTrueHeading = true
             } else {
-                // trueHeading < 0 means Core Location no longer has a valid
-                // calibrated geographic heading. Do not keep advertising an
-                // old Core Location correction; the next valid location will
-                // refresh WMM and the true-north fallback.
                 self.hasCoreLocationTrueHeading = false
-                self.hasDeclination = false
-                self.currentDeclination = 0.0
-                self.trueHeading = mag
+                // The system heading and the offline model have independent
+                // validity. A missing system true heading does not invalidate
+                // a WMM correction computed from a still-valid location fix.
+                let correction = self.hasLocationFix ? self.offlineDeclination : nil
+                self.hasDeclination = correction != nil
+                self.currentDeclination = correction ?? 0.0
+                self.trueHeading = (mag + (correction ?? 0.0) + 360.0)
+                    .truncatingRemainder(dividingBy: 360.0)
             }
             
             let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
@@ -874,6 +877,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             // 拒绝/受限/定位服务不可用/网络等任何非瞬态失败都视为失去定位，
             // 避免陈旧经纬度、磁偏角与太阳时继续参与术数计算。
             self.hasLocationFix = false
+            self.offlineDeclination = nil
             self.hasDeclination = false
             self.hasCoreLocationTrueHeading = false
             self.currentDeclination = 0.0
@@ -902,19 +906,17 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             self.longitude = loc.coordinate.longitude
             self.altitude = loc.altitude
 
-            // Do not overwrite Core Location's calibrated declination with an
-            // offline model when trueHeading is already available. WMM remains
-            // the fallback for devices/locations where Core Location has not
-            // produced a true heading yet.
+            let wmm = WorldMagneticModel.shared.field(
+                latitude: loc.coordinate.latitude,
+                longitude: loc.coordinate.longitude,
+                altitudeMeters: loc.altitude,
+                date: Date()
+            )
+            self.offlineDeclination = wmm.declination.isFinite ? wmm.declination : nil
+            // Cache the fallback even while Core Location supplies true north.
             if !self.hasCoreLocationTrueHeading {
-                let wmm = WorldMagneticModel.shared.field(
-                    latitude: loc.coordinate.latitude,
-                    longitude: loc.coordinate.longitude,
-                    altitudeMeters: loc.altitude,
-                    date: Date()
-                )
-                self.currentDeclination = wmm.declination
-                self.hasDeclination = true
+                self.currentDeclination = self.offlineDeclination ?? 0.0
+                self.hasDeclination = self.offlineDeclination != nil
                 self.trueHeading = (self.magneticHeading + self.currentDeclination + 360.0)
                     .truncatingRemainder(dividingBy: 360.0)
             }

@@ -465,47 +465,16 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             }
         }
 
-        let resolvedHeading = resolvedDoorCompassHeading(for: rooms)
         let blueprint = Self.render2DBlueprintImage(rooms: rooms, envelope: envelope)
         FloorplanView.persistRoomPlanImport(
             rooms: generatedRooms,
             centroid: centroid,
             blueprintImage: blueprint,
-            compassHeading: resolvedHeading,
+            // The blueprint's top is world -Z, rather than the door normal.
+            compassHeading: effectiveHeadingForDisplay,
             spatialSurvey: currentSpatialSurvey
         )
         return true
-    }
-
-    private func resolvedDoorCompassHeading(for rooms: [CapturedRoom]) -> Double? {
-        let doors = Self.deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
-        let primaryDoor: CapturedRoom.Surface?
-        if let envelope = Self.compute2DEnvelope(for: rooms), !doors.isEmpty {
-            func boundaryDistance(_ door: CapturedRoom.Surface) -> Float {
-                let p = door.transform.columns.3
-                return min(
-                    abs(p.x - envelope.minX), abs(p.x - envelope.maxX),
-                    abs(p.z - envelope.minZ), abs(p.z - envelope.maxZ)
-                )
-            }
-            primaryDoor = doors.min { lhs, rhs in
-                let ld = boundaryDistance(lhs)
-                let rd = boundaryDistance(rhs)
-                if abs(ld - rd) > 0.05 { return ld < rd }
-                return lhs.dimensions.x > rhs.dimensions.x
-            }
-        } else {
-            primaryDoor = doors.first ?? Self.deduplicated(rooms.flatMap { $0.openings }, id: { $0.identifier }).first
-        }
-        guard let door = primaryDoor else {
-            return nil
-        }
-        let normal = door.transform.columns.2
-        let normLen = hypot(normal.x, normal.z)
-        guard normLen > 0.01 else { return nil }
-        let localAngleDeg = Double(atan2(normal.x, -normal.z)) * 180.0 / .pi
-        let raw = initialCompassHeading + localAngleDeg
-        return (raw.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
     }
 
     /// Computes the true 2D floor polygon area and geometric centroid (PRD 6.7
@@ -635,20 +604,22 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         rooms: [CapturedRoom],
         envelope: (minX: Float, maxX: Float, minZ: Float, maxZ: Float)
     ) -> UIImage {
-        let size = CGSize(width: 960, height: 960)
+        let spanX = max(0.5, envelope.maxX - envelope.minX)
+        let spanZ = max(0.5, envelope.maxZ - envelope.minZ)
+        let size = GeometryUtils.aspectFitRect(aspectRatio: CGFloat(spanX / spanZ),
+                                              in: CGRect(x: 0, y: 0, width: 960, height: 960)).size
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let spanX = max(0.5, envelope.maxX - envelope.minX)
-        let spanZ = max(0.5, envelope.maxZ - envelope.minZ)
-        let pad: CGFloat = 96.0
-        let drawW = size.width - pad * 2
-        let drawH = size.height - pad * 2
+        let padX = size.width * 0.10
+        let padY = size.height * 0.10
+        let drawW = size.width - padX * 2
+        let drawH = size.height - padY * 2
 
         let mapPoint: (Float, Float) -> CGPoint = { x, z in
             let nx = CGFloat((x - envelope.minX) / spanX)
             let nz = CGFloat((z - envelope.minZ) / spanZ)
-            return CGPoint(x: pad + nx * drawW, y: pad + nz * drawH)
+            return CGPoint(x: padX + nx * drawW, y: padY + nz * drawH)
         }
         let allWalls = deduplicated(rooms.flatMap { $0.walls }, id: { $0.identifier })
         let allWindows = deduplicated(rooms.flatMap { $0.windows }, id: { $0.identifier })
@@ -664,11 +635,12 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             cg.setStrokeColor(UIColor.white.withAlphaComponent(0.06).cgColor)
             cg.setLineWidth(1)
             for idx in 0...8 {
-                let offset = pad + CGFloat(idx) * (drawW / 8.0)
-                cg.move(to: CGPoint(x: offset, y: pad))
-                cg.addLine(to: CGPoint(x: offset, y: size.height - pad))
-                cg.move(to: CGPoint(x: pad, y: offset))
-                cg.addLine(to: CGPoint(x: size.width - pad, y: offset))
+                let x = padX + CGFloat(idx) * (drawW / 8.0)
+                let y = padY + CGFloat(idx) * (drawH / 8.0)
+                cg.move(to: CGPoint(x: x, y: padY))
+                cg.addLine(to: CGPoint(x: x, y: size.height - padY))
+                cg.move(to: CGPoint(x: padX, y: y))
+                cg.addLine(to: CGPoint(x: size.width - padX, y: y))
             }
             cg.strokePath()
 
@@ -708,7 +680,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 .font: UIFont.monospacedSystemFont(ofSize: 22, weight: .bold),
                 .foregroundColor: UIColor(red: 0.95, green: 0.85, blue: 0.45, alpha: 0.9)
             ]
-            dimText.draw(at: CGPoint(x: pad, y: 34), withAttributes: attrs)
+            dimText.draw(at: CGPoint(x: padX, y: 12), withAttributes: attrs)
         }
     }
 

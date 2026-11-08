@@ -9,7 +9,7 @@ extension Notification.Name {
     public static let didImportRoomPlanFloorplan = Notification.Name("com.yanxiang.compass.didImportRoomPlanFloorplan")
 }
 
-private struct SavedFloorplanLayout: Codable {
+struct SavedFloorplanLayout: Codable {
     let rooms: [FloorplanRoom]
     let centroidX: Double
     let centroidY: Double
@@ -21,17 +21,73 @@ private struct SavedFloorplanLayout: Codable {
     /// restore before they can continue to unlock the layout.
     let floorplanAccessGrantID: String?
     let floorplanAccessGrantSignature: String?
+    var aspectRatio: Double? = nil
+    var widthMeters: Double? = nil
+    var depthMeters: Double? = nil
 }
 
 /// P1.2 多套户型宅谱档案记录（支持保存多套房源/客户户型、关联 3D 空间测绘模型及各自的已购解锁凭证）
-private struct FloorplanCaseRecord: Codable, Identifiable {
-    let id: String
+struct FloorplanCaseRecord: Codable, Identifiable {
+    var id: String
     var title: String
     let createdAt: Date
     let sittingSummary: String
     let layout: SavedFloorplanLayout
-    let imageFileName: String?
+    var imageFileName: String?
     var spatialSurvey: HouseSpatialSurvey? = nil
+    var virtualSpatialSurvey: HouseSpatialSurvey? = nil
+    var exteriorRecords: [ExteriorShaRecord]? = nil
+    // Included only in portable JSON backups, never in the defaults archive.
+    var backupImageData: Data? = nil
+}
+
+enum FloorplanCaseAssets {
+    static func imageURL(fileName: String, directory: URL) throws -> URL {
+        guard !fileName.isEmpty, fileName != ".", fileName != "..",
+              URL(fileURLWithPath: fileName).lastPathComponent == fileName else {
+            throw CocoaError(.fileReadInvalidFileName)
+        }
+        return directory.appendingPathComponent(fileName, isDirectory: false)
+    }
+
+    static func backup(_ record: FloorplanCaseRecord, directory: URL) throws -> Data {
+        var portable = record
+        if let name = record.imageFileName {
+            portable.backupImageData = try Data(contentsOf: imageURL(fileName: name, directory: directory))
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(portable)
+    }
+
+    static func importBackup(_ data: Data, existingIDs: Set<String>, directory: URL) throws -> FloorplanCaseRecord {
+        var record = try JSONDecoder().decode(FloorplanCaseRecord.self, from: data)
+        if record.id.isEmpty || existingIDs.contains(record.id) { record.id = UUID().uuidString }
+        let imageData: Data?
+        if let embedded = record.backupImageData {
+            imageData = embedded
+        } else if let name = record.imageFileName {
+            // Legacy backups can still be imported on the original device.
+            imageData = try Data(contentsOf: imageURL(fileName: name, directory: directory))
+        } else {
+            imageData = nil
+        }
+        record.imageFileName = nil
+        if let imageData {
+            let name = "floorplan-case-\(UUID().uuidString).jpg"
+            try imageData.write(to: imageURL(fileName: name, directory: directory), options: .atomic)
+            record.imageFileName = name
+        }
+        record.backupImageData = nil
+        return record
+    }
+
+    static func deleteImage(_ record: FloorplanCaseRecord, remainingCases: [FloorplanCaseRecord], directory: URL) throws {
+        guard let name = record.imageFileName,
+              !remainingCases.contains(where: { $0.imageFileName == name }) else { return }
+        let url = try imageURL(fileName: name, directory: directory)
+        if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+    }
 }
 
 /// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
@@ -75,6 +131,7 @@ public struct FloorplanView: View {
     @State private var roomDetectionMessage: String?
     @State private var calibratedWidthText: String = ""
     @State private var calibratedDepthText: String = ""
+    @State private var restoredAspectRatio: CGFloat = 1
     @FocusState private var isCalibrationFieldFocused: Bool
     @State private var roomsBeforeDetection: [FloorplanRoom]?
     @State private var centroidBeforeDetection: CGPoint?
@@ -118,6 +175,19 @@ public struct FloorplanView: View {
         // 直接使用统一的实时磁航向；航向管理器已经负责环形滤波，
         // 这里再按 0.5° 四舍五入会让户型方位和罗盘读数不同步。
         return motion.headingState.facingAngle
+    }
+
+    private var floorplanAspectRatio: CGFloat {
+        if let width = calibratedWidthMeters, let depth = calibratedDepthMeters { return width / depth }
+        if let image = userFloorplanImage, image.size.width > 0, image.size.height > 0 {
+            return image.size.width / image.size.height
+        }
+        return restoredAspectRatio
+    }
+
+    private var projectionDimensions: CGSize {
+        let width = calibratedWidthMeters ?? calibratedDepthMeters.map { $0 * floorplanAspectRatio } ?? 12
+        return CGSize(width: width, height: calibratedDepthMeters ?? width / floorplanAspectRatio)
     }
 
     private var floorplanHeadingState: CompassHeadingState {
@@ -323,6 +393,10 @@ public struct FloorplanView: View {
                     selectedEditingRoomID = nil
                     roomForTypeEditing = nil
                 }
+                calibratedWidthText = ""
+                calibratedDepthText = ""
+                restoredAspectRatio = 1
+                replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
                 floorplanImageBeforePicker = nil
                 persistLayout()
                 refreshAudit(force: true)
@@ -344,8 +418,8 @@ public struct FloorplanView: View {
             // the user had just edited.
             VRSpatialSurveyView(
                 initialFloorplanRooms: auditedRooms.isEmpty ? rooms : auditedRooms,
-                initialWidthMeters: calibratedWidthMeters,
-                initialDepthMeters: calibratedDepthMeters
+                initialWidthMeters: projectionDimensions.width,
+                initialDepthMeters: projectionDimensions.height
             )
         }
         .sheet(isPresented: $showReportShareSheet) {
@@ -414,6 +488,14 @@ public struct FloorplanView: View {
         .onChange(of: centroid) { _ in
             refreshAudit()
         }
+        .onChange(of: calibratedWidthText) { _ in
+            persistLayout()
+            refreshAudit(force: true)
+        }
+        .onChange(of: calibratedDepthText) { _ in
+            persistLayout()
+            refreshAudit(force: true)
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
             persistLayout()
         }
@@ -480,22 +562,20 @@ public struct FloorplanView: View {
             // install with no grant remains locked until acquireFloorplanAccess.
             hasFloorplanAccess: previousGrant.0,
             floorplanAccessGrantID: previousGrant.1,
-            floorplanAccessGrantSignature: previousGrant.2
+            floorplanAccessGrantSignature: previousGrant.2,
+            aspectRatio: blueprintImage.map { Double($0.size.width / max(1, $0.size.height)) }
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: savedLayoutKey)
         }
-        if let survey = spatialSurvey, let surveyData = try? JSONEncoder().encode(survey) {
-            UserDefaults.standard.set(surveyData, forKey: SpatialSurveyArchiveKeys.measured)
-        }
-        // A newly imported measured plan becomes the new baseline; discard a
-        // VR correction from a previous property so it cannot appear beside
-        // the new measured snapshot.
-        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.virtual)
+        ShaSurveyStore.shared.replaceProperty(measured: spatialSurvey, virtual: nil,
+                                              exterior: ShaSurveyStore.shared.records)
         if let imageURL = savedImageURL() {
             if let image = blueprintImage,
                let imageData = image.jpegData(compressionQuality: 0.85) ?? image.pngData() {
                 try? imageData.write(to: imageURL, options: .atomic)
+            } else {
+                try? FileManager.default.removeItem(at: imageURL)
             }
         }
         NotificationCenter.default.post(name: .didImportRoomPlanFloorplan, object: nil)
@@ -541,6 +621,7 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
+        restoreDimensions(saved)
         if saved.hasFloorplanAccess, let grantID = saved.floorplanAccessGrantID {
             if let grantSignature = saved.floorplanAccessGrantSignature,
                iap.validateFloorplanAccessGrant(FloorplanAccessGrant(id: grantID, signature: grantSignature)) {
@@ -568,6 +649,8 @@ public struct FloorplanView: View {
         if let imageURL = Self.savedImageURL(),
            let image = UIImage(contentsOfFile: imageURL.path) {
             userFloorplanImage = image
+        } else {
+            userFloorplanImage = nil
         }
         // Re-seal migrated grants and keep the restored layout in the current
         // format for the next launch.
@@ -600,6 +683,21 @@ public struct FloorplanView: View {
         }
     }
 
+    private func replaceSpatialArchives(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord]) {
+        ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior)
+        persistedSpatialSurvey = measured
+        persistedVirtualSpatialSurvey = virtual
+        currentFloorplanSurvey = nil
+        exportedReportImage = nil
+        FloorplanAuditStore.shared.clear()
+    }
+
+    private func restoreDimensions(_ layout: SavedFloorplanLayout) {
+        restoredAspectRatio = layout.aspectRatio.flatMap { $0.isFinite && $0 > 0 ? CGFloat($0) : nil } ?? 1
+        calibratedWidthText = layout.widthMeters.flatMap { $0.isFinite && $0 > 0 ? String($0) : nil } ?? ""
+        calibratedDepthText = layout.depthMeters.flatMap { $0.isFinite && $0 > 0 ? String($0) : nil } ?? ""
+    }
+
     /// Keep the image outside UserDefaults and store only the small editable
     /// layout model there. This avoids a large synchronous defaults write when
     /// a user imports a camera photo or a high-resolution floor plan.
@@ -614,7 +712,10 @@ public struct FloorplanView: View {
                 && floorplanAccessGrantID != nil
                 && floorplanAccessGrantSignature != nil,
             floorplanAccessGrantID: floorplanAccessGrantID,
-            floorplanAccessGrantSignature: floorplanAccessGrantSignature
+            floorplanAccessGrantSignature: floorplanAccessGrantSignature,
+            aspectRatio: Double(floorplanAspectRatio),
+            widthMeters: calibratedWidthMeters.map { Double($0) },
+            depthMeters: calibratedDepthMeters.map { Double($0) }
         )
         if let data = try? JSONEncoder().encode(saved) {
             UserDefaults.standard.set(data, forKey: Self.savedLayoutKey)
@@ -656,7 +757,7 @@ public struct FloorplanView: View {
             return nil
         }
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory.appendingPathComponent(fileName, isDirectory: false)
+        return try? FloorplanCaseAssets.imageURL(fileName: fileName, directory: directory)
     }
 
     private var archiveButtonTitle: String {
@@ -686,9 +787,16 @@ public struct FloorplanView: View {
         if let image = userFloorplanImage,
            let data = image.jpegData(compressionQuality: 0.82) ?? image.pngData() {
             let fname = "floorplan-case-\(caseID).jpg"
-            if let url = Self.caseImageURL(fileName: fname) {
-                try? data.write(to: url, options: .atomic)
+            guard let url = Self.caseImageURL(fileName: fname) else {
+                caseBackupToastMessage = lang.t("save_failed")
+                return
+            }
+            do {
+                try data.write(to: url, options: .atomic)
                 imgFileName = fname
+            } catch {
+                caseBackupToastMessage = lang.t("save_failed")
+                return
             }
         }
 
@@ -702,7 +810,10 @@ public struct FloorplanView: View {
                 && floorplanAccessGrantID != nil
                 && floorplanAccessGrantSignature != nil,
             floorplanAccessGrantID: floorplanAccessGrantID,
-            floorplanAccessGrantSignature: floorplanAccessGrantSignature
+            floorplanAccessGrantSignature: floorplanAccessGrantSignature,
+            aspectRatio: Double(floorplanAspectRatio),
+            widthMeters: calibratedWidthMeters.map { Double($0) },
+            depthMeters: calibratedDepthMeters.map { Double($0) }
         )
 
         let record = FloorplanCaseRecord(
@@ -712,7 +823,9 @@ public struct FloorplanView: View {
             sittingSummary: sittingText,
             layout: currentLayout,
             imageFileName: imgFileName,
-            spatialSurvey: persistedSpatialSurvey ?? persistedVirtualSpatialSurvey
+            spatialSurvey: persistedSpatialSurvey,
+            virtualSpatialSurvey: persistedVirtualSpatialSurvey,
+            exteriorRecords: ShaSurveyStore.shared.records
         )
         savedCases.insert(record, at: 0)
         persistCasesArchive()
@@ -720,6 +833,13 @@ public struct FloorplanView: View {
     }
 
     private func loadCaseFromArchive(_ record: FloorplanCaseRecord) {
+        roomDetectionGeneration &+= 1
+        isDetectingRooms = false
+        roomsBeforeDetection = nil
+        centroidBeforeDetection = nil
+        selectedRoom = nil
+        selectedEditingRoomID = nil
+        roomForTypeEditing = nil
         let saved = record.layout
         rooms = saved.rooms.map { r in
             var copy = Self.sanitizedRoom(r)
@@ -732,6 +852,7 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
+        restoreDimensions(saved)
         if saved.hasFloorplanAccess,
            let gID = saved.floorplanAccessGrantID,
            let gSig = saved.floorplanAccessGrantSignature,
@@ -753,21 +874,15 @@ public struct FloorplanView: View {
             userFloorplanImage = nil
         }
 
-        if let survey = record.spatialSurvey {
-            let isVR = survey.scanMethod.localizedCaseInsensitiveContains("VR") || survey.scanMethod.contains("仿真")
-            if isVR {
-                persistedVirtualSpatialSurvey = survey
-                if let sData = try? JSONEncoder().encode(survey) {
-                    UserDefaults.standard.set(sData, forKey: SpatialSurveyArchiveKeys.virtual)
-                }
-            } else {
-                persistedSpatialSurvey = survey
-                if let sData = try? JSONEncoder().encode(survey) {
-                    UserDefaults.standard.set(sData, forKey: SpatialSurveyArchiveKeys.measured)
-                }
-            }
-            ShaSurveyStore.shared.updateInterior(survey)
-        }
+        // Older records stored a VR model in the only available survey field.
+        let legacyIsVirtual = record.spatialSurvey.map {
+            $0.scanMethod.localizedCaseInsensitiveContains("VR") || $0.scanMethod.contains("仿真")
+        } ?? false
+        replaceSpatialArchives(
+            measured: legacyIsVirtual ? nil : record.spatialSurvey,
+            virtual: record.virtualSpatialSurvey ?? (legacyIsVirtual ? record.spatialSurvey : nil),
+            exterior: record.exteriorRecords ?? []
+        )
 
         persistedImageObjectID = nil
         persistLayout()
@@ -775,10 +890,12 @@ public struct FloorplanView: View {
     }
 
     private func exportCaseJSONToClipboard(_ record: FloorplanCaseRecord) {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let data = try? encoder.encode(record),
-              let jsonStr = String(data: data, encoding: .utf8) else { return }
+        guard let directory = Self.savedImageURL()?.deletingLastPathComponent(),
+              let data = try? FloorplanCaseAssets.backup(record, directory: directory),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            caseBackupToastMessage = lang.t("save_failed")
+            return
+        }
         UIPasteboard.general.string = jsonStr
         switch lang.effectiveLanguage {
         case .en: caseBackupToastMessage = "Copied case JSON backup to clipboard"
@@ -795,7 +912,8 @@ public struct FloorplanView: View {
     private func importCaseJSONFromClipboard() {
         guard let raw = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines),
               let data = raw.data(using: .utf8),
-              var decoded = try? JSONDecoder().decode(FloorplanCaseRecord.self, from: data) else {
+              let directory = Self.savedImageURL()?.deletingLastPathComponent(),
+              let decoded = try? FloorplanCaseAssets.importBackup(data, existingIDs: Set(savedCases.map { $0.id }), directory: directory) else {
             switch lang.effectiveLanguage {
             case .en: caseBackupToastMessage = "Clipboard does not contain valid Case JSON"
             case .zhHant: caseBackupToastMessage = "剪貼簿中未檢測到有效的宅譜 JSON 數據"
@@ -807,17 +925,6 @@ public struct FloorplanView: View {
             case .auto, .zhHans: caseBackupToastMessage = "剪贴板中未检测到有效的宅谱 JSON 数据"
             }
             return
-        }
-        if savedCases.contains(where: { $0.id == decoded.id }) {
-            decoded = FloorplanCaseRecord(
-                id: UUID().uuidString,
-                title: decoded.title,
-                createdAt: decoded.createdAt,
-                sittingSummary: decoded.sittingSummary,
-                layout: decoded.layout,
-                imageFileName: decoded.imageFileName,
-                spatialSurvey: decoded.spatialSurvey
-            )
         }
         savedCases.insert(decoded, at: 0)
         persistCasesArchive()
@@ -834,11 +941,16 @@ public struct FloorplanView: View {
     }
 
     private func deleteCaseFromArchive(_ record: FloorplanCaseRecord) {
-        if let fname = record.imageFileName,
-           let url = Self.caseImageURL(fileName: fname) {
-            try? FileManager.default.removeItem(at: url)
+        let remaining = savedCases.filter { $0.id != record.id }
+        if let directory = Self.savedImageURL()?.deletingLastPathComponent() {
+            do {
+                try FloorplanCaseAssets.deleteImage(record, remainingCases: remaining, directory: directory)
+            } catch {
+                caseBackupToastMessage = lang.t("save_failed")
+                return
+            }
         }
-        savedCases.removeAll { $0.id == record.id }
+        savedCases = remaining
         persistCasesArchive()
     }
 
@@ -991,7 +1103,7 @@ public struct FloorplanView: View {
                                                 Text(item.title)
                                                     .adaptiveFont(size: 14, weight: .bold)
                                                     .foregroundColor(.white)
-                                                if item.spatialSurvey != nil {
+                                                if item.spatialSurvey != nil || item.virtualSpatialSurvey != nil {
                                                     Text("3D")
                                                         .adaptiveFont(size: 9, weight: .bold)
                                                         .padding(.horizontal, 5)
@@ -1077,8 +1189,8 @@ public struct FloorplanView: View {
         let isCurrent: Bool
     }
 
-    private func evaluatePKMetric(id: String, title: String, rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, isCurrent: Bool) -> PropertyPKMetric {
-        let audit = FloorplanEngine.shared.auditFloorplan(rooms: rooms, centroid: centroid, heading: heading)
+    private func evaluatePKMetric(id: String, title: String, rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, aspectRatio: CGFloat, isCurrent: Bool) -> PropertyPKMetric {
+        let audit = FloorplanEngine.shared.auditFloorplan(rooms: rooms, centroid: centroid, heading: heading, aspectRatio: aspectRatio)
         let sitAngle = (heading + 180.0).truncatingRemainder(dividingBy: 360.0)
         let sitMtn = Mountain24Data.shared.mountain(for: sitAngle < 0 ? sitAngle + 360.0 : sitAngle)
         let faceMtn = Mountain24Data.shared.mountain(for: Self.normalizedHeading(heading))
@@ -1146,6 +1258,7 @@ public struct FloorplanView: View {
             rooms: rooms,
             centroid: centroid,
             heading: effectiveHeading,
+            aspectRatio: floorplanAspectRatio,
             isCurrent: true
         )
         let archivedMetrics = savedCases.prefix(5).map { rec in
@@ -1155,6 +1268,7 @@ public struct FloorplanView: View {
                 rooms: rec.layout.rooms,
                 centroid: CGPoint(x: rec.layout.centroidX, y: rec.layout.centroidY),
                 heading: rec.layout.compassRotation,
+                aspectRatio: Self.aspectRatio(for: rec),
                 isCurrent: false
             )
         }
@@ -1284,7 +1398,8 @@ public struct FloorplanView: View {
         let result = FloorplanEngine.shared.auditFloorplan(
             rooms: rooms,
             centroid: centroid,
-            heading: effectiveHeading
+            heading: effectiveHeading,
+            aspectRatio: floorplanAspectRatio
         )
         auditedRooms = result.auditedRooms
         auditReport = result.report
@@ -1298,6 +1413,15 @@ public struct FloorplanView: View {
 
     private var hasFloorplanAccess: Bool {
         iap.hasUnlockedVIP || didConsumeFloorplanCredit
+    }
+
+    private static func aspectRatio(for record: FloorplanCaseRecord) -> CGFloat {
+        if let ratio = record.layout.aspectRatio, ratio.isFinite, ratio > 0 { return CGFloat(ratio) }
+        if let name = record.imageFileName, let url = caseImageURL(fileName: name),
+           let image = UIImage(contentsOfFile: url.path), image.size.height > 0 {
+            return image.size.width / image.size.height
+        }
+        return 1
     }
 
     private func acquireFloorplanAccess() -> Bool {
@@ -1879,6 +2003,9 @@ public struct FloorplanView: View {
 
     private func resetToSampleLayout() {
         userFloorplanImage = nil
+        calibratedWidthText = ""
+        calibratedDepthText = ""
+        restoredAspectRatio = 1
         // Reset both the imported background and any custom room edits so a
         // demo layout can always be restored after explicit confirmation.
         rooms = FloorplanEngine.shared.generateSampleRooms()
@@ -1903,14 +2030,8 @@ public struct FloorplanView: View {
         // Keep an already purchased one-case grant attached to the active
         // layout. Resetting the editor must not silently consume the user's
         // paid case; the next imported plan can reuse that active grant.
+        replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
         persistLayout()
-        // A reset starts a new floorplan. Drop both measured and virtual
-        // snapshots so the 3D buttons cannot reopen geometry from a previous
-        // home after the visible canvas has been cleared.
-        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.measured)
-        UserDefaults.standard.removeObject(forKey: SpatialSurveyArchiveKeys.virtual)
-        persistedSpatialSurvey = nil
-        persistedVirtualSpatialSurvey = nil
         refreshAudit(force: true)
     }
 
@@ -1923,12 +2044,8 @@ public struct FloorplanView: View {
             .filter { $0.type != .missingCorner }
         guard !sourceRooms.isEmpty else { return nil }
 
-        func parsedMeters(_ text: String, fallback: Float) -> Float {
-            let value = Float(text.replacingOccurrences(of: ",", with: ".")) ?? fallback
-            return max(1.0, min(100.0, value.isFinite ? value : fallback))
-        }
-        let width = parsedMeters(calibratedWidthText, fallback: 12.0)
-        let depth = parsedMeters(calibratedDepthText, fallback: 10.0)
+        let width = Float(projectionDimensions.width)
+        let depth = Float(projectionDimensions.height)
         let roomHeight: Float = 2.8
 
         let rooms3D = sourceRooms
@@ -2431,7 +2548,7 @@ public struct FloorplanView: View {
     // MARK: - 户型交互画布
     private func floorplanCanvasView(auditedRooms: [FloorplanRoom]) -> some View {
         GeometryReader { geo in
-            let layoutRect = floorplanContentRect(image: userFloorplanImage, in: geo.size)
+            let layoutRect = floorplanContentRect(in: geo.size)
             let centerPt = CGPoint(
                 x: layoutRect.minX + centroid.x * layoutRect.width,
                 y: layoutRect.minY + centroid.y * layoutRect.height
@@ -2450,7 +2567,6 @@ public struct FloorplanView: View {
                 if let userImg = userFloorplanImage {
                     Image(uiImage: userImg)
                         .resizable()
-                        .scaledToFit()
                         .frame(width: layoutRect.width, height: layoutRect.height)
                         .position(x: layoutRect.midX, y: layoutRect.midY)
                         .opacity(0.85)
@@ -2472,38 +2588,9 @@ public struct FloorplanView: View {
         }
     }
     
-    private func floorplanContentRect(image: UIImage?, in canvasSize: CGSize) -> CGRect {
-        guard let image = image,
-              image.size.width > 0,
-              image.size.height > 0,
-              canvasSize.width > 0,
-              canvasSize.height > 0 else {
-            let side = min(canvasSize.width, canvasSize.height)
-            return CGRect(
-                x: (canvasSize.width - side) / 2,
-                y: (canvasSize.height - side) / 2,
-                width: side,
-                height: side
-            )
-        }
-        let imageAspect = image.size.width / image.size.height
-        let canvasAspect = canvasSize.width / canvasSize.height
-        if imageAspect > canvasAspect {
-            let height = canvasSize.width / imageAspect
-            return CGRect(
-                x: 0,
-                y: (canvasSize.height - height) / 2,
-                width: canvasSize.width,
-                height: height
-            )
-        }
-        let width = canvasSize.height * imageAspect
-        return CGRect(
-            x: (canvasSize.width - width) / 2,
-            y: 0,
-            width: width,
-            height: canvasSize.height
-        )
+    private func floorplanContentRect(in canvasSize: CGSize) -> CGRect {
+        GeometryUtils.aspectFitRect(aspectRatio: floorplanAspectRatio,
+                                    in: CGRect(origin: .zero, size: canvasSize))
     }
 
     private func roomBlockView(room: FloorplanRoom, layoutRect: CGRect) -> some View {
@@ -3025,6 +3112,7 @@ public struct FloorplanView: View {
         let heading = effectiveHeading
         let solarInfo = SolarTimeCalculator.shared.calculate(date: Date(), longitude: motion.longitude)
         let bgImage = userFloorplanImage
+        let planAspectRatio = floorplanAspectRatio
 
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             // The audit can contain more than six rooms/sector findings. Size
@@ -3132,11 +3220,11 @@ public struct FloorplanView: View {
             UIColor(red: 0.09, green: 0.10, blue: 0.14, alpha: 1.0).setFill()
             UIBezierPath(roundedRect: planBox, cornerRadius: 18).fill()
 
+            let innerBox = GeometryUtils.aspectFitRect(aspectRatio: planAspectRatio,
+                                                       in: planBox.insetBy(dx: 24, dy: 24))
             if let bgImg = bgImage {
-                bgImg.draw(in: planBox.insetBy(dx: 20, dy: 20), blendMode: .normal, alpha: 0.80)
+                bgImg.draw(in: innerBox, blendMode: .normal, alpha: 0.80)
             }
-
-            let innerBox = planBox.insetBy(dx: 24, dy: 24)
             for room in roomsToDraw {
                 let rx = innerBox.minX + room.rect.origin.x * innerBox.width
                 let ry = innerBox.minY + room.rect.origin.y * innerBox.height

@@ -7,9 +7,9 @@ import Foundation
 public enum LegalLinks {
     // Escape the slashes so the repository's lightweight Swift checker does
     // not mistake the URL for a source comment.
-    public static let termsOfUse = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-support/")!
-    public static let privacyPolicy = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-privacy/")!
-    public static let subscriptionInfo = URL(string: "https:\u{2F}\u{2F}yulintao.github.io/tiandiluopan-subscription/")!
+    public static let termsOfUse = URL(string: "https://yulintao.github.io/tiandiluopan-support/")!
+    public static let privacyPolicy = URL(string: "https://yulintao.github.io/tiandiluopan-privacy/")!
+    public static let subscriptionInfo = URL(string: "https://yulintao.github.io/tiandiluopan-subscription/")!
     /// 正式上架后分配的 App Store 数字 ID（配置后点击评分直接直达 App Store 撰写长评页面）
     public static let appStoreID: String = ""
 }
@@ -1139,7 +1139,7 @@ public struct AboutPageView: View {
 
     private func handleRateAppTap() {
         if !LegalLinks.appStoreID.isEmpty,
-           let url = URL(string: "https:\u{2F}\u{2F}apps.apple.com/app/id\(LegalLinks.appStoreID)?action=write-review"),
+           let url = URL(string: "https://apps.apple.com/app/id\(LegalLinks.appStoreID)?action=write-review"),
            UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
             return

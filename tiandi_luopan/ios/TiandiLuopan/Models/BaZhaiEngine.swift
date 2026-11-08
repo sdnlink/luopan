@@ -1324,10 +1324,10 @@ public final class RetentionServiceManager: ObservableObject {
 
         // CoreSpotlight 索引注册，支持用户在 iOS 负一屏下拉搜索“财神方位”、“黄道吉日”、“户型风水”、“奇门遁甲”直达本 App
         let entries: [(id: String, title: String, desc: String, keywords: [String])] = [
-            ("tiandiluopan:\u{2F}\u{2F}compass?guide=dailyGods", s1Title, s1Sub, ["财神", "喜神", "罗盘", "吉方", "Compass", "Wealth", "Fengshui"]),
-            ("tiandiluopan:\u{2F}\u{2F}compass?sheet=dailySign", s2Title, s2Sub, ["日签", "黄历", "吉日", "Almanac", "Sign"]),
-            ("tiandiluopan:\u{2F}\u{2F}tab?index=3", s3Title, s3Sub, ["户型", "分房", "缺角", "八宅", "Floorplan", "Room"]),
-            ("tiandiluopan:\u{2F}\u{2F}tab?index=2&sub=qimen", s4Title, s4Sub, ["奇门遁甲", "出行", "签约", "求财", "Qimen"])
+            ("tiandiluopan://compass?guide=dailyGods", s1Title, s1Sub, ["财神", "喜神", "罗盘", "吉方", "Compass", "Wealth", "Fengshui"]),
+            ("tiandiluopan://compass?sheet=dailySign", s2Title, s2Sub, ["日签", "黄历", "吉日", "Almanac", "Sign"]),
+            ("tiandiluopan://tab?index=3", s3Title, s3Sub, ["户型", "分房", "缺角", "八宅", "Floorplan", "Room"]),
+            ("tiandiluopan://tab?index=2&sub=qimen", s4Title, s4Sub, ["奇门遁甲", "出行", "签约", "求财", "Qimen"])
         ]
         var searchableItems: [CSSearchableItem] = []
         for entry in entries {

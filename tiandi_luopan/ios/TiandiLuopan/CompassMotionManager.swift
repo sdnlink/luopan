@@ -430,12 +430,29 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         lockAtFacingAngle(facing)
     }
 
+    /// 直接根据向首山选定并锁定
+    public func selectFacingMountain(_ mountain: Mountain24Item) {
+        lockAtFacingAngle(mountain.centerAngle)
+    }
+
+    /// 微调锁定角度 (如兼向/正向下卦测试)
+    public func adjustLockedAngle(delta: Double) {
+        DispatchQueue.main.async {
+            let current = self.headingState.facingAngle
+            self.lockAtFacingAngle(current + delta)
+        }
+    }
+
     /// 锁定到指定的向首角度（0 ~ 360°）并持久化到 UserDefaults 与 App Group 小组件
     public func lockAtFacingAngle(_ facingAngle: Double) {
         DispatchQueue.main.async {
             let normalized = (facingAngle.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
             self.isLocked = true
-            self.manualOffset = (normalized - self.heading + 360.0).truncatingRemainder(dividingBy: 360.0)
+            self.heading = normalized
+            self.continuousHeading = normalized
+            self.continuousMagneticHeading = normalized
+            self.manualOffset = 0.0
+            self.lastResolvedHeading = -999.0
             self.updateResolvedState(force: true)
             self.persistLockState()
             RetentionServiceManager.shared.recordMilestone(reason: "select_mountain")

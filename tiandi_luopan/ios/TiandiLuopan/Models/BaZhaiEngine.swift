@@ -693,25 +693,32 @@ public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
     public var id: String
     public var role: FamilyRole
     public var customName: String?
+    public var birthDate: Date?
     public var birthYear: Int
     public var isMale: Bool
 
-    public init(id: String = UUID().uuidString, role: FamilyRole, customName: String? = nil, birthYear: Int, isMale: Bool) {
+    public init(id: String = UUID().uuidString, role: FamilyRole, customName: String? = nil, birthDate: Date? = nil, birthYear: Int, isMale: Bool) {
         self.id = id
         self.role = role
         self.customName = customName
-        self.birthYear = max(1920, min(2035, birthYear))
+        self.birthDate = birthDate
+        if let d = birthDate {
+            self.birthYear = UserKuaProfileManager.fengShuiYear(for: d)
+        } else {
+            self.birthYear = max(1920, min(2035, birthYear))
+        }
         self.isMale = isMale
     }
 
     enum CodingKeys: String, CodingKey {
-        case id, role, customName, birthYear, isMale
+        case id, role, customName, birthDate, birthYear, isMale
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.role = try container.decode(FamilyRole.self, forKey: .role)
         self.customName = try container.decodeIfPresent(String.self, forKey: .customName)
+        self.birthDate = try container.decodeIfPresent(Date.self, forKey: .birthDate)
         self.birthYear = try container.decode(Int.self, forKey: .birthYear)
         self.isMale = try container.decode(Bool.self, forKey: .isMale)
         self.id = (try? container.decodeIfPresent(String.self, forKey: .id)) ?? UUID().uuidString
@@ -722,8 +729,27 @@ public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
         try container.encode(id, forKey: .id)
         try container.encode(role, forKey: .role)
         try container.encodeIfPresent(customName, forKey: .customName)
+        try container.encodeIfPresent(birthDate, forKey: .birthDate)
         try container.encode(birthYear, forKey: .birthYear)
         try container.encode(isMale, forKey: .isMale)
+    }
+
+    public var effectiveFengShuiYear: Int {
+        if let d = birthDate {
+            return UserKuaProfileManager.fengShuiYear(for: d)
+        }
+        return birthYear
+    }
+
+    public var formattedBirth: String {
+        if let d = birthDate {
+            let cal = Calendar.current
+            let y = cal.component(.year, from: d)
+            let m = cal.component(.month, from: d)
+            let day = cal.component(.day, from: d)
+            return "\(y)年\(m)月\(day)日"
+        }
+        return "\(birthYear)年"
     }
 
     public var displayName: String {
@@ -734,7 +760,7 @@ public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
     }
 
     public var lifeGuaNumber: Int {
-        UserKuaProfileManager.calcGuaNumber(birthYear: birthYear, isMale: isMale)
+        UserKuaProfileManager.calcGuaNumber(birthYear: effectiveFengShuiYear, isMale: isMale)
     }
 
     public var guaKey: String {
@@ -953,20 +979,26 @@ public final class UserKuaProfileManager: ObservableObject {
         }
     }
 
-    public func addFamilyMember(role: FamilyRole, customName: String? = nil, birthYear: Int, isMale: Bool) {
+    public func addFamilyMember(role: FamilyRole, customName: String? = nil, birthDate: Date? = nil, birthYear: Int, isMale: Bool) {
         if !isProfileEnabled {
             isProfileEnabled = true
         }
-        let profile = FamilyMemberProfile(role: role, customName: customName, birthYear: birthYear, isMale: isMale)
+        let profile = FamilyMemberProfile(role: role, customName: customName, birthDate: birthDate, birthYear: birthYear, isMale: isMale)
         familyMembers.append(profile)
     }
 
-    public func updateFamilyMember(id: String, role: FamilyRole? = nil, customName: String? = nil, birthYear: Int? = nil, isMale: Bool? = nil) {
+    public func updateFamilyMember(id: String, role: FamilyRole? = nil, customName: String? = nil, birthDate: Date? = nil, birthYear: Int? = nil, isMale: Bool? = nil) {
         guard let idx = familyMembers.firstIndex(where: { $0.id == id }) else { return }
         var m = familyMembers[idx]
         if let role = role { m.role = role }
         if let customName = customName { m.customName = customName }
-        if let birthYear = birthYear { m.birthYear = max(1920, min(2035, birthYear)) }
+        if let birthDate = birthDate {
+            m.birthDate = birthDate
+            m.birthYear = UserKuaProfileManager.fengShuiYear(for: birthDate)
+        } else if let birthYear = birthYear {
+            m.birthYear = max(1920, min(2035, birthYear))
+            m.birthDate = nil
+        }
         if let isMale = isMale { m.isMale = isMale }
         familyMembers[idx] = m
     }

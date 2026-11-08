@@ -6,20 +6,57 @@ import os
 import re
 from pathlib import Path
 
-ROOT_DIR = Path(__file__).resolve().parents[1] / "ios" / "TiandiLuopan"
+ROOT_DIR = Path(__file__).resolve().parents[1] / "ios"
+
+def clean_code(text):
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i:i+2] == '/*':
+            out.append(' ')
+            i += 2
+            while i < n and text[i:i+2] != '*/':
+                if text[i] == '\n':
+                    out.append('\n')
+                i += 1
+            i += 2
+        elif text[i:i+2] == '//':
+            i += 2
+            while i < n and text[i] != '\n':
+                i += 1
+        elif text[i:i+3] == '"""':
+            out.append('"')
+            i += 3
+            while i < n and text[i:i+3] != '"""':
+                if text[i] == '\n':
+                    out.append('\n')
+                elif text[i] == '\\' and i + 1 < n:
+                    i += 1
+                i += 1
+            i += 3
+            out.append('"')
+        elif text[i] == '"':
+            out.append('"')
+            i += 1
+            while i < n and text[i] != '"' and text[i] != '\n':
+                if text[i] == '\\' and i + 1 < n:
+                    i += 2
+                    continue
+                i += 1
+            if i < n and text[i] == '"':
+                i += 1
+            out.append('"')
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
 
 def check_file(path):
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
 
-    # Strip comments and string literals to check balanced braces
-    no_comments = re.sub(r'//.*', '', text)
-    no_comments = re.sub(r'/\*.*?\*/', '', no_comments, flags=re.DOTALL)
-    
-    # Strip string literals (preserving newlines for line counting)
-    def replacer(match):
-        return '"' + '\n' * match.group(0).count('\n') + '"'
-    no_strings = re.sub(r'"([^"\\]*(?:\\.[^"\\]*)*)"', replacer, no_comments)
+    no_strings = clean_code(text)
 
     stack = []
     errors = []

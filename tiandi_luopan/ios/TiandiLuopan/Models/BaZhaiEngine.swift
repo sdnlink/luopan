@@ -954,6 +954,9 @@ public final class UserKuaProfileManager: ObservableObject {
     }
 
     public func addFamilyMember(role: FamilyRole, customName: String? = nil, birthYear: Int, isMale: Bool) {
+        if !isProfileEnabled {
+            isProfileEnabled = true
+        }
         let profile = FamilyMemberProfile(role: role, customName: customName, birthYear: birthYear, isMale: isMale)
         familyMembers.append(profile)
     }

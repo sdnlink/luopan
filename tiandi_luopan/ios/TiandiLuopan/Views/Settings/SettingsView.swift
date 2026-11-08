@@ -783,17 +783,13 @@ public struct OwnerKuaReminderPageView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationBarTitle(lang.t("settings_menu_kua_reminder"), displayMode: .inline)
         .preferredColorScheme(.dark)
-        .overlay(
-            Group {
-                if showEditOwnerKuaDialog {
-                    EditOwnerKuaDialog(
-                        isPresented: $showEditOwnerKuaDialog,
-                        sittingPalace: "坎",
-                        onSaved: {}
-                    )
-                }
-            }
-        )
+        .sheet(isPresented: $showEditOwnerKuaDialog) {
+            EditOwnerKuaDialog(
+                isPresented: $showEditOwnerKuaDialog,
+                sittingPalace: "坎",
+                onSaved: {}
+            )
+        }
     }
 
     private var kuaInfoCard: some View {

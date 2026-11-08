@@ -1083,9 +1083,9 @@ public struct FloorplanView: View {
         let sitMtn = Mountain24Data.shared.mountain(for: sitAngle < 0 ? sitAngle + 360.0 : sitAngle)
         let faceMtn = Mountain24Data.shared.mountain(for: Self.normalizedHeading(heading))
         let compat = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: sitMtn.palace)
-        let ausp = audit.report.filter { $0.severity == .auspicious }.count
-        let warn = audit.report.filter { $0.severity == .warning }.count
-        let sev  = audit.report.filter { $0.severity == .severe }.count
+        let ausp = audit.report.filter { $0.isGood }.count
+        let warn = audit.report.filter { $0.isWarning }.count
+        let sev  = audit.report.filter { $0.isSevere }.count
         let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (compat.isMatchedWithHouse ? 8 : -4)
         let clampedScore = max(38, min(99, rawScore))
         let sitLabel = "\(sitMtn.localizedName)\(lang.t("mountain_suffix"))\(faceMtn.localizedName)\(lang.t("facing_suffix"))"

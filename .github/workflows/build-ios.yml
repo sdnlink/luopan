@@ -438,18 +438,17 @@ jobs:
           ENTITLEMENTS_PATH=""
           if [ -n "$SELECTED_GROUP" ]; then
             ENTITLEMENTS_PATH="$RUNNER_TEMP/signing/AppGroup.entitlements"
-            cat > "$ENTITLEMENTS_PATH" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>com.apple.security.application-groups</key>
-              <array>
-                  <string>${SELECTED_GROUP}</string>
-              </array>
-          </dict>
-          </plist>
-          EOF
+            printf '%s\n' \
+              '<?xml version="1.0" encoding="UTF-8"?>' \
+              '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+              '<plist version="1.0">' \
+              '<dict>' \
+              '    <key>com.apple.security.application-groups</key>' \
+              '    <array>' \
+              "        <string>${SELECTED_GROUP}</string>" \
+              '    </array>' \
+              '</dict>' \
+              '</plist>' > "$ENTITLEMENTS_PATH"
             plutil -lint "$ENTITLEMENTS_PATH"
             echo "Using App Group '$SELECTED_GROUP'; generated $ENTITLEMENTS_PATH"
             echo "::warning::CODE_SIGN_ENTITLEMENTS override applies to ALL targets and replaces the project's own entitlements files."
@@ -583,39 +582,31 @@ jobs:
                   <string>${PROFILE_UUID}</string>"
           fi
 
-          cat > ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>${METHOD}</string>
-
-              <key>signingStyle</key>
-              <string>manual</string>
-
-              <key>signingCertificate</key>
-              <string>${SIGNING_CERT}</string>
-
-              <key>teamID</key>
-              <string>${TEAM_ID}</string>
-
-              <key>provisioningProfiles</key>
-              <dict>
-                  ${PROFILES_MAP}
-              </dict>
-
-              <key>destination</key>
-              <string>export</string>
-
-              <key>manageAppVersionAndBuildNumber</key>
-              <false/>
-
-              <key>stripSwiftSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          EOF
+          printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0">' \
+            '<dict>' \
+            "    <key>method</key>" \
+            "    <string>${METHOD}</string>" \
+            "    <key>signingStyle</key>" \
+            "    <string>manual</string>" \
+            "    <key>signingCertificate</key>" \
+            "    <string>${SIGNING_CERT}</string>" \
+            "    <key>teamID</key>" \
+            "    <string>${TEAM_ID}</string>" \
+            "    <key>provisioningProfiles</key>" \
+            "    <dict>" \
+            "        ${PROFILES_MAP}" \
+            "    </dict>" \
+            "    <key>destination</key>" \
+            "    <string>export</string>" \
+            "    <key>manageAppVersionAndBuildNumber</key>" \
+            "    <false/>" \
+            "    <key>stripSwiftSymbols</key>" \
+            "    <true/>" \
+            '</dict>' \
+            '</plist>' > ExportOptions.plist
 
           plutil -lint ExportOptions.plist
 

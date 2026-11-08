@@ -373,6 +373,7 @@ public struct QimenDunjiaView: View {
                         .foregroundColor(isSelected ? .black : .white.opacity(0.85))
                         .cornerRadius(6)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }

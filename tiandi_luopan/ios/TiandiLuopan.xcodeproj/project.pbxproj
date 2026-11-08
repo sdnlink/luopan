@@ -84,6 +84,7 @@
 		9112 /* WidgetKit.framework in App Frameworks */ = {isa = PBXBuildFile; fileRef = 9210 /* WidgetKit.framework */; };
 		9113 /* Widget PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 9211 /* Widget PrivacyInfo.xcprivacy */; };
 		9111 /* TiandiLuopanWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 9209 /* TiandiLuopanWidget.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		9603 /* FunctionalRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9602 /* FunctionalRegressionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -173,6 +174,8 @@
 		9209 /* TiandiLuopanWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TiandiLuopanWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		9210 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		9211 /* Widget PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		9601 /* TiandiLuopanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TiandiLuopanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9602 /* FunctionalRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionalRegressionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -182,6 +185,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 5002;
 			remoteInfo = TiandiLuopanWidget;
+		};
+		9607 /* Test Host Proxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5001;
+			remoteInfo = TiandiLuopan;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -225,6 +235,12 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9605 /* Test Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -233,6 +249,7 @@
 			children = (
 				4001 /* TiandiLuopan */,
 				4004 /* TiandiLuopanWidget */,
+				9600 /* TiandiLuopanTests */,
 				4002 /* Frameworks */,
 				4003 /* Products */,
 			);
@@ -355,6 +372,7 @@
 			children = (
 				2000 /* TiandiLuopan.app */,
 				9209 /* TiandiLuopanWidget.appex */,
+				9601 /* TiandiLuopanTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -368,6 +386,12 @@
 				9211 /* Widget PrivacyInfo.xcprivacy */,
 			);
 			path = TiandiLuopanWidget;
+			sourceTree = "<group>";
+		};
+		9600 /* TiandiLuopanTests */ = {
+			isa = PBXGroup;
+			children = (9602 /* FunctionalRegressionTests.swift */,);
+			path = TiandiLuopanTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -409,6 +433,17 @@
 			productReference = 9209 /* TiandiLuopanWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		9609 /* TiandiLuopanTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9610 /* Test Configurations */;
+			buildPhases = (9604 /* Test Sources */, 9605 /* Test Frameworks */, 9606 /* Test Resources */,);
+			buildRules = ();
+			dependencies = (9608 /* Test Host Dependency */,);
+			name = TiandiLuopanTests;
+			productName = TiandiLuopanTests;
+			productReference = 9601 /* TiandiLuopanTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXTargetDependency section */
@@ -416,6 +451,11 @@
 			isa = PBXTargetDependency;
 			target = 5002 /* TiandiLuopanWidget */;
 			targetProxy = 9001 /* PBXContainerItemProxy */;
+		};
+		9608 /* Test Host Dependency */ = {
+			isa = PBXTargetDependency;
+			target = 5001 /* TiandiLuopan */;
+			targetProxy = 9607 /* Test Host Proxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -427,6 +467,7 @@
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					9609 = {CreatedOnToolsVersion = 15.0; TestTargetID = 5001; };
 					5001 = {
 						CreatedOnToolsVersion = 15.0;
 					};
@@ -455,6 +496,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				9609 /* TiandiLuopanTests */,
 				5001 /* TiandiLuopan */,
 				5002 /* TiandiLuopanWidget */,
 			);
@@ -480,6 +522,12 @@
 			files = (
 				9113 /* Widget PrivacyInfo.xcprivacy in Resources */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9606 /* Test Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -559,6 +607,12 @@
 				9108 /* Mountain24.swift in Widget Sources */,
 				9109 /* LocalizationManager.swift in Widget Sources */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9604 /* Test Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (9603 /* FunctionalRegressionTests.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -723,6 +777,40 @@
 			};
 			name = Release;
 		};
+		9611 /* Test Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TiandiLuopan.app/TiandiLuopan";
+			};
+			name = Debug;
+		};
+		9612 /* Test Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@loader_path/Frameworks",);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yanxiang.compass.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TiandiLuopan.app/TiandiLuopan";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -750,6 +838,12 @@
 				8005 /* Widget Debug */,
 				8006 /* Widget Release */,
 			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		9610 /* Test Configurations */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (9611 /* Test Debug */, 9612 /* Test Release */,);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};

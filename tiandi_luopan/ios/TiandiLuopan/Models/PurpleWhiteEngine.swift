@@ -191,7 +191,8 @@ public class PurpleWhiteEngine {
     }
 
     public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> PurpleWhiteChart {
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
         let rawYear = calendar.component(.year, from: date)
         let rawMonth = calendar.component(.month, from: date)
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)

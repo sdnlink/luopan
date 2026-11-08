@@ -66,21 +66,18 @@ public final class SolarTimeCalculator {
         return calculate(date: Date(), longitude: longitude)
     }
 
-    public func calculate(date: Date = Date(), longitude: Double = 0.0) -> SolarTimeResult {
+    public func calculate(date: Date = Date(), longitude: Double = 0.0, timeZone: TimeZone = .current) -> SolarTimeResult {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
+        calendar.timeZone = timeZone
 
-        let components = calendar.dateComponents([.hour, .minute, .second], from: date)
-        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        // 以当前系统时区的标准经线为基准；中国时区仍然等于东经 120°，
-        // 在其他地区也不会误套北京时间。secondsFromGMT(for:) 包含夏令时，
-        // 直接使用会在夏令时地区额外产生 1 小时（15°）的经度误差；
-        // 真太阳时应以时区的标准偏移量作为民用钟表基准。
-        let daylightSavingOffset = calendar.timeZone.daylightSavingTimeOffset(for: date)
-        let standardSecondsFromGMT = calendar.timeZone.secondsFromGMT(for: date) - Int(daylightSavingOffset)
-        let timezoneMeridian = Double(standardSecondsFromGMT) / 3600.0 * 15.0
-        let longitudeOffset = (longitude - timezoneMeridian) * 4.0
-        let daysInYear = Double(calendar.range(of: .day, in: .year, for: date)?.count ?? 365)
+        // Solar clock components are represented in UTC to avoid applying
+        // daylight saving time a second time, including at DST transitions.
+        var solarCalendar = Calendar(identifier: .gregorian)
+        solarCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let components = solarCalendar.dateComponents([.hour, .minute, .second], from: date)
+        let dayOfYear = solarCalendar.ordinality(of: .day, in: .year, for: date) ?? 1
+        let daysInYear = Double(solarCalendar.range(of: .day, in: .year, for: date)?.count ?? 365)
         let fractionalDay = Double(dayOfYear - 1)
             + Double((components.hour ?? 12) - 12) / 24.0
             + Double(components.minute ?? 0) / 1_440.0
@@ -93,28 +90,32 @@ public final class SolarTimeCalculator {
             - 0.014615 * cos(2.0 * gamma)
             - 0.040849 * sin(2.0 * gamma)
         )
-        let totalOffsetMinutes = longitudeOffset + equationOfTime
-        let trueSolarDate = date.addingTimeInterval(totalOffsetMinutes * 60.0)
+        let solarOffsetMinutes = longitude * 4.0 + equationOfTime
+        let totalOffsetMinutes = solarOffsetMinutes - Double(timeZone.secondsFromGMT(for: date)) / 60.0
+        let trueSolarDate = date.addingTimeInterval(solarOffsetMinutes * 60.0)
 
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         formatter.timeZone = calendar.timeZone
+        let solarFormatter = DateFormatter()
+        solarFormatter.calendar = solarCalendar
+        solarFormatter.dateFormat = "HH:mm:ss"
+        solarFormatter.timeZone = solarCalendar.timeZone
 
         let termIndex = solarTermIndex(for: date)
-        // Four Pillars use local apparent solar time.  A longitude correction
-        // can move an instant across a solar-term boundary, so derive the
-        // year/month pillar bucket from the corrected instant as well.
-        let baziTermIndex = solarTermIndex(for: trueSolarDate)
+        // Year/month boundaries are astronomical instants, independent of
+        // longitude. Only the day/hour use the apparent solar clock.
         let bazi = calculateBazi(
             for: trueSolarDate,
-            termIndex: baziTermIndex,
-            calendar: calendar,
-            beforeLiChun: isBeforeLiChun(for: trueSolarDate)
+            termIndex: termIndex,
+            calendar: solarCalendar,
+            civilYear: calendar.component(.year, from: date),
+            beforeLiChun: isBeforeLiChun(for: date, timeZone: timeZone)
         )
 
         return SolarTimeResult(
             standardTimeString: formatter.string(from: date),
-            trueSolarTimeString: formatter.string(from: trueSolarDate),
+            trueSolarTimeString: solarFormatter.string(from: trueSolarDate),
             timeOffsetMinutes: totalOffsetMinutes,
             equationOfTimeMinutes: equationOfTime,
             solarTermName: solarTerms[termIndex],
@@ -148,9 +149,9 @@ public final class SolarTimeCalculator {
     /// before Li Chun (index 2).  Checking only `termIndex < 2` therefore
     /// mislabels January dates that are still in index 23 as the new Ganzhi
     /// year.
-    public func isBeforeLiChun(for date: Date) -> Bool {
+    public func isBeforeLiChun(for date: Date, timeZone: TimeZone = .current) -> Bool {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
+        calendar.timeZone = timeZone
         let month = calendar.component(.month, from: date)
         let termIndex = solarTermIndex(for: date)
         // Bucket 23 is handled by the January branch above; in February only
@@ -197,6 +198,7 @@ public final class SolarTimeCalculator {
         for date: Date,
         termIndex: Int,
         calendar: Calendar,
+        civilYear: Int,
         beforeLiChun: Bool
     ) -> (fullText: String, dayPillar: String) {
         let components = calendar.dateComponents([.year, .month, .day, .hour], from: date)
@@ -207,13 +209,8 @@ public final class SolarTimeCalculator {
             ? (calendar.date(byAdding: .day, value: 1, to: date) ?? date)
             : date
         let dayComponents = calendar.dateComponents([.year, .month, .day], from: dayPillarDate)
-        let civilYear = components.year ?? 2000
-        // Li Chun is a civil-date boundary in addition to the solar-term
-        // bucket.  In January the sun can still be in bucket 23 (冬至), which
-        // is before Li Chun even though its index is greater than 2.
-        // The caller evaluates Li Chun using the same corrected apparent-solar
-        // instant used for the month bucket. This avoids assigning a different
-        // year during the few minutes around the boundary.
+        // The year comes from the original civil instant, even if the solar
+        // clock has crossed December 31 / January 1 at this longitude.
         let ganzhiYear = beforeLiChun ? civilYear - 1 : civilYear
         let yearCycle = positiveModulo(ganzhiYear - 4, 60)
         let yearStem = yearCycle % 10

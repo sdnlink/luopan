@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 // MARK: - 紫白飞星流年流月客星动态气运与太岁三煞视图 (PRD 第12章)
 
@@ -19,6 +20,9 @@ public struct PurpleWhiteView: View {
     @State private var selectedPalaceId: Int? = nil
     @State private var lastFacingSector: Int?
     @State private var lastCalendarDayKey: Int?
+    @State private var lastSolarTermIndex: Int?
+
+    private static let chartRefreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     // 两套口径（见 AdaptiveLayout）：isSplitLayout = Duo 内屏 / iPad 横屏左右分栏；
     // isLargeLayout 为宽屏（含 iPad），只放大宫格与内容尺寸。
@@ -69,6 +73,12 @@ public struct PurpleWhiteView: View {
         }
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshChart(force: true)
+        }
+        .onChange(of: motion.currentSolarTermName) { _ in
+            if !isUsingCustomDate { refreshChart() }
+        }
+        .onReceive(Self.chartRefreshTimer) { _ in
+            if !isUsingCustomDate { refreshChart() }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             refreshChart(force: true)
@@ -304,13 +314,18 @@ public struct PurpleWhiteView: View {
         guard isActive else { return }
         let effectiveDate = isUsingCustomDate ? selectedDate : Date()
         let sector = facingSector(for: motion.headingState.facingAngle)
-        let components = Calendar.current.dateComponents([.year, .month, .day], from: effectiveDate)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let components = calendar.dateComponents([.year, .month, .day], from: effectiveDate)
+        let termIndex = SolarTimeCalculator.shared.solarTermIndex(for: effectiveDate)
         let calendarDayKey = (components.year ?? 0) * 10_000
             + (components.month ?? 0) * 100
             + (components.day ?? 0)
-        if !force, lastFacingSector == sector, lastCalendarDayKey == calendarDayKey { return }
+        if !force, lastFacingSector == sector, lastCalendarDayKey == calendarDayKey,
+           lastSolarTermIndex == termIndex { return }
         lastFacingSector = sector
         lastCalendarDayKey = calendarDayKey
+        lastSolarTermIndex = termIndex
         cachedChart = PurpleWhiteEngine.shared.calculateChart(date: effectiveDate, heading: motion.headingState.facingAngle)
     }
 

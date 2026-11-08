@@ -20,6 +20,12 @@
                ReferencedContainer = "container:TiandiLuopan.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry buildForTesting = "YES" buildForRunning = "NO"
+            buildForProfiling = "NO" buildForArchiving = "NO" buildForAnalyzing = "NO">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "9609"
+               BuildableName = "TiandiLuopanTests.xctest" BlueprintName = "TiandiLuopanTests"
+               ReferencedContainer = "container:TiandiLuopan.xcodeproj"/>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -28,6 +34,11 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference skipped = "NO" parallelizable = "NO">
+            <BuildableReference BuildableIdentifier = "primary" BlueprintIdentifier = "9609"
+               BuildableName = "TiandiLuopanTests.xctest" BlueprintName = "TiandiLuopanTests"
+               ReferencedContainer = "container:TiandiLuopan.xcodeproj"/>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import Combine
 
 // MARK: - 全景形煞数据模型 (外部标注 / 距离判级 / 八宫聚合 / 室内外统一档案)
 // 补齐 AR 实景测绘的三大缺口：距离参与严重度分级、结构化标记持久化、
@@ -208,9 +209,11 @@ public final class ShaSurveyStore: ObservableObject {
     @Published public private(set) var latestInterior: HouseSpatialSurvey?
 
     private let storageKey = "tianji.sha_survey_store.v1"
+    private let defaults: UserDefaults
 
-    private init() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        guard let data = defaults.data(forKey: storageKey),
               let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         records = snapshot.records
         latestInterior = snapshot.latestInterior
@@ -224,7 +227,17 @@ public final class ShaSurveyStore: ObservableObject {
     private func persist() {
         let snapshot = Snapshot(records: records, latestInterior: latestInterior)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        UserDefaults.standard.set(data, forKey: storageKey)
+        defaults.set(data, forKey: storageKey)
+    }
+
+    /// A property switch replaces the entire archive, including empty slots.
+    /// Updating one slot in isolation would retain another property's model.
+    public func replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord]) {
+        defaults.set(measured.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.measured)
+        defaults.set(virtual.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.virtual)
+        records = exterior
+        latestInterior = measured ?? virtual
+        persist()
     }
 
     public func addRecord(_ record: ExteriorShaRecord) {

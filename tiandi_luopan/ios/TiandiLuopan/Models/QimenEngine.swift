@@ -370,7 +370,8 @@ public class QimenEngine {
 
     /// 日干支序号 (0..59)。与 SolarTimeCalculator 的 (JDN+49)%60 口径一致。
     private func dayGanZhiIndex(for date: Date) -> Int {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
         let comps = cal.dateComponents([.year, .month, .day], from: date)
         let y = comps.year ?? 2000, m = comps.month ?? 1, d = comps.day ?? 1
         let a = Int((14 - m) / 12)
@@ -381,7 +382,8 @@ public class QimenEngine {
     }
 
     public func calculateChart(date: Date = Date(), heading: Double = 0.0) -> QimenChart {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = .current
         let hour = cal.component(.hour, from: date)
         let solarTermIndex = SolarTimeCalculator.shared.solarTermIndex(for: date)
 

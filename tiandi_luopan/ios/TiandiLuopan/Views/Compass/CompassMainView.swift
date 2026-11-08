@@ -19,6 +19,7 @@ public struct CompassMainView: View {
     @State private var showLayerSheet = false
     @State private var showCalibSheet = false
     @State private var showDailySignSheet = false
+    @State private var showMountainPickerSheet = false
     
     public init(isActive: Bool = true) {
         self.isActive = isActive
@@ -127,6 +128,9 @@ public struct CompassMainView: View {
         .sheet(isPresented: $showDailySignSheet) {
             DailyAuspiciousCardSheet(sittingMountain: motion.headingState.sittingMountain)
         }
+        .sheet(isPresented: $showMountainPickerSheet) {
+            Mountain24PickerSheet(isPresented: $showMountainPickerSheet)
+        }
         .onAppear {
             motion.refreshTimeAndSolarTerm()
         }
@@ -175,6 +179,22 @@ public struct CompassMainView: View {
                 .cornerRadius(6)
             }
             .accessibilityLabel(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
+
+            // 手选24山快速选向与锁定
+            Button(action: {
+                showMountainPickerSheet = true
+            }) {
+                HStack(spacing: 3) {
+                    Image(systemName: "dial.medium.fill")
+                    Text(lang.effectiveLanguage == .en ? "24 Mtns" : "手选24山")
+                }
+                .adaptiveFont(size: 11, weight: .bold)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .background(Color.yanCyan.opacity(0.18))
+                .foregroundColor(Color.yanCyan)
+                .cornerRadius(6)
+            }
 
             // 空亡全景诊断
             Button(action: {

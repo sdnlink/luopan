@@ -113,10 +113,20 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
            let reference = CompassNorthReference(rawValue: saved) {
             northReference = reference
         }
-        // 恢复上次锁盘状态与坐向度数（跨会话持久化，并同步给小组件）
-        let savedLocked = UserDefaults.standard.bool(forKey: "compass_is_locked")
-        if savedLocked, UserDefaults.standard.object(forKey: "compass_locked_facing_angle") != nil {
-            let savedFacing = UserDefaults.standard.double(forKey: "compass_locked_facing_angle")
+        // 恢复上次锁盘状态与坐向度数（跨会话持久化 + iCloud KV 恢复，并同步给小组件）
+        let kv = NSUbiquitousKeyValueStore.default
+        let savedLocked: Bool = {
+            if UserDefaults.standard.object(forKey: "compass_is_locked") != nil {
+                return UserDefaults.standard.bool(forKey: "compass_is_locked")
+            }
+            return kv.bool(forKey: "compass_is_locked")
+        }()
+        let hasSavedAngle = UserDefaults.standard.object(forKey: "compass_locked_facing_angle") != nil
+            || kv.object(forKey: "compass_locked_facing_angle") != nil
+        if savedLocked, hasSavedAngle {
+            let savedFacing = UserDefaults.standard.object(forKey: "compass_locked_facing_angle") != nil
+                ? UserDefaults.standard.double(forKey: "compass_locked_facing_angle")
+                : kv.double(forKey: "compass_locked_facing_angle")
             let normalized = (savedFacing.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
             self.isLocked = true
             self.heading = normalized
@@ -435,9 +445,12 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private func persistLockState() {
         let effective = (heading + manualOffset + 360.0).truncatingRemainder(dividingBy: 360.0)
         UserDefaults.standard.set(isLocked, forKey: "compass_is_locked")
+        NSUbiquitousKeyValueStore.default.set(isLocked, forKey: "compass_is_locked")
         if isLocked {
             UserDefaults.standard.set(effective, forKey: "compass_locked_facing_angle")
+            NSUbiquitousKeyValueStore.default.set(effective, forKey: "compass_locked_facing_angle")
         }
+        NSUbiquitousKeyValueStore.default.synchronize()
         Self.syncSittingMountainToWidget(isLocked: isLocked, sittingMountainID: headingState.sittingMountain.id)
     }
 

@@ -1,8 +1,9 @@
 import UIKit
 import WidgetKit
 import Combine
+import CoreSpotlight
 
-/// 小组件深链的待处理路由。
+/// 小组件深链与主屏快捷指令（Quick Actions / Spotlight）的待处理路由。
 /// 不能用 NotificationCenter 直接投递：冷启动时 SceneDelegate 同步发通知，
 /// SwiftUI 视图树尚未挂载，.onReceive 订阅者还不存在，通知会被静默吞掉。
 /// 改为把「意图」留在单例状态里，由 RootContentView 挂载后主动消费。
@@ -10,6 +11,7 @@ public final class AppNavigationRouter: ObservableObject {
     public static let shared = AppNavigationRouter()
 
     @Published public private(set) var pendingAlmanacRoute = false
+    @Published public private(set) var pendingTabRoute: (tab: Int, subTab: Int?, openDailyCard: Bool)? = nil
 
     private init() {}
 
@@ -17,11 +19,21 @@ public final class AppNavigationRouter: ObservableObject {
         pendingAlmanacRoute = true
     }
 
+    public func requestRoute(tab: Int, subTab: Int? = nil, openDailyCard: Bool = false) {
+        pendingTabRoute = (tab: tab, subTab: subTab, openDailyCard: openDailyCard)
+    }
+
     /// 幂等消费：只有第一个消费者拿到 true，避免冷/热启动两条路径重复跳转。
     public func consumeAlmanac() -> Bool {
         guard pendingAlmanacRoute else { return false }
         pendingAlmanacRoute = false
         return true
+    }
+
+    public func consumeTabRoute() -> (tab: Int, subTab: Int?, openDailyCard: Bool)? {
+        guard let route = pendingTabRoute else { return nil }
+        pendingTabRoute = nil
+        return route
     }
 }
 
@@ -50,6 +62,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let url = connectionOptions.urlContexts.first?.url {
             Self.routeWidgetURL(url)
         }
+        if let shortcut = connectionOptions.shortcutItem {
+            Self.routeShortcutType(shortcut.type)
+        }
+        if let activity = connectionOptions.userActivities.first {
+            Self.routeUserActivity(activity)
+        }
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
@@ -59,12 +77,72 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
     }
 
-    /// 仅处理本 App 的日课深链，其它 scheme 忽略。
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        Self.routeShortcutType(shortcutItem.type)
+        completionHandler(true)
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        Self.routeUserActivity(userActivity)
+    }
+
+    /// 处理本 App 的深链（日课、罗盘财喜吉方、户型宅谱、奇门遁甲）。
     /// 冷启动与热启动都先写入单例状态，再由 RootContentView 挂载后消费；
     /// 通知仅作热启动时的即时补充。
-    private static func routeWidgetURL(_ url: URL) {
-        guard url.scheme == "tiandiluopan", url.host == "almanac" else { return }
-        AppNavigationRouter.shared.requestAlmanac()
+    public static func routeWidgetURL(_ url: URL) {
+        guard url.scheme == "tiandiluopan" else { return }
+        switch url.host {
+        case "almanac":
+            AppNavigationRouter.shared.requestAlmanac()
+        case "compass":
+            CompassLayerManager.shared.showDailyGodMarkers = true
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
+        case "floorplan":
+            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
+        case "qimen":
+            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
+        default:
+            return
+        }
+        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
+    }
+
+    public static func routeShortcutType(_ type: String) {
+        switch type {
+        case "com.yanxiang.compass.shortcut.dailycard":
+            CompassLayerManager.shared.showDailyGodMarkers = true
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
+        case "com.yanxiang.compass.shortcut.zeri":
+            AppNavigationRouter.shared.requestAlmanac()
+        case "com.yanxiang.compass.shortcut.floorplan":
+            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
+        case "com.yanxiang.compass.shortcut.qimen":
+            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
+        default:
+            return
+        }
+        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
+    }
+
+    private static func routeUserActivity(_ userActivity: NSUserActivity) {
+        guard userActivity.activityType == CSSearchableItemActionType,
+              let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String else { return }
+        switch id {
+        case "spotlight.zeri":
+            AppNavigationRouter.shared.requestAlmanac()
+        case "spotlight.bazhai":
+            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 1, openDailyCard: false)
+        case "spotlight.qimen":
+            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
+        case "spotlight.floorplan":
+            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
+        default:
+            return
+        }
         NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
     }
 

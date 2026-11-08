@@ -4,6 +4,7 @@ import UIKit
 import StoreKit
 import UserNotifications
 import Photos
+import CoreSpotlight
 
 // MARK: - 八宅风水与大游年九星吉凶模型 (BaZhai Engine)
 
@@ -559,12 +560,161 @@ public struct HouseKuaCompatibility {
     public let studyDirection: String       // 本命伏位文昌位
 }
 
+public enum FamilyRole: String, Codable, CaseIterable, Identifiable {
+    case spouse = "spouse"
+    case elder  = "elder"
+    case child1 = "child1"
+    case child2 = "child2"
+
+    public var id: String { rawValue }
+
+    public var defaultIsMale: Bool {
+        switch self {
+        case .spouse: return false
+        case .elder:  return true
+        case .child1: return true
+        case .child2: return false
+        }
+    }
+
+    public var localizedTitle: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch self {
+            case .spouse: return "Spouse"
+            case .elder:  return "Parent/Elder"
+            case .child1: return "Child 1"
+            case .child2: return "Child 2"
+            }
+        case .zhHant:
+            switch self {
+            case .spouse: return "配偶/伴侶"
+            case .elder:  return "父母/長輩"
+            case .child1: return "長子/長女"
+            case .child2: return "次子/次女"
+            }
+        case .ja:
+            switch self {
+            case .spouse: return "配偶者"
+            case .elder:  return "両親・年長者"
+            case .child1: return "第一子"
+            case .child2: return "第二子"
+            }
+        case .ko:
+            switch self {
+            case .spouse: return "배우자"
+            case .elder:  return "부모/어르신"
+            case .child1: return "자녀 1"
+            case .child2: return "자녀 2"
+            }
+        case .vi:
+            switch self {
+            case .spouse: return "Vợ/Chồng"
+            case .elder:  return "Ông Bà/Cha Mẹ"
+            case .child1: return "Con thứ 1"
+            case .child2: return "Con thứ 2"
+            }
+        case .th:
+            switch self {
+            case .spouse: return "คู่สมรส"
+            case .elder:  return "ผู้สูงอายุ"
+            case .child1: return "บุตรคนที่ 1"
+            case .child2: return "บุตรคนที่ 2"
+            }
+        case .id:
+            switch self {
+            case .spouse: return "Pasangan"
+            case .elder:  return "Orang Tua"
+            case .child1: return "Anak 1"
+            case .child2: return "Anak 2"
+            }
+        case .auto, .zhHans:
+            switch self {
+            case .spouse: return "配偶/伴侣"
+            case .elder:  return "父母/长辈"
+            case .child1: return "长子/长女"
+            case .child2: return "次子/次女"
+            }
+        }
+    }
+}
+
+public struct FamilyMemberProfile: Codable, Identifiable, Equatable {
+    public var id: String { role.rawValue }
+    public let role: FamilyRole
+    public var birthYear: Int
+    public var isMale: Bool
+
+    public init(role: FamilyRole, birthYear: Int, isMale: Bool) {
+        self.role = role
+        self.birthYear = max(1920, min(2035, birthYear))
+        self.isMale = isMale
+    }
+
+    public var lifeGuaNumber: Int {
+        UserKuaProfileManager.calcGuaNumber(birthYear: birthYear, isMale: isMale)
+    }
+
+    public var guaKey: String {
+        UserKuaProfileManager.guaKey(for: lifeGuaNumber)
+    }
+
+    public var isEastLife: Bool {
+        [1, 3, 4, 9].contains(lifeGuaNumber)
+    }
+
+    public var localizedGuaBadge: String {
+        let guaItem = BaZhaiPalaceItem(id: 0, direction: "", guaName: guaKey, star: .fuWei)
+        let lang = LocalizationManager.shared.effectiveLanguage
+        switch lang {
+        case .en:
+            return "\(guaItem.localizedGuaName) · \(isEastLife ? "East 4" : "West 4")"
+        case .zhHant, .ja:
+            return "\(guaItem.localizedGuaName)命·\(isEastLife ? "東四命" : "西四命")"
+        case .ko:
+            return "\(guaItem.localizedGuaName)명·\(isEastLife ? "동사명" : "서사명")"
+        case .vi:
+            return "Mệnh \(guaItem.localizedGuaName)·\(isEastLife ? "Đông Tứ" : "Tây Tứ")"
+        case .th:
+            return "ดวง\(guaItem.localizedGuaName)·\(isEastLife ? "ตะวันออก" : "ตะวันตก")"
+        case .id:
+            return "Gua \(guaItem.localizedGuaName)·\(isEastLife ? "Timur" : "Barat")"
+        case .auto, .zhHans:
+            return "\(guaItem.localizedGuaName)命·\(isEastLife ? "东四命" : "西四命")"
+        }
+    }
+
+    public var personalWealthAndStudySummary: String {
+        let chart = BaZhaiEngine.shared.analyze(sittingPalace: guaKey, facingPalace: "离")
+        let wDir = chart.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "-"
+        let sDir = chart.items.first(where: { $0.star == .fuWei })?.localizedDirection ?? "-"
+        let hDir = chart.items.first(where: { $0.star == .tianYi })?.localizedDirection ?? "-"
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            return "Wealth: \(wDir) · Health: \(hDir) · Study: \(sDir)"
+        case .zhHant, .ja:
+            return "生氣財位:\(wDir) · 天醫康健:\(hDir) · 文昌伏位:\(sDir)"
+        case .ko:
+            return "생기:\(wDir) · 천의:\(hDir) · 문창:\(sDir)"
+        case .vi:
+            return "Sinh Khí:\(wDir) · Thiên Y:\(hDir) · Văn Xương:\(sDir)"
+        case .th:
+            return "โชคลาภ:\(wDir) · สุขภาพ:\(hDir) · การเรียน:\(sDir)"
+        case .id:
+            return "Rezeki:\(wDir) · Sehat:\(hDir) · Studi:\(sDir)"
+        case .auto, .zhHans:
+            return "生气财位:\(wDir) · 天医康健:\(hDir) · 文昌伏位:\(sDir)"
+        }
+    }
+}
+
 public final class UserKuaProfileManager: ObservableObject {
     public static let shared = UserKuaProfileManager()
 
     private let kBirthYearKey = "tiandi_owner_birth_year"
     private let kIsMaleKey = "tiandi_owner_is_male"
     private let kEnabledKey = "tiandi_owner_profile_enabled"
+    private let kFamilyMembersKey = "tiandi_family_members_v1"
 
     @Published public var birthYear: Int {
         didSet {
@@ -575,6 +725,7 @@ public final class UserKuaProfileManager: ObservableObject {
             }
             UserDefaults.standard.set(birthYear, forKey: kBirthYearKey)
             LocalizationManager.sharedDefaults?.set(birthYear, forKey: kBirthYearKey)
+            NSUbiquitousKeyValueStore.default.set(Int64(birthYear), forKey: kBirthYearKey)
         }
     }
 
@@ -582,6 +733,7 @@ public final class UserKuaProfileManager: ObservableObject {
         didSet {
             UserDefaults.standard.set(isMale, forKey: kIsMaleKey)
             LocalizationManager.sharedDefaults?.set(isMale, forKey: kIsMaleKey)
+            NSUbiquitousKeyValueStore.default.set(isMale, forKey: kIsMaleKey)
         }
     }
 
@@ -589,13 +741,27 @@ public final class UserKuaProfileManager: ObservableObject {
         didSet {
             UserDefaults.standard.set(isProfileEnabled, forKey: kEnabledKey)
             LocalizationManager.sharedDefaults?.set(isProfileEnabled, forKey: kEnabledKey)
+            NSUbiquitousKeyValueStore.default.set(isProfileEnabled, forKey: kEnabledKey)
+        }
+    }
+
+    @Published public var familyMembers: [FamilyMemberProfile] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(familyMembers) {
+                UserDefaults.standard.set(data, forKey: kFamilyMembersKey)
+                LocalizationManager.sharedDefaults?.set(data, forKey: kFamilyMembersKey)
+                NSUbiquitousKeyValueStore.default.set(data, forKey: kFamilyMembersKey)
+            }
         }
     }
 
     private init() {
         let shared = LocalizationManager.sharedDefaults
+        let cloud = NSUbiquitousKeyValueStore.default
+        let cloudYear = cloud.longLong(forKey: kBirthYearKey)
         let savedYear = (shared?.object(forKey: kBirthYearKey) as? Int)
             ?? (UserDefaults.standard.object(forKey: kBirthYearKey) as? Int)
+            ?? (cloudYear > 0 ? Int(cloudYear) : nil)
             ?? 1990
         let savedMale = (shared?.object(forKey: kIsMaleKey) as? Bool)
             ?? (UserDefaults.standard.object(forKey: kIsMaleKey) as? Bool)
@@ -606,10 +772,15 @@ public final class UserKuaProfileManager: ObservableObject {
         self.birthYear = max(1920, min(2035, savedYear))
         self.isMale = savedMale
         self.isProfileEnabled = savedEnabled
+        if let fData = (shared?.data(forKey: kFamilyMembersKey))
+            ?? UserDefaults.standard.data(forKey: kFamilyMembersKey)
+            ?? cloud.data(forKey: kFamilyMembersKey),
+           let decoded = try? JSONDecoder().decode([FamilyMemberProfile].self, from: fData) {
+            self.familyMembers = decoded
+        }
     }
 
-    /// 根据后天洛书命卦公式计算本命卦洛书数 (1..9，5男寄坤2、女寄艮8)
-    public var lifeGuaNumber: Int {
+    public static func calcGuaNumber(birthYear: Int, isMale: Bool) -> Int {
         var sum = birthYear
         while sum >= 10 {
             var next = 0
@@ -633,8 +804,8 @@ public final class UserKuaProfileManager: ObservableObject {
         return raw
     }
 
-    public var ownerGuaKey: String {
-        switch lifeGuaNumber {
+    public static func guaKey(for guaNumber: Int) -> String {
+        switch guaNumber {
         case 1: return "坎"
         case 2: return "坤"
         case 3: return "震"
@@ -645,6 +816,58 @@ public final class UserKuaProfileManager: ObservableObject {
         case 9: return "离"
         default: return "坎"
         }
+    }
+
+    public func addOrUpdateFamilyMember(role: FamilyRole, birthYear: Int, isMale: Bool) {
+        let profile = FamilyMemberProfile(role: role, birthYear: birthYear, isMale: isMale)
+        if let idx = familyMembers.firstIndex(where: { $0.role == role }) {
+            familyMembers[idx] = profile
+        } else {
+            familyMembers.append(profile)
+        }
+    }
+
+    public func removeFamilyMember(role: FamilyRole) {
+        familyMembers.removeAll { $0.role == role }
+    }
+
+    /// 智能分房推荐：根据房间落宫八卦，自动匹配最适合居住/使用该房间的家庭成员（如子女文昌伏位、长辈天医位、夫妻延年/生气位）
+    public func recommendFamilyMemberForPalace(canonGua: String) -> String? {
+        guard isProfileEnabled, canonGua != "中", !familyMembers.isEmpty else { return nil }
+        for member in familyMembers {
+            let chart = BaZhaiEngine.shared.analyze(sittingPalace: member.guaKey, facingPalace: "离")
+            if let item = chart.items.first(where: { $0.guaName == canonGua }), item.star.isAuspicious {
+                let sName = item.star.localizedName
+                switch LocalizationManager.shared.effectiveLanguage {
+                case .en:
+                    return "[Smart Room Fit] Best for \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                case .zhHant:
+                    return "【智能分房推薦】極利「\(member.role.localizedTitle)（\(member.birthYear)年）」居住或學習（落其本命\(sName)）"
+                case .ja:
+                    return "【部屋割推奨】「\(member.role.localizedTitle)（\(member.birthYear)年）」に最適（本命\(sName)）"
+                case .ko:
+                    return "[맞춤 방 추천] '\(member.role.localizedTitle)(\(member.birthYear)년)'에게 최적 (본명 \(sName))"
+                case .vi:
+                    return "[Gợi Ý Phân Phòng] Rất hợp cho \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                case .th:
+                    return "[แนะนำจัดห้อง] เหมาะกับ\(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                case .id:
+                    return "[Rekomendasi Kamar] Cocok untuk \(member.role.localizedTitle) (\(member.birthYear), \(sName))"
+                case .auto, .zhHans:
+                    return "【智能分房推荐】极利「\(member.role.localizedTitle)（\(member.birthYear)年）」居住或学习（落其本命\(sName)）"
+                }
+            }
+        }
+        return nil
+    }
+
+    /// 根据后天洛书命卦公式计算本命卦洛书数 (1..9，5男寄坤2、女寄艮8)
+    public var lifeGuaNumber: Int {
+        Self.calcGuaNumber(birthYear: birthYear, isMale: isMale)
+    }
+
+    public var ownerGuaKey: String {
+        Self.guaKey(for: lifeGuaNumber)
     }
 
     public var isEastLife: Bool {
@@ -779,6 +1002,31 @@ public final class UserKuaProfileManager: ObservableObject {
 
 // MARK: - P1.3 留存与召回服务：App Store 智能好评引导与节气/吉日本地通知 (RetentionServiceManager)
 
+public struct FengshuiRemedyTask: Codable, Identifiable, Equatable {
+    public let id: String
+    public let palaceDirection: String
+    public let title: String
+    public let remedyAction: String
+    public let createdAt: Date
+    public var isCompleted: Bool
+
+    public init(
+        id: String,
+        palaceDirection: String,
+        title: String,
+        remedyAction: String,
+        createdAt: Date = Date(),
+        isCompleted: Bool = false
+    ) {
+        self.id = id
+        self.palaceDirection = palaceDirection
+        self.title = title
+        self.remedyAction = remedyAction
+        self.createdAt = createdAt
+        self.isCompleted = isCompleted
+    }
+}
+
 public final class RetentionServiceManager: ObservableObject {
     public static let shared = RetentionServiceManager()
 
@@ -786,6 +1034,7 @@ public final class RetentionServiceManager: ObservableObject {
     private let kLastReviewPromptTimeKey = "tiandi_last_review_prompt_ts"
     private let kSolarTermNotifyKey = "tiandi_solar_term_notify_enabled"
     private let kScheduledDaysKey = "tiandi_scheduled_auspicious_days"
+    private let kRemedyTasksKey = "tiandi_remedy_tasks_v1"
 
     @Published public var solarTermNotificationsEnabled: Bool {
         didSet {
@@ -799,12 +1048,147 @@ public final class RetentionServiceManager: ObservableObject {
     }
 
     @Published public private(set) var scheduledDayIDs: Set<String> = []
+    @Published public var remedyTasks: [FengshuiRemedyTask] = [] {
+        didSet {
+            if let data = try? JSONEncoder().encode(remedyTasks) {
+                UserDefaults.standard.set(data, forKey: kRemedyTasksKey)
+                NSUbiquitousKeyValueStore.default.set(data, forKey: kRemedyTasksKey)
+            }
+        }
+    }
 
     private init() {
         self.solarTermNotificationsEnabled = UserDefaults.standard.bool(forKey: kSolarTermNotifyKey)
         if let saved = UserDefaults.standard.stringArray(forKey: kScheduledDaysKey) {
             self.scheduledDayIDs = Set(saved)
         }
+        if let rData = UserDefaults.standard.data(forKey: kRemedyTasksKey)
+            ?? NSUbiquitousKeyValueStore.default.data(forKey: kRemedyTasksKey),
+           let decoded = try? JSONDecoder().decode([FengshuiRemedyTask].self, from: rData) {
+            self.remedyTasks = decoded
+        }
+    }
+
+    public func toggleRemedyTask(id: String, palaceDirection: String, title: String, remedyAction: String) {
+        if let idx = remedyTasks.firstIndex(where: { $0.id == id }) {
+            remedyTasks.remove(at: idx)
+        } else {
+            let task = FengshuiRemedyTask(
+                id: id,
+                palaceDirection: palaceDirection,
+                title: title,
+                remedyAction: remedyAction
+            )
+            remedyTasks.insert(task, at: 0)
+        }
+    }
+
+    public func toggleRemedyCompletion(id: String) {
+        if let idx = remedyTasks.firstIndex(where: { $0.id == id }) {
+            remedyTasks[idx].isCompleted.toggle()
+        }
+    }
+
+    public func removeRemedyTask(id: String) {
+        remedyTasks.removeAll { $0.id == id }
+    }
+
+    /// 注册 iOS 主屏幕长按快捷入口 (Quick Actions) 与系统 Spotlight 搜索索引 (CoreSpotlight)
+    public func registerSystemShortcutsAndSpotlight() {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let s1Title: String; let s1Sub: String
+        let s2Title: String; let s2Sub: String
+        let s3Title: String; let s3Sub: String
+        let s4Title: String; let s4Sub: String
+        switch lang {
+        case .en:
+            s1Title = "Daily Wealth & Joy Compass"; s1Sub = "Locate today's auspicious directions"
+            s2Title = "Daily Auspicious Sign Card"; s2Sub = "Generate & share today's fortune card"
+            s3Title = "Floorplan 9-Palace Audit"; s3Sub = "Check room layout & owner Life Gua"
+            s4Title = "Qi Men Decision Guide"; s4Sub = "Best hour & direction for contracts/wealth"
+        case .zhHant:
+            s1Title = "今日財神與吉方導引"; s1Sub = "一鍵開啟羅盤財神喜神金標"
+            s2Title = "今日吉方日籤海報"; s2Sub = "生成黑金國風日課分享卡"
+            s3Title = "戶型九宮立極體檢"; s3Sub = "多套宅譜對比與智能分房"
+            s4Title = "奇門遁甲辦事吉方"; s4Sub = "簽約求財出行一事一斷"
+        case .ja:
+            s1Title = "本日の財神・吉方位ガイド"; s1Sub = "羅盤で吉方位を即座に確認"
+            s2Title = "本日の吉籤カード作成"; s2Sub = "日課カードを保存・共有"
+            s3Title = "間取り九宮風水診断"; s3Sub = "複数物件比較と部屋割推奨"
+            s4Title = "奇門遁甲・用事別吉方"; s4Sub = "契約・金運・外出の吉方"
+        case .ko:
+            s1Title = "오늘의 재신·길방 가이드"; s1Sub = "나침반 길방 마커 바로 켜기"
+            s2Title = "오늘의 길첨 카드"; s2Sub = "일과 길방 포스터 생성 및 공유"
+            s3Title = "평면도 구궁 풍수 진단"; s3Sub = "다주택 비교 및 맞춤 방 추천"
+            s4Title = "기문둔갑 용건별 길방"; s4Sub = "계약·재물·출행 길방 속람"
+        case .vi:
+            s1Title = "Hướng Thần Tài & Hỷ Thần"; s1Sub = "Mở nhanh kim chỉ nam cát phương"
+            s2Title = "Thẻ Cát Phương Hôm Nay"; s2Sub = "Tạo & chia sẻ thẻ nhật khóa"
+            s3Title = "Khám Phong Thủy Mặt Bằng"; s3Sub = "So sánh căn hộ & gợi ý phân phòng"
+            s4Title = "Kỳ Môn Cát Phương Theo Việc"; s4Sub = "Ký kết, cầu tài, xuất hành"
+        case .th:
+            s1Title = "นำทางทิศเทพโชคลาภวันนี้"; s1Sub = "เปิดเข็มทิศชี้ทิศมงคลทันที"
+            s2Title = "การ์ดมงคลประจำวัน"; s2Sub = "สร้างและแชร์การ์ดฤกษ์มงคล"
+            s3Title = "ตรวจฮวงจุ้ยผังบ้าน 9 วัง"; s3Sub = "เปรียบเทียบผังบ้านและจัดห้อง"
+            s4Title = "ฉีเหมินชี้ทิศตามธุระ"; s4Sub = "เซ็นสัญญา โชคลาภ เดินทาง"
+        case .id:
+            s1Title = "Panduan Arah Rezeki Hari Ini"; s1Sub = "Buka penunjuk arah hoki di kompas"
+            s2Title = "Kartu Keberuntungan Harian"; s2Sub = "Buat & bagikan kartu harian"
+            s3Title = "Audit Denah 9 Istana"; s3Sub = "Bandingkan properti & rekomendasi kamar"
+            s4Title = "Panduan Qi Men Sesuai Urusan"; s4Sub = "Kontrak, rezeki, perjalanan"
+        case .auto, .zhHans:
+            s1Title = "今日财神与吉方导引"; s1Sub = "一键开启罗盘财神喜神金标"
+            s2Title = "今日吉方日签海报"; s2Sub = "生成黑金国风日课分享卡"
+            s3Title = "户型九宫立极体检"; s3Sub = "多套宅谱对比与智能分房"
+            s4Title = "奇门遁甲办事吉方"; s4Sub = "签约求财出行一事一断"
+        }
+
+        DispatchQueue.main.async {
+            UIApplication.shared.shortcutItems = [
+                UIApplicationShortcutItem(
+                    type: "com.yanxiang.compass.shortcut.dailygods",
+                    localizedTitle: s1Title,
+                    localizedSubtitle: s1Sub,
+                    icon: UIApplicationShortcutIcon(systemImageName: "safari.fill")
+                ),
+                UIApplicationShortcutItem(
+                    type: "com.yanxiang.compass.shortcut.dailysign",
+                    localizedTitle: s2Title,
+                    localizedSubtitle: s2Sub,
+                    icon: UIApplicationShortcutIcon(systemImageName: "sparkles.rectangle.stack.fill")
+                ),
+                UIApplicationShortcutItem(
+                    type: "com.yanxiang.compass.shortcut.floorplan",
+                    localizedTitle: s3Title,
+                    localizedSubtitle: s3Sub,
+                    icon: UIApplicationShortcutIcon(systemImageName: "square.split.bottomrightquarter.fill")
+                ),
+                UIApplicationShortcutItem(
+                    type: "com.yanxiang.compass.shortcut.qimen",
+                    localizedTitle: s4Title,
+                    localizedSubtitle: s4Sub,
+                    icon: UIApplicationShortcutIcon(systemImageName: "timelapse")
+                )
+            ]
+        }
+
+        // CoreSpotlight 索引注册，支持用户在 iOS 负一屏下拉搜索“财神方位”、“黄道吉日”、“户型风水”、“奇门遁甲”直达本 App
+        let entries: [(id: String, title: String, desc: String, keywords: [String])] = [
+            ("tiandiluopan://compass?guide=dailyGods", s1Title, s1Sub, ["财神", "喜神", "罗盘", "吉方", "Compass", "Wealth", "Fengshui"]),
+            ("tiandiluopan://compass?sheet=dailySign", s2Title, s2Sub, ["日签", "黄历", "吉日", "Almanac", "Sign"]),
+            ("tiandiluopan://tab?index=3", s3Title, s3Sub, ["户型", "分房", "缺角", "八宅", "Floorplan", "Room"]),
+            ("tiandiluopan://tab?index=2&sub=qimen", s4Title, s4Sub, ["奇门遁甲", "出行", "签约", "求财", "Qimen"])
+        ]
+        var searchableItems: [CSSearchableItem] = []
+        for entry in entries {
+            let attr = CSSearchableItemAttributeSet(itemContentType: "public.content")
+            attr.title = entry.title
+            attr.contentDescription = entry.desc
+            attr.keywords = entry.keywords
+            let item = CSSearchableItem(uniqueIdentifier: entry.id, domainIdentifier: "com.yanxiang.compass", attributeSet: attr)
+            searchableItems.append(item)
+        }
+        CSSearchableIndex.default().indexSearchableItems(searchableItems, completionHandler: nil)
     }
 
     /// 是否正处于自动化 UI 测试或截图流水线环境（避免弹窗干扰自动化测试）

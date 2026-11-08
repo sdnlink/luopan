@@ -14,6 +14,7 @@ public struct QimenDunjiaView: View {
     @State private var isUsingCustomDate: Bool = false
     @State private var cachedChart: QimenChart?
     @State private var selectedPalaceId: Int? = nil
+    @State private var selectedScenario: QimenScenarioType = .contract
     @State private var lastChartHeading: Double?
     @State private var lastChartTimeKey: Int?
 
@@ -82,12 +83,16 @@ public struct QimenDunjiaView: View {
             // P0.3 时辰穿越控制栏（每 2 小时换一局，支持提前推演谈判/出行时辰）
             qimenTimeControlBar()
                 .padding(.horizontal, 16)
+
+            // P3.3 奇门遁甲「场景化一事一断」速查向导条
+            qimenScenarioSelectorBar(chart: chart)
+                .padding(.horizontal, 16)
             
             // P0.2 开放 3x3 奇门九宫方阵预览 (天地人神四盘可点选查看八门九星)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                let rec = QimenEngine.shared.evaluateScenario(selectedScenario, chart: chart, heading: motion.headingState.facingAngle)
                 ForEach(chart.cells) { cell in
-                    let defaultId = chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6
-                    let activeId = selectedPalaceId ?? defaultId
+                    let activeId = selectedPalaceId ?? rec.recommendedPalaceId
                     qimenCellView(cell: cell, isSelected: cell.palaceId == activeId)
                         .onTapGesture {
                             selectedPalaceId = cell.palaceId
@@ -101,7 +106,11 @@ public struct QimenDunjiaView: View {
             } analysis: {
             // 选中宫门星神摘要与出行动身方位导航（展开态右栏 / 折叠态底部）
             VStack(spacing: 12) {
-                if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? (chart.cells.first(where: { $0.doorName == "开门" || $0.doorName == "生门" })?.palaceId ?? 6)) }), !activeCell.isTaiJiCenter {
+                let rec = QimenEngine.shared.evaluateScenario(selectedScenario, chart: chart, heading: motion.headingState.facingAngle)
+                qimenScenarioGuideCard(rec: rec)
+                    .padding(.horizontal, 16)
+
+                if let activeCell = chart.cells.first(where: { $0.palaceId == (selectedPalaceId ?? rec.recommendedPalaceId) }), !activeCell.isTaiJiCenter {
                     let doorObj = QimenDoor(name: activeCell.doorName, palace: activeCell.palaceId, isAuspicious: activeCell.isDoorAuspicious, luckType: activeCell.doorLuck, lore: "")
                     HStack(spacing: 8) {
                         Text("【\(activeCell.localizedPalaceName)】")
@@ -341,6 +350,81 @@ public struct QimenDunjiaView: View {
                 .stroke(borderColor, lineWidth: 1)
         )
     }
+    // MARK: - P3.3 奇门场景化一事一断选择器与指南卡
+    private func qimenScenarioSelectorBar(chart: QimenChart) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(QimenScenarioType.allCases) { item in
+                    let isSelected = selectedScenario == item
+                    Button(action: {
+                        selectedScenario = item
+                        let rec = QimenEngine.shared.evaluateScenario(item, chart: chart, heading: motion.headingState.facingAngle)
+                        selectedPalaceId = rec.recommendedPalaceId
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: item.iconName)
+                                .adaptiveFont(size: 10)
+                            Text(item.localizedTitle)
+                                .adaptiveFont(size: 10, weight: .bold)
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.08))
+                        .foregroundColor(isSelected ? .black : .white.opacity(0.85))
+                        .cornerRadius(6)
+                    }
+                }
+            }
+        }
+    }
+
+    private func qimenScenarioGuideCard(rec: QimenScenarioRecommendation) -> some View {
+        let badgeLabel: String = {
+            switch lang.effectiveLanguage {
+            case .en: return "Best Direction"
+            case .zhHant: return "一事一斷 · 首選吉方"
+            case .ja: return "目的別・最吉方位"
+            case .ko: return "목적별 길방"
+            case .vi: return "Phương vị ưu tiên"
+            case .th: return "ทิศมงคลตามภารกิจ"
+            case .id: return "Arah Prioritas"
+            case .auto, .zhHans: return "一事一断 · 首选吉方"
+            }
+        }()
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: rec.scenario.iconName)
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text("\(rec.scenario.localizedTitle) · \(rec.directionTitle)")
+                    .adaptiveFont(size: 12, weight: .bold)
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+                Text(badgeLabel)
+                    .adaptiveFont(size: 9, weight: .bold)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.yanCyan.opacity(0.18))
+                    .foregroundColor(Color.yanCyan)
+                    .cornerRadius(4)
+            }
+            Text(rec.keyPattern)
+                .adaptiveFont(size: 10, weight: .semibold, design: .monospaced)
+                .foregroundColor(Color.green)
+            Text(rec.actionGuide)
+                .adaptiveFont(size: 11)
+                .foregroundColor(.white.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .background(Color(red: 0.11, green: 0.13, blue: 0.18))
+        .cornerRadius(9)
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.35), lineWidth: 1)
+        )
+    }
+
     // MARK: - 奇门遁甲 VIP 展开态预览占位卡 (消除展开态双栏右侧留白)
     private func qimenVIPPreviewCard() -> some View {
         let lang = LocalizationManager.shared

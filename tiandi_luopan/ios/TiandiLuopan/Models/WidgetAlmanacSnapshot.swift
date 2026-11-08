@@ -44,6 +44,8 @@ public struct WidgetAlmanacSnapshot {
     public let sittingMountainBadge: String?
     /// 若今日冲克锁定坐山，标记为 true
     public let hasSittingClash: Bool
+    /// P3.6 今日财神与喜神吉方徽章（桌面小组件联动）
+    public let wealthJoyBadge: String
 }
 
 public enum WidgetAlmanacBuilder {
@@ -134,6 +136,27 @@ public enum WidgetAlmanacBuilder {
         let progress = min(1.0, max(0.0, elapsedDays / termLengthDays))
         let daysLeft = max(0, Int(ceil(termLengthDays - elapsedDays)))
 
+        let dailyGods = ZeRiEngine.shared.dailyCompassDirections(for: date)
+        let wjBadge: String
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            wjBadge = "Wealth:\(dailyGods.wealthDirection) · Joy:\(dailyGods.joyDirection)"
+        case .zhHant:
+            wjBadge = "財神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        case .ja:
+            wjBadge = "財神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        case .ko:
+            wjBadge = "재신:\(dailyGods.wealthDirection) · 희신:\(dailyGods.joyDirection)"
+        case .vi:
+            wjBadge = "Tài:\(dailyGods.wealthDirection) · Hỷ:\(dailyGods.joyDirection)"
+        case .th:
+            wjBadge = "โชค:\(dailyGods.wealthDirection) · มงคล:\(dailyGods.joyDirection)"
+        case .id:
+            wjBadge = "Rezeki:\(dailyGods.wealthDirection) · Hoki:\(dailyGods.joyDirection)"
+        case .zhHans, .auto:
+            wjBadge = "财神:\(dailyGods.wealthDirection) · 喜神:\(dailyGods.joyDirection)"
+        }
+
         return WidgetAlmanacSnapshot(
             date: date,
             localizedDayPillar: dayCourse.localizedDayPillar,
@@ -151,7 +174,8 @@ public enum WidgetAlmanacBuilder {
             dayOfficerIndex: resolveDayOfficerIndex(for: date, dayPillar: dayCourse.dayPillar),
             isGeneralDay: sittingBadge == nil,
             sittingMountainBadge: sittingBadge,
-            hasSittingClash: dayCourse.sittingClashWarning != nil
+            hasSittingClash: dayCourse.sittingClashWarning != nil,
+            wealthJoyBadge: wjBadge
         )
     }
 

@@ -11,6 +11,7 @@ public struct PurpleWhiteView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @ObservedObject var retention = RetentionServiceManager.shared
     @State private var showPaywall: Bool = false
     @State private var selectedDate: Date = Date()
     @State private var isUsingCustomDate: Bool = false
@@ -398,6 +399,40 @@ public struct PurpleWhiteView: View {
                     .adaptiveFont(size: 12, weight: .semibold)
                     .foregroundColor(isDanger ? .red : Color.yanCyan)
                 Spacer()
+                let remedyId = "pw_\(item.palaceId)"
+                let inRemedy = retention.isRemedySaved(id: remedyId)
+                let addRemedyLabel: String = {
+                    switch lang.effectiveLanguage {
+                    case .en: return inRemedy ? "Tracked" : "+ Track"
+                    case .zhHant: return inRemedy ? "已入清單" : "+ 調理打卡"
+                    case .ja: return inRemedy ? "登録済" : "+ 化殺記録"
+                    case .ko: return inRemedy ? "등록됨" : "+ 비보체크"
+                    case .vi: return inRemedy ? "Đã lưu" : "+ Theo dõi"
+                    case .th: return inRemedy ? "บันทึกแล้ว" : "+ ติดตาม"
+                    case .id: return inRemedy ? "Tersimpan" : "+ Lacak"
+                    case .auto, .zhHans: return inRemedy ? "已入清单" : "+ 调理打卡"
+                    }
+                }()
+                Button(action: {
+                    retention.toggleRemedyTask(
+                        id: remedyId,
+                        palaceTitle: "\(item.palaceName)·\(item.starName)",
+                        actionSummary: plainSummary,
+                        isSha: isDanger
+                    )
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: inRemedy ? "checkmark.circle.fill" : "plus.circle")
+                            .adaptiveFont(size: 9)
+                        Text(addRemedyLabel)
+                            .adaptiveFont(size: 9, weight: .bold)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(inRemedy ? Color.green.opacity(0.22) : Color.yanCyan.opacity(0.18))
+                    .foregroundColor(inRemedy ? .green : Color.yanCyan)
+                    .cornerRadius(5)
+                }
                 Text("\(item.yearGuestStar) / \(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
                     .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))

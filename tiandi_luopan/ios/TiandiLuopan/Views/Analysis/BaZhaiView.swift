@@ -17,6 +17,7 @@ public struct BaZhaiView: View {
     @State private var isUsingCustomDate: Bool = false
     @State private var showUpcomingDays: Bool = false
     @State private var showShichenTable: Bool = true
+    @State private var showFamilySection: Bool = false
     @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
     @State private var cachedAnalysis: BaZhaiAnalysis?
     @State private var cachedWaterItems: [SanHeWaterItem]?
@@ -206,12 +207,19 @@ public struct BaZhaiView: View {
             .cornerRadius(12)
             .padding(.horizontal, 16)
             
-            // 宅主命卦与人宅合一配对卡 (P1.1)
+            // 宅主命卦与人宅合一配对卡 (P1.1 + 全家成员命卦分房)
             ownerKuaCard(sittingPalace: state.sittingMountain.palace)
+
+            // 21天气场调理打卡追踪清单
+            if !retention.remedyTasks.isEmpty {
+                remedyTrackerCard()
+            }
 
             // 八方游年星列表
             VStack(spacing: 8) {
                 ForEach(bz.items) { item in
+                    let taskID = "bazhai-\(state.sittingMountain.palace)-\(item.guaName)"
+                    let isSavedTask = retention.remedyTasks.contains(where: { $0.id == taskID })
                     // 固定 120pt 的方向列会把建议文字挤成竖排单字；改为纵向堆叠，
                     // 方向/星名一行、建议说明整行，所有语言都能完整换行。
                     VStack(alignment: .leading, spacing: 6) {
@@ -225,6 +233,26 @@ public struct BaZhaiView: View {
                                 .foregroundColor(item.star.isAuspicious ? Color(red: 0.4, green: 0.85, blue: 0.4) : Color(red: 0.95, green: 0.4, blue: 0.4))
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
+                            Button(action: {
+                                retention.toggleRemedyTask(
+                                    id: taskID,
+                                    palaceDirection: item.localizedDirection,
+                                    title: item.star.localizedName,
+                                    remedyAction: item.star.plainLanguageSummary
+                                )
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: isSavedTask ? "checkmark.circle.fill" : "plus.circle")
+                                        .font(.system(size: 10))
+                                    Text(remedyButtonLabel(isSaved: isSavedTask))
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(isSavedTask ? Color.green.opacity(0.22) : Color.white.opacity(0.08))
+                                .foregroundColor(isSavedTask ? .green : .white.opacity(0.8))
+                                .cornerRadius(5)
+                            }
                         }
                         // 顶置白话吉凶速断 (P2.1)
                         Text(item.star.plainLanguageSummary)
@@ -705,6 +733,11 @@ public struct BaZhaiView: View {
                     .adaptiveFont(size: 11, weight: .semibold)
                     .foregroundColor(.white.opacity(0.85))
             }
+
+            Divider().background(Color.white.opacity(0.1))
+
+            // 全家成员命卦与智能分房档案
+            familyMembersSection(maleLabel: maleLabel, femaleLabel: femaleLabel)
         }
         .padding(12)
         .background(Color(red: 0.12, green: 0.12, blue: 0.16))
@@ -713,6 +746,212 @@ public struct BaZhaiView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.25), lineWidth: 1)
         )
+        .padding(.horizontal, 16)
+    }
+
+    private func familyMembersSection(maleLabel: String, femaleLabel: String) -> some View {
+        let headerTitle: String
+        let addHint: String
+        switch lang.effectiveLanguage {
+        case .en:
+            headerTitle = "Family Members Life Gua & Smart Room Fit (\(kua.familyMembers.count))"
+            addHint = "+ Add Member"
+        case .zhHant:
+            headerTitle = "全家成員命卦與智能分房檔案（\(kua.familyMembers.count)人）"
+            addHint = "+ 添加家人"
+        case .ja:
+            headerTitle = "家族全員の本命卦・部屋割診断（\(kua.familyMembers.count)名）"
+            addHint = "+ 家族追加"
+        case .ko:
+            headerTitle = "가족 구성원 본명괘 및 방 배정 (\(kua.familyMembers.count)명)"
+            addHint = "+ 가족 추가"
+        case .vi:
+            headerTitle = "Bản Mệnh Gia Đình & Phân Phòng (\(kua.familyMembers.count))"
+            addHint = "+ Thêm người"
+        case .th:
+            headerTitle = "รหัสชีวิตสมาชิกครอบครัว & จัดห้อง (\(kua.familyMembers.count))"
+            addHint = "+ เพิ่มสมาชิก"
+        case .id:
+            headerTitle = "Gua Anggota Keluarga & Kamar (\(kua.familyMembers.count))"
+            addHint = "+ Tambah"
+        case .auto, .zhHans:
+            headerTitle = "全家成员命卦与智能分房档案（\(kua.familyMembers.count)人）"
+            addHint = "+ 添加家人"
+        }
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Button(action: {
+                    withAnimation { showFamilySection.toggle() }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.yanCyan)
+                        Text(headerTitle)
+                            .adaptiveFont(size: 11, weight: .bold)
+                            .foregroundColor(.yanCyan)
+                        Image(systemName: showFamilySection ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                Spacer()
+                Menu {
+                    ForEach(FamilyRole.allCases) { role in
+                        Button(action: {
+                            let defaultYear = (role == .elder) ? 1965 : ((role == .spouse) ? kua.birthYear : 2015)
+                            kua.addOrUpdateFamilyMember(role: role, birthYear: defaultYear, isMale: role.defaultIsMale)
+                            showFamilySection = true
+                        }) {
+                            Text(role.localizedTitle)
+                        }
+                    }
+                } label: {
+                    Text(addHint)
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.yanCyan.opacity(0.18))
+                        .foregroundColor(.yanCyan)
+                        .cornerRadius(4)
+                }
+            }
+
+            if showFamilySection && !kua.familyMembers.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(kua.familyMembers) { member in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text(member.role.localizedTitle)
+                                    .adaptiveFont(size: 11, weight: .bold)
+                                    .foregroundColor(.white)
+                                Text("【\(member.localizedGuaBadge)】")
+                                    .adaptiveFont(size: 10, weight: .bold)
+                                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                Spacer()
+                                Menu {
+                                    ForEach((1935...2026).reversed(), id: \.self) { yr in
+                                        Button(action: {
+                                            kua.addOrUpdateFamilyMember(role: member.role, birthYear: yr, isMale: member.isMale)
+                                        }) {
+                                            Text("\(String(yr))")
+                                        }
+                                    }
+                                } label: {
+                                    Text("\(String(member.birthYear))▾")
+                                        .adaptiveFont(size: 10, weight: .semibold)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(4)
+                                }
+                                Button(action: {
+                                    kua.addOrUpdateFamilyMember(role: member.role, birthYear: member.birthYear, isMale: !member.isMale)
+                                }) {
+                                    Text(member.isMale ? maleLabel : femaleLabel)
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(Color.yanCyan.opacity(0.18))
+                                        .foregroundColor(.yanCyan)
+                                        .cornerRadius(4)
+                                }
+                                Button(action: {
+                                    kua.removeFamilyMember(role: member.role)
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.white.opacity(0.45))
+                                }
+                            }
+                            Text(member.personalWealthAndStudySummary)
+                                .adaptiveFont(size: 10)
+                                .foregroundColor(.white.opacity(0.78))
+                        }
+                        .padding(7)
+                        .background(Color.white.opacity(0.04))
+                        .cornerRadius(6)
+                    }
+                }
+            }
+        }
+    }
+
+    private func remedyButtonLabel(isSaved: Bool) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return isSaved ? "Tracked" : "+ Track"
+        case .zhHant: return isSaved ? "已入清單" : "+ 調理打卡"
+        case .ja: return isSaved ? "登録済" : "+ 対策記録"
+        case .ko: return isSaved ? "등록됨" : "+ 조리체크"
+        case .vi: return isSaved ? "Đã lưu" : "+ Theo dõi"
+        case .th: return isSaved ? "บันทึกแล้ว" : "+ ติดตาม"
+        case .id: return isSaved ? "Tersimpan" : "+ Lacak"
+        case .auto, .zhHans: return isSaved ? "已入清单" : "+ 调理打卡"
+        }
+    }
+
+    // MARK: - 21天气场调理与化煞催旺打卡清单
+    private func remedyTrackerCard() -> some View {
+        let title: String
+        switch lang.effectiveLanguage {
+        case .en: title = "My Fengshui Remedy & Activation Tracker (\(retention.remedyTasks.count))"
+        case .zhHant: title = "我家化煞催旺調理打卡清單（\(retention.remedyTasks.count)項 · 換月複盤）"
+        case .ja: title = "我が家の風水対策・催旺チェックリスト（\(retention.remedyTasks.count)件）"
+        case .ko: title = "우리집 풍수 비보·최왕 실천 체크리스트 (\(retention.remedyTasks.count)건)"
+        case .vi: title = "Danh Sách Hóa Sát & Kích Tài Lộc Gia Đình (\(retention.remedyTasks.count))"
+        case .th: title = "รายการปรับฮวงจุ้ยและเสริมมงคลประจำบ้าน (\(retention.remedyTasks.count))"
+        case .id: title = "Daftar Pelacak Solusi Fengshui Rumah (\(retention.remedyTasks.count))"
+        case .auto, .zhHans: title = "我家化煞催旺调理打卡清单（\(retention.remedyTasks.count)项 · 换月复盘）"
+        }
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "checklist.checked")
+                    .foregroundColor(.green)
+                Text(title)
+                    .adaptiveFont(size: 12, weight: .bold)
+                    .foregroundColor(.green)
+                Spacer()
+            }
+
+            ForEach(retention.remedyTasks) { task in
+                HStack(alignment: .top, spacing: 8) {
+                    Button(action: {
+                        retention.toggleRemedyCompletion(id: task.id)
+                    }) {
+                        Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
+                            .foregroundColor(task.isCompleted ? .green : .white.opacity(0.6))
+                            .font(.system(size: 14))
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(task.palaceDirection) · \(task.title)")
+                            .adaptiveFont(size: 11, weight: .bold)
+                            .foregroundColor(task.isCompleted ? .white.opacity(0.5) : .white)
+                            .strikethrough(task.isCompleted)
+                        Text(task.remedyAction)
+                            .adaptiveFont(size: 10)
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: {
+                        retention.removeRemedyTask(id: task.id)
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                }
+                .padding(7)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.11, green: 0.13, blue: 0.12))
+        .cornerRadius(12)
         .padding(.horizontal, 16)
     }
 

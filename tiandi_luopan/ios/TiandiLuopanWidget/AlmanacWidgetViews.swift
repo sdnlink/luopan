@@ -447,6 +447,22 @@ private struct MediumView: View {
                             .foregroundColor(Palette.dim)
                             .lineLimit(1)
                     }
+
+                    Link(destination: URL(string: "tiandiluopan://compass?guide=dailyGods")!) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "location.north.circle.fill")
+                                .font(.system(size: 9))
+                            Text(s.wealthJoyBadge)
+                                .font(.system(size: 9, weight: .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                        }
+                        .foregroundColor(Palette.cyan)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Palette.cyan.opacity(0.14))
+                        .cornerRadius(4)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -641,10 +657,29 @@ private struct LargeView: View {
                 .frame(width: 100)
             }
 
-            // 底栏：流年与流月中宫客星
-            HStack(spacing: 10) {
-                StarCard(title: WidgetText.yearStar.string(), star: s.yearCentralStar, name: s.yearStarName)
-                StarCard(title: WidgetText.monthStar.string(), star: s.monthCentralStar, name: s.monthStarName)
+            // 底栏：流年与流月中宫客星 + 今日财神喜神吉方直达胶囊
+            VStack(spacing: 6) {
+                HStack(spacing: 10) {
+                    StarCard(title: WidgetText.yearStar.string(), star: s.yearCentralStar, name: s.yearStarName)
+                    StarCard(title: WidgetText.monthStar.string(), star: s.monthCentralStar, name: s.monthStarName)
+                }
+                Link(destination: URL(string: "tiandiluopan://compass?guide=dailyGods")!) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "location.north.circle.fill")
+                            .font(.system(size: 10))
+                        Text(s.wealthJoyBadge)
+                            .font(.system(size: 10, weight: .bold))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(Palette.gold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Palette.card)
+                    .cornerRadius(6)
+                }
             }
         }
     }

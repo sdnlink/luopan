@@ -817,7 +817,7 @@ public struct RootContentView: View {
             .count
         let multipleActiveScenes = activeSceneCount > 1
         UIApplication.shared.isIdleTimerDisabled = multipleActiveScenes || selectedTab == 0 || selectedTab == 1
-        motion.setDeviceMotionEnabled(multipleActiveScenes || selectedTab == 0)
+        motion.setDeviceMotionEnabled(multipleActiveScenes || selectedTab == 0 || selectedTab == 1)
         motion.setHeadingUpdatesEnabled(multipleActiveScenes || selectedTab != 4)
         motion.resumeIfSensorsEnabled()
     }

@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "This map has no reliable north reference. Scan again and save a new map.";
 "ar_roomplan_coordinate_heading" = "Survey Reference Heading";
+
+"ar_roomplan_confirm_entrance" = "Confirm main entrance";
+"ar_survey_heading_pending" = "Calibrating direction. Hold the phone steady to enable directional analysis.";

@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "Bản đồ thiếu hướng tham chiếu đáng tin cậy. Vui lòng quét và lưu lại.";
 "ar_roomplan_coordinate_heading" = "Hướng tham chiếu khảo sát";
+
+"ar_roomplan_confirm_entrance" = "Xác nhận cửa chính";
+"ar_survey_heading_pending" = "Đang hiệu chỉnh hướng. Giữ điện thoại ổn định để phân tích phương vị.";

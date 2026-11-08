@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "Peta ini tidak memiliki acuan arah yang andal. Pindai dan simpan peta baru.";
 "ar_roomplan_coordinate_heading" = "Arah Acuan Survei";
+
+"ar_roomplan_confirm_entrance" = "Konfirmasi pintu utama";
+"ar_survey_heading_pending" = "Mengalibrasi arah. Pegang ponsel dengan stabil untuk mengaktifkan analisis arah.";

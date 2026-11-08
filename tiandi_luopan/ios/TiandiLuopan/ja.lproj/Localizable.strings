@@ -563,3 +563,6 @@
 
 "ar_spatial_map_orientation_missing" = "このマップには信頼できる方位基準がありません。再スキャンして保存してください。";
 "ar_roomplan_coordinate_heading" = "測量基準方位";
+
+"ar_roomplan_confirm_entrance" = "玄関ドアを確認";
+"ar_survey_heading_pending" = "方位を校正中です。端末を安定させると方位分析が可能になります。";

@@ -268,13 +268,111 @@ public struct ARSceneEvidence {
     }
 }
 
+/// A compact value copy of one exposure's depth data, independent of later AR frames.
+struct ARCapturedDepth {
+    let width: Int
+    let height: Int
+    let values: [Float]
+    let confidence: [UInt8]?
+    let viewToImage: CGAffineTransform
+
+    func sample(at point: CGPoint) -> Float? {
+        let imagePoint = point.applying(viewToImage)
+        guard width > 0, height > 0, values.count == width * height,
+              imagePoint.x >= 0, imagePoint.x <= 1, imagePoint.y >= 0, imagePoint.y <= 1 else { return nil }
+        let x = min(width - 1, Int(imagePoint.x * CGFloat(width)))
+        let y = min(height - 1, Int(imagePoint.y * CGFloat(height)))
+        var samples: [Float] = []
+        for dy in -1...1 {
+            for dx in -1...1 {
+                let index = max(0, min(height - 1, y + dy)) * width + max(0, min(width - 1, x + dx))
+                if let confidence, confidence.count == values.count, confidence[index] < 1 { continue }
+                let value = values[index]
+                if value.isFinite, value > 0.05, value < 60 { samples.append(value) }
+            }
+        }
+        samples.sort()
+        return samples.isEmpty ? nil : samples[samples.count / 2]
+    }
+
+    static func capture(_ map: CVPixelBuffer?, confidence: CVPixelBuffer?, viewToImage: CGAffineTransform) -> ARCapturedDepth? {
+        guard let map else { return nil }
+        CVPixelBufferLockBaseAddress(map, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(map, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(map) else { return nil }
+        let width = CVPixelBufferGetWidth(map), height = CVPixelBufferGetHeight(map)
+        let stride = CVPixelBufferGetBytesPerRow(map)
+        var values: [Float] = []
+        values.reserveCapacity(width * height)
+        for y in 0..<height {
+            let row = base.advanced(by: y * stride).assumingMemoryBound(to: Float32.self)
+            values.append(contentsOf: UnsafeBufferPointer(start: row, count: width))
+        }
+        var scores: [UInt8]?
+        if let confidence, CVPixelBufferGetWidth(confidence) == width, CVPixelBufferGetHeight(confidence) == height {
+            CVPixelBufferLockBaseAddress(confidence, .readOnly)
+            defer { CVPixelBufferUnlockBaseAddress(confidence, .readOnly) }
+            if let base = CVPixelBufferGetBaseAddress(confidence) {
+                var copied: [UInt8] = []
+                let stride = CVPixelBufferGetBytesPerRow(confidence)
+                for y in 0..<height {
+                    copied.append(contentsOf: UnsafeBufferPointer(start: base.advanced(by: y * stride).assumingMemoryBound(to: UInt8.self), count: width))
+                }
+                scores = copied
+            }
+        }
+        return ARCapturedDepth(width: width, height: height, values: values, confidence: scores, viewToImage: viewToImage)
+    }
+}
+
 public struct ARCapturedFrame {
     public let image: UIImage
     public let evidence: ARSceneEvidence?
+    let pose: ARCapturePose?
+    let depth: ARCapturedDepth?
+    let capturedAt: Date
 
     public init(image: UIImage, evidence: ARSceneEvidence? = nil) {
+        self.init(image: image, evidence: evidence, pose: nil, depth: nil)
+    }
+
+    init(image: UIImage, evidence: ARSceneEvidence? = nil, pose: ARCapturePose?, depth: ARCapturedDepth? = nil, capturedAt: Date = Date()) {
         self.image = image
         self.evidence = evidence
+        self.pose = pose
+        self.depth = depth
+        self.capturedAt = capturedAt
+    }
+
+    func exteriorRecord(shaID: String, point: CGPoint, confidence: Double?, source: ShaRecordSource, note: String?) -> ExteriorShaRecord? {
+        guard let pose else { return nil }
+        return ExteriorShaRecord(shaID: shaID,
+                                 bearingDegrees: pose.projection.bearing(point: point, cameraHeading: pose.heading),
+                                 capturedHeadingDegrees: pose.heading,
+                                 elevationDegrees: pose.projection.elevation(point: point, cameraElevation: pose.elevation),
+                                 distanceMeters: depth?.sample(at: point), confidence: confidence,
+                                 capturedAt: capturedAt, source: source, note: note)
+    }
+
+    /// Vision sees the same aspect-fill crop as the live camera viewport.
+    static func viewportImage(_ image: UIImage, size: CGSize) -> UIImage {
+        guard size.width > 0, size.height > 0 else { return image }
+        let sourceSize: CGSize
+        if let cg = image.cgImage {
+            let swapped = [UIImage.Orientation.left, .right, .leftMirrored, .rightMirrored].contains(image.imageOrientation)
+            sourceSize = CGSize(width: CGFloat(swapped ? cg.height : cg.width), height: CGFloat(swapped ? cg.width : cg.height))
+        } else { sourceSize = image.size }
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return image }
+        let resolutionScale = min(1, 1280 / max(size.width, size.height))
+        let output = CGSize(width: size.width * resolutionScale, height: size.height * resolutionScale)
+        let scale = max(output.width / sourceSize.width, output.height / sourceSize.height)
+        let drawn = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: output, format: format).image { _ in
+            image.draw(in: CGRect(x: (output.width - drawn.width) / 2, y: (output.height - drawn.height) / 2,
+                                  width: drawn.width, height: drawn.height))
+        }
     }
 }
 
@@ -301,6 +399,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var lubanEvaluation: LubanRulerEvaluation?
     @Published public private(set) var savedAnchorCount: Int = 0
     @Published public private(set) var cameraElevationDegrees: Double = 0.0
+    @Published public private(set) var cameraHorizontalFOVDegrees: Double?
+    @Published private(set) var currentCameraPose: ARCapturePose?
     @Published public private(set) var cameraRollDegrees: Double = 0.0
     @Published public private(set) var groundBaguaProjected: Bool = false
     @Published public private(set) var currentStandingPalace: String?
@@ -317,6 +417,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var cornerPinNodes: [SCNNode] = []
     private var cornerRooms: [SpatialRoom3D] = []
     private var surveyHeadingDegrees: Double?
+    @Published public private(set) var hasHeadingReference = false
     private var sessionGeneration = 0
     private var lastMeasurementTimestamp: TimeInterval = 0
     private var lastSemanticUpdateTimestamp: TimeInterval = 0
@@ -424,6 +525,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
 
         let configuration = ARWorldTrackingConfiguration()
+        configuration.worldAlignment = .gravity
         configuration.planeDetection = [.horizontal, .vertical]
         configuration.environmentTexturing = .automatic
         lidarAvailable = false
@@ -460,7 +562,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         estimatedRoomHeightMeters = nil
         hasLowBeamWarning = false
         sessionGeneration += 1
-        surveyHeadingDegrees = CompassMotionManager.shared.headingState.facingAngle
+        surveyHeadingDegrees = nil
+        currentCameraPose = nil
+        cameraHorizontalFOVDegrees = nil
+        hasHeadingReference = false
         clearLubanPoints()
         clearCornerRooms()
         clearGroundBaguaOverlay()
@@ -535,10 +640,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         guard let centerPos = floorPos else { return false }
 
-        let camForward = -SIMD3<Float>(frame.camera.transform.columns.2.x, 0, frame.camera.transform.columns.2.z)
-        let cameraWorldYaw = atan2(camForward.x, -camForward.z)
-        let compassHeadingRad = Float(CompassMotionManager.shared.headingState.facingAngle * .pi / 180.0)
-        let northYaw = cameraWorldYaw - compassHeadingRad
+        guard let coordinateHeading = surveyHeadingDegrees else { return false }
+        let northYaw = -Float(coordinateHeading * .pi / 180)
 
         let plane = SCNPlane(width: CGFloat(resolvedSpan), height: CGFloat(resolvedSpan))
         let mat = SCNMaterial()
@@ -874,7 +977,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         if minX >= maxX { minX = -3.0; maxX = 3.0 }
         if minZ >= maxZ { minZ = -3.0; maxZ = 3.0 }
 
-        let heading = surveyHeadingDegrees ?? CompassMotionManager.shared.headingState.facingAngle
+        guard let heading = surveyHeadingDegrees else { return nil }
 
         // 不再硬编码门/窗占位：AR 平面测绘不提供真实门扇与窗洞，虚构会
         // 误导鲁班门光/开门见灶/玄空旺星等下游检测。门/窗数据由
@@ -1000,6 +1103,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     public func syncPlanesToFloorplan() -> Bool {
+        guard surveyHeadingDegrees != nil else { return false }
         guard let frame = sceneView?.session.currentFrame else { return false }
         let planes = frame.anchors.compactMap { $0 as? ARPlaneAnchor }
         guard !planes.isEmpty else { return false }
@@ -1109,14 +1213,13 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         let weightedX = floorplanRooms.reduce(0.0) { $0 + Double($1.rect.midX) } / Double(max(1, floorplanRooms.count))
         let weightedY = floorplanRooms.reduce(0.0) { $0 + Double($1.rect.midY) } / Double(max(1, floorplanRooms.count))
         let currentSurvey = buildSpatialSurvey()
-        FloorplanView.persistRoomPlanImport(
+        return FloorplanView.persistRoomPlanImport(
             rooms: floorplanRooms,
             centroid: CGPoint(x: weightedX, y: weightedY),
             blueprintImage: blueprint,
             compassHeading: surveyHeadingDegrees,
             spatialSurvey: currentSurvey
         )
-        return true
     }
 
     /// Captures a 1080×1920 holographic AR survey report image combining the live
@@ -1491,7 +1594,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             }
             if viewSize.width > 0, viewSize.height > 0 {
                 let orientation = sceneView.window?.windowScene?.interfaceOrientation ?? .portrait
-                let viewPoint = CGPoint(x: CGFloat(nx) * viewSize.width, y: CGFloat(ny) * viewSize.height)
+                let viewPoint = CGPoint(x: CGFloat(nx), y: CGFloat(ny))
                 let imagePoint = viewPoint.applying(
                     frame.displayTransform(for: orientation, viewportSize: viewSize).inverted()
                 )
@@ -1602,6 +1705,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             clearGroundBaguaOverlay()
             sessionGeneration += 1
             surveyHeadingDegrees = archive.coordinateHeading
+            hasHeadingReference = true
             configuration.initialWorldMap = worldMap
             trackingState = .initializing
             mappingState = .extending
@@ -1649,7 +1753,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
         lastCapturedTimestamp = frame.timestamp
         let interfaceOrientation = sceneView?.window?.windowScene?.interfaceOrientation ?? .portrait
-        guard let image = Self.image(from: frame.capturedImage, interfaceOrientation: interfaceOrientation) else {
+        guard let fullImage = Self.image(from: frame.capturedImage, interfaceOrientation: interfaceOrientation) else {
             DispatchQueue.main.async { completion(nil) }
             return
         }
@@ -1674,27 +1778,39 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             depthMap = frame.sceneDepth?.depthMap
             confidenceMap = frame.sceneDepth?.confidenceMap
         }
+        let viewport = sceneView?.bounds.size ?? fullImage.size
+        let image = ARCapturedFrame.viewportImage(fullImage, size: viewport)
+        let projection = Self.viewportProjection(for: frame, orientation: interfaceOrientation, size: viewport)
+        let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x, frame.camera.transform.columns.2.y, frame.camera.transform.columns.2.z)
+        let worldYaw = atan2(Double(forward.x), Double(-forward.z)) * 180 / .pi
+        let pose: ARCapturePose? = (frameTrackingIsNormal ? surveyHeadingDegrees : nil).flatMap { baseline in
+            projection.map { ARCapturePose(heading: (baseline + worldYaw + 720).truncatingRemainder(dividingBy: 360),
+                                          elevation: asin(max(-1, min(1, Double(forward.y)))) * 180 / .pi,
+                                          projection: $0) }
+        }
+        let capturedDepth = ARCapturedDepth.capture(depthMap, confidence: confidenceMap,
+            viewToImage: frame.displayTransform(for: interfaceOrientation, viewportSize: viewport).inverted())
         let evidence = ARSceneEvidence(
             trackingIsNormal: frameTrackingIsNormal,
             mappingIsUsable: frameMappingIsUsable,
             lidarAvailable: lidarAvailable,
             depthStreamAvailable: depthMap != nil,
             depthCoverage: Self.depthCoverage(from: depthMap, confidenceMap: confidenceMap),
-            horizontalFOVDegrees: Self.portraitHorizontalFOV(for: frame),
+            horizontalFOVDegrees: projection?.horizontalFOVDegrees,
             verticalPlaneCount: frame.anchors
                 .compactMap { $0 as? ARPlaneAnchor }
                 .filter { $0.alignment == .vertical }
                 .count,
             wallFaceCount: Self.wallFaceCount(in: frame.anchors),
-            depthSampleMeters: Self.centerDepthSample(from: depthMap, confidenceMap: confidenceMap),
-            leftDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.25, portraitNormY: 0.5),
-            rightDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.75, portraitNormY: 0.5),
-            topDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.5, portraitNormY: 0.25),
-            bottomDepthMeters: Self.regionalDepthSample(from: depthMap, confidenceMap: confidenceMap, portraitNormX: 0.5, portraitNormY: 0.78),
+            depthSampleMeters: capturedDepth?.sample(at: CGPoint(x: 0.5, y: 0.5)),
+            leftDepthMeters: capturedDepth?.sample(at: CGPoint(x: 0.25, y: 0.5)),
+            rightDepthMeters: capturedDepth?.sample(at: CGPoint(x: 0.75, y: 0.5)),
+            topDepthMeters: capturedDepth?.sample(at: CGPoint(x: 0.5, y: 0.25)),
+            bottomDepthMeters: capturedDepth?.sample(at: CGPoint(x: 0.5, y: 0.78)),
             timestamp: frame.timestamp
         )
         DispatchQueue.main.async {
-            completion(ARCapturedFrame(image: image, evidence: evidence))
+            completion(ARCapturedFrame(image: image, evidence: evidence, pose: pose, depth: capturedDepth))
         }
     }
 
@@ -1780,6 +1896,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         estimatedRoomHeightMeters = nil
         hasLowBeamWarning = false
         surveyHeadingDegrees = nil
+        currentCameraPose = nil
+        cameraHorizontalFOVDegrees = nil
+        hasHeadingReference = false
     }
 
     public func session(_ session: ARSession, didUpdate frame: ARFrame) {
@@ -1809,6 +1928,14 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                   self.sceneView === sceneView else { return }
             self.retryCount = 0
             self.trackingState = state
+            if state == .normal, self.surveyHeadingDegrees == nil {
+                let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x,
+                                           frame.camera.transform.columns.2.y,
+                                           frame.camera.transform.columns.2.z)
+                self.surveyHeadingDegrees = SurveyCoordinateReference.heading(
+                    cameraHeading: CompassMotionManager.shared.physicalHeading(), cameraForward: forward)
+                self.hasHeadingReference = self.surveyHeadingDegrees != nil
+            }
             self.updateMeasurements(frame: frame, sceneView: sceneView)
         }
         if Thread.isMainThread {
@@ -1858,6 +1985,10 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             guard let self = self, let current = self.sceneView,
                   current.session === failedSession else { return }
             self.trackingState = .initializing
+            if configuration.initialWorldMap == nil {
+                self.surveyHeadingDegrees = nil
+                self.hasHeadingReference = false
+            }
             current.session.pause()
             current.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         }
@@ -1865,10 +1996,22 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private func updateMeasurements(frame: ARFrame, sceneView: ARSCNView) {
         let anchors = frame.anchors
+        let orientation = sceneView.window?.windowScene?.interfaceOrientation ?? .portrait
+        if let projection = Self.viewportProjection(for: frame, orientation: orientation, size: sceneView.bounds.size),
+           abs((cameraHorizontalFOVDegrees ?? 0) - projection.horizontalFOVDegrees) > 0.1 {
+            cameraHorizontalFOVDegrees = projection.horizontalFOVDegrees
+        }
         let forwardY = min(1.0, max(-1.0, Double(-frame.camera.transform.columns.2.y)))
         let rightY = min(1.0, max(-1.0, Double(-frame.camera.transform.columns.1.y)))
         cameraElevationDegrees = asin(forwardY) * 180.0 / .pi
         cameraRollDegrees = asin(rightY) * 180.0 / .pi
+        if trackingState == .normal, let baseline = surveyHeadingDegrees,
+           let projection = Self.viewportProjection(for: frame, orientation: orientation, size: sceneView.bounds.size) {
+            let forward = -frame.camera.transform.columns.2
+            let yaw = atan2(Double(forward.x), Double(-forward.z)) * 180 / .pi
+            currentCameraPose = ARCapturePose(heading: (baseline + yaw + 720).truncatingRemainder(dividingBy: 360),
+                                             elevation: cameraElevationDegrees, projection: projection)
+        } else { currentCameraPose = nil }
         if groundBaguaProjected {
             updateStandingPalace(cameraTransform: frame.camera.transform)
         }
@@ -2143,16 +2286,17 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return Float(valid) / Float(total)
     }
 
-    private static func portraitHorizontalFOV(for frame: ARFrame) -> Double? {
-        let pixelHeight = Double(CVPixelBufferGetHeight(frame.capturedImage))
-        let focalY = Double(frame.camera.intrinsics.columns.1.y)
-        guard pixelHeight > 0, focalY > 0 else { return nil }
-        // The app is portrait-only. After rotating ARKit's landscape buffer,
-        // the portrait horizontal axis corresponds to the sensor's vertical
-        // axis, so use fy rather than an arbitrary fixed field of view.
-        let radians = 2.0 * atan(pixelHeight / (2.0 * focalY))
-        let degrees = radians * 180.0 / .pi
-        return degrees.isFinite && degrees >= 20 && degrees <= 120 ? degrees : nil
+    private static func viewportProjection(for frame: ARFrame, orientation: UIInterfaceOrientation, size: CGSize) -> ARTargetProjection? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        let portrait = orientation == .portrait || orientation == .portraitUpsideDown
+        let width = Double(portrait ? frame.camera.imageResolution.height : frame.camera.imageResolution.width)
+        let height = Double(portrait ? frame.camera.imageResolution.width : frame.camera.imageResolution.height)
+        let focal = Double(portrait ? frame.camera.intrinsics.columns.1.y : frame.camera.intrinsics.columns.0.x)
+        guard width > 0, height > 0, focal > 0 else { return nil }
+        let scale = max(Double(size.width) / width, Double(size.height) / height)
+        let visibleWidth = Double(size.width) / scale
+        return ARTargetProjection(horizontalFOVDegrees: 2 * atan(visibleWidth / (2 * focal)) * 180 / .pi,
+                                  aspectRatio: Double(size.width / size.height))
     }
 
     private static func wallFaceCount(in anchors: [ARAnchor]) -> Int {
@@ -2835,6 +2979,10 @@ public struct ARSpatialSurveyView: View {
 
     private var measurementPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if !model.hasHeadingReference {
+                Text(lang.t("ar_survey_heading_pending"))
+                    .adaptiveFont(size: 11).foregroundColor(.orange)
+            }
             HStack {
                 Label(trackingText, systemImage: trackingIcon)
                     .adaptiveFont(size: 11, weight: .semibold)

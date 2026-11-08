@@ -10,6 +10,7 @@ public final class CameraPreviewController: ObservableObject {
     fileprivate weak var activeView: CameraPreviewView.CameraUIView?
     
     public init() {}
+    var currentCapturePose: ARCapturePose? { activeView?.exposurePose() }
     
     public func stopSession(completion: (() -> Void)? = nil) {
         if let view = activeView {
@@ -30,6 +31,7 @@ public struct CameraPreviewView: UIViewRepresentable {
     public var isActive: Bool
     public var captureTrigger: Int
     public var onPhotoCaptured: ((UIImage?) -> Void)?
+    var onFrameCaptured: ((ARCapturedFrame?) -> Void)? = nil
     
     public init(
         controller: CameraPreviewController? = nil,
@@ -45,11 +47,25 @@ public struct CameraPreviewView: UIViewRepresentable {
         self.onPhotoCaptured = onPhotoCaptured
     }
     
+    init(controller: CameraPreviewController?, cameraPosition: AVCaptureDevice.Position,
+         isActive: Bool, captureTrigger: Int, onFrameCaptured: @escaping (ARCapturedFrame?) -> Void) {
+        self.controller = controller
+        self.cameraPosition = cameraPosition
+        self.isActive = isActive
+        self.captureTrigger = captureTrigger
+        self.onFrameCaptured = onFrameCaptured
+    }
+
     public class CameraUIView: UIView, AVCapturePhotoCaptureDelegate {
         private var captureSession: AVCaptureSession?
         private var previewLayer: AVCaptureVideoPreviewLayer?
         private var photoCaptureOutput: AVCapturePhotoOutput?
-        private var photoCompletion: ((UIImage?) -> Void)?
+        private var photoCompletion: ((ARCapturedFrame?) -> Void)?
+        private var photoPose: ARCapturePose?
+        private var photoCaptureID: Int64?
+        private var photoCaptureDate = Date()
+        private var photoViewportSize: CGSize = .zero
+        private var cameraDevice: AVCaptureDevice?
         private var currentPosition: AVCaptureDevice.Position = .back
         private var isCapturingPhoto = false
         private var sessionObservers: [NSObjectProtocol] = []
@@ -107,6 +123,7 @@ public struct CameraPreviewView: UIViewRepresentable {
             photoCaptureOutput = nil
             photoCompletion = nil
             
+            cameraDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position)
             let session = AVCaptureSession()
             // The AR page continuously streams frames for preview and the
             // rectangle detector.  720p is sufficient for the on-device
@@ -285,6 +302,28 @@ public struct CameraPreviewView: UIViewRepresentable {
         }
 
         public func capturePhoto(completion: @escaping (UIImage?) -> Void) {
+            captureFrame { completion($0?.image) }
+        }
+
+        fileprivate func exposurePose() -> ARCapturePose? {
+            let motion = CompassMotionManager.shared
+            guard let heading = motion.physicalHeading(),
+                  let elevation = motion.physicalCameraElevation(front: currentPosition == .front),
+                  bounds.width > 0, bounds.height > 0 else { return nil }
+            let rawFOV = Double(cameraDevice?.activeFormat.videoFieldOfView ?? 60)
+            let dimensions = cameraDevice.map { CMVideoFormatDescriptionGetDimensions($0.activeFormat.formatDescription) }
+            let width = Double(dimensions?.width ?? 1920), height = Double(dimensions?.height ?? 1080)
+            let focal = width / (2 * tan(rawFOV * .pi / 360))
+            let portrait = (window?.windowScene?.interfaceOrientation ?? .portrait).isPortrait
+            let orientedWidth = portrait ? height : width, orientedHeight = portrait ? width : height
+            let scale = max(Double(bounds.width) / orientedWidth, Double(bounds.height) / orientedHeight)
+            let fov = 2 * atan((Double(bounds.width) / scale) / (2 * focal)) * 180 / .pi
+            return ARCapturePose(heading: (heading + (currentPosition == .front ? 180 : 0)).truncatingRemainder(dividingBy: 360),
+                                 elevation: elevation,
+                                 projection: ARTargetProjection(horizontalFOVDegrees: fov, aspectRatio: Double(bounds.width / bounds.height)))
+        }
+
+        public func captureFrame(completion: @escaping (ARCapturedFrame?) -> Void) {
             guard let photoOutput = photoCaptureOutput, captureSession?.isRunning == true else {
                 completion(nil)
                 return
@@ -301,12 +340,25 @@ public struct CameraPreviewView: UIViewRepresentable {
 
             isCapturingPhoto = true
             photoCompletion = completion
+            photoPose = exposurePose()
+            photoCaptureDate = Date()
+            photoViewportSize = bounds.size
             let settings = AVCapturePhotoSettings()
             settings.flashMode = .off
             if #available(iOS 13.0, *) {
                 settings.photoQualityPrioritization = .speed
             }
+            photoCaptureID = settings.uniqueID
             photoOutput.capturePhoto(with: settings, delegate: self)
+        }
+
+        public func photoOutput(_ output: AVCapturePhotoOutput, willCapturePhotoFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.photoCaptureID == resolvedSettings.uniqueID else { return }
+                self.photoPose = self.exposurePose()
+                self.photoCaptureDate = Date()
+                self.photoViewportSize = self.bounds.size
+            }
         }
 
         public func photoOutput(
@@ -327,10 +379,15 @@ public struct CameraPreviewView: UIViewRepresentable {
             // lens switch/interruption cannot deliver the same request twice.
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                guard self.photoCaptureID == photo.resolvedSettings.uniqueID else { return }
                 let completion = self.photoCompletion
+                let pose = self.photoPose
+                let date = self.photoCaptureDate
+                let viewport = self.photoViewportSize
+                self.photoCaptureID = nil
                 self.photoCompletion = nil
                 self.isCapturingPhoto = false
-                completion?(image)
+                completion?(image.map { ARCapturedFrame(image: ARCapturedFrame.viewportImage($0, size: viewport), pose: pose, capturedAt: date) })
             }
         }
         
@@ -397,6 +454,8 @@ public struct CameraPreviewView: UIViewRepresentable {
         private func cancelPendingCapture() {
             let pendingCompletion = photoCompletion
             photoCompletion = nil
+            photoCaptureID = nil
+            photoPose = nil
             isCapturingPhoto = false
             guard let pendingCompletion = pendingCompletion else { return }
             DispatchQueue.main.async {
@@ -435,8 +494,9 @@ public struct CameraPreviewView: UIViewRepresentable {
 
         if context.coordinator.lastCaptureTrigger != captureTrigger {
             context.coordinator.lastCaptureTrigger = captureTrigger
-            uiView.capturePhoto { image in
-                onPhotoCaptured?(image)
+            uiView.captureFrame { frame in
+                if let onFrameCaptured { onFrameCaptured(frame) }
+                else { onPhotoCaptured?(frame?.image) }
             }
         }
     }
@@ -482,8 +542,8 @@ public struct ARVisionView: View {
     @State private var scanOffset: CGFloat = -180
     @State private var selectedShaIndex: Int = 0
     @State private var isAutoFollowingDirection: Bool = true // 实景朝向智能跟随
-    @State private var targetOffset: CGSize = .zero
-    @State private var manualTargetNormalizedOffset: Double = 0.0
+    @State private var targetNormalizedDrag: CGSize = .zero
+    @State private var targetViewportSize: CGSize = .zero
     @State private var targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
     @State private var targetHorizontalFOV: Double = 50.0
     @State private var targetDragStart: CGSize?
@@ -527,37 +587,33 @@ public struct ARVisionView: View {
     /// AR 实景镜头实时朝向：当真机传感器有实时航向时，即使主罗盘已锁定家宅坐向（motion.isLocked == true），
     /// 镜头环视四周仍使用实时传感器航向，确保「锁好家宅坐山后，举起手机环视各扇窗测形煞与吉位」流畅可用；
     /// 模拟器无传感器航向时回退到 motion.headingState.facingAngle。
-    private var arCameraFacingAngle: Double {
-        if motion.hasLiveSensorHeading {
-            return motion.liveSensorHeading
+    private var currentCapturePose: ARCapturePose? {
+        if cameraPosition == .back, ARWorldTrackingConfiguration.isSupported {
+            return fusionModel.trackingState == .normal ? fusionModel.currentCameraPose : nil
         }
-        return motion.headingState.facingAngle
+        return cameraModel.currentCapturePose
+    }
+
+    private var arCameraFacingAngle: Double {
+        currentCapturePose?.heading ?? motion.physicalHeading() ?? motion.headingState.facingAngle
     }
 
     // 计算靶心拖拽后的相对目标偏角与二十四山
-    private var targetCalculatedHeading: Double {
-        // Vision returns a normalized horizontal location. Keep that
-        // location in the bearing calculation even before the overlay knows
-        // its concrete pixel size; a manual drag adds a screen-space delta.
-        let normalizedHorizontalOffset = (targetNormalizedPoint.x + manualTargetNormalizedOffset - 0.5) * 2.0
-        let halfFOVRadians = targetHorizontalFOV * .pi / 360.0
-        let detectedAngleDelta = atan(normalizedHorizontalOffset * tan(halfFOVRadians)) * 180.0 / .pi
-        let raw = arCameraFacingAngle + detectedAngleDelta
-        return (raw.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+    private var targetProjection: ARTargetProjection {
+        let aspect = targetViewportSize.height > 0 ? Double(targetViewportSize.width / targetViewportSize.height) : 9.0 / 16.0
+        return currentCapturePose?.projection ?? ARTargetProjection(horizontalFOVDegrees: targetHorizontalFOV, aspectRatio: aspect)
     }
-    
+
+    private var targetCalculatedHeading: Double {
+        targetProjection.bearing(point: currentTargetSamplePoint, cameraHeading: arCameraFacingAngle)
+    }
+
     private var targetMountain: Mountain24 {
         return Mountain24Data.shared.mountain(for: targetCalculatedHeading)
     }
 
-    /// 目标仰角：相机光轴俯仰角 + 目标在画面中的纵向偏移角（俯为负、仰为正）。
-    /// 竖向 FOV 按横向 FOV 的 9/16 近似折算；手动拖框的垂直增量幅度小（约
-    /// ±1.5°），不并入，避免引入屏幕尺寸魔法常数。
     private var targetElevationDegrees: Double {
-        let verticalFOVDeg = targetHorizontalFOV * 9.0 / 16.0
-        let yFraction = (Double(targetNormalizedPoint.y) - 0.5) * 2.0
-        let delta = atan(yFraction * tan(verticalFOVDeg * .pi / 360.0)) * 180.0 / .pi
-        return fusionModel.cameraElevationDegrees + delta
+        targetProjection.elevation(point: currentTargetSamplePoint, cameraElevation: currentCapturePose?.elevation ?? 0)
     }
 
     private var targetSanHeWater: SanHeWaterItem? {
@@ -712,8 +768,7 @@ public struct ARVisionView: View {
                 aiResult = nil
                 targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                 targetHorizontalFOV = 50.0
-                targetOffset = .zero
-                manualTargetNormalizedOffset = 0.0
+                targetNormalizedDrag = .zero
                 targetDragStart = nil
                 snapshotGeneration += 1
             }
@@ -802,8 +857,7 @@ public struct ARVisionView: View {
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
-            targetOffset = .zero
-            manualTargetNormalizedOffset = 0.0
+            targetNormalizedDrag = .zero
             targetDragStart = nil
             isSwitchingCamera = false
         }
@@ -891,9 +945,7 @@ public struct ARVisionView: View {
                                 cameraPosition: cameraPosition,
                                 isActive: isActive && !showSpatialSurvey,
                                 captureTrigger: captureTrigger,
-                                onPhotoCaptured: { image in
-                                    handleCapturedFrame(image.map { ARCapturedFrame(image: $0) })
-                                }
+                                onFrameCaptured: { frame in handleCapturedFrame(frame) }
                             )
                             .id("camera_preview_\(cameraPosition.rawValue)")
                         }
@@ -1075,29 +1127,9 @@ public struct ARVisionView: View {
         let m = targetMountain
         
         return AnyView(GeometryReader { proxy in
-            let detectedOffset = CGSize(
-                width: (targetNormalizedPoint.x - 0.5) * proxy.size.width,
-                height: (targetNormalizedPoint.y - 0.5) * proxy.size.height
-            )
-            let rawOffset = CGSize(
-                width: detectedOffset.width + targetOffset.width,
-                height: detectedOffset.height + targetOffset.height
-            )
-            // 锁定框尺寸按取景区可用宽度确定（窄屏不超出、宽屏不过大），
-            // 限位、文字换行宽度与拖拽限位共用同一组尺寸，避免框体越出取景区。
             let boxSize = Self.targetBoxSize(in: proxy.size)
-            // Keep the target card inside the camera viewport on every
-            // iPhone/iPad aspect ratio, including split-screen layouts.
-            let maxX = max(0, proxy.size.width / 2 - boxSize.width / 2)
-            let maxY = max(0, proxy.size.height / 2 - boxSize.height / 2)
-            let clampedOffset = CGSize(
-                width: min(max(rawOffset.width, -maxX), maxX),
-                height: min(max(rawOffset.height, -maxY), maxY)
-            )
-            let normPoint = CGPoint(
-                x: min(max(0.5 + clampedOffset.width / max(proxy.size.width, 1), 0.02), 0.98),
-                y: min(max(0.5 + clampedOffset.height / max(proxy.size.height, 1), 0.02), 0.98)
-            )
+            let normPoint = ARTargetProjection.targetPoint(detected: targetNormalizedPoint, normalizedDrag: targetNormalizedDrag,
+                                                           viewport: proxy.size, marker: boxSize)
             let targetDist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: normPoint) : nil
 
             let waterItem = targetSanHeWater
@@ -1156,28 +1188,23 @@ public struct ARVisionView: View {
             }
             .frame(width: boxSize.width, height: boxSize.height)
             .position(
-                x: proxy.size.width / 2 + clampedOffset.width,
-                y: proxy.size.height / 2 + clampedOffset.height
+                x: normPoint.x * proxy.size.width,
+                y: normPoint.y * proxy.size.height
             )
+            .onAppear { targetViewportSize = proxy.size }
+            .onChange(of: proxy.size) { targetViewportSize = $0 }
             .gesture(
                 DragGesture()
                     .onChanged { gesture in
                         if targetDragStart == nil {
-                            targetDragStart = targetOffset
+                            targetDragStart = targetNormalizedDrag
                         }
                         let start = targetDragStart ?? .zero
-                        let proposed = CGSize(width: start.width + gesture.translation.width,
-                                              height: start.height + gesture.translation.height)
-                        let maxX = max(0, proxy.size.width / 2 - boxSize.width / 2)
-                        let maxY = max(0, proxy.size.height / 2 - boxSize.height / 2)
-                        let clamped = CGSize(
-                            width: min(max(proposed.width, -maxX), maxX),
-                            height: min(max(proposed.height, -maxY), maxY)
-                        )
-                        targetOffset = clamped
-                        manualTargetNormalizedOffset = Double(
-                            clamped.width / max(proxy.size.width, 1)
-                        )
+                        let proposed = CGSize(width: start.width + gesture.translation.width / max(proxy.size.width, 1),
+                                              height: start.height + gesture.translation.height / max(proxy.size.height, 1))
+                        let point = ARTargetProjection.targetPoint(detected: targetNormalizedPoint, normalizedDrag: proposed,
+                                                                   viewport: proxy.size, marker: boxSize)
+                        targetNormalizedDrag = CGSize(width: point.x - targetNormalizedPoint.x, height: point.y - targetNormalizedPoint.y)
                     }
                     .onEnded { _ in
                         targetDragStart = nil
@@ -1496,8 +1523,7 @@ public struct ARVisionView: View {
                             aiError = nil
                             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
                             targetHorizontalFOV = 50.0
-                            targetOffset = .zero
-                            manualTargetNormalizedOffset = 0.0
+                            targetNormalizedDrag = .zero
                         }) {
                             Text(item.localizedName)
                                 .adaptiveFont(size: 11, weight: isSelected ? .bold : .medium)
@@ -1613,6 +1639,7 @@ public struct ARVisionView: View {
             aiError = lang.t("ar_ai_camera_required")
             return
         }
+        guard currentCapturePose != nil else { aiError = lang.t("ar_survey_heading_pending"); return }
         aiError = nil
         photoPermissionDenied = false
         aiResult = nil
@@ -1620,8 +1647,7 @@ public struct ARVisionView: View {
         // a stale marker can otherwise look like a fresh detection.
         targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
         targetHorizontalFOV = 50.0
-        targetOffset = .zero
-        manualTargetNormalizedOffset = 0.0
+        targetNormalizedDrag = .zero
         aiScanFrames.removeAll(keepingCapacity: true)
         isAIScanning = true
         aiScanGeneration &+= 1
@@ -1640,7 +1666,7 @@ public struct ARVisionView: View {
                 aiError = lang.t("ar_ai_no_frame")
                 return
             }
-            captureAndSaveSnapshot(baseImage: frame.image)
+            captureAndSaveSnapshot(frame: frame)
         case .none:
             // A capture can finish after the AR tab was dismissed or the
             // request was superseded. Do not turn that stale frame into an
@@ -1734,7 +1760,8 @@ public struct ARVisionView: View {
                     results: nextResults,
                     failures: nextFailures,
                     generation: generation,
-                    firstFailure: nextFailure
+                    firstFailure: nextFailure,
+                    frames: images
                 )
             }
         }
@@ -1744,7 +1771,8 @@ public struct ARVisionView: View {
         results: [ShaAnalysisResult],
         failures: Int,
         generation: Int,
-        firstFailure: OnDeviceShaAnalyzer.AnalysisError?
+        firstFailure: OnDeviceShaAnalyzer.AnalysisError?,
+        frames: [ARCapturedFrame]
     ) {
         guard generation == aiScanGeneration else { return }
         isAIScanning = false
@@ -1755,12 +1783,14 @@ public struct ARVisionView: View {
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
-            targetOffset = .zero
-            manualTargetNormalizedOffset = 0.0
+            targetNormalizedDrag = .zero
             aiError = firstFailure.localizedDescription
             return
         }
         guard failures == 0, results.count == 3,
+              let capturedPose = frames.first?.pose,
+              let livePose = currentCapturePose, capturedPose.isCompatible(with: livePose),
+              frames.allSatisfy({ $0.pose.map { capturedPose.isCompatible(with: $0) } == true }),
               let first = results.first,
               results.dropFirst().allSatisfy({ candidate in
                   candidate.shaID == first.shaID &&
@@ -1770,8 +1800,7 @@ public struct ARVisionView: View {
             aiResult = nil
             targetNormalizedPoint = CGPoint(x: 0.5, y: 0.5)
             targetHorizontalFOV = 50.0
-            targetOffset = .zero
-            manualTargetNormalizedOffset = 0.0
+            targetNormalizedDrag = .zero
             aiError = lang.t("ar_ai_temporal_ambiguous")
             return
         }
@@ -1787,10 +1816,10 @@ public struct ARVisionView: View {
             summary: "three-frame-temporal-consensus",
             horizontalFOVDegrees: results.compactMap { $0.horizontalFOVDegrees }.first
         )
-        applyAIScanResult(candidate)
+        applyAIScanResult(candidate, frame: frames[0])
     }
 
-    private func applyAIScanResult(_ analysis: ShaAnalysisResult) {
+    private func applyAIScanResult(_ analysis: ShaAnalysisResult, frame: ARCapturedFrame) {
         aiResult = analysis
         if let index = shaList.firstIndex(where: { $0.id == analysis.shaID }) {
             selectedShaIndex = index
@@ -1806,24 +1835,13 @@ public struct ARVisionView: View {
                fov.isFinite, fov >= 20, fov <= 120 {
                 targetHorizontalFOV = fov
             }
-            targetOffset = .zero
-            manualTargetNormalizedOffset = 0.0
-            // AI 三帧共识即一次带置信度的方位标注，自动并入全景档案
-            let sample = CGPoint(
-                x: min(max(Double(targetNormalizedPoint.x), 0.02), 0.98),
-                y: min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
-            )
-            let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
-            shaStore.addRecord(ExteriorShaRecord(
-                shaID: analysis.shaID,
-                bearingDegrees: targetCalculatedHeading,
-                capturedHeadingDegrees: motion.headingState.facingAngle,
-                elevationDegrees: targetElevationDegrees,
-                distanceMeters: dist,
-                confidence: analysis.confidence,
-                source: .ai,
-                note: "three-frame-temporal-consensus"
-            ))
+            targetNormalizedDrag = .zero
+            if let record = frame.exteriorRecord(shaID: analysis.shaID, point: currentTargetSamplePoint,
+                                                  confidence: analysis.confidence, source: .ai,
+                                                  note: "three-frame-temporal-consensus") {
+                shaStore.addRecord(record)
+            }
+
         }
     }
 
@@ -1831,22 +1849,22 @@ public struct ARVisionView: View {
 
     /// 当前锁定框在画面中的归一化采样点（并入 AI 目标点与手动水平拖动）
     private var currentTargetSamplePoint: CGPoint {
-        let x = min(max(Double(targetNormalizedPoint.x) + manualTargetNormalizedOffset, 0.02), 0.98)
-        let y = min(max(Double(targetNormalizedPoint.y), 0.02), 0.98)
-        return CGPoint(x: x, y: y)
+        ARTargetProjection.targetPoint(detected: targetNormalizedPoint, normalizedDrag: targetNormalizedDrag,
+                                       viewport: targetViewportSize, marker: Self.targetBoxSize(in: targetViewportSize))
     }
 
     /// 把当前目标锁定框记入全景形煞档案（手动/AI 统一入口）
     private func markCurrentSha() {
         guard shaList.indices.contains(activeShaIndex) else { return }
         let sha = shaList[activeShaIndex]
+        guard let pose = currentCapturePose else { aiError = lang.t("ar_survey_heading_pending"); return }
         let sample = currentTargetSamplePoint
         let dist = (cameraPosition == .back) ? fusionModel.sampleDepth(atViewNormalizedPoint: sample) : nil
         let record = ExteriorShaRecord(
             shaID: sha.id,
-            bearingDegrees: targetCalculatedHeading,
-            capturedHeadingDegrees: motion.headingState.facingAngle,
-            elevationDegrees: targetElevationDegrees,
+            bearingDegrees: pose.projection.bearing(point: sample, cameraHeading: pose.heading),
+            capturedHeadingDegrees: pose.heading,
+            elevationDegrees: pose.projection.elevation(point: sample, cameraElevation: pose.elevation),
             distanceMeters: dist,
             confidence: aiResult?.confidence,
             source: aiResult == nil ? .manual : .ai,
@@ -1856,22 +1874,15 @@ public struct ARVisionView: View {
     }
     
     // MARK: - 绘制并保存带水印防伪印章的现场勘测存证快照
-    private func captureAndSaveSnapshot(baseImage: UIImage) {
+    private func captureAndSaveSnapshot(frame: ARCapturedFrame) {
+        guard let pose = frame.pose else { aiError = lang.t("ar_survey_heading_pending"); return }
+        let baseImage = frame.image
         snapshotGeneration += 1
         let generation = snapshotGeneration
-        // 存证画布跟随底图**显示方向**的长宽比：iPad 横屏拍到的是横版照片，
-        // 塞进 1080×1920 竖版画布会被 aspectFill 左右裁掉 25%~45%，形煞位置与叠加 HUD 全部对不上。
-        // 注意不能用 `size` 直接比：AR 融合路径的底图是 ARKit 的横向像素缓冲（1920×1440），
-        // 靠 `imageOrientation`（.right/.left）旋成竖屏显示，`size` 仍是横向的；
-        // 这里按 orientation 是否 90°/270° 交换宽高得到真实显示尺寸，两条路径才都判得对。
-        let isQuarterTurn = [UIImage.Orientation.left, .right, .leftMirrored, .rightMirrored]
-            .contains(baseImage.imageOrientation)
-        let displayWidth = isQuarterTurn ? baseImage.size.height : baseImage.size.width
-        let displayHeight = isQuarterTurn ? baseImage.size.width : baseImage.size.height
-        let isLandscapeShot = displayWidth > displayHeight
-        let size = isLandscapeShot
-            ? CGSize(width: 1920, height: 1080)
-            : CGSize(width: 1080, height: 1920)
+        // Preserve the exact viewport aspect ratio; a second aspect-fill crop
+        // would shift the target relative to its recorded normalized point.
+        let size = GeometryUtils.aspectFitRect(aspectRatio: baseImage.size.width / max(1, baseImage.size.height),
+                                               in: CGRect(x: 0, y: 0, width: 1920, height: 1920)).size
         // Keep the proof image at its declared pixel dimensions instead of
         // inheriting a 2x/3x Retina scale and allocating a much larger bitmap.
         let format = UIGraphicsImageRendererFormat()
@@ -1880,8 +1891,8 @@ public struct ARVisionView: View {
         
         guard shaList.indices.contains(activeShaIndex) else { return }
         let currentSha = shaList[activeShaIndex]
-        let currentHeading = motion.headingState.facingAngle
-        let mFacing = motion.headingState.facingMountain
+        let currentHeading = pose.heading
+        let mFacing = Mountain24Data.shared.mountain(for: currentHeading)
         let coordsStr = motion.coordsDesc
         let language = lang.effectiveLanguage
         let watermarkTitle = lang.t("ar_watermark_title")
@@ -1892,18 +1903,17 @@ public struct ARVisionView: View {
         let facingPinyin = mFacing.pinyin
         let facingName = mFacing.localizedName
         let facingPalace = mFacing.localizedPalace
-        let targetHeading = targetCalculatedHeading
-        let targetMtn = targetMountain
+        let targetHeading = pose.projection.bearing(point: currentTargetSamplePoint, cameraHeading: pose.heading)
+        let targetMtn = Mountain24Data.shared.mountain(for: targetHeading)
         let targetMtnName = targetMtn.localizedName
         let targetPalace = targetMtn.localizedPalace
-        let normTargetX = min(max(Double(targetNormalizedPoint.x) + manualTargetNormalizedOffset, 0.08), 0.92)
-        let normTargetY = min(max(Double(targetNormalizedPoint.y), 0.12), 0.72)
-        let sampledDist = (cameraPosition == .back)
-            ? fusionModel.sampleDepth(atViewNormalizedPoint: CGPoint(x: normTargetX, y: normTargetY))
-            : nil
+        let targetPoint = currentTargetSamplePoint
+        let normTargetX = Double(targetPoint.x)
+        let normTargetY = Double(targetPoint.y)
+        let sampledDist = frame.depth?.sample(at: targetPoint)
         let isLidar = fusionModel.lidarAvailable
         let solarTimeStr = motion.trueSolarTimeStr
-        let auditDate = Date()
+        let auditDate = frame.capturedAt
         
         DispatchQueue.global(qos: .userInitiated).async {
             let image = renderer.image { ctx in

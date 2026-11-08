@@ -487,4 +487,255 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertEqual(outcomes, [false])
     }
 
+
+    private func caseRecord(_ id: String) -> FloorplanCaseRecord {
+        var value = record(image: nil)
+        value.id = id
+        value.title = id
+        return value
+    }
+
+    @MainActor
+    func testTwoWindowsInsertCasesWithoutOverwritingEachOthersArchives() throws {
+        let suite = "case-store-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let shared = FloorplanCaseStore(defaults: defaults)
+        let windowA = shared, windowB = shared
+        try shared.insert(caseRecord("A"))
+        try windowA.insert(caseRecord("B"))
+        try windowB.insert(caseRecord("C"))
+        XCTAssertEqual(windowA.records.map(\.id), ["C", "B", "A"])
+        XCTAssertEqual(FloorplanCaseStore(defaults: defaults).records.map(\.id), ["C", "B", "A"])
+    }
+
+    @MainActor
+    func testStaleWindowDeletionCannotResurrectADeletedCase() throws {
+        let suite = "case-delete-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let shared = FloorplanCaseStore(defaults: defaults)
+        try shared.insert(caseRecord("A"))
+        try shared.insert(caseRecord("B"))
+        try shared.remove(id: "A", imageDirectory: directory)
+        try shared.insert(caseRecord("C"))
+        try shared.remove(id: "A", imageDirectory: directory)
+        XCTAssertEqual(shared.records.map(\.id), ["C", "B"])
+    }
+
+    @MainActor
+    func testOldWorkspaceRevisionCannotOverwriteTheNewPlanOrItsImage() throws {
+        let suite = "workspace-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let store = FloorplanWorkspaceStore(defaults: defaults, directory: directory)
+        let first = record(image: nil).layout
+        var second = first
+        second.houseFacingDegrees = 180
+        func image(_ color: UIColor) -> UIImage {
+            UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { _ in
+                color.setFill(); UIRectFill(CGRect(x: 0, y: 0, width: 8, height: 8))
+            }
+        }
+        let red = image(.red), blue = image(.blue)
+        XCTAssertTrue(try store.save(layout: first, image: red, writerID: UUID(), expectedRevision: 0))
+        let oldRevision = store.snapshot.revision
+        XCTAssertTrue(try store.save(layout: second, image: blue, writerID: UUID(), expectedRevision: oldRevision))
+        let imageURL = try XCTUnwrap(store.imageURL)
+        let bytes = try Data(contentsOf: imageURL)
+        XCTAssertFalse(try store.save(layout: first, image: red, writerID: UUID(), expectedRevision: oldRevision))
+        XCTAssertEqual(try Data(contentsOf: imageURL), bytes)
+        XCTAssertEqual(store.snapshot.layout?.houseFacingDegrees, 180)
+        XCTAssertTrue(store.snapshot.image === blue)
+        let restored = FloorplanWorkspaceStore(defaults: defaults, directory: directory)
+        XCTAssertEqual(restored.snapshot.layout?.houseFacingDegrees, 180)
+    }
+
+    @MainActor
+    func testApplyingASharedWorkspaceSnapshotDoesNotStartAWriteFeedbackLoop() throws {
+        let suite = "workspace-echo-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let store = FloorplanWorkspaceStore(defaults: defaults, directory: directory)
+        let layout = record(image: nil).layout
+        try store.save(layout: layout, image: nil, writerID: UUID())
+        let revision = store.snapshot.revision
+        try store.save(layout: layout, image: nil, writerID: UUID(), expectedRevision: revision)
+        XCTAssertEqual(store.snapshot.revision, revision)
+    }
+
+    func testScanReferenceUsesPhysicalCameraAndArPoseIndependentlyOfLockedChart() throws {
+        let baseline = try XCTUnwrap(SurveyCoordinateReference.heading(cameraHeading: 180, cameraForward: SIMD3(0, 0, -1)))
+        XCTAssertEqual(baseline, 180, accuracy: 0.00001)
+        let turned = try XCTUnwrap(SurveyCoordinateReference.heading(cameraHeading: 270, cameraForward: SIMD3(1, 0, 0)))
+        XCTAssertEqual(turned, baseline, accuracy: 0.00001)
+    }
+
+    func testScanReferenceCannotUseAnUnavailableHeadingOrAVerticalCameraRay() {
+        XCTAssertNil(SurveyCoordinateReference.heading(cameraHeading: nil, cameraForward: SIMD3(0, 0, -1)))
+        XCTAssertNil(SurveyCoordinateReference.heading(cameraHeading: .nan, cameraForward: SIMD3(0, 0, -1)))
+        XCTAssertNil(SurveyCoordinateReference.heading(cameraHeading: 90, cameraForward: SIMD3(0, 1, 0)))
+    }
+
+    @MainActor
+    func testRoomPlanFacingSurvivesBlueprintPersistenceAndVrReconstruction() throws {
+        var layout = record(image: nil).layout
+        layout = SavedFloorplanLayout(rooms: [], centroidX: 0.5, centroidY: 0.5, compassRotation: 0,
+                                      isSyncWithCompass: false, hasFloorplanAccess: false,
+                                      floorplanAccessGrantID: nil, floorplanAccessGrantSignature: nil,
+                                      houseFacingDegrees: 90)
+        let restored = try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONEncoder().encode(layout))
+        let orientation = FloorplanOrientation(coordinateHeading: restored.compassRotation, houseFacingDegrees: restored.houseFacingDegrees)
+        let reference = VRSurveyReference(coordinateHeading: restored.compassRotation,
+                                          houseFacingDegrees: orientation.facing(afterCalibratingTo: restored.compassRotation),
+                                          normalizedCentroid: CGPoint(x: 0.5, y: 0.5), yaw: 0)
+        let room = SpatialRoom3D(name: "客厅", type: .livingRoom, center: SIMD3(6, 1.4, 5), size: SIMD3(12, 2.8, 10))
+        let result = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "VR", walls: [], openings: [], beams: [], rooms: [room], objects: [],
+                                                                  compassHeading: reference.coordinateHeading,
+                                                                  centroidOverride: reference.centroid(width: 12, depth: 10),
+                                                                  houseFacingDegrees: reference.houseFacingDegrees)
+        XCTAssertEqual(result.compassHeading, 0)
+        XCTAssertEqual(result.houseFacingDegrees, 90)
+        XCTAssertEqual(orientation.facing(afterCalibratingTo: 30), 120)
+    }
+
+    func testUnspecifiedHouseFacingDoesNotDefaultToBlueprintNorth() {
+        let orientation = FloorplanOrientation(coordinateHeading: 80, houseFacingDegrees: nil)
+        XCTAssertNil(orientation.relativeFacing)
+        XCTAssertNil(orientation.facing(afterCalibratingTo: 110))
+    }
+
+    func testEntranceSelectionIsInvariantUnderArbitraryScanRotations() {
+        let main = UUID(), interior = UUID()
+        let corners: [SIMD2<Float>] = [SIMD2(-5, -3), SIMD2(5, -3), SIMD2(5, 3), SIMD2(-5, 3)]
+        for degrees in [0.0, 15, 45, 89, 123, 270] {
+            let angle = Float(degrees * .pi / 180)
+            func rotate(_ p: SIMD2<Float>) -> SIMD2<Float> {
+                SIMD2(p.x * cos(angle) - p.y * sin(angle), p.x * sin(angle) + p.y * cos(angle))
+            }
+            let doors = [SpatialEntranceCandidate(id: main, position: rotate(SIMD2(5, 0)), width: 1),
+                         SpatialEntranceCandidate(id: interior, position: rotate(SIMD2(4.5, 2)), width: 1.2)]
+            XCTAssertEqual(GeometryUtils.entranceDoorID(wallEndpoints: corners.map(rotate), doors: doors), main, "rotation: \(degrees)")
+            XCTAssertEqual(GeometryUtils.entranceDoorID(wallEndpoints: Array(corners.map(rotate).reversed()), doors: Array(doors.reversed())), main)
+        }
+    }
+
+    func testEntranceSelectionUsesDoorWidthForBoundaryTies() {
+        let first = UUID(), second = UUID()
+        let points: [SIMD2<Float>] = [SIMD2(-5, -3), SIMD2(5, -3), SIMD2(5, 3), SIMD2(-5, 3)]
+        let doors = [SpatialEntranceCandidate(id: first, position: SIMD2(5, 0), width: 0.8),
+                     SpatialEntranceCandidate(id: second, position: SIMD2(0, -3), width: 1.2)]
+        XCTAssertEqual(GeometryUtils.entranceDoorID(wallEndpoints: points, doors: doors), second)
+    }
+
+    func testVerticalTargetDragUsesTheSamePointForDisplayDistanceAndRecord() throws {
+        let point = ARTargetProjection.targetPoint(detected: CGPoint(x: 0.5, y: 0.5), normalizedDrag: CGSize(width: 0, height: 0.25),
+                                                   viewport: CGSize(width: 400, height: 800), marker: CGSize(width: 200, height: 150))
+        XCTAssertEqual(point.y, 0.75)
+        let values: [Float] = (0..<64).map { $0 / 8 < 4 ? 1 : 8 }
+        let depth = ARCapturedDepth(width: 8, height: 8, values: values, confidence: nil, viewToImage: .identity)
+        let pose = ARCapturePose(heading: 90, elevation: 0, projection: ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5))
+        let frame = ARCapturedFrame(image: UIImage(), pose: pose, depth: depth)
+        let saved = try XCTUnwrap(frame.exteriorRecord(shaID: "luchong", point: point, confidence: nil, source: .manual, note: nil))
+        XCTAssertEqual(depth.sample(at: CGPoint(x: 0.5, y: 0.5 - 0.25)), 1)
+        XCTAssertEqual(saved.distanceMeters, depth.sample(at: point))
+        XCTAssertEqual(saved.distanceMeters, 8)
+        XCTAssertLessThan(saved.elevationDegrees, 0)
+    }
+
+    func testTargetCoordinatesStayConsistentAtViewportEdgesAndAfterRotation() {
+        for viewport in [CGSize(width: 400, height: 800), CGSize(width: 800, height: 400)] {
+            let marker = CGSize(width: 200, height: 150)
+            let point = ARTargetProjection.targetPoint(detected: CGPoint(x: 0.9, y: 0.1), normalizedDrag: CGSize(width: 0.5, height: -0.5),
+                                                       viewport: viewport, marker: marker)
+            XCTAssertEqual(point.x * viewport.width, viewport.width - marker.width / 2, accuracy: 0.00001)
+            XCTAssertEqual(point.y * viewport.height, marker.height / 2, accuracy: 0.00001)
+        }
+    }
+
+    func testTopOfImageIsPositiveElevationForPortraitAndLandscape() {
+        for aspect in [0.5, 1.0, 2.0] {
+            let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: aspect)
+            let above = projection.elevation(point: CGPoint(x: 0.5, y: 0.25), cameraElevation: 0)
+            let below = projection.elevation(point: CGPoint(x: 0.5, y: 0.75), cameraElevation: 0)
+            XCTAssertGreaterThan(above, 0)
+            XCTAssertLessThan(below, 0)
+            XCTAssertEqual(above, -below, accuracy: 0.000001)
+        }
+    }
+
+    func testCapturedRecordUsesExposurePoseAndDepthAfterPhoneTurns() throws {
+        let date = instant("2026-11-08T04:00:00Z")
+        let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5)
+        let captured = ARCapturePose(heading: 90, elevation: 5, projection: projection)
+        let current = ARCapturePose(heading: 180, elevation: -10, projection: projection)
+        XCTAssertFalse(captured.isCompatible(with: current))
+        let depth = ARCapturedDepth(width: 3, height: 3, values: Array(repeating: 6, count: 9), confidence: nil, viewToImage: .identity)
+        let frame = ARCapturedFrame(image: UIImage(), pose: captured, depth: depth, capturedAt: date)
+        let record = try XCTUnwrap(frame.exteriorRecord(shaID: "tianzhan", point: CGPoint(x: 0.5, y: 0.5), confidence: 0.8, source: .ai, note: nil))
+        XCTAssertEqual(record.bearingDegrees, 90)
+        XCTAssertEqual(record.elevationDegrees, 5)
+        XCTAssertEqual(record.distanceMeters, 6)
+        XCTAssertEqual(record.capturedHeadingDegrees, 90)
+        XCTAssertEqual(record.capturedAt, date)
+    }
+
+    func testAiPoseConsensusHandlesNorthSeamAndRejectsChangedViewport() {
+        let projection = ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 0.5)
+        let first = ARCapturePose(heading: 359, elevation: 0, projection: projection)
+        XCTAssertTrue(first.isCompatible(with: ARCapturePose(heading: 1, elevation: 1, projection: projection)))
+        XCTAssertFalse(first.isCompatible(with: ARCapturePose(heading: 359, elevation: 0,
+                                                              projection: ARTargetProjection(horizontalFOVDegrees: 50, aspectRatio: 2))))
+    }
+
+    func testCapturedDepthUsesNormalizedDisplayTransformAndRejectsLowConfidence() {
+        let depth = ARCapturedDepth(width: 3, height: 3, values: Array(repeating: 4, count: 9),
+                                    confidence: Array(repeating: 2, count: 9), viewToImage: CGAffineTransform(translationX: 0.1, y: 0.1))
+        XCTAssertEqual(depth.sample(at: CGPoint(x: 0.5, y: 0.5)), 4)
+        XCTAssertNil(depth.sample(at: CGPoint(x: 1, y: 1)))
+        let invalid = ARCapturedDepth(width: 3, height: 3, values: Array(repeating: 4, count: 9),
+                                      confidence: Array(repeating: 0, count: 9), viewToImage: .identity)
+        XCTAssertNil(invalid.sample(at: CGPoint(x: 0.5, y: 0.5)))
+    }
+
+    @MainActor
+    func testFloorplanExportKeepsOneCentroidAndItsMatchingAudit() {
+        let language = LocalizationManager.shared.effectiveLanguage
+        defer { LocalizationManager.shared.effectiveLanguage = language }
+        LocalizationManager.shared.effectiveLanguage = .zhHans
+        let room = FloorplanRoom(name: "书房", type: .study, rect: CGRect(x: 0.65, y: 0.45, width: 0.1, height: 0.1))
+        var center = CGPoint(x: 0.5, y: 0.5)
+        let report = FloorplanReportSnapshot(rooms: [room], centroid: center, heading: 0, aspectRatio: 1)
+        center = CGPoint(x: 0.8, y: 0.5)
+        let edited = FloorplanEngine.shared.auditFloorplan(rooms: [room], centroid: center, heading: 0)
+        XCTAssertTrue(report.rooms[0].palaceName.contains("正东"))
+        XCTAssertTrue(edited.auditedRooms[0].palaceName.contains("正西"))
+        XCTAssertEqual(report.centroid, CGPoint(x: 0.5, y: 0.5))
+    }
+
+    @MainActor
+    func testFloorplanAuditInvalidatesAtLiChunWithUnchangedGeometry() {
+        let language = LocalizationManager.shared.effectiveLanguage
+        defer { LocalizationManager.shared.effectiveLanguage = language }
+        LocalizationManager.shared.effectiveLanguage = .zhHans
+        let boundary = liChunBoundary()
+        let before = boundary.addingTimeInterval(-1), after = boundary.addingTimeInterval(1)
+        XCTAssertNotEqual(FloorplanAuditTimeKey(date: before), FloorplanAuditTimeKey(date: after))
+        let room = FloorplanRoom(name: "书房", type: .study, rect: CGRect(x: 0.7, y: 0.4, width: 0.1, height: 0.1))
+        let old = FloorplanReportSnapshot(rooms: [room], centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, date: before)
+        let new = FloorplanReportSnapshot(rooms: [room], centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, date: after)
+        XCTAssertNotEqual(old.report.map(\.lore), new.report.map(\.lore))
+        XCTAssertEqual(old.date, before)
+        XCTAssertEqual(new.date, after)
+    }
+
 }

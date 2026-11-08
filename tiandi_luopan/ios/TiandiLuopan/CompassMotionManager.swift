@@ -108,6 +108,24 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     private var lastResolvedRoll: Double = .nan
     private var cancellables = Set<AnyCancellable>()
     
+    private var liveHeadingDate: Date?
+    private var cameraGravityZ: Double?
+    private var cameraAttitudeDate: Date?
+
+    /// Physical heading only; a selected mountain never substitutes for a sensor fix.
+    public func physicalHeading(at date: Date = Date()) -> Double? {
+        guard hasLiveSensorHeading, let liveHeadingDate,
+              abs(date.timeIntervalSince(liveHeadingDate)) <= 3,
+              liveSensorHeading.isFinite else { return nil }
+        return liveSensorHeading
+    }
+
+    public func physicalCameraElevation(front: Bool = false, at date: Date = Date()) -> Double? {
+        guard let cameraGravityZ, let cameraAttitudeDate,
+              abs(date.timeIntervalSince(cameraAttitudeDate)) <= 3 else { return nil }
+        return asin(max(-1, min(1, front ? -cameraGravityZ : cameraGravityZ))) * 180 / .pi
+    }
+
     override public init() {
         super.init()
         if let saved = UserDefaults.standard.string(forKey: "compass_north_reference"),
@@ -308,6 +326,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         guard isRunning else { return }
         isRunning = false
         locationManager.stopUpdatingHeading()
+        liveHeadingDate = nil
         locationManager.stopUpdatingLocation()
         motionManager.stopDeviceMotionUpdates()
     }
@@ -325,8 +344,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
     }
 
     /// Core Location heading remains available to every analysis tab, while
-    /// the higher-power attitude/magnetic stream is only needed by the live
-    /// compass and calibration screens.
+    /// the attitude stream is needed by the live compass, camera elevation,
+    /// and calibration screens.
     public func setDeviceMotionEnabled(_ enabled: Bool) {
         tabDeviceMotionEnabled = enabled
         applyEffectiveSensorConfig()
@@ -720,6 +739,8 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
         motionManager.startDeviceMotionUpdates(using: referenceFrame, to: .main) { [weak self] motion, error in
             guard let self = self, let motion = motion, error == nil else { return }
             
+            self.cameraGravityZ = motion.gravity.z
+            self.cameraAttitudeDate = Date()
             let pitchDeg = motion.attitude.pitch * 180.0 / .pi
             let rollDeg = motion.attitude.roll * 180.0 / .pi
             
@@ -852,6 +873,7 @@ public final class CompassMotionManager: NSObject, ObservableObject, CLLocationM
             }
             
             let referenceHeading = self.northReference == .trueNorth && self.hasDeclination ? self.trueHeading : mag
+            self.liveHeadingDate = newHeading.timestamp
             let normalizedLive = (referenceHeading.truncatingRemainder(dividingBy: 360.0) + 360.0).truncatingRemainder(dividingBy: 360.0)
             if !self.hasLiveSensorHeading || abs(normalizedLive - self.liveSensorHeading) >= 0.15 {
                 self.liveSensorHeading = normalizedLive

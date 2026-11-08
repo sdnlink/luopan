@@ -799,6 +799,7 @@ public struct RootContentView: View {
                 analysisSubTab = sub
             }
             if route.openDailyCard {
+                showOnboarding = false
                 showShortcutDailyCard = true
             }
         }

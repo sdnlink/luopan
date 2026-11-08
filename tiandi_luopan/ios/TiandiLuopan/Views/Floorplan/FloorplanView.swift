@@ -1197,7 +1197,7 @@ public struct FloorplanView: View {
                             Text(m.kuaBadge)
                                 .adaptiveFont(size: 9, weight: .semibold)
                                 .foregroundColor(m.isKuaMatch ? .green : .orange)
-                            Text("吉\(m.auspiciousCount) / 煞\(m.shaCount)")
+                            Text(pkCountSummaryText(auspicious: m.auspiciousCount, sha: m.shaCount))
                                 .adaptiveFont(size: 9, design: .monospaced)
                                 .foregroundColor(.white.opacity(0.65))
                         }
@@ -1219,6 +1219,18 @@ public struct FloorplanView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.3), lineWidth: 1)
         )
+    }
+
+    private func pkCountSummaryText(auspicious: Int, sha: Int) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Good \(auspicious) / Sha \(sha)"
+        case .zhHant, .ja: return "吉\(auspicious) / 煞\(sha)"
+        case .ko: return "길\(auspicious) / 살\(sha)"
+        case .vi: return "Cát \(auspicious) / Sát \(sha)"
+        case .th: return "มงคล \(auspicious) / พิฆาต \(sha)"
+        case .id: return "Baik \(auspicious) / Sha \(sha)"
+        case .auto, .zhHans: return "吉\(auspicious) / 煞\(sha)"
+        }
     }
 
     private static func clampedUnit(_ value: Double, fallback: Double) -> CGFloat {

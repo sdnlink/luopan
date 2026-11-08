@@ -892,6 +892,18 @@ public struct BaZhaiView: View {
         }
     }
 
+    private func remedyDayCycleBadge(days: Int) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Day \(days)/21"
+        case .zhHant, .ja: return "第\(days)/21天"
+        case .ko: return "\(days)/21일차"
+        case .vi: return "Ngày \(days)/21"
+        case .th: return "วันที่ \(days)/21"
+        case .id: return "Hari \(days)/21"
+        case .auto, .zhHans: return "第\(days)/21天"
+        }
+    }
+
     // MARK: - 21天气场调理与化煞催旺打卡清单
     private func remedyTrackerCard() -> some View {
         let title: String
@@ -917,6 +929,7 @@ public struct BaZhaiView: View {
             }
 
             ForEach(retention.remedyTasks) { task in
+                let elapsedDays = max(1, min(21, (Calendar.current.dateComponents([.day], from: task.createdAt, to: Date()).day ?? 0) + 1))
                 HStack(alignment: .top, spacing: 8) {
                     Button(action: {
                         retention.toggleRemedyCompletion(id: task.id)
@@ -926,10 +939,19 @@ public struct BaZhaiView: View {
                             .font(.system(size: 14))
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(task.palaceDirection) · \(task.title)")
-                            .adaptiveFont(size: 11, weight: .bold)
-                            .foregroundColor(task.isCompleted ? .white.opacity(0.5) : .white)
-                            .strikethrough(task.isCompleted)
+                        HStack(spacing: 6) {
+                            Text("\(task.palaceDirection) · \(task.title)")
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(task.isCompleted ? .white.opacity(0.5) : .white)
+                                .strikethrough(task.isCompleted)
+                            Text(remedyDayCycleBadge(days: elapsedDays))
+                                .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.18))
+                                .foregroundColor(.green)
+                                .cornerRadius(4)
+                        }
                         Text(task.remedyAction)
                             .adaptiveFont(size: 10)
                             .foregroundColor(.white.opacity(0.75))

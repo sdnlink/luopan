@@ -433,6 +433,7 @@ public struct PurpleWhiteView: View {
                     .foregroundColor(inRemedy ? .green : Color.yanCyan)
                     .cornerRadius(5)
                 }
+                .buttonStyle(PlainButtonStyle())
                 Text("\(item.yearGuestStar) / \(lang.t("tag_month_prefix"))\(item.monthGuestStar)")
                     .adaptiveFont(size: 11, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))

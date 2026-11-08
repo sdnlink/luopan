@@ -393,6 +393,7 @@ public struct TianJiShuView: View {
                         .foregroundColor(.white.opacity(0.6))
                 }
             }
+            .buttonStyle(PlainButtonStyle())
 
             if showCustomSignEditor {
                 VStack(spacing: 6) {
@@ -434,6 +435,7 @@ public struct TianJiShuView: View {
                         .foregroundColor(.black)
                         .cornerRadius(6)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }

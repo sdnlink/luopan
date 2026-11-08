@@ -321,6 +321,7 @@ public struct BaZhaiView: View {
                                 .foregroundColor(isSavedTask ? .green : .white.opacity(0.8))
                                 .cornerRadius(5)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         // 顶置白话吉凶速断 (P2.1)
                         Text(item.star.plainLanguageSummary)
@@ -1087,6 +1088,7 @@ public struct BaZhaiView: View {
                             .foregroundColor(task.isCompleted ? .green : .white.opacity(0.6))
                             .font(.system(size: 14))
                     }
+                    .buttonStyle(PlainButtonStyle())
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text("\(task.palaceDirection) · \(task.title)")
@@ -1114,6 +1116,7 @@ public struct BaZhaiView: View {
                             .font(.system(size: 11))
                             .foregroundColor(.white.opacity(0.45))
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding(7)
                 .background(Color.white.opacity(0.04))
@@ -1515,6 +1518,7 @@ public struct BaZhaiView: View {
                                 .foregroundColor(isScheduled ? Color.green : .white.opacity(0.85))
                                 .cornerRadius(5)
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 6)

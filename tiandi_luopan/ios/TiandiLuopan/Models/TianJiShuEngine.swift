@@ -665,7 +665,12 @@ public class TianJiShuEngine {
             let customSealRaw = (UserDefaults.standard.string(forKey: "tianjishu_custom_seal") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let sealText: String
             if !customSealRaw.isEmpty {
-                sealText = customSealRaw.replacingOccurrences(of: " ", with: "\n")
+                if !customSealRaw.contains(" ") && !customSealRaw.contains("\n") && customSealRaw.count == 4 {
+                    let mid = customSealRaw.index(customSealRaw.startIndex, offsetBy: 2)
+                    sealText = "\(customSealRaw[..<mid])\n\(customSealRaw[mid...])"
+                } else {
+                    sealText = customSealRaw.replacingOccurrences(of: " ", with: "\n")
+                }
             } else {
                 sealText = tr8(
                     "天机演象\n罗盘\n御印",
@@ -678,11 +683,16 @@ public class TianJiShuEngine {
                     "TIANJI\nKOMPAS\nSEGEL RESMI"
                 )
             }
+            let sealParagraph = NSMutableParagraphStyle()
+            sealParagraph.alignment = .center
+            sealParagraph.lineSpacing = 4
+            let sealFontSize: CGFloat = customSealRaw.count > 8 ? 18 : (customSealRaw.count > 4 ? 22 : 28)
             let sealAttr: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 28),
-                .foregroundColor: vermilion
+                .font: UIFont.boldSystemFont(ofSize: sealFontSize),
+                .foregroundColor: vermilion,
+                .paragraphStyle: sealParagraph
             ]
-            sealText.draw(in: sealRect.insetBy(dx: 16, dy: 24), withAttributes: sealAttr)
+            sealText.draw(in: sealRect.insetBy(dx: 14, dy: 24), withAttributes: sealAttr)
             
             // 岁次干支天文学立春动态推导
             let calendar = Calendar.current
@@ -736,9 +746,13 @@ public class TianJiShuEngine {
                     signText = "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启"
                 }
             }
-            signText.draw(at: CGPoint(x: 500, y: curY + 45), withAttributes: [
+            let signParagraph = NSMutableParagraphStyle()
+            signParagraph.alignment = .right
+            signParagraph.lineSpacing = 4
+            signText.draw(in: CGRect(x: 420, y: curY + 38, width: 340, height: 150), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 22, weight: .bold),
-                .foregroundColor: UIColor(red: 70/255.0, green: 50/255.0, blue: 35/255.0, alpha: 1.0)
+                .foregroundColor: UIColor(red: 70/255.0, green: 50/255.0, blue: 35/255.0, alpha: 1.0),
+                .paragraphStyle: signParagraph
             ])
             
             // 11. 卷尾合规免责声明 (Compliance & disclaimer)

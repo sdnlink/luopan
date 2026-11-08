@@ -95,16 +95,33 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// 通知仅作热启动时的即时补充。
     public static func routeWidgetURL(_ url: URL) {
         guard url.scheme == "tiandiluopan" else { return }
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+        let sheetParam = queryItems.first(where: { $0.name == "sheet" })?.value
+        let indexParam = queryItems.first(where: { $0.name == "index" })?.value
+        let subParam = queryItems.first(where: { $0.name == "sub" })?.value
+
         switch url.host {
         case "almanac":
             AppNavigationRouter.shared.requestAlmanac()
         case "compass":
             CompassLayerManager.shared.showDailyGodMarkers = true
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
+            let shouldOpenDailyCard = (sheetParam == "dailySign" || sheetParam == "dailyCard")
+            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: shouldOpenDailyCard)
         case "floorplan":
             AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
         case "qimen":
             AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
+        case "tab":
+            if subParam == "qimen" {
+                AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
+            } else if indexParam == "3" {
+                AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
+            } else if let idxStr = indexParam, let idx = Int(idxStr) {
+                AppNavigationRouter.shared.requestRoute(tab: max(0, min(4, idx)), subTab: nil, openDailyCard: false)
+            } else {
+                return
+            }
         default:
             return
         }

@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "순동, 천연 흑요석, 황옥 등 천연 소재 기물을 우선 사용하고 플라스틱 도금 모조품은 피하세요.";
 "ar_sha_talisman_hang_title" = "설치 예절 및 유의점";
 "ar_sha_talisman_hang_desc" = "거울면은 바깥쪽으로 3~5도 아래로 기울이고, 팔괘경이나 산해진이 이웃집 문·창문을 직접 비추지 않도록 배려하세요.";
+
+"ar_spatial_map_orientation_missing" = "이 지도에는 신뢰할 수 있는 기준 방향이 없습니다. 다시 스캔하여 저장하세요.";
+"ar_roomplan_coordinate_heading" = "측량 기준 방향";

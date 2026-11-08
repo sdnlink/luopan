@@ -145,7 +145,10 @@ public struct House3DSpaceViewer: View {
             beams: survey.beams,
             rooms: localizedRooms,
             objects: survey.objects,
-            compassHeading: survey.compassHeading
+            compassHeading: survey.compassHeading,
+            centroidOverride: survey.centroidWasExplicit == true ? survey.centroid : nil,
+            houseFacingDegrees: survey.houseFacingDegrees,
+            analysisDate: survey.timestamp
         )
         survey = rebuilt
         selectedShaItem = nil
@@ -437,7 +440,10 @@ public struct House3DSpaceViewer: View {
             beams: survey.beams,
             rooms: updatedRooms,
             objects: survey.objects,
-            compassHeading: survey.compassHeading
+            compassHeading: survey.compassHeading,
+            centroidOverride: survey.centroidWasExplicit == true ? survey.centroid : nil,
+            houseFacingDegrees: survey.houseFacingDegrees,
+            analysisDate: survey.timestamp
         )
         survey = rebuilt
         // Keep corrections made in the viewer when the source is an actual
@@ -1214,14 +1220,20 @@ public final class HouseSceneCoordinator: NSObject {
         let cosAxis = cos(axisAngle)
         let sinAxis = sin(axisAngle)
 
-        let facingGua = HouseSpatialSurveyEngine.guaForAngle(survey.compassHeading)
-        let sittingAngle = (survey.compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
+        guard let houseFacing = survey.resolvedHouseFacing else { return }
+        let facingGua = HouseSpatialSurveyEngine.guaForAngle(houseFacing)
+        let sittingAngle = (houseFacing + 180.0).truncatingRemainder(dividingBy: 360.0)
         let sittingGua = HouseSpatialSurveyEngine.guaForAngle(sittingAngle)
 
         let bazhai = BaZhaiEngine.shared.analyze(sittingPalace: sittingGua, facingPalace: facingGua)
-        let facingM = Mountain24Data.shared.mountain(for: survey.compassHeading)
+        let facingM = Mountain24Data.shared.mountain(for: houseFacing)
         let sittingM = Mountain24Data.shared.mountain(for: sittingAngle)
-        let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: sittingM, facing: facingM)
+        let xkChart = FlyingStarsEngine.shared.calculateChart(
+            period: FlyingStarsEngine.shared.currentPeriod(for: survey.timestamp),
+            sitting: sittingM, facing: facingM,
+            useTiGua: Mountain24Data.shared.resolveHeadingState(heading: houseFacing).isJianXiang,
+            date: survey.timestamp
+        )
 
         for row in -1...1 {
             for col in -1...1 {

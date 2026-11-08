@@ -272,7 +272,7 @@ public final class ShaSurveyStore: ObservableObject {
         let capturedHeading = records.lazy
             .compactMap { $0.capturedHeadingDegrees }
             .first(where: { $0.isFinite })
-        let interiorHeading = latestInterior?.compassHeading
+        let interiorHeading = latestInterior?.resolvedHouseFacing
         let fallbackHeading = CompassMotionManager.shared.headingState.facingAngle
         let heading = [capturedHeading, interiorHeading, fallbackHeading]
             .compactMap { $0 }

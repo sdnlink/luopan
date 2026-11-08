@@ -16,7 +16,7 @@ public struct QimenDunjiaView: View {
     @State private var selectedPalaceId: Int? = nil
     @State private var selectedScenario: QimenScenarioType = .contract
     @State private var lastChartHeading: Double?
-    @State private var lastChartTimeKey: Int?
+    @State private var lastChartTimeKey: QimenChartTimeKey?
 
     // Qimen uses the current hour. A low-frequency publisher catches an hour
     // boundary while the phone is stationary; refreshChart's time key keeps
@@ -185,6 +185,9 @@ public struct QimenDunjiaView: View {
         .onChange(of: lang.effectiveLanguage) { _ in
             refreshChart(force: true)
         }
+        .onChange(of: motion.currentSolarTermName) { _ in
+            if !isUsingCustomDate { refreshChart() }
+        }
         .onChange(of: isActive) { active in
             if active { refreshChart(force: true) }
         }
@@ -283,11 +286,7 @@ public struct QimenDunjiaView: View {
         guard isActive else { return }
         let heading = motion.headingState.facingAngle
         let now = isUsingCustomDate ? selectedDate : Date()
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour], from: now)
-        let timeKey = (components.year ?? 0) * 1_000_000
-            + (components.month ?? 0) * 10_000
-            + (components.day ?? 0) * 24
-            + (components.hour ?? 0)
+        let timeKey = QimenEngine.shared.chartTimeKey(for: now)
         if !force, let lastHeading = lastChartHeading,
            let lastTimeKey = lastChartTimeKey,
            lastTimeKey == timeKey {

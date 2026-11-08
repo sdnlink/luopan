@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "Ưu tiên chất liệu tự nhiên như đồng nguyên chất, đá hắc diệu thạch, hoàng ngọc; tránh đồ nhựa mạ giả.";
 "ar_sha_talisman_hang_title" = "Lưu ý khi treo";
 "ar_sha_talisman_hang_desc" = "Mặt gương hướng ra ngoài, hơi chúc xuống 3–5°; tránh để gương Bát Quái hay Sơn Hải Trấn chiếu thẳng vào cửa nhà hàng xóm.";
+
+"ar_spatial_map_orientation_missing" = "Bản đồ thiếu hướng tham chiếu đáng tin cậy. Vui lòng quét và lưu lại.";
+"ar_roomplan_coordinate_heading" = "Hướng tham chiếu khảo sát";

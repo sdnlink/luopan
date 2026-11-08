@@ -641,7 +641,17 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
     public let centroidX: Float
     public let centroidY: Float
     public let centroidZ: Float
+    /// Azimuth of world -Z, used only to convert model coordinates to bearings.
     public let compassHeading: Double
+    /// Actual house facing; independent of the AR session's starting direction.
+    public let houseFacingDegrees: Double?
+    public let centroidWasExplicit: Bool?
+
+    public var resolvedHouseFacing: Double? {
+        HouseSpatialSurveyEngine.resolveHouseFacing(openings: openings, centroid: centroid,
+                                                   coordinateHeading: compassHeading,
+                                                   explicitFacing: houseFacingDegrees)
+    }
     public let shaItems: [HouseSpatialShaItem]
     public let fengshuiScore: Int
     /// 立极中宫是否采用回退口径（严重凹凸户型时落到主功能区/最大房间中心）。
@@ -669,7 +679,9 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         compassHeading: Double,
         shaItems: [HouseSpatialShaItem],
         fengshuiScore: Int,
-        isCentroidIndirect: Bool? = nil
+        isCentroidIndirect: Bool? = nil,
+        houseFacingDegrees: Double? = nil,
+        centroidWasExplicit: Bool? = nil
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -684,6 +696,8 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
         self.centroidY = centroid.y
         self.centroidZ = centroid.z
         self.compassHeading = compassHeading
+        self.houseFacingDegrees = houseFacingDegrees
+        self.centroidWasExplicit = centroidWasExplicit
         self.shaItems = shaItems
         self.fengshuiScore = max(0, min(100, fengshuiScore))
         self.isCentroidIndirect = isCentroidIndirect
@@ -693,6 +707,24 @@ public struct HouseSpatialSurvey: Identifiable, Codable {
 // MARK: - 全屋形煞与 3D 测绘分析引擎 (HouseSpatialSurveyEngine)
 
 public enum HouseSpatialSurveyEngine {
+    /// Use the outward entrance normal when no explicit facing was supplied.
+    /// The coordinate baseline alone cannot establish a house's facing.
+    public static func resolveHouseFacing(
+        openings: [SpatialOpening3D], centroid: SIMD3<Float>,
+        coordinateHeading: Double, explicitFacing: Double? = nil
+    ) -> Double? {
+        func normalized(_ angle: Double) -> Double {
+            (angle.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        }
+        if let explicitFacing, explicitFacing.isFinite { return normalized(explicitFacing) }
+        guard coordinateHeading.isFinite,
+              let door = openings.first(where: { $0.type == .entranceDoor }) else { return nil }
+        var normal = SIMD2<Float>(door.normalX, door.normalZ)
+        guard normal.x.isFinite, normal.y.isFinite, simd_length(normal) > 0.001 else { return nil }
+        let outward = SIMD2<Float>(door.posX - centroid.x, door.posZ - centroid.z)
+        if simd_dot(normal, outward) < 0 { normal = -normal }
+        return normalized(atan2(Double(normal.x), Double(-normal.y)) * 180 / .pi + coordinateHeading)
+    }
 
     /// 对全屋 3D 空间进行全方位形煞审计与结构测算
     public static func analyzeSpatialHouse(
@@ -703,7 +735,9 @@ public enum HouseSpatialSurveyEngine {
         rooms: [SpatialRoom3D],
         objects: [SpatialObject3D],
         compassHeading: Double,
-        centroidOverride: SIMD3<Float>? = nil
+        centroidOverride: SIMD3<Float>? = nil,
+        houseFacingDegrees: Double? = nil,
+        analysisDate: Date = Date()
     ) -> HouseSpatialSurvey {
         // 1. 计算全屋物理边界包围盒
         var minX: Float = .greatestFiniteMagnitude
@@ -1855,9 +1889,13 @@ public enum HouseSpatialSurveyEngine {
             }
         }
 
+        let resolvedFacing = resolveHouseFacing(openings: openings, centroid: centroid,
+                                                coordinateHeading: compassHeading,
+                                                explicitFacing: houseFacingDegrees)
+        if let houseFacing = resolvedFacing {
         // N. 八宅吉凶宫位体检 (基于罗盘实测朝向)
-        let facingGua = guaForAngle(compassHeading)
-        let sittingAngle = (compassHeading + 180.0).truncatingRemainder(dividingBy: 360.0)
+        let facingGua = guaForAngle(houseFacing)
+        let sittingAngle = (houseFacing + 180.0).truncatingRemainder(dividingBy: 360.0)
         let sittingGua = guaForAngle(sittingAngle)
         let bazhai = BaZhaiEngine.shared.analyze(sittingPalace: sittingGua, facingPalace: facingGua)
 
@@ -1979,9 +2017,14 @@ public enum HouseSpatialSurveyEngine {
         }
 
         // O. 三元九运玄空飞星理气体检 (形理兼备)
-        let facingMountainItem = Mountain24Data.shared.mountain(for: compassHeading)
+        let facingMountainItem = Mountain24Data.shared.mountain(for: houseFacing)
         let sittingMountainItem = Mountain24Data.shared.mountain(for: sittingAngle)
-        let xkChart = FlyingStarsEngine.shared.calculateChart(sitting: sittingMountainItem, facing: facingMountainItem)
+        let xkChart = FlyingStarsEngine.shared.calculateChart(
+            period: FlyingStarsEngine.shared.currentPeriod(for: analysisDate),
+            sitting: sittingMountainItem, facing: facingMountainItem,
+            useTiGua: Mountain24Data.shared.resolveHeadingState(heading: houseFacing).isJianXiang,
+            date: analysisDate
+        )
         let curPeriod = xkChart.period
 
         for palace in xkChart.palaces {
@@ -2219,17 +2262,17 @@ public enum HouseSpatialSurveyEngine {
         // O.1 玄空出卦 · 空亡破局煞 (理气最高危)：大门朝向落入大/小空亡线时自动警示并提示替卦
         if let mainDoor = mainDoors.first {
             var probe = CompassHeadingState(
-                heading: compassHeading,
-                facingAngle: compassHeading,
-                facingMountain: Mountain24Data.shared.mountain(for: compassHeading),
+                heading: houseFacing,
+                facingAngle: houseFacing,
+                facingMountain: Mountain24Data.shared.mountain(for: houseFacing),
                 sittingMountain: Mountain24Data.shared.mountain(for: sittingAngle)
             )
-            probe.heading = compassHeading
+            probe.heading = houseFacing
             let kwLevel = probe.kongWangLevel
             if kwLevel != .pure {
                 let isMajor = kwLevel == .largeVoid
                 let isSmall = kwLevel == .smallVoid
-                let degStr = String(format: "%.1f°", compassHeading)
+                let degStr = String(format: "%.1f°", houseFacing)
                 shaItems.append(HouseSpatialShaItem(
                     title: tr8(
                         "玄空出卦 · 空亡破局煞", "玄空出卦 · 空亡破局煞", "Xuan Kong · Void Line (Kong Wang) Warning",
@@ -2327,7 +2370,10 @@ public enum HouseSpatialSurveyEngine {
             }
         }
 
-                return HouseSpatialSurvey(
+        }
+
+        return HouseSpatialSurvey(
+            timestamp: analysisDate,
             scanMethod: scanMethod,
             dimensions: dimensions,
             walls: walls,
@@ -2339,7 +2385,9 @@ public enum HouseSpatialSurveyEngine {
             compassHeading: compassHeading,
             shaItems: shaItems,
             fengshuiScore: score,
-            isCentroidIndirect: isCentroidIndirect
+            isCentroidIndirect: isCentroidIndirect,
+            houseFacingDegrees: resolvedFacing,
+            centroidWasExplicit: centroidOverride != nil
         )
     }
 

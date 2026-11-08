@@ -35,10 +35,14 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var errorMessage: String?
     /// 结算页罗盘校准旋钮产生的朝向微调量（度），叠加到 initialCompassHeading 上
     @Published public var headingOffsetDegrees: Double = 0.0
-    /// 当前生效的大门朝向（初始罗盘读数 + 用户校准微调），供结算页展示
-    public var effectiveHeadingForDisplay: Double {
+    /// Coordinate baseline, used by the top-down blueprint.
+    private var coordinateHeading: Double {
         let h = (initialCompassHeading + headingOffsetDegrees).truncatingRemainder(dividingBy: 360.0)
         return h >= 0 ? h : h + 360.0
+    }
+
+    public var effectiveHeadingForDisplay: Double {
+        currentSpatialSurvey?.resolvedHouseFacing ?? coordinateHeading
     }
 
     private weak var captureView: RoomCaptureView?
@@ -471,7 +475,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             centroid: centroid,
             blueprintImage: blueprint,
             // The blueprint's top is world -Z, rather than the door normal.
-            compassHeading: effectiveHeadingForDisplay,
+            compassHeading: coordinateHeading,
             spatialSurvey: currentSpatialSurvey
         )
         return true
@@ -1251,7 +1255,7 @@ public struct ARRoomPlanSurveyView: View {
                                 }
                                 // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
                                 VStack(spacing: 2) {
-                                    Text("\(lang.t("ar_roomplan_door_heading")) \(String(format: "%.1f°", model.effectiveHeadingForDisplay))")
+                                    Text("\(lang.t(model.currentSpatialSurvey?.resolvedHouseFacing == nil ? "ar_roomplan_coordinate_heading" : "ar_roomplan_door_heading")) \(String(format: "%.1f°", model.effectiveHeadingForDisplay))")
                                         .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
                                         .foregroundColor(.white)
                                     HStack(spacing: 3) {
@@ -1293,7 +1297,7 @@ public struct ARRoomPlanSurveyView: View {
                                         }
                                     }
                                 }
-                                .accessibilityLabel(lang.t("ar_roomplan_door_heading"))
+                                .accessibilityLabel(lang.t(model.currentSpatialSurvey?.resolvedHouseFacing == nil ? "ar_roomplan_coordinate_heading" : "ar_roomplan_door_heading"))
                                 Button(action: syncToFloorplan) {
                                     Image(systemName: "scope")
                                         .adaptiveFont(size: 13, weight: .bold)

@@ -560,3 +560,6 @@
 "ar_sha_talisman_material_desc" = "Utamakan bahan alami seperti kuningan murni, obsidian alami, atau giok kuning; hindari tiruan plastik berlapis.";
 "ar_sha_talisman_hang_title" = "Etika Pemasangan";
 "ar_sha_talisman_hang_desc" = "Arahkan permukaan reflektif keluar dan miring 3–5° ke bawah; hindari mengarahkan cermin Bagua langsung ke pintu atau jendela tetangga.";
+
+"ar_spatial_map_orientation_missing" = "Peta ini tidak memiliki acuan arah yang andal. Pindai dan simpan peta baru.";
+"ar_roomplan_coordinate_heading" = "Arah Acuan Survei";

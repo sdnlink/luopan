@@ -419,7 +419,10 @@ public struct FloorplanView: View {
             VRSpatialSurveyView(
                 initialFloorplanRooms: auditedRooms.isEmpty ? rooms : auditedRooms,
                 initialWidthMeters: projectionDimensions.width,
-                initialDepthMeters: projectionDimensions.height
+                initialDepthMeters: projectionDimensions.height,
+                initialCoordinateHeading: effectiveHeading,
+                initialHouseFacingDegrees: effectiveHeading,
+                initialCentroid: centroid
             )
         }
         .sheet(isPresented: $showReportShareSheet) {
@@ -2127,7 +2130,8 @@ public struct FloorplanView: View {
             rooms: rooms3D,
             objects: [],
             compassHeading: effectiveHeading,
-            centroidOverride: SIMD3<Float>(Float(centroid.x) * width, 0, Float(centroid.y) * depth)
+            centroidOverride: SIMD3<Float>(Float(centroid.x) * width, 0, Float(centroid.y) * depth),
+            houseFacingDegrees: effectiveHeading
         )
     }
 

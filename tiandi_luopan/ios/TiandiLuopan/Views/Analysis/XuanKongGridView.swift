@@ -11,10 +11,11 @@ public struct XuanKongGridView: View {
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
-    @State private var useTiGua: Bool = false
     // 手动替卦锁定：nil=跟随传感器 isJianXiang；非 nil=用户手动指定，传感器不再覆盖。
     // 换坐/向山后重置回跟随，避免用户已看清的盘被高频传感器样本突然改写。
-    @State private var manualTiGuaOverride: Bool? = nil
+    @State private var starMode = FlyingStarModeSelection()
+    private var useTiGua: Bool { starMode.usesTiGua(automatic: motion.headingState.isJianXiang) }
+    @State private var reportSnapshot: TianJiAnalysisSnapshot?
     @State private var showTianJiShuSheet: Bool = false
     @State private var showDailySignSheet: Bool = false
     @State private var showPaywall: Bool = false
@@ -107,7 +108,7 @@ public struct XuanKongGridView: View {
         }
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         .sheet(isPresented: $showTianJiShuSheet) {
-            TianJiShuView()
+            if let reportSnapshot { TianJiShuView(analysis: reportSnapshot) }
         }
         .sheet(isPresented: $showDailySignSheet) {
             DailyAuspiciousCardSheet()
@@ -135,16 +136,15 @@ public struct XuanKongGridView: View {
         }
         .onChange(of: motion.headingState.isJianXiang) { isJian in
             // 仅跟随模式（用户未手动锁定）下才随传感器切换下卦/替卦。
-            guard manualTiGuaOverride == nil else { return }
-            useTiGua = isJian
+            guard starMode.manualOverride == nil else { return }
             refreshChart()
         }
         .onChange(of: motion.headingState.sittingMountain.id) { _ in
-            manualTiGuaOverride = nil
+            starMode.restoreAutomatic()
             refreshChart()
         }
         .onChange(of: motion.headingState.facingMountain.id) { _ in
-            manualTiGuaOverride = nil
+            starMode.restoreAutomatic()
             refreshChart()
         }
         .onChange(of: lang.effectiveLanguage) { _ in
@@ -335,6 +335,8 @@ public struct XuanKongGridView: View {
             Spacer()
             
             Button(action: {
+                reportSnapshot = TianJiAnalysisSnapshot(heading: motion.headingState.facingAngle,
+                                                        period: selectedPeriod, useTiGua: useTiGua)
                 showTianJiShuSheet = true
             }) {
                 Text(lang.t("one_click_export"))
@@ -456,10 +458,9 @@ public struct XuanKongGridView: View {
                     .minimumScaleFactor(0.7)
                 
                 Button(action: {
-                    useTiGua.toggle()
+                    starMode.toggle(automatic: motion.headingState.isJianXiang)
                     // 手动切换后锁定该选择，传感器 isJianXiang 不再覆盖；
                     // 换坐/向山后自动回到跟随模式。
-                    manualTiGuaOverride = useTiGua
                 }) {
                     HStack(spacing: 3) {
                         Image(systemName: "arrow.triangle.2.circlepath")

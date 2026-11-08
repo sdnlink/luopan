@@ -5,6 +5,45 @@ import CryptoKit
 import Security
 import UIKit
 
+/// Live exports keep their slot until completion or cancellation. Wall-clock
+/// expiry would allow a long-running share to succeed without paying for it.
+struct TianjiCreditReservations {
+    private var tokens: Set<String> = []
+    var count: Int { tokens.count }
+
+    mutating func reserve(availableCredits: Int) -> String? {
+        guard availableCredits > tokens.count else { return nil }
+        let token = UUID().uuidString
+        tokens.insert(token)
+        return token
+    }
+
+    @discardableResult
+    mutating func finish(_ token: String) -> Bool {
+        tokens.remove(token) != nil
+    }
+}
+
+/// The activity controller retains this lease until its completion handler is
+/// released. Dismissing SwiftUI's sheet must not cancel a pending success.
+final class TianjiExportCreditLease {
+    private let lock = NSLock()
+    private var finished = false
+    private let settlement: (Bool) -> Void
+
+    init(settlement: @escaping (Bool) -> Void) { self.settlement = settlement }
+
+    func complete(success: Bool) {
+        lock.lock()
+        guard !finished else { lock.unlock(); return }
+        finished = true
+        lock.unlock()
+        settlement(success)
+    }
+
+    deinit { complete(success: false) }
+}
+
 // MARK: - 权益校验结果 (StoreKit 2 权威校验)
 
 public struct ReceiptValidationResult {
@@ -262,11 +301,9 @@ public class StoreKitIAPManager: ObservableObject {
     private var revokedEntitlementTransactionIDs = Set<UInt64>()
     /// In-flight exports reserve a slot in memory and only debit the durable
     /// balance after the deliverable succeeds.  A process termination therefore
-    /// cannot permanently destroy a paid credit.  Stale reservations are
-    /// released after a short timeout so an interrupted share sheet cannot
-    /// block the next export forever.
-    private var activeTianjiReservations: [String: Date] = [:]
-    private let tianjiReservationTimeout: TimeInterval = 300
+    /// cannot permanently destroy a paid credit. Active operations own their
+    /// reservation until completion, cancellation, or controller teardown.
+    private var activeTianjiReservations = TianjiCreditReservations()
     private var transactionListener: Task<Void, Never>?
     private var verificationTask: Task<Void, Never>?
     /// 内存镜像（主线程读写），避免 SwiftUI 每帧 JSON 解码 + HMAC
@@ -484,7 +521,6 @@ public class StoreKitIAPManager: ObservableObject {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
-        pruneExpiredTianjiReservationsLocked()
         if mirror.isLifetime || mirror.vipActive || mirror.vipExpireDate > Date().timeIntervalSince1970 {
             return true
         }
@@ -633,7 +669,6 @@ public class StoreKitIAPManager: ObservableObject {
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
         if isVIPUnlocked() { return true }
-        pruneExpiredTianjiReservationsLocked()
         guard mirror.tianjiCredits > activeTianjiReservations.count else { return false }
         var updated = mirror
         updated.tianjiCredits -= 1
@@ -653,11 +688,7 @@ public class StoreKitIAPManager: ObservableObject {
         defer { entitlementLock.unlock() }
         guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return nil }
         if isVIPUnlocked() { return nil }
-        pruneExpiredTianjiReservationsLocked()
-        guard mirror.tianjiCredits > activeTianjiReservations.count else { return nil }
-        let token = UUID().uuidString
-        activeTianjiReservations[token] = Date()
-        return token
+        return activeTianjiReservations.reserve(availableCredits: mirror.tianjiCredits)
     }
 
     /// Commit a reservation after the deliverable was produced. This is the
@@ -665,12 +696,7 @@ public class StoreKitIAPManager: ObservableObject {
     public func commitTianjiCreditReservation(_ token: String) {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        pruneExpiredTianjiReservationsLocked()
-        // Consume the in-flight slot even when a concurrent refund or
-        // entitlement refresh removed the underlying credit.  Leaving the
-        // token in the reservation table would make every later export look
-        // busy until the five-minute timeout.
-        guard activeTianjiReservations.removeValue(forKey: token) != nil else { return }
+        guard activeTianjiReservations.finish(token) else { return }
         guard var mirror = currentMirrorLocked(), mirror.isAuthoritative,
               mirror.tianjiCredits > 0 else { return }
         mirror.tianjiCredits -= 1
@@ -686,14 +712,7 @@ public class StoreKitIAPManager: ObservableObject {
     public func refundTianjiCreditReservation(_ token: String) {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        activeTianjiReservations.removeValue(forKey: token)
-    }
-
-    /// Release interrupted export slots. The manager calls this while checking
-    /// availability, so an interrupted share sheet cannot block future use.
-    private func pruneExpiredTianjiReservationsLocked() {
-        let cutoff = Date().addingTimeInterval(-tianjiReservationTimeout)
-        activeTianjiReservations = activeTianjiReservations.filter { $0.value > cutoff }
+        activeTianjiReservations.finish(token)
     }
 
     /// Atomically claim a verified transaction and, for consumables, mint its

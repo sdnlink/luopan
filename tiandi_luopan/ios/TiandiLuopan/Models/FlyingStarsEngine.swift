@@ -1,5 +1,13 @@
 import Foundation
 
+struct FlyingStarModeSelection {
+    var manualOverride: Bool?
+
+    func usesTiGua(automatic: Bool) -> Bool { manualOverride ?? automatic }
+    mutating func toggle(automatic: Bool) { manualOverride = !usesTiGua(automatic: automatic) }
+    mutating func restoreAutomatic() { manualOverride = nil }
+}
+
 // MARK: - 玄空九宫飞星排盘引擎 (XuanKong Flying Stars Engine)
 
 /// Classical source notes shared by palace-level evaluations and chart summaries.

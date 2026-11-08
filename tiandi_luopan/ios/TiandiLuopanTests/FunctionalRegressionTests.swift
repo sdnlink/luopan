@@ -202,4 +202,289 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertEqual(mirror.vipExpireDate, 0)
         XCTAssertTrue(mirror.purchasedProductIDs.isEmpty)
     }
+
+    func testReopeningJanuaryBirthdayNeverSubtractsAnotherYear() {
+        let original = instant("1990-01-10T04:00:00Z")
+        var savedDate = original
+        let calendar = UserKuaProfileManager.gregorianCalendar(timeZone: TimeZone(secondsFromGMT: 8 * 3600)!)
+        for _ in 0..<5 {
+            let editor = BirthDateEditorState(date: savedDate, calendar: calendar)
+            XCTAssertEqual(editor.year, 1990)
+            XCTAssertEqual(UserKuaProfileManager.fengShuiYear(for: editor.date, calendar: calendar), 1989)
+            savedDate = editor.date
+        }
+        XCTAssertEqual(savedDate, original)
+    }
+
+    func testBirthYearUsesGregorianYearUnderBuddhistAndIslamicCalendars() {
+        let date = instant("1990-06-15T04:00:00Z")
+        let identifiers: [Calendar.Identifier] = [.gregorian, .buddhist, .islamicCivil]
+        for identifier in identifiers {
+            var calendar = Calendar(identifier: identifier)
+            calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
+            XCTAssertEqual(BirthDateEditorState(date: date, calendar: calendar).year, 1990)
+            XCTAssertEqual(UserKuaProfileManager.fengShuiYear(for: date, calendar: calendar), 1990)
+        }
+    }
+
+    func testOwnerAndFamilyUseTheAstronomicalLiChunBoundary() {
+        let boundary = liChunBoundary()
+        let calendar = UserKuaProfileManager.gregorianCalendar(timeZone: TimeZone(secondsFromGMT: 8 * 3600)!)
+        XCTAssertEqual(UserKuaProfileManager.fengShuiYear(for: boundary.addingTimeInterval(-1), calendar: calendar), 2025)
+        XCTAssertEqual(UserKuaProfileManager.fengShuiYear(for: boundary.addingTimeInterval(1), calendar: calendar), 2026)
+        let member = FamilyMemberProfile(role: .spouse, birthDate: instant("1990-01-10T04:00:00Z"),
+                                         birthYear: 2035, isMale: false)
+        XCTAssertEqual(member.birthYear, 1989)
+        XCTAssertEqual(member.effectiveFengShuiYear, 1989)
+    }
+
+    @MainActor
+    func testOneZiHourHasOneBureauAndOneHourPillarAcrossMidnight() {
+        let zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        let early = QimenEngine.shared.calculateChart(date: instant("2026-11-10T15:30:00Z"), timeZone: zone)
+        let late = QimenEngine.shared.calculateChart(date: instant("2026-11-10T16:30:00Z"), timeZone: zone)
+        XCTAssertEqual(early.juNumber, 8)
+        XCTAssertEqual(early.juNumber, late.juNumber)
+        XCTAssertEqual(early.title, late.title)
+        XCTAssertEqual(early.cells.map(\.doorName), late.cells.map(\.doorName))
+        XCTAssertEqual(early.cells.map(\.tianStem), late.cells.map(\.tianStem))
+        XCTAssertEqual(early.cells.map(\.diStem), late.cells.map(\.diStem))
+        XCTAssertEqual(early.cells.map(\.starName), late.cells.map(\.starName))
+        XCTAssertEqual(early.cells.map(\.godName), late.cells.map(\.godName))
+    }
+
+    func testQimenCacheInvalidatesForSolarTermCrossingWithinOneHour() {
+        let boundary = liChunBoundary()
+        let zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        let before = QimenEngine.shared.chartTimeKey(for: boundary.addingTimeInterval(-1), timeZone: zone)
+        let after = QimenEngine.shared.chartTimeKey(for: boundary.addingTimeInterval(1), timeZone: zone)
+        XCTAssertEqual(before.hour, after.hour)
+        XCTAssertEqual(before.day, after.day)
+        XCTAssertNotEqual(before.solarTerm, after.solarTerm)
+        XCTAssertNotEqual(before, after)
+    }
+
+    func testQimenCacheDistinguishesRepeatedHourAtDaylightSavingEnd() {
+        let zone = TimeZone(identifier: "America/New_York")!
+        let first = QimenEngine.shared.chartTimeKey(for: instant("2026-11-01T05:30:00Z"), timeZone: zone)
+        let second = QimenEngine.shared.chartTimeKey(for: instant("2026-11-01T06:30:00Z"), timeZone: zone)
+        XCTAssertEqual(first.hour, second.hour)
+        XCTAssertNotEqual(first, second)
+    }
+
+    func testChangingMountainRestoresAutomaticModeEvenWhenAutomaticFlagIsUnchanged() {
+        var selection = FlyingStarModeSelection()
+        selection.toggle(automatic: false)
+        XCTAssertTrue(selection.usesTiGua(automatic: false))
+        selection.restoreAutomatic()
+        XCTAssertFalse(selection.usesTiGua(automatic: false))
+        selection.toggle(automatic: true)
+        XCTAssertFalse(selection.usesTiGua(automatic: true))
+        selection.restoreAutomatic()
+        XCTAssertTrue(selection.usesTiGua(automatic: true))
+    }
+
+    @MainActor
+    func testReportKeepsSelectedPeriodAndManualTiGuaInsteadOfDefaults() {
+        let date = instant("2026-11-08T04:00:00Z")
+        let snapshot = TianJiAnalysisSnapshot(heading: 90, period: 8, useTiGua: true, reportDate: date)
+        let exported = snapshot.flyingStarsChart()
+        let displayed = FlyingStarsEngine.shared.calculateChart(
+            period: 8, sitting: Mountain24Data.shared.mountain(for: 270),
+            facing: Mountain24Data.shared.mountain(for: 90), useTiGua: true, date: date)
+        XCTAssertEqual(exported.period, 8)
+        XCTAssertTrue(exported.isTiGua)
+        XCTAssertFalse(TianJiAnalysisSnapshot(heading: 90, reportDate: date).useTiGua)
+        XCTAssertEqual(exported.palaces.map(\.mountainStar), displayed.palaces.map(\.mountainStar))
+        XCTAssertEqual(exported.palaces.map(\.facingStar), displayed.palaces.map(\.facingStar))
+        XCTAssertEqual(snapshot.reportDate, date)
+    }
+
+    @MainActor
+    func testManualLowerChartIsPreservedForAnOffCenterHeadingInReport() {
+        let snapshot = TianJiAnalysisSnapshot(heading: 94, period: 8, useTiGua: false)
+        XCTAssertTrue(TianJiAnalysisSnapshot(heading: 94).useTiGua)
+        XCTAssertFalse(snapshot.flyingStarsChart().isTiGua)
+    }
+
+    func testExportReservationStaysActiveUntilExplicitCompletionAndCommitsOnce() throws {
+        var reservations = TianjiCreditReservations()
+        let token = try XCTUnwrap(reservations.reserve(availableCredits: 1))
+        // Repeated availability checks must not evict a still-presented share.
+        for _ in 0..<100 { XCTAssertNil(reservations.reserve(availableCredits: 1)) }
+        XCTAssertEqual(reservations.count, 1)
+        XCTAssertTrue(reservations.finish(token))
+        XCTAssertFalse(reservations.finish(token))
+        XCTAssertEqual(reservations.count, 0)
+    }
+
+    func testCancellingOneExportDoesNotReleaseAnotherExportsCredit() throws {
+        var reservations = TianjiCreditReservations()
+        let first = try XCTUnwrap(reservations.reserve(availableCredits: 2))
+        let second = try XCTUnwrap(reservations.reserve(availableCredits: 2))
+        XCTAssertTrue(reservations.finish(first))
+        XCTAssertFalse(reservations.finish(first))
+        XCTAssertEqual(reservations.count, 1)
+        XCTAssertNil(reservations.reserve(availableCredits: 1))
+        XCTAssertTrue(reservations.finish(second))
+    }
+
+    private func entrance(position: SIMD3<Float>, normal: SIMD3<Float>) -> SpatialOpening3D {
+        SpatialOpening3D(type: .entranceDoor, position: position, normal: normal, width: 1, height: 2.1)
+    }
+
+    func testHouseFacingIsInvariantWhenScanCoordinateAxesRotate() throws {
+        let eastDoor = entrance(position: SIMD3<Float>(5, 1, 0), normal: SIMD3<Float>(1, 0, 0))
+        let northDoor = entrance(position: SIMD3<Float>(0, 1, -5), normal: SIMD3<Float>(0, 0, -1))
+        let first = try XCTUnwrap(HouseSpatialSurveyEngine.resolveHouseFacing(openings: [eastDoor], centroid: .zero, coordinateHeading: 0))
+        let rotated = try XCTUnwrap(HouseSpatialSurveyEngine.resolveHouseFacing(openings: [northDoor], centroid: .zero, coordinateHeading: 90))
+        XCTAssertEqual(first, 90, accuracy: 0.00001)
+        XCTAssertEqual(rotated, first, accuracy: 0.00001)
+    }
+
+    func testHouseFacingCorrectsAnInwardDoorNormalAndHonorsExplicitFacing() throws {
+        let door = entrance(position: SIMD3<Float>(5, 1, 0), normal: SIMD3<Float>(-1, 0, 0))
+        XCTAssertEqual(try XCTUnwrap(HouseSpatialSurveyEngine.resolveHouseFacing(openings: [door], centroid: .zero, coordinateHeading: 0)), 90, accuracy: 0.00001)
+        XCTAssertEqual(HouseSpatialSurveyEngine.resolveHouseFacing(openings: [door], centroid: .zero, coordinateHeading: 0, explicitFacing: 180), 180)
+        XCTAssertNil(HouseSpatialSurveyEngine.resolveHouseFacing(openings: [], centroid: .zero, coordinateHeading: 90))
+    }
+
+    @MainActor
+    func testRotatedScansGiveTheSameHouseAnalysis() throws {
+        let language = LocalizationManager.shared.effectiveLanguage
+        defer { LocalizationManager.shared.effectiveLanguage = language }
+        LocalizationManager.shared.effectiveLanguage = .zhHans
+        let date = instant("2026-11-08T04:00:00Z")
+        let corners: [SIMD3<Float>] = [SIMD3(-5, 0, -3), SIMD3(5, 0, -3), SIMD3(5, 0, 3), SIMD3(-5, 0, 3)]
+        func rotate(_ p: SIMD3<Float>) -> SIMD3<Float> { SIMD3(p.z, p.y, -p.x) }
+        func analyze(rotated: Bool) -> HouseSpatialSurvey {
+            let points = rotated ? corners.map(rotate) : corners
+            let walls = (0..<4).map { SpatialWall3D(start: points[$0], end: points[($0 + 1) % 4]) }
+            let doorPosition = SIMD3<Float>(5, 1, 0)
+            let doorNormal = SIMD3<Float>(1, 0, 0)
+            let rooms = [
+                SpatialRoom3D(name: "主卧", type: .masterBedroom, center: rotated ? rotate(SIMD3(2, 1.4, -1)) : SIMD3(2, 1.4, -1), size: SIMD3(3, 2.8, 2), rotationY: rotated ? -Float.pi / 2 : 0),
+                SpatialRoom3D(name: "卫浴", type: .bathroom, center: rotated ? rotate(SIMD3(-2, 1.4, 1)) : SIMD3(-2, 1.4, 1), size: SIMD3(2, 2.8, 2), rotationY: rotated ? -Float.pi / 2 : 0)
+            ]
+            return HouseSpatialSurveyEngine.analyzeSpatialHouse(
+                scanMethod: "test", walls: walls,
+                openings: [entrance(position: rotated ? rotate(doorPosition) : doorPosition,
+                                    normal: rotated ? rotate(doorNormal) : doorNormal)],
+                beams: [], rooms: rooms, objects: [], compassHeading: rotated ? 90 : 0,
+                centroidOverride: .zero, analysisDate: date)
+        }
+        let first = analyze(rotated: false)
+        let second = analyze(rotated: true)
+        XCTAssertEqual(try XCTUnwrap(first.houseFacingDegrees), 90, accuracy: 0.00001)
+        XCTAssertEqual(first.houseFacingDegrees, second.houseFacingDegrees)
+        let findings: (HouseSpatialSurvey) -> [String] = { survey in
+            survey.shaItems.filter { $0.detail.contains("八宅") || $0.detail.contains("玄空") || $0.title.contains("玄空") }
+                .map { $0.title + "|" + $0.locationName + "|" + $0.detail }.sorted()
+        }
+        XCTAssertFalse(findings(first).isEmpty)
+        XCTAssertEqual(findings(first), findings(second))
+    }
+
+    @MainActor
+    func testManualVrHeadingAndCentroidSurviveGenerationAndArchiveRoundTrip() throws {
+        let reference = VRSurveyReference(coordinateHeading: 90, houseFacingDegrees: 180,
+                                          normalizedCentroid: CGPoint(x: 0.3, y: 0.7), yaw: 0)
+        let center = try XCTUnwrap(reference.centroid(width: 12, depth: 10))
+        XCTAssertEqual(center.x, 3.6, accuracy: 0.00001)
+        XCTAssertEqual(center.z, 7, accuracy: 0.00001)
+        let room = SpatialRoom3D(name: "客厅", type: .livingRoom, center: SIMD3(6, 1.4, 5), size: SIMD3(12, 2.8, 10))
+        let result = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "VR", walls: [], openings: [], beams: [], rooms: [room], objects: [],
+                                                                  compassHeading: reference.coordinateHeading, centroidOverride: center,
+                                                                  houseFacingDegrees: reference.houseFacingDegrees)
+        let restored = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONEncoder().encode(result))
+        XCTAssertEqual(restored.compassHeading, 90)
+        XCTAssertEqual(restored.houseFacingDegrees, 180)
+        XCTAssertEqual(restored.centroidX, 3.6, accuracy: 0.00001)
+        XCTAssertEqual(restored.centroidZ, 7, accuracy: 0.00001)
+        XCTAssertEqual(restored.centroidWasExplicit, true)
+    }
+
+    func testVrCentroidUsesTheSameRotationAndScaleAsRooms() throws {
+        let reference = VRSurveyReference(coordinateHeading: 25, houseFacingDegrees: 130,
+                                          normalizedCentroid: CGPoint(x: 0.25, y: 0.75), yaw: .pi / 2)
+        let center = try XCTUnwrap(reference.centroid(width: 12, depth: 8))
+        XCTAssertEqual(center.x, 4, accuracy: 0.00001)
+        XCTAssertEqual(center.z, 1, accuracy: 0.00001)
+    }
+
+    func testLegacySurveyDecodesWithoutConfusingBaselineWithHouseFacing() throws {
+        let original = survey("legacy")
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        json.removeValue(forKey: "houseFacingDegrees")
+        json.removeValue(forKey: "centroidWasExplicit")
+        let restored = try JSONDecoder().decode(HouseSpatialSurvey.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(restored.compassHeading, 90)
+        XCTAssertNil(restored.resolvedHouseFacing)
+        XCTAssertNil(restored.centroidWasExplicit)
+    }
+
+    func testSolarReminderNamesFollowActualTransitionsAcrossYearBoundary() throws {
+        let solar = SolarTimeCalculator.shared
+        let start = instant("2026-12-23T00:00:00Z")
+        let transitions = solar.upcomingSolarTerms(after: start, count: 24)
+        XCTAssertEqual(transitions.count, 24)
+        XCTAssertEqual(Array(transitions.prefix(3)).map(\.name), ["小寒", "大寒", "立春"])
+        var previous = start
+        for transition in transitions {
+            XCTAssertGreaterThan(transition.date, previous)
+            XCTAssertEqual(solar.solarTermName(for: transition.date.addingTimeInterval(1)), transition.name)
+            XCTAssertNotEqual(solar.solarTermName(for: transition.date.addingTimeInterval(-1)), transition.name)
+            XCTAssertNotNil(SolarTermsData.shared.terms.first(where: { $0.name == transition.name }))
+            previous = transition.date
+        }
+        XCTAssertGreaterThan(try XCTUnwrap(transitions.last).date.timeIntervalSince(start), 330 * 86400)
+    }
+
+    func testSolarReminderRefillAfterDeliveryStartsWithTheFollowingTerm() throws {
+        let solar = SolarTimeCalculator.shared
+        let firstBatch = solar.upcomingSolarTerms(after: instant("2026-02-05T00:00:00Z"))
+        let delivered = try XCTUnwrap(firstBatch.first)
+        XCTAssertEqual(delivered.name, "雨水")
+        let refill = solar.upcomingSolarTerms(after: delivered.date.addingTimeInterval(1))
+        XCTAssertEqual(refill.count, 24)
+        XCTAssertEqual(refill.first?.name, "惊蛰")
+        XCTAssertGreaterThan(try XCTUnwrap(refill.last).date, try XCTUnwrap(firstBatch.last).date)
+    }
+
+    func testWorldMapArchiveKeepsItsOriginalNorthReference() throws {
+        let payload = Data([1, 2, 3, 4])
+        let saved = try SpatialWorldMapArchive(mapData: payload, coordinateHeading: 450)
+        let restored = try SpatialWorldMapArchive.decode(JSONEncoder().encode(saved))
+        XCTAssertEqual(restored.mapData, payload)
+        XCTAssertEqual(restored.coordinateHeading, 90)
+    }
+
+    func testLegacyWorldMapWithoutNorthReferenceRequiresRescan() {
+        XCTAssertThrowsError(try SpatialWorldMapArchive.decode(Data("bplist00-legacy-map".utf8))) {
+            XCTAssertEqual($0 as? ARSpatialSurveyError, .mapOrientationUnavailable)
+        }
+        XCTAssertThrowsError(try SpatialWorldMapArchive(mapData: Data([1]), coordinateHeading: .nan))
+    }
+
+
+    func testShareCompletionCanSettleAfterPresentationOwnerReleasesLease() throws {
+        var outcomes: [Bool] = []
+        var lease: TianjiExportCreditLease? = TianjiExportCreditLease { outcomes.append($0) }
+        var controllerCompletion: ((Bool) -> Void)? = { [heldLease = lease!] success in heldLease.complete(success: success) }
+        lease = nil
+        XCTAssertTrue(outcomes.isEmpty)
+        controllerCompletion?(true)
+        controllerCompletion?(true)
+        controllerCompletion = nil
+        XCTAssertEqual(outcomes, [true])
+    }
+
+    func testControllerTeardownWithoutCompletionReleasesExportSlot() {
+        var outcomes: [Bool] = []
+        var lease: TianjiExportCreditLease? = TianjiExportCreditLease { outcomes.append($0) }
+        XCTAssertNotNil(lease)
+        lease = nil
+        XCTAssertEqual(outcomes, [false])
+    }
+
 }

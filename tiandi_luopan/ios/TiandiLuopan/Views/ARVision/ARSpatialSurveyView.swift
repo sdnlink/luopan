@@ -2616,7 +2616,7 @@ public struct ARSpatialSurveyView: View {
                         .background(Color.yanGold)
                         .cornerRadius(14)
                     }
-                    .accessibilityLabel(lang.t("ar_spatial_3d_btn"))
+                    .accessibilityLabel(lang.t("floorplan_3d_recent_actual"))
                     Button(action: {
                         if !iap.hasUnlockedVIP {
                             showPaywall = true

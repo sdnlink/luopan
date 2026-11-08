@@ -20,12 +20,17 @@ on:
     branches:
       - main
       - master
+    # 只有工程或 workflow 本身变化才触发，避免改文档也占一次 macOS runner
+    paths:
+      - 'tiandi_luopan/**'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-build-${{ github.ref }}
+  # 把构建目标放进 group：避免 push 触发的 development 构建把排队中的 app-store 构建顶掉
+  group: ios-build-${{ github.ref }}-${{ github.event.inputs.build_target || 'development' }}
   cancel-in-progress: false
 
 jobs:
@@ -58,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       # --------------------------------------------------
-      # 2. 选择最新 Xcode 并检查构建环境
+      # 2. 选择 Xcode 并检查构建环境
       # --------------------------------------------------
       - name: Select Xcode 27 & Require iOS 27.1 SDK
         run: |
@@ -67,12 +72,10 @@ jobs:
           echo "===== Available Xcode Versions on Runner ====="
           ls -d /Applications/Xcode*.app 2>/dev/null || true
 
-          # 必须用 iOS 27.1 SDK 编译：低版本 SDK 构建的包在 iPhone Duo 内屏上
+          # 必须用 iOS 27.1+ SDK 编译：低版本 SDK 构建的包在 iPhone Duo 内屏上
           # 会以兼容模式显示（缩小的 iPhone 画面 + 黑边），布局与商店包均不合格。
-          XCODE_APP=""
-          for cand in /Applications/Xcode_27.1.app /Applications/Xcode_27*.app; do
-            if [ -d "$cand" ]; then XCODE_APP="$cand"; break; fi
-          done
+          # 用版本排序取最高的 Xcode_27*，避免 27.0 排在 27.1.1 前面被先选中。
+          XCODE_APP="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           if [ -z "$XCODE_APP" ]; then
             XCODE_APP="$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n 1 || true)"
           fi
@@ -80,28 +83,23 @@ jobs:
             echo "::error::No Xcode installation found on runner"
             exit 1
           fi
-          echo "Switching to Xcode: $XCODE_APP"
-          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+
+          # 用 DEVELOPER_DIR 而不是 sudo xcode-select -s：不改机器全局状态，也不需要免密 sudo
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          echo "Using Xcode: $XCODE_APP"
           xcodebuild -version
 
           IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version 2>/dev/null || echo missing)"
-          SIM_SDK="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || echo missing)"
-          echo "Device SDK: $IOS_SDK | Simulator SDK: $SIM_SDK"
-          for sdk in "$IOS_SDK" "$SIM_SDK"; do
-            if ! awk -v v="$sdk" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
-              echo "::error::iOS SDK 27.1+ required (got $sdk). Older SDK builds run in iPhone Duo compatibility mode."
-              exit 1
-            fi
-          done
-          echo "SDK check passed: iOS $IOS_SDK / Simulator $SIM_SDK"
+          echo "Device SDK: $IOS_SDK"
+          if ! awk -v v="$IOS_SDK" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+            echo "::error::iOS SDK 27.1+ required (got $IOS_SDK). Older SDK builds run in iPhone Duo compatibility mode."
+            exit 1
+          fi
+          echo "SDK check passed: iOS $IOS_SDK"
 
           echo "===== Target Mode: $BUILD_TARGET ====="
-          echo "===== macOS ====="
           sw_vers
-
-          echo "===== Active Xcode & SDKs ====="
-          xcode-select -p
-          xcodebuild -version
           xcodebuild -showsdks
 
           echo "===== Project ====="
@@ -109,8 +107,36 @@ jobs:
           xcodebuild -list -project "$PROJECT_PATH"
 
       # --------------------------------------------------
-      # 3. (已并入 Build Archive) build number 通过 CURRENT_PROJECT_VERSION 命令行参数传入，
-      #    不再用 sed 改 pbxproj —— 原写法匹配不到时会被 || true 静默吞掉。
+      # 3. 生成 build number 并做工程前置检查
+      #    build number 用 UTC 时间戳（YYMMDD.HHMM），单调递增：
+      #    - Re-run 不会和上次已上传的 build 撞号（run_number 在 Re-run 时不变）
+      #    - 不依赖 TestFlight 上已有的历史 build 号大小
+      #    它通过 CURRENT_PROJECT_VERSION 命令行参数传入 xcodebuild，不再 sed 改 pbxproj。
+      # --------------------------------------------------
+      - name: Prepare Build Number & Project Checks
+        run: |
+          set -euo pipefail
+
+          NOW="$(date -u +%y%m%d%H%M)"
+          BUILD_NUMBER="${NOW:0:6}.$((10#${NOW:6:4}))"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Build number: $BUILD_NUMBER"
+
+          # 依赖管理提示：本 workflow 直接 xcodebuild -project，不会安装依赖
+          if [ -f pubspec.yaml ]; then
+            echo "::warning::Detected pubspec.yaml (Flutter). This workflow does not run 'flutter pub get'; generated xcconfig may be missing."
+          fi
+          if [ -f ios/Podfile ]; then
+            echo "::warning::Detected ios/Podfile (CocoaPods). This workflow builds with -project and does not run 'pod install'; you probably need -workspace."
+          fi
+
+          # 自定义签名变量必须在工程里被引用，否则会被静默忽略
+          for var in APP_PROVISIONING_PROFILE_SPECIFIER WIDGET_PROVISIONING_PROFILE_SPECIFIER WIDGET_CODE_SIGNING_ALLOWED; do
+            if ! grep -rqs --include=project.pbxproj --include='*.xcconfig' "$var" ios; then
+              echo "::warning::$var is not referenced in project.pbxproj / *.xcconfig; the command-line override will have no effect."
+            fi
+          done
+
       # --------------------------------------------------
       # 4. 根据模式导入证书和描述文件
       # --------------------------------------------------
@@ -118,6 +144,8 @@ jobs:
         id: setup_signing
         env:
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # 可选：App Group ID（仓库变量）。设置后强制使用它；不设置则从描述文件里自动挑
+          APP_GROUP_ID: ${{ vars.APP_GROUP_ID }}
           # 开发者模式凭证 (含 fallback)
           DEV_P12: ${{ secrets.DEV_CERTIFICATE_P12 || secrets.BUILD_CERTIFICATE_P12 }}
           DEV_P12_PWD: ${{ secrets.DEV_P12_PASSWORD || secrets.P12_PASSWORD }}
@@ -140,6 +168,8 @@ jobs:
           P12_PATH="$RUNNER_TEMP/signing/certificate.p12"
           PP_PATH="$RUNNER_TEMP/signing/profile.mobileprovision"
           PROFILE_PLIST="$RUNNER_TEMP/signing/profile.plist"
+          INSTALLED_LIST="$RUNNER_TEMP/signing/installed_profiles.txt"
+          : > "$INSTALLED_LIST"
 
           # 区分模式读取对应的 Base64
           if [ "$BUILD_TARGET" = "app-store" ]; then
@@ -147,12 +177,14 @@ jobs:
             P12_RAW="$DIST_P12"
             P12_PASSWORD="$DIST_P12_PWD"
             PROV_RAW="$DIST_PROV"
+            WIDGET_PROV_RAW="$DIST_WIDGET_PROV"
             CERT_SEARCH_PATTERN="(Apple Distribution|iPhone Distribution)"
           else
             echo "==== Configuring for Developer Device Test (Development) ===="
             P12_RAW="$DEV_P12"
             P12_PASSWORD="$DEV_P12_PWD"
             PROV_RAW="$DEV_PROV"
+            WIDGET_PROV_RAW="$DEV_WIDGET_PROV"
             CERT_SEARCH_PATTERN="(Apple Development|iPhone Developer)"
           fi
 
@@ -178,15 +210,17 @@ jobs:
           # 创建临时 Keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/build-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # 导入 P12
+          # 导入 P12：只授权 codesign / security，不用 -A（-A 允许任意程序访问私钥）
           security import "$P12_PATH" \
             -P "$P12_PASSWORD" \
-            -A \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
             -t cert \
             -f pkcs12 \
             -k "$KEYCHAIN_PATH"
@@ -206,24 +240,45 @@ jobs:
           echo "Available Identities in Keychain:"
           echo "$IDENTITIES"
 
-          SIGNING_IDENTITY="$(
-            printf '%s\n' "$IDENTITIES" |
-            awk -F '"' "/$CERT_SEARCH_PATTERN:/ {
-              print \$2
-              exit
-            }"
-          )"
-
-          if [ -z "$SIGNING_IDENTITY" ]; then
+          SIGNING_LINE="$(printf '%s\n' "$IDENTITIES" | grep -E "\"$CERT_SEARCH_PATTERN:" | head -n 1 || true)"
+          if [ -z "$SIGNING_LINE" ]; then
             echo "ERROR: Matching signing certificate ($CERT_SEARCH_PATTERN) not found."
             exit 1
           fi
+          SIGNING_IDENTITY="$(printf '%s\n' "$SIGNING_LINE" | sed -E 's/^[^"]*"([^"]*)".*/\1/')"
+          CERT_SHA1="$(printf '%s\n' "$SIGNING_LINE" | awk '{print toupper($2)}')"
 
           if [[ "$SIGNING_IDENTITY" != *"($TEAM_ID)"* ]]; then
             echo "WARNING: Certificate identity does not contain ($TEAM_ID), proceeding with: $SIGNING_IDENTITY"
           fi
+          echo "Selected Signing Identity: $SIGNING_IDENTITY ($CERT_SHA1)"
 
-          echo "Selected Signing Identity: $SIGNING_IDENTITY"
+          # 描述文件通用预检：未过期 + 包含刚导入的这张证书
+          check_profile() {
+            local plist="$1" label="$2" exp exp_epoch i=0 found="false" sha
+            exp="$(plutil -extract ExpirationDate raw -o - "$plist")"
+            exp_epoch="$(date -u -j -f '%Y-%m-%dT%H:%M:%SZ' "$exp" +%s)"
+            if [ "$exp_epoch" -le "$(date -u +%s)" ]; then
+              echo "ERROR: $label provisioning profile expired at $exp"
+              exit 1
+            fi
+            while sha="$(plutil -extract "DeveloperCertificates.$i" raw -o - "$plist" 2>/dev/null)"; do
+              sha="$(printf '%s' "$sha" | base64 -D | shasum -a 1 | awk '{print toupper($1)}')"
+              if [ "$sha" = "$CERT_SHA1" ]; then found="true"; fi
+              i=$((i + 1))
+            done
+            if [ "$found" != "true" ]; then
+              echo "ERROR: $label provisioning profile does not contain the imported certificate ($CERT_SHA1)."
+              exit 1
+            fi
+            echo "$label profile preflight OK (expires $exp)"
+          }
+
+          # 读取某个描述文件里的全部 App Group
+          groups_of() {
+            /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups" "$1" 2>/dev/null \
+              | grep -E '^[[:space:]]+[^[:space:]]' | sed -E 's/^[[:space:]]+//' || true
+          }
 
           # 解码 Provisioning Profile
           security cms -D -i "$PP_PATH" > "$PROFILE_PLIST"
@@ -276,23 +331,21 @@ jobs:
             exit 1
           fi
 
+          check_profile "$PROFILE_PLIST" "Main app"
+
           # 安装主工程 Provisioning Profile
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           mkdir -p "$PROFILE_DIR"
           cp "$PP_PATH" "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+          echo "$PROFILE_DIR/$PROFILE_UUID.mobileprovision" >> "$INSTALLED_LIST"
 
           # --------------------------------------------------
-          # 小组件描述文件处理（兼容通配符 Wildcard / 独立描述文件 / 优雅降级）
+          # 小组件描述文件处理（兼容通配符 Wildcard / 独立描述文件）
           # --------------------------------------------------
-          if [ "$BUILD_TARGET" = "app-store" ]; then
-            WIDGET_PROV_RAW="$DIST_WIDGET_PROV"
-          else
-            WIDGET_PROV_RAW="$DEV_WIDGET_PROV"
-          fi
-
           EXPECTED_WIDGET_APP_ID="$TEAM_ID.$WIDGET_BUNDLE_ID"
           HAS_WIDGET_PROFILE="false"
           WIDGET_PROFILE_UUID=""
+          WIDGET_PROFILE_PLIST=""
 
           # shellcheck disable=SC2053
           if [[ "$EXPECTED_WIDGET_APP_ID" == $PROFILE_APP_ID ]]; then
@@ -311,6 +364,7 @@ jobs:
             WIDGET_PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$WIDGET_PROFILE_PLIST")
             WIDGET_PROFILE_TEAM=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$WIDGET_PROFILE_PLIST")
             WIDGET_PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$WIDGET_PROFILE_PLIST")
+            WIDGET_GET_TASK_ALLOW=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:get-task-allow" "$WIDGET_PROFILE_PLIST" 2>/dev/null || echo "false")
 
             echo "===== Widget Provisioning Profile Metadata ====="
             echo "Name: $WIDGET_PROFILE_NAME"
@@ -329,48 +383,78 @@ jobs:
               exit 1
             fi
 
+            if [ "$BUILD_TARGET" = "app-store" ] && [ "$WIDGET_GET_TASK_ALLOW" = "true" ]; then
+              echo "ERROR: App Store mode requires the widget profile to be a distribution profile (get-task-allow=false)."
+              exit 1
+            fi
+
+            check_profile "$WIDGET_PROFILE_PLIST" "Widget"
+
             cp "$WIDGET_PP_PATH" "$PROFILE_DIR/$WIDGET_PROFILE_UUID.mobileprovision"
+            echo "$PROFILE_DIR/$WIDGET_PROFILE_UUID.mobileprovision" >> "$INSTALLED_LIST"
             HAS_WIDGET_PROFILE="true"
             echo "Widget profile installed successfully: $WIDGET_PROFILE_NAME ($WIDGET_PROFILE_UUID)"
           else
+            if [ "$BUILD_TARGET" = "app-store" ]; then
+              echo "::error::No widget provisioning profile for app-store mode (expected App ID: $EXPECTED_WIDGET_APP_ID). Refusing to ship a build without the widget."
+              echo "::error::Configure DIST_WIDGET_PROVISION_PROFILE in GitHub Secrets, or use a wildcard distribution profile."
+              exit 1
+            fi
             echo "::warning::No widget provisioning profile secret found for $BUILD_TARGET mode."
-            echo "::warning::Expected App ID: $EXPECTED_WIDGET_APP_ID."
-            echo "::warning::To sign the widget on CI, configure DEV_WIDGET_PROVISION_PROFILE / DIST_WIDGET_PROVISION_PROFILE in GitHub Secrets."
-            HAS_WIDGET_PROFILE="false"
-            WIDGET_PROFILE_UUID=""
+            echo "::warning::Expected App ID: $EXPECTED_WIDGET_APP_ID. The widget will be signed off and stripped from this development build."
           fi
 
-          # 动态探测描述文件是否包含 App Groups 权限 (com.apple.security.application-groups)
-          # 若主工程描述文件与小组件描述文件均已开启 App Group，则自动生成并注入 Entitlements，激活真机主程序与小组件实时坐向同步；
-          # 若描述文件尚未勾选 App Group（如 Wildcard 通配描述文件），则保持空 Entitlements，确保归档签名不报错。
-          MAIN_APP_GROUP=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" "$PROFILE_PLIST" 2>/dev/null || true)
-          WIDGET_APP_GROUP=""
-          if [ "$HAS_WIDGET_PROFILE" = "true" ]; then
-            if [ -f "${WIDGET_PROFILE_PLIST:-}" ]; then
-              WIDGET_APP_GROUP=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.security.application-groups:0" "$WIDGET_PROFILE_PLIST" 2>/dev/null || true)
+          # --------------------------------------------------
+          # App Group：仅当主 App 和小组件的描述文件都带有同一个 App Group 时才注入 entitlements。
+          # 注意：CODE_SIGN_ENTITLEMENTS 命令行覆盖会作用于所有 target，并替换工程里原有的
+          # entitlements 文件（Push、关联域名等会被丢掉）。如果工程还依赖这些能力，
+          # 请改为在工程里配置 entitlements，并把此处的注入去掉。
+          # --------------------------------------------------
+          MAIN_GROUPS="$(groups_of "$PROFILE_PLIST")"
+          if [ "$HAS_WIDGET_PROFILE" = "true" ] && [ -n "$WIDGET_PROFILE_PLIST" ]; then
+            WIDGET_GROUPS="$(groups_of "$WIDGET_PROFILE_PLIST")"
+          else
+            WIDGET_GROUPS="$MAIN_GROUPS"
+          fi
+
+          SELECTED_GROUP=""
+          if [ -n "${APP_GROUP_ID:-}" ]; then
+            if printf '%s\n' "$MAIN_GROUPS" | grep -qxF "$APP_GROUP_ID" && printf '%s\n' "$WIDGET_GROUPS" | grep -qxF "$APP_GROUP_ID"; then
+              SELECTED_GROUP="$APP_GROUP_ID"
             else
-              WIDGET_APP_GROUP="$MAIN_APP_GROUP"
+              echo "ERROR: APP_GROUP_ID ($APP_GROUP_ID) is not present in both the app and widget provisioning profiles."
+              echo "Main groups: $MAIN_GROUPS"
+              echo "Widget groups: $WIDGET_GROUPS"
+              exit 1
             fi
+          else
+            # 取两个描述文件共有的第一个 group
+            while IFS= read -r g; do
+              [ -n "$g" ] || continue
+              if printf '%s\n' "$WIDGET_GROUPS" | grep -qxF "$g"; then SELECTED_GROUP="$g"; break; fi
+            done <<< "$MAIN_GROUPS"
           fi
 
           ENTITLEMENTS_PATH=""
-          if [ -n "$MAIN_APP_GROUP" ] && { [ "$HAS_WIDGET_PROFILE" != "true" ] || [ -n "$WIDGET_APP_GROUP" ]; }; then
+          if [ -n "$SELECTED_GROUP" ]; then
             ENTITLEMENTS_PATH="$RUNNER_TEMP/signing/AppGroup.entitlements"
             cat > "$ENTITLEMENTS_PATH" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>${MAIN_APP_GROUP}</string>
-	</array>
-</dict>
-</plist>
-EOF
-            echo "Detected App Group entitlement ($MAIN_APP_GROUP) in provisioning profile; generated $ENTITLEMENTS_PATH"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.security.application-groups</key>
+              <array>
+                  <string>${SELECTED_GROUP}</string>
+              </array>
+          </dict>
+          </plist>
+          EOF
+            plutil -lint "$ENTITLEMENTS_PATH"
+            echo "Using App Group '$SELECTED_GROUP'; generated $ENTITLEMENTS_PATH"
+            echo "::warning::CODE_SIGN_ENTITLEMENTS override applies to ALL targets and replaces the project's own entitlements files."
           else
-            echo "No App Group entitlement found in provisioning profile(s); archiving without CODE_SIGN_ENTITLEMENTS override."
+            echo "No common App Group in provisioning profile(s); archiving without CODE_SIGN_ENTITLEMENTS override."
           fi
 
           # 输出供后续步骤使用
@@ -398,7 +482,6 @@ EOF
           HAS_WIDGET_PROFILE: ${{ steps.setup_signing.outputs.has_widget_profile }}
           WIDGET_PROFILE_UUID: ${{ steps.setup_signing.outputs.widget_profile_uuid }}
           ENTITLEMENTS_PATH: ${{ steps.setup_signing.outputs.entitlements_path }}
-          BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
 
@@ -439,20 +522,20 @@ EOF
 
           test -d build/TiandiLuopan.xcarchive
 
-          # 归档产物必须确实链接 iOS 27.1 SDK（DTSDKName 由构建时 SDK 写入）
           ARCHIVED_APP="build/TiandiLuopan.xcarchive/Products/Applications/TiandiLuopan.app"
           test -d "$ARCHIVED_APP" || { echo "::error::Archived app not found at $ARCHIVED_APP"; exit 1; }
+
+          # 归档产物必须确实链接 iOS 27.1+ SDK（DTSDKName 由构建时 SDK 写入，形如 iphoneos27.1）
           DTSDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$ARCHIVED_APP/Info.plist" 2>/dev/null || true)"
           echo "Archived DTSDKName = $DTSDK"
-          case "$DTSDK" in
-            *27.1*) : ;;
-            *)
-              echo "::error::Archive not built against iOS 27.1 SDK (DTSDKName=$DTSDK); Duo inner display would run in compatibility mode."
-              exit 1
-              ;;
-          esac
+          DTSDK_VER="${DTSDK#iphoneos}"
+          if ! awk -v v="$DTSDK_VER" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+            echo "::error::Archive not built against iOS 27.1+ SDK (DTSDKName=$DTSDK); Duo inner display would run in compatibility mode."
+            exit 1
+          fi
 
-          # 若未配置小组件描述文件，从归档中剥离未签名的 appex，避免后续 export 阶段校验失败
+          # 开发模式且未配置小组件描述文件：剥离未签名的 appex，避免 export 阶段校验失败
+          # （app-store 模式在签名步骤已经强制要求小组件描述文件，不会走到这里）
           if [ "$HAS_WIDGET_PROFILE" != "true" ]; then
             if [ -d "$ARCHIVED_APP/PlugIns/TiandiLuopanWidget.appex" ]; then
               echo "::warning::Removing unsigned TiandiLuopanWidget.appex from archive to allow main app IPA export."
@@ -465,11 +548,17 @@ EOF
           ACTUAL_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ARCHIVED_APP/Info.plist" 2>/dev/null || true)"
           echo "Archived CFBundleVersion = $ACTUAL_BUILD (expected $BUILD_NUMBER)"
           if [ "$ACTUAL_BUILD" != "$BUILD_NUMBER" ]; then
-            echo "::warning::CFBundleVersion ($ACTUAL_BUILD) != run_number ($BUILD_NUMBER); TestFlight may reject a duplicate/lower build number."
+            if [ "$BUILD_TARGET" = "app-store" ]; then
+              echo "::error::CFBundleVersion ($ACTUAL_BUILD) != $BUILD_NUMBER. Info.plist probably hardcodes CFBundleVersion; it must be \$(CURRENT_PROJECT_VERSION)."
+              exit 1
+            fi
+            echo "::warning::CFBundleVersion ($ACTUAL_BUILD) != $BUILD_NUMBER."
           fi
 
       # --------------------------------------------------
       # 6. 配置导出选项 ExportOptions.plist
+      #    manageAppVersionAndBuildNumber=false：不让 Xcode 在导出/上传时改写 build number，
+      #    保证 IPA 里的版本号就是我们生成的 BUILD_NUMBER。
       # --------------------------------------------------
       - name: Create ExportOptions
         env:
@@ -502,6 +591,9 @@ EOF
               <key>method</key>
               <string>${METHOD}</string>
 
+              <key>signingStyle</key>
+              <string>manual</string>
+
               <key>signingCertificate</key>
               <string>${SIGNING_CERT}</string>
 
@@ -516,6 +608,9 @@ EOF
               <key>destination</key>
               <string>export</string>
 
+              <key>manageAppVersionAndBuildNumber</key>
+              <false/>
+
               <key>stripSwiftSymbols</key>
               <true/>
           </dict>
@@ -523,6 +618,10 @@ EOF
           EOF
 
           plutil -lint ExportOptions.plist
+
+          # 上传用的变体：与上面完全相同，只把 destination 换成 upload
+          sed 's#<string>export</string>#<string>upload</string>#' ExportOptions.plist > ExportOptions-upload.plist
+          plutil -lint ExportOptions-upload.plist
 
       # --------------------------------------------------
       # 7. 导出 IPA 安装包
@@ -550,13 +649,16 @@ EOF
           echo "IPA_FILE=$IPA_FILE" >> "$GITHUB_ENV"
 
       # --------------------------------------------------
-      # 8. 校验 IPA 签名信息
+      # 8. 校验 IPA 签名信息（带断言）
       # --------------------------------------------------
       - name: Verify IPA Signature
+        env:
+          HAS_WIDGET_PROFILE: ${{ steps.setup_signing.outputs.has_widget_profile }}
         run: |
           set -euo pipefail
 
           VERIFY_DIR="$RUNNER_TEMP/ipa-verify"
+          rm -rf "$VERIFY_DIR"
           mkdir -p "$VERIFY_DIR"
 
           unzip -q "$IPA_FILE" -d "$VERIFY_DIR"
@@ -578,10 +680,36 @@ EOF
           test -s "$EMBEDDED_PROFILE"
 
           security cms -D -i "$EMBEDDED_PROFILE" > "$VERIFY_DIR/embedded-profile.plist"
-          /usr/libexec/PlistBuddy -c "Print :Name" "$VERIFY_DIR/embedded-profile.plist"
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:get-task-allow" "$VERIFY_DIR/embedded-profile.plist"
+          echo "Profile: $(/usr/libexec/PlistBuddy -c "Print :Name" "$VERIFY_DIR/embedded-profile.plist")"
+          GTA="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:get-task-allow" "$VERIFY_DIR/embedded-profile.plist" 2>/dev/null || echo false)"
+          echo "get-task-allow: $GTA"
 
-          # 检查小组件扩展签名（若存在）
+          # 断言：模式与产物一致
+          if [ "$BUILD_TARGET" = "app-store" ] && [ "$GTA" != "false" ]; then
+            echo "::error::app-store IPA has get-task-allow=$GTA (expected false)."
+            exit 1
+          fi
+          if [ "$BUILD_TARGET" = "development" ] && [ "$GTA" != "true" ]; then
+            echo "::error::development IPA has get-task-allow=$GTA (expected true)."
+            exit 1
+          fi
+
+          # 断言：IPA 内 SDK 版本 ≥ 27.1，build number 正确
+          IPA_SDK="$(/usr/libexec/PlistBuddy -c 'Print :DTSDKName' "$APP_PATH/Info.plist" 2>/dev/null || true)"
+          IPA_SDK_VER="${IPA_SDK#iphoneos}"
+          echo "IPA DTSDKName: $IPA_SDK"
+          if ! awk -v v="$IPA_SDK_VER" 'BEGIN { if (v !~ /^[0-9]+(\.[0-9]+)*$/) exit 1; split(v, a, "."); m = a[1] + 0; n = (a[2] == "" ? 0 : a[2] + 0); if (m < 27) exit 1; if (m == 27 && n < 1) exit 1; exit 0 }'; then
+            echo "::error::IPA was not built against iOS 27.1+ SDK ($IPA_SDK)."
+            exit 1
+          fi
+          IPA_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist" 2>/dev/null || true)"
+          echo "IPA CFBundleVersion: $IPA_BUILD (expected $BUILD_NUMBER)"
+          if [ "$BUILD_TARGET" = "app-store" ] && [ "$IPA_BUILD" != "$BUILD_NUMBER" ]; then
+            echo "::error::IPA CFBundleVersion ($IPA_BUILD) != $BUILD_NUMBER."
+            exit 1
+          fi
+
+          # 检查小组件扩展签名（若存在）；app-store 模式必须存在
           WIDGET_APPEX="$(find "$APP_PATH/PlugIns" -maxdepth 1 -name '*.appex' 2>/dev/null | head -n 1 || true)"
           if [ -n "$WIDGET_APPEX" ] && [ -d "$WIDGET_APPEX" ]; then
             echo "===== Widget Extension Code Signature Info ====="
@@ -591,6 +719,9 @@ EOF
               security cms -D -i "$WIDGET_APPEX/embedded.mobileprovision" > "$VERIFY_DIR/widget-profile.plist"
               echo "Widget Profile Name: $(/usr/libexec/PlistBuddy -c "Print :Name" "$VERIFY_DIR/widget-profile.plist" 2>/dev/null || true)"
             fi
+          elif [ "$BUILD_TARGET" = "app-store" ]; then
+            echo "::error::app-store IPA contains no widget extension."
+            exit 1
           fi
 
       # --------------------------------------------------
@@ -604,18 +735,31 @@ EOF
           cat SHA256SUMS.txt
 
       # --------------------------------------------------
-      # 10. 上传至苹果商店 App Store Connect / TestFlight (仅 app-store 模式生效)
+      # 10. 上传 IPA 构建产物至 GitHub Artifacts
+      #     放在 TestFlight 上传之前：即使上传失败，签好名的 IPA 也能下载。
+      # --------------------------------------------------
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TiandiLuopan-${{ github.event.inputs.build_target || 'development' }}-IPA
+          path: tiandi_luopan/dist-ios/
+          if-no-files-found: error
+          retention-days: 14
+
+      # --------------------------------------------------
+      # 11. 上传至 App Store Connect / TestFlight (仅 app-store 模式生效)
+      #     改为 xcodebuild -exportArchive + destination=upload + API Key 认证：
+      #     不再使用 altool（--upload-app 已被标记 deprecated，--apple-id 也不属于该子命令），
+      #     失败时由 xcodebuild 的退出码直接报错，不再 grep 日志猜成败。
       # --------------------------------------------------
       - name: Upload to App Store Connect (TestFlight)
-        # 注意：push 触发时 BUILD_TARGET 恒为 development，所以 push 永远不会上传；上传只在手动选 app-store 且勾选 upload_to_appstore 时发生。
+        # push 触发时 BUILD_TARGET 恒为 development，所以 push 永远不会上传；
+        # 上传只在手动选 app-store 且勾选 upload_to_appstore 时发生。
         if: ${{ env.BUILD_TARGET == 'app-store' && inputs.upload_to_appstore }}
         env:
           API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
           ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
           API_KEY_RAW: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          # 可选：App Store Connect 里该 App 的数字 Apple ID。Xcode 26 的 altool 在
-          # Bundle ID 前缀相近的多个 App 间可能传错目标，设置后会显式指定。
-          APP_APPLE_ID: ${{ secrets.APPSTORE_APPLE_ID }}
         run: |
           set -euo pipefail
 
@@ -626,63 +770,31 @@ EOF
             exit 1
           fi
 
-          # 确保私钥目录存在
-          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          KEY_DIR="$RUNNER_TEMP/appstoreconnect"
           mkdir -p "$KEY_DIR"
           KEY_FILE="$KEY_DIR/AuthKey_${API_KEY_ID}.p8"
           trap 'rm -f "$KEY_FILE"' EXIT
 
-          # 智能兼容：无论用户 Secret 存的是 PEM 原文还是 Base64，均能正确处理
-          if echo "$API_KEY_RAW" | grep -q "BEGIN PRIVATE KEY"; then
-            echo "$API_KEY_RAW" > "$KEY_FILE"
+          # 兼容：Secret 存的是 PEM 原文或 Base64 均可
+          if printf '%s' "$API_KEY_RAW" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$API_KEY_RAW" > "$KEY_FILE"
           else
             printf '%s' "$API_KEY_RAW" | base64 -D > "$KEY_FILE"
           fi
           chmod 600 "$KEY_FILE"
 
-          # 重新确认 IPA 文件路径
-          UPLOAD_IPA="$(find dist-ios -maxdepth 1 -name '*.ipa' -print -quit)"
-          if [ -z "$UPLOAD_IPA" ] || [ ! -f "$UPLOAD_IPA" ]; then
-            echo "::error::Cannot find exported .ipa file in dist-ios/ directory!"
-            exit 1
-          fi
-
-          echo "Target IPA for upload: $UPLOAD_IPA"
-          echo "Uploading to App Store Connect using API Key: $API_KEY_ID..."
-
-          APPLE_ID_ARGS=()
-          if [ -n "${APP_APPLE_ID:-}" ]; then
-            APPLE_ID_ARGS=(--apple-id "$APP_APPLE_ID")
-          fi
-
-          # --upload-app 已被 Apple 标记为 deprecated（官方建议 --upload-package），目前仍可用。
-          UPLOAD_LOG="build/altool-upload.log"
-          xcrun altool --upload-app \
-            -f "$UPLOAD_IPA" \
-            -t ios \
-            --apiKey "$API_KEY_ID" \
-            --apiIssuer "$ISSUER_ID" \
-            ${APPLE_ID_ARGS[@]+"${APPLE_ID_ARGS[@]}"} \
-            --verbose 2>&1 | tee "$UPLOAD_LOG"
-
-          # 部分 Xcode 版本的 altool 上传失败时也返回 0，所以额外解析输出，避免“假成功”
-          if grep -Eq 'UPLOAD FAILED|Validation failed|ERROR:' "$UPLOAD_LOG"; then
-            echo "::error::altool reported an upload failure (see build/altool-upload.log)"
-            exit 1
-          fi
+          echo "Uploading build $BUILD_NUMBER to App Store Connect using API Key: $API_KEY_ID..."
+          mkdir -p build/upload-export
+          xcodebuild -exportArchive \
+            -archivePath build/TiandiLuopan.xcarchive \
+            -exportPath build/upload-export \
+            -exportOptionsPlist ExportOptions-upload.plist \
+            -authenticationKeyPath "$KEY_FILE" \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$ISSUER_ID" \
+            2>&1 | tee build/xcodebuild-upload.log
 
           echo "🎉 Successfully uploaded to App Store Connect! TestFlight build will appear in 5-15 minutes."
-
-      # --------------------------------------------------
-      # 11. 上传 IPA 构建产物至 GitHub Artifacts (两种模式均可下载)
-      # --------------------------------------------------
-      - name: Upload IPA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: TiandiLuopan-${{ github.event.inputs.build_target || 'development' }}-IPA
-          path: tiandi_luopan/dist-ios/
-          if-no-files-found: error
-          retention-days: 14
 
       # --------------------------------------------------
       # 12. 上传构建与诊断日志
@@ -695,5 +807,30 @@ EOF
           path: |
             tiandi_luopan/build/*.log
             tiandi_luopan/ExportOptions.plist
+            tiandi_luopan/ExportOptions-upload.plist
           if-no-files-found: ignore
           retention-days: 7
+
+      # --------------------------------------------------
+      # 13. 清理签名材料（无论成败）
+      #     只删本次安装的描述文件，不动 runner 上其他任务的文件。
+      # --------------------------------------------------
+      - name: Cleanup Signing Material
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          set +e
+
+          if [ -n "${KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null
+          fi
+
+          LIST="$RUNNER_TEMP/signing/installed_profiles.txt"
+          if [ -f "$LIST" ]; then
+            while IFS= read -r f; do
+              [ -n "$f" ] && rm -f "$f"
+            done < "$LIST"
+          fi
+
+          rm -rf "$RUNNER_TEMP/signing" "$RUNNER_TEMP/appstoreconnect" "$RUNNER_TEMP/ipa-verify"
+          exit 0

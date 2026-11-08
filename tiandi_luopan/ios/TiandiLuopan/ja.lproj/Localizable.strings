@@ -10,7 +10,11 @@
 "tab_ar" = "AR実景";
 "tab_floorplan" = "間取り";
 "tab_analysis" = "玄空風水";
-"tab_settings" = "会員・設定";
+"tab_settings" = "設定";
+"settings_menu_vip" = "マスター会員";
+"settings_menu_kua_reminder" = "家主本命卦と節気リマインダー";
+"settings_menu_language" = "表示言語設定";
+"settings_menu_about" = "アプリについて";
 "lock_heading" = "方位を固定";
 "locked_heading" = "方位固定中";
 "layers_settings" = "レイヤー設定";

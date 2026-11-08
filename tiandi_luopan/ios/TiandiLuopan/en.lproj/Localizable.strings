@@ -10,7 +10,11 @@
 "tab_ar" = "AR Scan";
 "tab_floorplan" = "Floor Plan";
 "tab_analysis" = "Feng Shui";
-"tab_settings" = "VIP & Settings";
+"tab_settings" = "Settings";
+"settings_menu_vip" = "Master VIP";
+"settings_menu_kua_reminder" = "Life Gua & Solar Terms";
+"settings_menu_language" = "UI Language & Preferences";
+"settings_menu_about" = "About";
 "lock_heading" = "Lock Heading";
 "locked_heading" = "Heading Locked";
 "layers_settings" = "Dial Layers";

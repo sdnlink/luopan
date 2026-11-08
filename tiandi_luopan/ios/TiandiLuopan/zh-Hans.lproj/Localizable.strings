@@ -10,7 +10,11 @@
 "ar_camera_busy" = "另一窗口正在使用相机，同一时间只能有一个窗口打开相机页面。";
 "tab_floorplan" = "户型立极";
 "tab_analysis" = "玄空理气";
-"tab_settings" = "大师会员";
+"tab_settings" = "设置";
+"settings_menu_vip" = "大师会员";
+"settings_menu_kua_reminder" = "宅主命卦与节气提醒";
+"settings_menu_language" = "界面语言设置";
+"settings_menu_about" = "关于";
 "lock_heading" = "锁定朝向";
 "locked_heading" = "已锁定朝向";
 "layers_settings" = "图层管理";

@@ -138,8 +138,8 @@ public struct BaZhaiView: View {
                     ),
                     ownerBirthYear: kua.birthYear,
                     ownerIsMale: kua.isMale,
-                    onConfirm: { role, customName, year, isMale in
-                        kua.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
+                    onConfirm: { role, customName, birthDate, year, isMale in
+                        kua.addFamilyMember(role: role, customName: customName, birthDate: birthDate, birthYear: year, isMale: isMale)
                         withAnimation {
                             showFamilySection = true
                         }
@@ -988,7 +988,7 @@ public struct BaZhaiView: View {
                                         }
                                     }
                                 } label: {
-                                    Text("\(String(member.birthYear))▾")
+                                    Text("\(member.formattedBirth)▾")
                                         .adaptiveFont(size: 10, weight: .semibold)
                                         .padding(.horizontal, 5)
                                         .padding(.vertical, 2)
@@ -1608,7 +1608,19 @@ public struct AddFamilyMemberDialog: View {
     @Binding var isPresented: Bool
     let ownerBirthYear: Int
     let ownerIsMale: Bool
-    let onConfirm: (FamilyRole, String?, Int, Bool) -> Void
+    let onConfirm: (FamilyRole, String?, Date?, Int, Bool) -> Void
+
+    public init(
+        isPresented: Binding<Bool>,
+        ownerBirthYear: Int,
+        ownerIsMale: Bool,
+        onConfirm: @escaping (FamilyRole, String?, Date?, Int, Bool) -> Void
+    ) {
+        self._isPresented = isPresented
+        self.ownerBirthYear = ownerBirthYear
+        self.ownerIsMale = ownerIsMale
+        self.onConfirm = onConfirm
+    }
 
     public init(
         isPresented: Binding<Bool>,
@@ -1619,15 +1631,65 @@ public struct AddFamilyMemberDialog: View {
         self._isPresented = isPresented
         self.ownerBirthYear = ownerBirthYear
         self.ownerIsMale = ownerIsMale
-        self.onConfirm = onConfirm
+        self.onConfirm = { role, name, _, year, isMale in
+            onConfirm(role, name, year, isMale)
+        }
     }
 
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedRole: FamilyRole = .spouse
     @State private var customName: String = ""
+    @State private var inputMode: Int = 0 // 0: 精确公历生辰 (波轮 WheelDatePickerStyle), 1: 年份快速选择
+    @State private var selectedDate: Date = Date()
     @State private var selectedYear: Int = 1990
     @State private var selectedIsMale: Bool = false
     @State private var isInitialized: Bool = false
+
+    private var dateRange: ClosedRange<Date> {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
+        let start = cal.date(from: DateComponents(year: 1920, month: 1, day: 1)) ?? Date(timeIntervalSince1970: -1577923200)
+        let end = cal.date(from: DateComponents(year: 2026, month: 12, day: 31)) ?? Date()
+        return start...end
+    }
+
+    private var effectiveFengShuiYear: Int {
+        if inputMode == 0 {
+            return UserKuaProfileManager.fengShuiYear(for: selectedDate)
+        } else {
+            return selectedYear
+        }
+    }
+
+    private var isDateBeforeLiChun: Bool {
+        guard inputMode == 0 else { return false }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
+        let m = cal.component(.month, from: selectedDate)
+        let d = cal.component(.day, from: selectedDate)
+        let calYear = cal.component(.year, from: selectedDate)
+        let fsYear = UserKuaProfileManager.fengShuiYear(for: selectedDate)
+        return (m < 2 || (m == 2 && d < 4)) && fsYear < calYear
+    }
+
+    private var selectedDateFormatted: String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: selectedDate)
+        let m = cal.component(.month, from: selectedDate)
+        let d = cal.component(.day, from: selectedDate)
+        return "\(y)年\(m)月\(d)日"
+    }
+
+    private func dateForYear(_ yr: Int) -> Date {
+        var comp = Calendar.current.dateComponents([.month, .day], from: selectedDate)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 8 * 3600) ?? .current
+        var newComp = DateComponents()
+        newComp.year = yr
+        newComp.month = comp.month ?? 6
+        newComp.day = comp.day ?? 15
+        return cal.date(from: newComp) ?? Date()
+    }
 
     private func initDefaults() {
         guard !isInitialized else { return }
@@ -1635,6 +1697,7 @@ public struct AddFamilyMemberDialog: View {
         selectedRole = .spouse
         selectedIsMale = !ownerIsMale
         selectedYear = ownerBirthYear
+        selectedDate = dateForYear(ownerBirthYear)
     }
 
     private func applyRolePreset(_ role: FamilyRole) {
@@ -1668,10 +1731,11 @@ public struct AddFamilyMemberDialog: View {
             selectedIsMale = true
             selectedYear = ownerBirthYear
         }
+        selectedDate = dateForYear(selectedYear)
     }
 
     private var previewGuaBadge: String {
-        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: selectedYear, isMale: selectedIsMale)
+        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: effectiveFengShuiYear, isMale: selectedIsMale)
         let guaKey = UserKuaProfileManager.guaKey(for: guaNum)
         let isEast = [1, 3, 4, 9].contains(guaNum)
         let guaItem = BaZhaiPalaceItem(id: 0, direction: "", guaName: guaKey, star: .fuWei)
@@ -1694,7 +1758,7 @@ public struct AddFamilyMemberDialog: View {
     }
 
     private var previewDirectionsSummary: String {
-        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: selectedYear, isMale: selectedIsMale)
+        let guaNum = UserKuaProfileManager.calcGuaNumber(birthYear: effectiveFengShuiYear, isMale: selectedIsMale)
         let guaKey = UserKuaProfileManager.guaKey(for: guaNum)
         let chart = BaZhaiEngine.shared.analyze(sittingPalace: guaKey, facingPalace: "离")
         let wDir = chart.items.first(where: { $0.star == .shengQi })?.localizedDirection ?? "-"
@@ -1718,14 +1782,14 @@ public struct AddFamilyMemberDialog: View {
         }
     }
 
-    var body: some View {
+    public var body: some View {
         ZStack {
             Color(red: 0.11, green: 0.11, blue: 0.15)
                 .ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 12) {
-                    // 弹窗顶栏
+                    // 1. 弹窗顶栏
                     HStack(spacing: 6) {
                         Image(systemName: "person.crop.circle.badge.plus")
                             .font(.system(size: 16))
@@ -1747,7 +1811,7 @@ public struct AddFamilyMemberDialog: View {
                         .foregroundColor(.white.opacity(0.7))
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // 身份关系网格
+                    // 2. 身份关系网格
                     VStack(alignment: .leading, spacing: 6) {
                         Text(roleSectionTitle)
                             .adaptiveFont(size: 11, weight: .bold)
@@ -1777,98 +1841,18 @@ public struct AddFamilyMemberDialog: View {
                         }
                     }
 
-                    // 称呼/姓名（选填）
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(nameSectionTitle)
-                            .adaptiveFont(size: 11, weight: .bold)
-                            .foregroundColor(.white.opacity(0.85))
-                        TextField(namePlaceholder, text: $customName)
-                            .adaptiveFont(size: 12)
-                            .padding(8)
-                            .background(Color.white.opacity(0.08))
-                            .foregroundColor(.white)
-                            .cornerRadius(6)
-                    }
-
-                    // 生辰年份与性别选择
-                    HStack(spacing: 8) {
+                    // 3. 称呼/姓名（选填）与 性别选择
+                    HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(birthYearSectionTitle)
+                            Text(nameSectionTitle)
                                 .adaptiveFont(size: 11, weight: .bold)
                                 .foregroundColor(.white.opacity(0.85))
-
-                            HStack(spacing: 4) {
-                                Button(action: { selectedYear = max(1920, selectedYear - 10) }) {
-                                    Text("-10")
-                                        .adaptiveFont(size: 10, weight: .bold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 7)
-                                        .background(Color.white.opacity(0.08))
-                                        .foregroundColor(.white.opacity(0.9))
-                                        .cornerRadius(5)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-
-                                Button(action: { selectedYear = max(1920, selectedYear - 1) }) {
-                                    Text("-1")
-                                        .adaptiveFont(size: 10, weight: .bold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 7)
-                                        .background(Color.white.opacity(0.08))
-                                        .foregroundColor(.white.opacity(0.9))
-                                        .cornerRadius(5)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-
-                                Menu {
-                                    ForEach((1920...2026).reversed(), id: \.self) { yr in
-                                        Button(action: { selectedYear = yr }) {
-                                            HStack {
-                                                Text("\(String(yr))年")
-                                                if yr == selectedYear {
-                                                    Image(systemName: "checkmark")
-                                                }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    HStack(spacing: 3) {
-                                        Text("\(String(selectedYear))年")
-                                            .adaptiveFont(size: 11, weight: .bold)
-                                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                                        Image(systemName: "chevron.down")
-                                            .font(.system(size: 8, weight: .bold))
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                    .padding(.horizontal, 7)
-                                    .padding(.vertical, 7)
-                                    .background(Color.white.opacity(0.12))
-                                    .cornerRadius(5)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-
-                                Button(action: { selectedYear = min(2026, selectedYear + 1) }) {
-                                    Text("+1")
-                                        .adaptiveFont(size: 10, weight: .bold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 7)
-                                        .background(Color.white.opacity(0.08))
-                                        .foregroundColor(.white.opacity(0.9))
-                                        .cornerRadius(5)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-
-                                Button(action: { selectedYear = min(2026, selectedYear + 10) }) {
-                                    Text("+10")
-                                        .adaptiveFont(size: 10, weight: .bold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 7)
-                                        .background(Color.white.opacity(0.08))
-                                        .foregroundColor(.white.opacity(0.9))
-                                        .cornerRadius(5)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
+                            TextField(namePlaceholder, text: $customName)
+                                .adaptiveFont(size: 12)
+                                .padding(8)
+                                .background(Color.white.opacity(0.08))
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
@@ -1885,6 +1869,10 @@ public struct AddFamilyMemberDialog: View {
                                         .background(selectedIsMale ? Color.yanCyan.opacity(0.28) : Color.white.opacity(0.06))
                                         .foregroundColor(selectedIsMale ? .yanCyan : .white.opacity(0.8))
                                         .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(selectedIsMale ? Color.yanCyan : Color.clear, lineWidth: 1)
+                                        )
                                 }
                                 .buttonStyle(PlainButtonStyle())
 
@@ -1896,14 +1884,171 @@ public struct AddFamilyMemberDialog: View {
                                         .background(!selectedIsMale ? Color.pink.opacity(0.28) : Color.white.opacity(0.06))
                                         .foregroundColor(!selectedIsMale ? Color.pink : .white.opacity(0.8))
                                         .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(!selectedIsMale ? Color.pink : Color.clear, lineWidth: 1)
+                                        )
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
-                        .frame(width: 100)
+                        .frame(width: 110)
                     }
 
-                    // 实时命卦排盘预览卡
+                    // 4. 生辰输入模式切换（公历年月日波轮 / 年份快速选择）
+                    Picker("", selection: $inputMode) {
+                        Text(modeDateLabel).tag(0)
+                        Text(modeYearLabel).tag(1)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+
+                    // 5. 日期波轮或年份快速选择内容
+                    if inputMode == 0 {
+                        // 精确公历生辰波轮 (WheelDatePickerStyle)
+                        VStack(spacing: 6) {
+                            HStack {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                Text(datePickerHint)
+                                    .adaptiveFont(size: 12, weight: .semibold)
+                                    .foregroundColor(.white.opacity(0.85))
+                                Spacer()
+                                Text(selectedDateFormatted)
+                                    .adaptiveFont(size: 13, weight: .bold)
+                                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                            }
+                            .padding(.horizontal, 4)
+
+                            DatePicker(
+                                "",
+                                selection: $selectedDate,
+                                in: dateRange,
+                                displayedComponents: [.date]
+                            )
+                            .datePickerStyle(WheelDatePickerStyle())
+                            .labelsHidden()
+                            .frame(maxHeight: 140)
+                            .clipped()
+                            .colorScheme(.dark)
+                            .onChange(of: selectedDate) { newDate in
+                                selectedYear = Calendar.current.component(.year, from: newDate)
+                            }
+
+                            // 立春换年解释或流年确认卡
+                            HStack(spacing: 6) {
+                                Image(systemName: isDateBeforeLiChun ? "info.circle.fill" : "sparkles")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(isDateBeforeLiChun ? .orange : Color.yanCyan)
+                                Text(liChunExplanationText)
+                                    .adaptiveFont(size: 10.5)
+                                    .foregroundColor(isDateBeforeLiChun ? .orange : .white.opacity(0.8))
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
+                        }
+                    } else {
+                        // 年份快速选择
+                        VStack(spacing: 6) {
+                            HStack(spacing: 6) {
+                                Button(action: {
+                                    selectedYear = max(1920, selectedYear - 10)
+                                    selectedDate = dateForYear(selectedYear)
+                                }) {
+                                    Text("-10")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: {
+                                    selectedYear = max(1920, selectedYear - 1)
+                                    selectedDate = dateForYear(selectedYear)
+                                }) {
+                                    Text("-1")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Spacer()
+
+                                Menu {
+                                    ForEach((1920...2026).reversed(), id: \.self) { yr in
+                                        Button(action: {
+                                            selectedYear = yr
+                                            selectedDate = dateForYear(yr)
+                                        }) {
+                                            HStack {
+                                                Text("\(String(yr))年")
+                                                if yr == selectedYear {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Text("\(String(selectedYear))年")
+                                            .adaptiveFont(size: 13, weight: .bold)
+                                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(Color.white.opacity(0.12))
+                                    .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Spacer()
+
+                                Button(action: {
+                                    selectedYear = min(2026, selectedYear + 1)
+                                    selectedDate = dateForYear(selectedYear)
+                                }) {
+                                    Text("+1")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+
+                                Button(action: {
+                                    selectedYear = min(2026, selectedYear + 10)
+                                    selectedDate = dateForYear(selectedYear)
+                                }) {
+                                    Text("+10")
+                                        .adaptiveFont(size: 10, weight: .bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 7)
+                                        .background(Color.white.opacity(0.08))
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding(8)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(8)
+                    }
+
+                    // 6. 实时命卦排盘预览卡
                     VStack(alignment: .leading, spacing: 3) {
                         HStack {
                             Text("【\(previewGuaBadge)】")
@@ -1922,7 +2067,7 @@ public struct AddFamilyMemberDialog: View {
                     .background(Color.white.opacity(0.05))
                     .cornerRadius(6)
 
-                    // 底部确认与取消按钮
+                    // 7. 底部确认与取消按钮
                     HStack(spacing: 10) {
                         Button(action: { isPresented = false }) {
                             Text(cancelText)
@@ -1937,7 +2082,8 @@ public struct AddFamilyMemberDialog: View {
 
                         Button(action: {
                             let trimmed = customName.trimmingCharacters(in: .whitespacesAndNewlines)
-                            onConfirm(selectedRole, trimmed.isEmpty ? nil : trimmed, selectedYear, selectedIsMale)
+                            let birthDateToPass = (inputMode == 0) ? selectedDate : nil
+                            onConfirm(selectedRole, trimmed.isEmpty ? nil : trimmed, birthDateToPass, effectiveFengShuiYear, selectedIsMale)
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             isPresented = false
                         }) {
@@ -2079,6 +2225,66 @@ public struct AddFamilyMemberDialog: View {
         }
     }
 
+    private var modeDateLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Exact Birth Date"
+        case .zhHant: return "公曆年月日"
+        case .ja: return "生年月日"
+        case .ko: return "생년월일"
+        case .vi: return "Ngày sinh"
+        case .th: return "วันเกิด"
+        case .id: return "Tanggal Lahir"
+        case .auto, .zhHans: return "公历年月日"
+        }
+    }
+
+    private var modeYearLabel: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Birth Year"
+        case .zhHant: return "出生年份"
+        case .ja: return "生まれ年"
+        case .ko: return "출생연도"
+        case .vi: return "Năm sinh"
+        case .th: return "ปีเกิด"
+        case .id: return "Tahun Lahir"
+        case .auto, .zhHans: return "出生年份"
+        }
+    }
+
+    private var datePickerHint: String {
+        switch lang.effectiveLanguage {
+        case .en: return "Select Birthday:"
+        case .zhHant: return "選擇公曆生日："
+        case .ja: return "誕生日を選択："
+        case .ko: return "생년월일 선택:"
+        case .vi: return "Chọn ngày sinh:"
+        case .th: return "เลือกวันเกิด:"
+        case .id: return "Pilih Tanggal Lahir:"
+        case .auto, .zhHans: return "选择公历生日："
+        }
+    }
+
+    private var liChunExplanationText: String {
+        let y = effectiveFengShuiYear
+        if isDateBeforeLiChun {
+            switch lang.effectiveLanguage {
+            case .en:
+                return "Born before Li Chun (Feb 4). Life Gua calculated using previous Feng Shui year (\(y))."
+            case .zhHant, .ja:
+                return "公曆立春（約2月4日）前出生，依風水歲首以立春前一年（\(y)年）核算命卦。"
+            default:
+                return "公历立春（约2月4日）前出生，依风水岁首以立春前一年（\(y)年）核算命卦。"
+            }
+        } else {
+            switch lang.effectiveLanguage {
+            case .en:
+                return "Feng Shui year: \(y)."
+            default:
+                return "对应风水流年：\(y)年。"
+            }
+        }
+    }
+
     private var cancelText: String {
         switch lang.effectiveLanguage {
         case .en: return "Cancel"
@@ -2204,6 +2410,14 @@ public struct EditOwnerKuaDialog: View {
         }
     }
 
+    private var selectedDateFormatted: String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: selectedDate)
+        let m = cal.component(.month, from: selectedDate)
+        let d = cal.component(.day, from: selectedDate)
+        return "\(y)年\(m)月\(d)日"
+    }
+
     public var body: some View {
         ZStack {
             Color(red: 0.11, green: 0.11, blue: 0.15)
@@ -2237,25 +2451,35 @@ public struct EditOwnerKuaDialog: View {
 
                 // 3. 日期或年份选择内容
                 if inputMode == 0 {
-                    // 精确公历日期选择器
+                    // 精确公历日期选择器（波轮样式 WheelDatePickerStyle）
                     VStack(spacing: 6) {
                         HStack {
+                            Image(systemName: "calendar")
+                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                             Text(datePickerHint)
                                 .adaptiveFont(size: 12, weight: .semibold)
                                 .foregroundColor(.white.opacity(0.85))
                             Spacer()
-                            DatePicker(
-                                "",
-                                selection: $selectedDate,
-                                in: dateRange,
-                                displayedComponents: [.date]
-                            )
-                            .labelsHidden()
-                            .colorScheme(.dark)
+                            Text(selectedDateFormatted)
+                                .adaptiveFont(size: 13, weight: .bold)
+                                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                         }
-                        .padding(10)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(8)
+                        .padding(.horizontal, 4)
+
+                        DatePicker(
+                            "",
+                            selection: $selectedDate,
+                            in: dateRange,
+                            displayedComponents: [.date]
+                        )
+                        .datePickerStyle(WheelDatePickerStyle())
+                        .labelsHidden()
+                        .frame(maxHeight: 140)
+                        .clipped()
+                        .colorScheme(.dark)
+                        .onChange(of: selectedDate) { newDate in
+                            selectedYear = Calendar.current.component(.year, from: newDate)
+                        }
 
                         // 立春换年解释或流年确认卡
                         HStack(spacing: 6) {

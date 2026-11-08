@@ -906,7 +906,7 @@ public struct OwnerKuaReminderPageView: View {
                                         }
                                     } label: {
                                         HStack(spacing: 2) {
-                                            Text("\(String(member.birthYear))年")
+                                            Text(member.formattedBirth)
                                                 .adaptiveFont(size: 11, weight: .semibold)
                                             Image(systemName: "chevron.down")
                                                 .font(.system(size: 8, weight: .bold))
@@ -1013,8 +1013,8 @@ public struct OwnerKuaReminderPageView: View {
                     ),
                     ownerBirthYear: kuaProfile.birthYear,
                     ownerIsMale: kuaProfile.isMale,
-                    onConfirm: { role, customName, year, isMale in
-                        kuaProfile.addFamilyMember(role: role, customName: customName, birthYear: year, isMale: isMale)
+                    onConfirm: { role, customName, birthDate, year, isMale in
+                        kuaProfile.addFamilyMember(role: role, customName: customName, birthDate: birthDate, birthYear: year, isMale: isMale)
                         activeSheet = nil
                     }
                 )

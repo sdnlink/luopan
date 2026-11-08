@@ -552,6 +552,7 @@ public struct RootContentView: View {
     /// 由根视图持有，小组件深链可把日课子页一并定位。
     @State private var analysisSubTab: Int = 0
     @State private var showOnboarding: Bool = false
+    @State private var showShortcutDailyCard: Bool = false
     // 读取 size class 建立环境依赖：折叠/展开（或 iPad 分屏拖动）切换时本视图
     // 重渲染并级联子视图 body 重算，使 Font.adaptive 的静态查询同步刷新
     //（配合 body 尾部 onChange 一起生效）。
@@ -744,12 +745,16 @@ public struct RootContentView: View {
             Self.applyTabBarAppearance(isLargeLayout: horizontalSizeClass == .regular)
             motion.start()
             updateResourceUsage()
+            RetentionServiceManager.shared.registerSystemShortcutsAndSpotlight()
             if OnboardingGuideSheet.shouldPresentOnLaunch() {
                 showOnboarding = true
             }
         }
         .sheet(isPresented: $showOnboarding) {
             OnboardingGuideSheet()
+        }
+        .sheet(isPresented: $showShortcutDailyCard) {
+            DailyAuspiciousCardSheet()
         }
         .onChange(of: selectedTab) { _ in
             updateResourceUsage()
@@ -764,9 +769,8 @@ public struct RootContentView: View {
             consumePendingAlmanacRoute()
         }
         .onOpenURL { url in
-            // SwiftUI 原生兜底：若系统把 URL 交给视图层，也能定位到日课。
-            guard url.scheme == "tiandiluopan", url.host == "almanac" else { return }
-            AppNavigationRouter.shared.requestAlmanac()
+            // SwiftUI 原生兜底：若系统把 URL 交给视图层，也能定位到目标页。
+            SceneDelegate.routeWidgetURL(url)
             consumePendingAlmanacRoute()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
@@ -782,12 +786,22 @@ public struct RootContentView: View {
         }
     }
 
-    /// 消费小组件深链的待处理意图（幂等）。
+    /// 消费小组件深链与主屏快捷入口的待处理意图（幂等）。
     /// Tab 3 = 理气页，子 Tab 1 = 八宅三合里的天星择日日课卡。
     private func consumePendingAlmanacRoute() {
-        guard AppNavigationRouter.shared.consumeAlmanac() else { return }
-        selectedTab = 3
-        analysisSubTab = 1
+        if AppNavigationRouter.shared.consumeAlmanac() {
+            selectedTab = 3
+            analysisSubTab = 1
+        }
+        if let route = AppNavigationRouter.shared.consumeTabRoute() {
+            selectedTab = route.tab
+            if let sub = route.subTab {
+                analysisSubTab = sub
+            }
+            if route.openDailyCard {
+                showShortcutDailyCard = true
+            }
+        }
     }
 
     /// The live compass and camera survey need an awake screen while they are

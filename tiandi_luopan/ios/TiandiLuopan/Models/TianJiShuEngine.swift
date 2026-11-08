@@ -157,13 +157,33 @@ public class TianJiShuEngine {
             let sSize = subTitle.size(withAttributes: subAttr)
             subTitle.draw(at: CGPoint(x: (size.width - sSize.width) / 2, y: 165), withAttributes: subAttr)
             
-            // 防伪编号
+            // 防伪编号与福主尊称署名
             let snLabel = tr8("防伪鉴真号", "防偽鑒真號", "Verification No.", "識別真贋番号", "감정 진위 번호", "Mã xác thực", "หมายเลขตรวจสอบ", "No. Verifikasi")
             let sn = "\(snLabel): YX-\(Int(reportDate.timeIntervalSince1970))-\(Int.random(in: 1000...9999))"
             sn.draw(at: CGPoint(x: 100, y: 220), withAttributes: [
                 .font: UIFont.monospacedSystemFont(ofSize: 18, weight: .regular),
                 .foregroundColor: UIColor.gray
             ])
+
+            let customClient = (UserDefaults.standard.string(forKey: "tianjishu_custom_client") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !customClient.isEmpty {
+                let clientLine = tr8(
+                    "委托福主：\(customClient) 雅鉴",
+                    "委託福主：\(customClient) 雅鑒",
+                    "Prepared for: \(customClient)",
+                    "依頼施主：\(customClient) 様",
+                    "의뢰 복주: \(customClient) 귀하",
+                    "Thân chủ: \(customClient)",
+                    "จัดทำเพื่อ: \(customClient)",
+                    "Disiapkan untuk: \(customClient)"
+                )
+                let cAttr: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.boldSystemFont(ofSize: 20),
+                    .foregroundColor: vermilion
+                ]
+                let cSize = clientLine.size(withAttributes: cAttr)
+                clientLine.draw(at: CGPoint(x: max(540, 980 - cSize.width), y: 218), withAttributes: cAttr)
+            }
             
             // 4. 第一部：坐向立极与分金格局
             var curY: CGFloat = 280
@@ -635,23 +655,29 @@ public class TianJiShuEngine {
                 archive: panoramaArchive
             )
             
-            // 9. 卷尾朱砂印鉴与落款
+            // 9. 卷尾朱砂印鉴与落款（支持自定义师门堂号与印文）
             let sealRect = CGRect(x: 780, y: curY + 20, width: 180, height: 180)
             cg.setStrokeColor(vermilion.cgColor)
             cg.setLineWidth(4)
             cg.stroke(sealRect)
             cg.stroke(sealRect.insetBy(dx: 6, dy: 6))
-            
-            let sealText = tr8(
-                "天机演象\n罗盘\n御印",
-                "天機演象\n羅盤\n御印",
-                "TIANJI\nYANXIANG\nCELESTIAL\nSEAL",
-                "天機演象\n羅盤\n御印",
-                "천기연상\n나경\n어인",
-                "THIÊN CƠ\nLA BÀN\nNGỰ ẤN",
-                "สวรรค์ลิขิต\nเข็มทิศ\nตราประทับ",
-                "TIANJI\nKOMPAS\nSEGEL RESMI"
-            )
+
+            let customSealRaw = (UserDefaults.standard.string(forKey: "tianjishu_custom_seal") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let sealText: String
+            if !customSealRaw.isEmpty {
+                sealText = customSealRaw.replacingOccurrences(of: " ", with: "\n")
+            } else {
+                sealText = tr8(
+                    "天机演象\n罗盘\n御印",
+                    "天機演象\n羅盤\n御印",
+                    "TIANJI\nYANXIANG\nCELESTIAL\nSEAL",
+                    "天機演象\n羅盤\n御印",
+                    "천기연상\n나경\n어인",
+                    "THIÊN CƠ\nLA BÀN\nNGỰ ẤN",
+                    "สวรรค์ลิขิต\nเข็มทิศ\nตราประทับ",
+                    "TIANJI\nKOMPAS\nSEGEL RESMI"
+                )
+            }
             let sealAttr: [NSAttributedString.Key: Any] = [
                 .font: UIFont.boldSystemFont(ofSize: 28),
                 .foregroundColor: vermilion
@@ -669,24 +695,46 @@ public class TianJiShuEngine {
             let yOffset = ((gzYear - 4) % 60 + 60) % 60
             let curGzYear = "\(stems[yOffset % 10])\(branches[yOffset % 12])"
             
+            let customMasterRaw = (UserDefaults.standard.string(forKey: "tianjishu_custom_master") ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             let signText: String
-            switch renderLanguage {
-            case .en:
-                signText = "MASTER FENG SHUI\nTIANJI YANXIANG\nYEAR \(curGzYear)"
-            case .zhHant:
-                signText = "大 師 堪 輿 親 訂\n天 機 演 象 院\n歲 次 \(curGzYear) 謹 啟"
-            case .ja:
-                signText = "監修 風水鑑定親定\n天 機 演 象 院\n歳 次 \(curGzYear) 謹 啓"
-            case .ko:
-                signText = "풍수지리 감여 친정\n천 기 연 상 원\n세 차 \(curGzYear) 삼가 올림"
-            case .vi:
-                signText = "PHONG THỦY ĐẠI SƯ ĐỊNH BẢN\nTHIÊN CƠ DIỄN TƯỢNG VIỆN\nTUẾ THỨ \(curGzYear) CẨN KHẢI"
-            case .th:
-                signText = "ปรมาจารย์ฮวงจุ้ยลิขิต\nสถาบันเทียนจียั่นเซี่ยง\nปี \(curGzYear)"
-            case .id:
-                signText = "MASTER FENG SHUI RESMI\nTIANJI YANXIANG ACADEMY\nTAHUN \(curGzYear)"
-            case .auto, .zhHans:
-                signText = "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启"
+            if !customMasterRaw.isEmpty {
+                switch renderLanguage {
+                case .en:
+                    signText = "CONSULTANT & STUDIO\n\(customMasterRaw)\nYEAR \(curGzYear)"
+                case .zhHant:
+                    signText = "堪 輿 親 訂 落 款\n\(customMasterRaw)\n歲 次 \(curGzYear) 謹 啟"
+                case .ja:
+                    signText = "風水鑑定親定\n\(customMasterRaw)\n歳 次 \(curGzYear) 謹 啓"
+                case .ko:
+                    signText = "풍수지리 감여 친정\n\(customMasterRaw)\n세 차 \(curGzYear) 삼가 올림"
+                case .vi:
+                    signText = "PHONG THỦY ĐỊNH BẢN\n\(customMasterRaw)\nTUẾ THỨ \(curGzYear) CẨN KHẢI"
+                case .th:
+                    signText = "ปรมาจารย์ฮวงจุ้ยลิขิต\n\(customMasterRaw)\nปี \(curGzYear)"
+                case .id:
+                    signText = "KONSULTAN FENG SHUI\n\(customMasterRaw)\nTAHUN \(curGzYear)"
+                case .auto, .zhHans:
+                    signText = "堪 舆 亲 订 落 款\n\(customMasterRaw)\n岁 次 \(curGzYear) 谨 启"
+                }
+            } else {
+                switch renderLanguage {
+                case .en:
+                    signText = "MASTER FENG SHUI\nTIANJI YANXIANG\nYEAR \(curGzYear)"
+                case .zhHant:
+                    signText = "大 師 堪 輿 親 訂\n天 機 演 象 院\n歲 次 \(curGzYear) 謹 啟"
+                case .ja:
+                    signText = "監修 風水鑑定親定\n天 機 演 象 院\n歳 次 \(curGzYear) 謹 啓"
+                case .ko:
+                    signText = "풍수지리 감여 친정\n천 기 연 상 원\n세 차 \(curGzYear) 삼가 올림"
+                case .vi:
+                    signText = "PHONG THỦY ĐẠI SƯ ĐỊNH BẢN\nTHIÊN CƠ DIỄN TƯỢNG VIỆN\nTUẾ THỨ \(curGzYear) CẨN KHẢI"
+                case .th:
+                    signText = "ปรมาจารย์ฮวงจุ้ยลิขิต\nสถาบันเทียนจียั่นเซี่ยง\nปี \(curGzYear)"
+                case .id:
+                    signText = "MASTER FENG SHUI RESMI\nTIANJI YANXIANG ACADEMY\nTAHUN \(curGzYear)"
+                case .auto, .zhHans:
+                    signText = "大 师 堪 舆 亲 订\n天 机 演 象 院\n岁 次 \(curGzYear) 谨 启"
+                }
             }
             signText.draw(at: CGPoint(x: 500, y: curY + 45), withAttributes: [
                 .font: UIFont.systemFont(ofSize: 22, weight: .bold),

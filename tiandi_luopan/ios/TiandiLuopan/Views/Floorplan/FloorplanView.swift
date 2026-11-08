@@ -848,7 +848,6 @@ public struct FloorplanView: View {
         }
     }
 
-    @ViewBuilder
     private func caseArchiveSheetView() -> some View {
         let sheetTitle: String
         let placeholder: String
@@ -915,7 +914,7 @@ public struct FloorplanView: View {
             loadBtn = "载入"
         }
 
-        NavigationView {
+        return NavigationView {
             ZStack {
                 Color(red: 0.08, green: 0.08, blue: 0.11).ignoresSafeArea()
 
@@ -981,7 +980,10 @@ public struct FloorplanView: View {
                         Spacer()
                     } else {
                         ScrollView {
-                            VStack(spacing: 10) {
+                            VStack(spacing: 12) {
+                                // P3.4 多套房源 PK 横向对比矩阵（选房/租房比对神器）
+                                propertyComparisonPKCard()
+
                                 ForEach(savedCases) { item in
                                     HStack(spacing: 10) {
                                         VStack(alignment: .leading, spacing: 4) {
@@ -1060,6 +1062,163 @@ public struct FloorplanView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    // MARK: - P3.4 多套房源 PK 横向对比矩阵（选房/租房比对神器）
+    private struct PropertyPKMetric: Identifiable {
+        let id: String
+        let title: String
+        let sittingText: String
+        let score: Int
+        let isKuaMatch: Bool
+        let kuaBadge: String
+        let auspiciousCount: Int
+        let shaCount: Int
+        let isCurrent: Bool
+    }
+
+    private func evaluatePKMetric(id: String, title: String, rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, isCurrent: Bool) -> PropertyPKMetric {
+        let audit = FloorplanEngine.shared.auditFloorplan(rooms: rooms, centroid: centroid, heading: heading)
+        let sitAngle = (heading + 180.0).truncatingRemainder(dividingBy: 360.0)
+        let sitMtn = Mountain24Data.shared.mountain(for: sitAngle < 0 ? sitAngle + 360.0 : sitAngle)
+        let faceMtn = Mountain24Data.shared.mountain(for: Self.normalizedHeading(heading))
+        let compat = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: sitMtn.palace)
+        let ausp = audit.report.filter { $0.severity == .auspicious }.count
+        let warn = audit.report.filter { $0.severity == .warning }.count
+        let sev  = audit.report.filter { $0.severity == .severe }.count
+        let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (compat.isMatch ? 8 : -4)
+        let clampedScore = max(38, min(99, rawScore))
+        let sitLabel = "\(sitMtn.localizedName)\(lang.t("mountain_suffix"))\(faceMtn.localizedName)\(lang.t("facing_suffix"))"
+        return PropertyPKMetric(
+            id: id,
+            title: title,
+            sittingText: sitLabel,
+            score: clampedScore,
+            isKuaMatch: compat.isMatch,
+            kuaBadge: compat.matchBadgeTitle,
+            auspiciousCount: ausp,
+            shaCount: warn + sev,
+            isCurrent: isCurrent
+        )
+    }
+
+    private func propertyComparisonPKCard() -> some View {
+        let currentTitle: String = {
+            switch lang.effectiveLanguage {
+            case .en: return "Current Plan"
+            case .zhHant: return "當前正在勘測戶型"
+            case .ja: return "現在の間取り"
+            case .ko: return "현재 평면도"
+            case .vi: return "Mặt bằng hiện tại"
+            case .th: return "ผังปัจจุบัน"
+            case .id: return "Denah Saat Ini"
+            case .auto, .zhHans: return "当前正在勘测户型"
+            }
+        }()
+        let pkHeaderTitle: String = {
+            switch lang.effectiveLanguage {
+            case .en: return "Multi-Property Feng Shui PK Matrix"
+            case .zhHant: return "多套房源堪輿 PK 橫向比對榜"
+            case .ja: return "複数物件・風水 PK 比較マトリクス"
+            case .ko: return "다주택 풍수 PK 비교 매트릭스"
+            case .vi: return "Bảng So Sánh PK Phong Thủy Nhiều Căn Hộ"
+            case .th: return "ตารางเปรียบเทียบฮวงจุ้ยหลายบ้าน (PK)"
+            case .id: return "Matriks Perbandingan PK Multi-Properti"
+            case .auto, .zhHans: return "多套房源堪舆 PK 横向比对榜"
+            }
+        }()
+        let bestTag: String = {
+            switch lang.effectiveLanguage {
+            case .en: return "TOP PICK"
+            case .zhHant: return "首選推薦"
+            case .ja: return "最優秀物件"
+            case .ko: return "최우선 추천"
+            case .vi: return "ƯU TIÊN SỐ 1"
+            case .th: return "แนะนำอันดับ 1"
+            case .id: return "PILIHAN UTAMA"
+            case .auto, .zhHans: return "首选吉宅"
+            }
+        }()
+
+        let currentMetric = evaluatePKMetric(
+            id: "current_live",
+            title: currentTitle,
+            rooms: rooms,
+            centroid: centroid,
+            heading: effectiveHeading,
+            isCurrent: true
+        )
+        let archivedMetrics = savedCases.prefix(5).map { rec in
+            evaluatePKMetric(
+                id: rec.id,
+                title: rec.title,
+                rooms: rec.layout.rooms,
+                centroid: CGPoint(x: rec.layout.centroidX, y: rec.layout.centroidY),
+                heading: rec.layout.compassRotation,
+                isCurrent: false
+            )
+        }
+        let allMetrics = ([currentMetric] + archivedMetrics).sorted { $0.score > $1.score }
+        let topId = allMetrics.first?.id
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "chart.bar.xaxis")
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Text(pkHeaderTitle)
+                    .adaptiveFont(size: 13, weight: .bold)
+                    .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                Spacer()
+            }
+
+            ForEach(allMetrics) { m in
+                let isTop = m.id == topId
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 5) {
+                            Text(m.title)
+                                .adaptiveFont(size: 12, weight: .bold)
+                                .foregroundColor(m.isCurrent ? Color.yanCyan : .white)
+                                .lineLimit(1)
+                            if isTop {
+                                Text(bestTag)
+                                    .adaptiveFont(size: 8, weight: .bold)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1.5)
+                                    .background(Color.green.opacity(0.25))
+                                    .foregroundColor(.green)
+                                    .cornerRadius(4)
+                            }
+                        }
+                        HStack(spacing: 6) {
+                            Text(m.sittingText)
+                                .adaptiveFont(size: 10)
+                                .foregroundColor(.white.opacity(0.7))
+                            Text(m.kuaBadge)
+                                .adaptiveFont(size: 9, weight: .semibold)
+                                .foregroundColor(m.isKuaMatch ? .green : .orange)
+                            Text("吉\(m.auspiciousCount) / 煞\(m.shaCount)")
+                                .adaptiveFont(size: 9, design: .monospaced)
+                                .foregroundColor(.white.opacity(0.65))
+                        }
+                    }
+                    Spacer()
+                    Text("\(m.score)")
+                        .adaptiveFont(size: 18, weight: .bold, design: .monospaced)
+                        .foregroundColor(isTop ? .green : Color(red: 0.95, green: 0.85, blue: 0.45))
+                }
+                .padding(8)
+                .background(isTop ? Color.green.opacity(0.08) : Color.white.opacity(0.04))
+                .cornerRadius(8)
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.11, green: 0.12, blue: 0.17))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(red: 0.95, green: 0.85, blue: 0.45).opacity(0.3), lineWidth: 1)
+        )
     }
 
     private static func clampedUnit(_ value: Double, fallback: Double) -> CGFloat {

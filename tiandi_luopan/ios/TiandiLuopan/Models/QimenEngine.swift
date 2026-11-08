@@ -705,4 +705,219 @@ public class QimenEngine {
         if delta < -180.0 { delta += 360.0 }
         return delta
     }
+
+    // MARK: - P3.3 奇门遁甲「场景化一事一断」速查向导
+
+    public func evaluateScenario(_ scenario: QimenScenarioType, chart: QimenChart, heading: Double = 0.0) -> QimenScenarioRecommendation {
+        let lang = LocalizationManager.shared.effectiveLanguage
+        let nonCenter = chart.cells.filter { !$0.isTaiJiCenter }
+        var bestCell = nonCenter.first ?? chart.cells[0]
+        var bestScore = -999
+
+        for cell in nonCenter {
+            var score = 0
+            // 基础吉凶门分
+            if cell.doorName == "开门" || cell.doorName == "生门" { score += 30 }
+            else if cell.doorName == "休门" { score += 25 }
+            else if cell.doorName == "景门" { score += 12 }
+            else if cell.doorName == "杜门" { score += 5 }
+            else if cell.doorName == "死门" || cell.doorName == "惊门" || cell.doorName == "伤门" { score -= 40 }
+
+            // 三奇加分
+            if ["乙", "丙", "丁"].contains(cell.tianStem) { score += 18 }
+            if cell.tianStem == "戊" { score += 12 }
+            if cell.tianStem == "庚" { score -= 15 }
+
+            // 场景专属用神加权
+            switch scenario {
+            case .contract:
+                if cell.doorName == "开门" || cell.doorName == "景门" { score += 25 }
+                if cell.godName == "值符" || cell.godName == "六合" || cell.godName == "太阴" { score += 22 }
+                if cell.starName == "天辅" || cell.starName == "天心" { score += 12 }
+            case .wealth:
+                if cell.doorName == "生门" { score += 35 }
+                if cell.doorName == "开门" { score += 22 }
+                if cell.tianStem == "戊" || cell.diStem == "戊" { score += 20 }
+                if cell.starName == "天任" { score += 15 }
+            case .romance:
+                if cell.godName == "六合" { score += 35 }
+                if cell.godName == "太阴" { score += 20 }
+                if cell.doorName == "休门" || cell.doorName == "生门" { score += 20 }
+                if cell.tianStem == "乙" || cell.tianStem == "丁" { score += 15 }
+            case .medical:
+                if cell.starName == "天心" || cell.starName == "天任" { score += 35 }
+                if cell.doorName == "休门" || cell.doorName == "生门" || cell.doorName == "开门" { score += 22 }
+                if cell.tianStem == "乙" { score += 18 }
+            case .exam:
+                if cell.starName == "天辅" || cell.starName == "天英" { score += 32 }
+                if cell.doorName == "景门" || cell.doorName == "开门" { score += 28 }
+                if cell.godName == "值符" || cell.godName == "九天" { score += 18 }
+            case .travel:
+                if cell.doorName == "开门" || cell.doorName == "休门" || cell.doorName == "生门" { score += 28 }
+                if cell.godName == "九天" || cell.godName == "值符" || cell.godName == "太阴" { score += 20 }
+            }
+
+            if score > bestScore {
+                bestScore = score
+                bestCell = cell
+            }
+        }
+
+        let rawDir = bestCell.palaceName.split(separator: " ").first.map(String.init) ?? "西北"
+        var turnHint = ""
+        if let targetBearing = Self.bearing(for: rawDir), heading.isFinite {
+            let turn = Self.shortestTurn(from: heading, to: targetBearing)
+            if abs(turn) >= 2.0 {
+                let deg = Int(round(abs(turn)))
+                switch lang {
+                case .en: turnHint = turn > 0 ? " (Turn right \(deg)°)" : " (Turn left \(deg)°)"
+                case .zhHant: turnHint = turn > 0 ? "（右轉\(deg)°）" : "（左轉\(deg)°）"
+                case .ja: turnHint = turn > 0 ? "（右へ\(deg)°）" : "（左へ\(deg)°）"
+                case .ko: turnHint = turn > 0 ? " (우회전 \(deg)°)" : " (좌회전 \(deg)°)"
+                case .vi: turnHint = turn > 0 ? " (Rẽ phải \(deg)°)" : " (Rẽ trái \(deg)°)"
+                case .th: turnHint = turn > 0 ? " (เลี้ยวขวา \(deg)°)" : " (เลี้ยวซ้าย \(deg)°)"
+                case .id: turnHint = turn > 0 ? " (Belok kanan \(deg)°)" : " (Belok kiri \(deg)°)"
+                case .auto, .zhHans: turnHint = turn > 0 ? "（右转\(deg)°）" : "（左转\(deg)°）"
+                }
+            }
+        }
+
+        let dirTitle = "\(bestCell.localizedPalaceName)\(turnHint)"
+        let pattern = "\(bestCell.localizedDoorName) · \(bestCell.localizedStarName) · \(bestCell.localizedGodName) · \(bestCell.localizedTianStem)/\(bestCell.localizedDiStem)"
+
+        let actionGuide: String
+        switch lang {
+        case .en:
+            actionGuide = "For \(scenario.localizedTitle), face or travel toward 【\(bestCell.localizedPalaceName)】 where \(bestCell.localizedDoorName) meets \(bestCell.localizedStarName) & \(bestCell.localizedGodName). In meetings, sit with your back to this palace to command the Qi."
+        case .zhHant:
+            actionGuide = "【\(scenario.localizedTitle)指南】當下最利方位為【\(bestCell.localizedPalaceName)】，得「\(bestCell.localizedDoorName)+\(bestCell.localizedStarName)+\(bestCell.localizedGodName)」吉格。出行宜往此方動身；洽談/面試宜背靠此方而坐（面朝對宮）以納天時奇門之氣。"
+        case .ja:
+            actionGuide = "【\(scenario.localizedTitle)指針】現在の最吉方位は【\(bestCell.localizedPalaceName)】（\(bestCell.localizedDoorName)・\(bestCell.localizedStarName)・\(bestCell.localizedGodName)）です。出発はこの方位へ向かい、商談や面接ではこの方位を背にして座ると吉気を得られます。"
+        case .ko:
+            actionGuide = "[\(scenario.localizedTitle) 가이드] 현재 가장 유리한 방위는 【\(bestCell.localizedPalaceName)】(\(bestCell.localizedDoorName)·\(bestCell.localizedStarName)·\(bestCell.localizedGodName))입니다. 출발 시 이 방위로 향하고, 협상·면접 시 이 방위를 등지고 앉으세요."
+        case .vi:
+            actionGuide = "[Chỉ dẫn \(scenario.localizedTitle)] Phương vị cát lợi nhất hiện tại là 【\(bestCell.localizedPalaceName)】 (\(bestCell.localizedDoorName) + \(bestCell.localizedStarName) + \(bestCell.localizedGodName)). Nên xuất hành về hướng này hoặc ngồi tựa lưng vào hướng này khi đàm phán."
+        case .th:
+            actionGuide = "[คำแนะนำ\(scenario.localizedTitle)] ทิศมงคลที่สุดขณะนี้คือ 【\(bestCell.localizedPalaceName)】 (\(bestCell.localizedDoorName) + \(bestCell.localizedStarName) + \(bestCell.localizedGodName)) แนะนำเดินทางไปทิศนี้ หรือนั่งหันหลังพิงทิศนี้ขณะเจรจา"
+        case .id:
+            actionGuide = "[Panduan \(scenario.localizedTitle)] Arah terbaik saat ini adalah 【\(bestCell.localizedPalaceName)】 (\(bestCell.localizedDoorName) + \(bestCell.localizedStarName) + \(bestCell.localizedGodName)). Bergeraklah ke arah ini atau duduk membelakangi arah ini saat negosiasi."
+        case .auto, .zhHans:
+            actionGuide = "【\(scenario.localizedTitle)指南】当下最利方位为【\(bestCell.localizedPalaceName)】，得「\(bestCell.localizedDoorName)+\(bestCell.localizedStarName)+\(bestCell.localizedGodName)」加会。出行宜往此方动身；签约/面试宜背靠此方而坐（背孤击虚）以乘奇门吉气。"
+        }
+
+        return QimenScenarioRecommendation(
+            scenario: scenario,
+            recommendedPalaceId: bestCell.palaceId,
+            directionTitle: dirTitle,
+            keyPattern: pattern,
+            actionGuide: actionGuide
+        )
+    }
+}
+
+public enum QimenScenarioType: String, CaseIterable, Identifiable {
+    case contract = "contract"
+    case wealth   = "wealth"
+    case romance  = "romance"
+    case exam     = "exam"
+    case medical  = "medical"
+    case travel   = "travel"
+
+    public var id: String { rawValue }
+
+    public var iconName: String {
+        switch self {
+        case .contract: return "signature"
+        case .wealth:   return "banknote.fill"
+        case .romance:  return "heart.fill"
+        case .exam:     return "graduationcap.fill"
+        case .medical:  return "cross.case.fill"
+        case .travel:   return "airplane.departure"
+        }
+    }
+
+    public var localizedTitle: String {
+        switch LocalizationManager.shared.effectiveLanguage {
+        case .en:
+            switch self {
+            case .contract: return "Deal / Sign"
+            case .wealth:   return "Wealth"
+            case .romance:  return "Romance"
+            case .exam:     return "Exam / Job"
+            case .medical:  return "Medical"
+            case .travel:   return "Travel"
+            }
+        case .zhHant:
+            switch self {
+            case .contract: return "簽約談判"
+            case .wealth:   return "求財開業"
+            case .romance:  return "婚戀人緣"
+            case .exam:     return "考試面試"
+            case .medical:  return "求醫祛病"
+            case .travel:   return "出行遠門"
+            }
+        case .ja:
+            switch self {
+            case .contract: return "契約・商談"
+            case .wealth:   return "求財・開業"
+            case .romance:  return "良縁・恋愛"
+            case .exam:     return "試験・面接"
+            case .medical:  return "医療・快癒"
+            case .travel:   return "旅行・外出"
+            }
+        case .ko:
+            switch self {
+            case .contract: return "계약·협상"
+            case .wealth:   return "구재·개업"
+            case .romance:  return "연애·인연"
+            case .exam:     return "시험·면접"
+            case .medical:  return "구병·진료"
+            case .travel:   return "출행·여행"
+            }
+        case .vi:
+            switch self {
+            case .contract: return "Ký kết"
+            case .wealth:   return "Cầu tài"
+            case .romance:  return "Tình duyên"
+            case .exam:     return "Thi cử"
+            case .medical:  return "Cầu y"
+            case .travel:   return "Xuất hành"
+            }
+        case .th:
+            switch self {
+            case .contract: return "เจรจา/สัญญา"
+            case .wealth:   return "โชคลาภ/ค้าขาย"
+            case .romance:  return "ความรัก"
+            case .exam:     return "สอบ/สัมภาษณ์"
+            case .medical:  return "พบแพทย์"
+            case .travel:   return "เดินทาง"
+            }
+        case .id:
+            switch self {
+            case .contract: return "Kontrak"
+            case .wealth:   return "Rezeki"
+            case .romance:  return "Asmara"
+            case .exam:     return "Ujian/Kerja"
+            case .medical:  return "Medis"
+            case .travel:   return "Perjalanan"
+            }
+        case .auto, .zhHans:
+            switch self {
+            case .contract: return "签约谈判"
+            case .wealth:   return "求财开业"
+            case .romance:  return "婚恋人缘"
+            case .exam:     return "考试面试"
+            case .medical:  return "求医祛病"
+            case .travel:   return "出行远门"
+            }
+        }
+    }
+}
+
+public struct QimenScenarioRecommendation {
+    public let scenario: QimenScenarioType
+    public let recommendedPalaceId: Int
+    public let directionTitle: String
+    public let keyPattern: String
+    public let actionGuide: String
 }

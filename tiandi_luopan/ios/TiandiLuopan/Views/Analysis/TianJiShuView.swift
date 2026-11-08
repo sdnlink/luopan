@@ -25,6 +25,10 @@ public struct TianJiShuView: View {
     // Invalidated whenever a new render starts or the view disappears, so a
     // late background result cannot overwrite current or dismissed state.
     @State private var renderGeneration: Int = 0
+    @State private var showCustomSignEditor: Bool = false
+    @State private var customClientName: String = UserDefaults.standard.string(forKey: "tianjishu_custom_client") ?? ""
+    @State private var customMasterName: String = UserDefaults.standard.string(forKey: "tianjishu_custom_master") ?? ""
+    @State private var customSealText: String = UserDefaults.standard.string(forKey: "tianjishu_custom_seal") ?? ""
     
     public init() {}
     
@@ -46,6 +50,10 @@ public struct TianJiShuView: View {
                         }
                         Spacer()
                     } else if let img = scrollImage {
+                        // P3.8 自定义师门落款、堂号印章与福主署名栏
+                        customSignatureBar()
+                            .padding(.horizontal, 16)
+
                         // 宣纸长卷全景预览 (支持纵向长距离滚动)
                         ScrollView {
                             ZStack {
@@ -308,6 +316,130 @@ public struct TianJiShuView: View {
         guard let token = reservedTianjiCredit else { return }
         reservedTianjiCredit = nil
         iap.commitTianjiCreditReservation(token)
+    }
+
+    private func customSignatureBar() -> some View {
+        let barTitle: String
+        let clientPh: String
+        let masterPh: String
+        let sealPh: String
+        let applyTitle: String
+        switch lang.effectiveLanguage {
+        case .en:
+            barTitle = "Custom Seal, Studio & Client Signature"
+            clientPh = "Client Name (e.g. Mr. Chen)"
+            masterPh = "Master / Studio Name"
+            sealPh = "Seal Text (e.g. XUAN KONG SEAL)"
+            applyTitle = "Apply & Re-render Scroll"
+        case .zhHant:
+            barTitle = "定制師門落款 · 堂號朱印 · 福主署名"
+            clientPh = "委託福主尊稱（如：陳公諱明 雅鑒）"
+            masterPh = "堪輿師/堂號落款（如：玄空堂 李師傅）"
+            sealPh = "朱砂印文（空格換行，如：玄空堂 欽定印）"
+            applyTitle = "鈐印並重新生成長卷"
+        case .ja:
+            barTitle = "鑑定師落款・屋号朱印・施主名のカスタマイズ"
+            clientPh = "施主様のお名前"
+            masterPh = "鑑定師・屋号"
+            sealPh = "朱印テキスト（空白で改行）"
+            applyTitle = "落款を反映して再生成"
+        case .ko:
+            barTitle = "감여사 낙관 · 당호 인장 · 복주 서명 맞춤 설정"
+            clientPh = "의뢰 복주 성함"
+            masterPh = "감여사 / 당호 낙관"
+            sealPh = "인장 문구 (공백으로 줄바꿈)"
+            applyTitle = "낙관 적용 및 장권 재생성"
+        case .vi:
+            barTitle = "Tùy Chỉnh Lạc Khoản · Ấn Chương · Tên Thân Chủ"
+            clientPh = "Tên Thân Chủ"
+            masterPh = "Tên Đại Sư / Đường Hiệu"
+            sealPh = "Chữ Ấn Chương"
+            applyTitle = "Áp Dụng & Tạo Lại Trường Quyển"
+        case .th:
+            barTitle = "ปรับแต่งชื่อซินแส · ตราประทับ · ชื่อเจ้าของบ้าน"
+            clientPh = "ชื่อเจ้าของบ้าน"
+            masterPh = "ชื่อซินแส / สำนัก"
+            sealPh = "ข้อความในตราประทับ"
+            applyTitle = "ประทับตราและสร้างม้วนคัมภีร์ใหม่"
+        case .id:
+            barTitle = "Kustomisasi Nama Klien, Master & Stempel"
+            clientPh = "Nama Klien"
+            masterPh = "Nama Master / Studio"
+            sealPh = "Teks Stempel Merah"
+            applyTitle = "Terapkan & Buat Ulang"
+        case .auto, .zhHans:
+            barTitle = "定制师门落款 · 堂号朱印 · 福主署名"
+            clientPh = "委托福主尊称（如：陈先生 雅鉴）"
+            masterPh = "堪舆师/堂号落款（如：玄空堂 李师傅）"
+            sealPh = "朱砂印文（空格换行，如：玄空堂 钦定印）"
+            applyTitle = "钤印并重新生成长卷"
+        }
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showCustomSignEditor.toggle()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "seal.fill")
+                        .foregroundColor(Color(red: 0.95, green: 0.35, blue: 0.32))
+                    Text(barTitle)
+                        .adaptiveFont(size: 12, weight: .bold)
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Spacer()
+                    Image(systemName: showCustomSignEditor ? "chevron.up" : "chevron.down")
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+
+            if showCustomSignEditor {
+                VStack(spacing: 6) {
+                    TextField(clientPh, text: $customClientName)
+                        .adaptiveFont(size: 11)
+                        .padding(7)
+                        .background(Color.white.opacity(0.08))
+                        .foregroundColor(.white)
+                        .cornerRadius(6)
+                    HStack(spacing: 6) {
+                        TextField(masterPh, text: $customMasterName)
+                            .adaptiveFont(size: 11)
+                            .padding(7)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                        TextField(sealPh, text: $customSealText)
+                            .adaptiveFont(size: 11)
+                            .padding(7)
+                            .background(Color.white.opacity(0.08))
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+                    Button(action: {
+                        UserDefaults.standard.set(customClientName, forKey: "tianjishu_custom_client")
+                        UserDefaults.standard.set(customMasterName, forKey: "tianjishu_custom_master")
+                        UserDefaults.standard.set(customSealText, forKey: "tianjishu_custom_seal")
+                        showCustomSignEditor = false
+                        beginRendering()
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.seal.fill")
+                            Text(applyTitle)
+                        }
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(Color(red: 0.83, green: 0.68, blue: 0.21))
+                        .foregroundColor(.black)
+                        .cornerRadius(6)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.white.opacity(0.06))
+        .cornerRadius(8)
     }
 
     /// Render a clean export image only after the user starts a real save/share

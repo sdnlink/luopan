@@ -13,6 +13,10 @@ public enum ShaRecordSource: String, Codable {
     case manual    // 用户手动拖框锁定
 }
 
+public enum InteriorSurveySource: String, Codable {
+    case measured, virtual, projection
+}
+
 /// 单条外部形煞现场标注（结构化记录，Codable 可持久化/导出）
 public struct ExteriorShaRecord: Identifiable, Codable, Equatable {
     public let id: UUID
@@ -206,11 +210,14 @@ public final class ShaSurveyStore: ObservableObject {
     /// Changes only when the active property changes, not on ordinary edits.
     /// Every open capture/editor holds its original ID until it is dismissed.
     @Published public private(set) var propertyID = UUID()
+    /// Durable identity for reminders/archives; propertyID remains the stale-writer generation.
+    @Published public private(set) var propertyKey = UUID().uuidString
 
     /// 外部形煞标注（按采集顺序）
     @Published public private(set) var records: [ExteriorShaRecord] = []
     /// 最近一次室内体检（RoomPlan/LiDAR/户型图路径）
     @Published public private(set) var latestInterior: HouseSpatialSurvey?
+    @Published public private(set) var interiorSource: InteriorSurveySource?
     @Published public private(set) var siteFacts: [XuanKongSiteFact] = []
 
     private let storageKey = "tianji.sha_survey_store.v1"
@@ -219,20 +226,30 @@ public final class ShaSurveyStore: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         guard let data = defaults.data(forKey: storageKey),
-              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
+              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { persist(); return }
         records = snapshot.records
         latestInterior = snapshot.latestInterior
         siteFacts = snapshot.siteFacts ?? []
+        propertyKey = snapshot.propertyKey ?? propertyKey
+        interiorSource = snapshot.interiorSource ?? latestInterior.map { survey in
+            if survey.scanMethod.localizedCaseInsensitiveContains("VR") || survey.scanMethod.contains("仿真") { return .virtual }
+            if survey.scanMethod.contains("RoomPlan") || survey.scanMethod.contains("AR") || survey.scanMethod.contains("LiDAR") { return .measured }
+            return .projection
+        }
+        persist()
     }
 
     private struct Snapshot: Codable {
         let records: [ExteriorShaRecord]
         let latestInterior: HouseSpatialSurvey?
         var siteFacts: [XuanKongSiteFact]? = nil
+        var propertyKey: String? = nil
+        var interiorSource: InteriorSurveySource? = nil
     }
 
     private func persist() {
-        let snapshot = Snapshot(records: records, latestInterior: latestInterior, siteFacts: siteFacts)
+        let snapshot = Snapshot(records: records, latestInterior: latestInterior, siteFacts: siteFacts,
+                                propertyKey: propertyKey, interiorSource: interiorSource)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: storageKey)
     }
@@ -242,13 +259,18 @@ public final class ShaSurveyStore: ObservableObject {
     @discardableResult
     public func replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
                                 siteFacts: [XuanKongSiteFact] = [],
+                                propertyKey: String? = nil,
                                 expectedPropertyID: UUID? = nil) -> Bool {
         if let expectedPropertyID, !isCurrentProperty(expectedPropertyID) { return false }
-        if expectedPropertyID == nil { propertyID = UUID() }
+        if expectedPropertyID == nil {
+            propertyID = UUID()
+            self.propertyKey = propertyKey ?? UUID().uuidString
+        }
         defaults.set(measured.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.measured)
         defaults.set(virtual.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.virtual)
         records = exterior
         latestInterior = measured ?? virtual
+        interiorSource = measured != nil ? .measured : (virtual != nil ? .virtual : nil)
         self.siteFacts = siteFacts.filter { (0...8).contains($0.palaceID) }
         persist()
         return true
@@ -262,6 +284,13 @@ public final class ShaSurveyStore: ObservableObject {
         persist()
     }
 
+    /// Refresh geometry for the current house without turning it into a property switch.
+    @discardableResult
+    public func refreshMeasuredSurvey(_ survey: HouseSpatialSurvey?, propertyID: UUID) -> Bool {
+        replaceProperty(measured: survey, virtual: nil, exterior: records, siteFacts: siteFacts,
+                        expectedPropertyID: propertyID)
+    }
+
     public func isCurrentProperty(_ id: UUID) -> Bool { propertyID == id }
 
     /// UI and capture completions call this on the main thread. Validate before
@@ -272,8 +301,10 @@ public final class ShaSurveyStore: ObservableObject {
               key == SpatialSurveyArchiveKeys.measured || key == SpatialSurveyArchiveKeys.virtual,
               let data = try? JSONEncoder().encode(survey) else { return false }
         defaults.set(data, forKey: key)
-        if key == SpatialSurveyArchiveKeys.measured || latestInterior == nil {
+        let hasMeasuredArchive = defaults.data(forKey: SpatialSurveyArchiveKeys.measured) != nil
+        if key == SpatialSurveyArchiveKeys.measured || !hasMeasuredArchive {
             latestInterior = survey
+            interiorSource = key == SpatialSurveyArchiveKeys.measured ? .measured : .virtual
             persist()
         }
         NotificationCenter.default.post(name: key == SpatialSurveyArchiveKeys.measured
@@ -293,6 +324,7 @@ public final class ShaSurveyStore: ObservableObject {
     public func updateInterior(_ survey: HouseSpatialSurvey?, propertyID: UUID) -> Bool {
         guard isCurrentProperty(propertyID) else { return false }
         latestInterior = survey
+        interiorSource = survey == nil ? nil : .projection
         persist()
         return true
     }

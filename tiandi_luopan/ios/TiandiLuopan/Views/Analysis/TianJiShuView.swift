@@ -39,11 +39,14 @@ public struct TianJiShuView: View {
 
     public init(analysis: TianJiAnalysisSnapshot? = nil) {
         let motion = CompassMotionManager.shared
-        self._analysis = State(initialValue: analysis ?? TianJiAnalysisSnapshot(heading: motion.headingState.facingAngle))
+        let snapshot = analysis ?? TianJiAnalysisSnapshot(heading: motion.headingState.facingAngle)
+        self._analysis = State(initialValue: snapshot)
         self._capturedCoordsDesc = State(initialValue: motion.coordsDesc)
         self._capturedSolarTimeDesc = State(initialValue: motion.solarTimeDesc)
-        self._capturedFloorplanReport = State(initialValue: FloorplanAuditStore.shared.latestReport)
-        self._capturedPanoramaArchive = State(initialValue: ShaSurveyStore.shared.archive)
+        self._capturedFloorplanReport = State(initialValue: snapshot.hasSpatialSnapshot
+            ? snapshot.capturedFloorplanReport : FloorplanAuditStore.shared.latestReport)
+        self._capturedPanoramaArchive = State(initialValue: snapshot.hasSpatialSnapshot
+            ? snapshot.capturedPanoramaArchive : ShaSurveyStore.shared.archive)
     }
     
     public var body: some View {

@@ -154,7 +154,8 @@ public struct House3DSpaceViewer: View {
             centroidOverride: survey.centroidWasExplicit == true ? survey.centroid : nil,
             houseFacingDegrees: survey.houseFacingDegrees,
             houseFacingWasExplicit: survey.houseFacingWasExplicit ?? (survey.fixedHouseFacing != nil),
-            analysisDate: survey.timestamp
+            analysisDate: survey.timestamp,
+            surveyID: survey.id
         )
         survey = rebuilt
         selectedShaItem = nil

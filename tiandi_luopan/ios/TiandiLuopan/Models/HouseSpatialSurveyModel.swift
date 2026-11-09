@@ -755,7 +755,8 @@ public enum HouseSpatialSurveyEngine {
         centroidOverride: SIMD3<Float>? = nil,
         houseFacingDegrees: Double? = nil,
         houseFacingWasExplicit: Bool? = nil,
-        analysisDate: Date = Date()
+        analysisDate: Date = Date(),
+        surveyID: UUID = UUID()
     ) -> HouseSpatialSurvey {
         // 1. 计算全屋物理边界包围盒
         var minX: Float = .greatestFiniteMagnitude
@@ -2391,6 +2392,7 @@ public enum HouseSpatialSurveyEngine {
         }
 
         return HouseSpatialSurvey(
+            id: surveyID,
             timestamp: analysisDate,
             scanMethod: scanMethod,
             dimensions: dimensions,

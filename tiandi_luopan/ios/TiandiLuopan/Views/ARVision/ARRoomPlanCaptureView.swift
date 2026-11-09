@@ -540,7 +540,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
             propertyID: propertyID,
             // The blueprint's top is world -Z, rather than the door normal.
             compassHeading: coordinateHeading,
-            spatialSurvey: currentSpatialSurvey
+            spatialSurvey: currentSpatialSurvey,
+            surveyMapping: currentSpatialSurvey.map { survey in
+                FloorplanSurveyMapping(surveyID: survey.id, minX: Double(envelope.minX), minZ: Double(envelope.minZ),
+                    spanX: Double(spanX), spanZ: Double(spanZ), padding: Double(padding))
+            }
         )
     }
 

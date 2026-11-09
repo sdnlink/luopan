@@ -630,9 +630,11 @@ public final class ZeRiEngine {
             guard allowedOfficers.contains(officerIdx) else { continue }
 
             let dLabel = formatter.string(from: candidateDate)
+            let dateParts = calendar.dateComponents([.year, .month, .day], from: candidateDate)
+            let fullDate = String(format: "%04d-%02d-%02d", dateParts.year ?? 0, dateParts.month ?? 0, dateParts.day ?? 0)
             results.append(
                 UpcomingAuspiciousDay(
-                    id: "\(dLabel)-\(analysis.dayPillar)",
+                    id: "\(fullDate)-\(analysis.dayPillar)",
                     date: candidateDate,
                     dateLabel: dLabel,
                     localizedDayPillar: analysis.localizedDayPillar,

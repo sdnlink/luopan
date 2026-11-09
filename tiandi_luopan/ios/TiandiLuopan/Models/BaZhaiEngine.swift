@@ -5,6 +5,7 @@ import StoreKit
 import UserNotifications
 import Photos
 import CoreSpotlight
+import CryptoKit
 
 // MARK: - 八宅风水与大游年九星吉凶模型 (BaZhai Engine)
 
@@ -127,9 +128,8 @@ public enum StarLuckType: String, Codable, CaseIterable {
         localizedSuggestion
     }
     
-    /// Traditional wording is kept verbatim in `baseLocalizedSuggestion`.
-    /// The source note below makes the health/wealth symbolism explicit without
-    /// presenting it as a clinical or financial conclusion.
+    /// Keep the existing interpretation, followed by this star's rule summary.
+    /// Unverified transmitted wording is not presented as a quotation from a book.
     public var localizedSuggestion: String {
         baseLocalizedSuggestion + "\n\n" + classicalSourceNote
     }
@@ -228,27 +228,25 @@ public enum StarLuckType: String, Codable, CaseIterable {
         }
     }
 
-    private var classicalSourceNote: String {
-        let source = "《八宅明镜》八宅九星诀：“生气贪狼木，延年武曲金，天医巨门土，伏位辅弼木；绝命破军金，五鬼廉贞火，六煞文曲水，祸害禄存土。”"
-        switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
-            return "Classical source: Eight-House Nine-Star formula in Ba Zhai Ming Jing: ‘Sheng Qi is Tan Lang Wood; Yan Nian is Wu Qu Metal; Tian Yi is Ju Men Earth; Fu Wei is Fu Bi Wood; Jue Ming is Po Jun Metal; Wu Gui is Lian Zhen Fire; Liu Sha is Wen Qu Water; Huo Hai is Lu Cun Earth.’ Interpretation: the health, vitality and wealth language above is a symbolic traditional-culture reading of these star names, not a medical diagnosis, treatment, financial advice or guaranteed outcome."
-        case .zhHant:
-            return "古籍出处： 《八宅明鏡》八宅九星訣：「生氣貪狼木，延年武曲金，天醫巨門土，伏位輔弼木；絕命破軍金，五鬼廉貞火，六煞文曲水，禍害祿存土。」解釋：上文涉及健康、元氣與財帛的語句，屬九星名義的傳統文化象徵解讀，不是醫療診斷、治療或財務建議，也不保證實際結果。"
-        case .ja:
-            return "出典：『八宅明鏡』八宅九星訣「生気は貪狼木、延年は武曲金、天医は巨門土、伏位は輔弼木、絶命は破軍金、五鬼は廉貞火、六殺は文曲水、禍害は禄存土」。解釈：健康・活力・財に関する表現は星名に基づく伝統文化上の象徴的な読みであり、医学的診断・治療・金融助言や結果の保証ではありません。"
-        case .ko:
-            return "출처: 《팔택명경》 팔택구성결 ‘생기는 탐랑목, 연년은 무곡금, 천의는 거문토, 복위는 보필목, 절명은 파군금, 오귀는 염정화, 육살은 문곡수, 화해는 녹존토’입니다. 해석: 위 건강·활력·재물 표현은 전통문화의 상징적 해석이며 의학적 진단·치료·재무 조언이나 결과 보장이 아닙니다."
-        case .vi:
-            return "Nguồn cổ: Quyết Cửu Tinh Bát Trạch trong Bát Trạch Minh Kính: ‘Sinh Khí thuộc Tham Lang Mộc; Diên Niên thuộc Vũ Khúc Kim; Thiên Y thuộc Cự Môn Thổ; Phục Vị thuộc Phụ Bật Mộc; Tuyệt Mệnh thuộc Phá Quân Kim; Ngũ Quỷ thuộc Liêm Trinh Hỏa; Lục Sát thuộc Văn Khúc Thủy; Họa Hại thuộc Lộc Tồn Thổ.’ Giải thích: các câu về sức khỏe, sinh lực và tài lộc là biểu tượng văn hóa truyền thống, không phải chẩn đoán y khoa, điều trị, tư vấn tài chính hay bảo đảm kết quả."
-        case .th:
-            return "ที่มาโบราณ: สูตรดาวเก้าดวงแปดบ้านในคัมภีร์ปาจ้ายหมิงจิ่งกล่าวว่า ‘เซิงชี่ดาวทานหลางธาตุไม้ เหยียนเหนียนดาวอู่ชวีธาตุทอง เทียนอีดาวจวี้เหมินธาตุดิน ฝูเว่ยดาวฝู่ปี้ธาตุไม้ เจวี๋ยหมิงดาวผัวจวินธาตุทอง อู่กุ่ยดาวเหลียนเจินธาตุไฟ ลิ่วซาดาวเหวินชวีธาตุน้ำ ฮั่วไห่ดาวลู่ชุนธาตุดิน’ คำอธิบาย: ถ้อยคำด้านสุขภาพ พลังชีวิต และทรัพย์สินเป็นสัญลักษณ์ทางวัฒนธรรมดั้งเดิม ไม่ใช่การวินิจฉัยหรือรักษาโรค คำแนะนำทางการเงิน หรือการรับประกันผลลัพธ์"
-        case .id:
-            return "Sumber klasik: Rumus Sembilan Bintang Ba Zhai dalam Ba Zhai Ming Jing: ‘Sheng Qi Tan Lang Kayu; Yan Nian Wu Qu Logam; Tian Yi Ju Men Tanah; Fu Wei Fu Bi Kayu; Jue Ming Po Jun Logam; Wu Gui Lian Zhen Api; Liu Sha Wen Qu Air; Huo Hai Lu Cun Tanah.’ Penjelasan: ungkapan tentang kesehatan, vitalitas, dan rezeki di atas adalah tafsir simbolik budaya tradisional, bukan diagnosis medis, pengobatan, nasihat keuangan, atau jaminan hasil."
-        case .auto, .zhHans:
-            return "古籍出处：\(source)解释：上文涉及健康、元气与财帛的语句，属于九星名义的传统文化象征解读，不是医疗诊断、治疗或财务建议，也不保证实际结果。"
+    var sourceReference: TraditionalEvidence {
+        let key: String
+        switch self {
+        case .shengQi: key = "ref_bz_shengqi"
+        case .yanNian: key = "ref_bz_yannian"
+        case .tianYi: key = "ref_bz_tianyi"
+        case .fuWei: key = "ref_bz_fuwei"
+        case .jueMing: key = "ref_bz_jueming"
+        case .wuGui: key = "ref_bz_wugui"
+        case .liuSha: key = "ref_bz_liusha"
+        case .huoHai: key = "ref_bz_huohai"
         }
+        return TraditionalEvidence(id: "bazhai." + name, kind: .rule, titleKey: key, matches: [localizedName])
     }
+
+    private var classicalSourceNote: String {
+        sourceReference.localizedText + "\n" + LocalizationManager.shared.t("ref_scope_note")
+    }
+
 }
 
 public struct BaZhaiPalaceItem: Identifiable {
@@ -1279,6 +1277,60 @@ public struct FengshuiRemedyTask: Codable, Identifiable, Equatable {
     }
 }
 
+public struct AuspiciousReminderContext: Codable, Equatable {
+    let propertyKey: String
+    let sittingMountain: String
+
+    public init(propertyKey: String, sittingMountain: String) {
+        self.propertyKey = propertyKey
+        self.sittingMountain = sittingMountain
+    }
+
+    func key(for date: Date, timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let bytes = (try? encoder.encode(self)) ?? Data()
+        let digest = SHA256.hash(data: bytes).prefix(12).map { String(format: "%02x", $0) }.joined()
+        return String(format: "%04d-%02d-%02d-", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0) + digest
+    }
+}
+
+struct AuspiciousReminderRecord: Codable, Equatable, Identifiable {
+    let id: String
+    let date: Date
+    let context: AuspiciousReminderContext
+    var requestID: String { "tiandi_zeri_" + id }
+
+    init(date: Date, context: AuspiciousReminderContext, timeZone: TimeZone = .current) {
+        self.id = context.key(for: date, timeZone: timeZone)
+        self.date = date
+        self.context = context
+    }
+}
+
+struct AuspiciousReminderArchive: Codable {
+    static let storageKey = "tiandi_auspicious_reminders_v2"
+    static let legacyKey = "tiandi_scheduled_auspicious_days"
+    var records: [AuspiciousReminderRecord] = []
+    /// Existing requests have no house metadata. Keep them as unassigned until removed/delivered.
+    var legacyIDs: Set<String> = []
+
+    static func restore(defaults: UserDefaults) -> Self {
+        var archive = defaults.data(forKey: storageKey).flatMap { try? JSONDecoder().decode(Self.self, from: $0) } ?? Self()
+        archive.legacyIDs.formUnion(defaults.stringArray(forKey: legacyKey) ?? [])
+        archive.save(defaults: defaults)
+        defaults.removeObject(forKey: legacyKey)
+        return archive
+    }
+
+    func save(defaults: UserDefaults) {
+        if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.storageKey) }
+    }
+}
+
 public final class RetentionServiceManager: ObservableObject {
     public static let shared = RetentionServiceManager()
 
@@ -1287,7 +1339,9 @@ public final class RetentionServiceManager: ObservableObject {
     private var solarNotificationGeneration = 0
     private let solarNotificationPrefix = "tiandi_solar_term_"
     private let kSolarTermNotifyKey = "tiandi_solar_term_notify_enabled"
-    private let kScheduledDaysKey = "tiandi_scheduled_auspicious_days"
+    private var reminderArchive = AuspiciousReminderArchive()
+    private var pendingReminderIDs: Set<String> = []
+    private var reminderGeneration: UInt64 = 0
     private let kRemedyTasksKey = "tiandi_remedy_tasks_v1"
 
     @Published public var solarTermNotificationsEnabled: Bool {
@@ -1298,6 +1352,7 @@ public final class RetentionServiceManager: ObservableObject {
     @Published public var showNotificationPermissionDeniedAlert: Bool = false
 
     @Published public private(set) var scheduledDayIDs: Set<String> = []
+    @Published public private(set) var legacyScheduledDayIDs: Set<String> = []
     @Published public var remedyTasks: [FengshuiRemedyTask] = [] {
         didSet {
             if let data = try? JSONEncoder().encode(remedyTasks) {
@@ -1309,9 +1364,9 @@ public final class RetentionServiceManager: ObservableObject {
 
     private init() {
         self.solarTermNotificationsEnabled = UserDefaults.standard.bool(forKey: kSolarTermNotifyKey)
-        if let saved = UserDefaults.standard.stringArray(forKey: kScheduledDaysKey) {
-            self.scheduledDayIDs = Set(saved)
-        }
+        reminderArchive = AuspiciousReminderArchive.restore(defaults: .standard)
+        scheduledDayIDs = Set(reminderArchive.records.map(\.id))
+        legacyScheduledDayIDs = reminderArchive.legacyIDs
         if let rData = UserDefaults.standard.data(forKey: kRemedyTasksKey)
             ?? NSUbiquitousKeyValueStore.default.data(forKey: kRemedyTasksKey),
            let decoded = try? JSONDecoder().decode([FengshuiRemedyTask].self, from: rData) {
@@ -1652,44 +1707,50 @@ public final class RetentionServiceManager: ObservableObject {
     }
 
     /// 为用户选定的吉日设置当天早晨 08:00 动土/入宅/出行提醒
-    public func toggleAuspiciousDayReminder(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String) {
-        let reqID = "tiandi_zeri_\(day.id)"
+    public func toggleAuspiciousDayReminder(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String,
+                                          context: AuspiciousReminderContext) {
+        let record = AuspiciousReminderRecord(date: day.date, context: context)
         let center = UNUserNotificationCenter.current()
-        if scheduledDayIDs.contains(day.id) {
-            center.removePendingNotificationRequests(withIdentifiers: [reqID])
-            scheduledDayIDs.remove(day.id)
-            UserDefaults.standard.set(Array(scheduledDayIDs), forKey: kScheduledDaysKey)
+        if scheduledDayIDs.contains(record.id) {
+            center.removePendingNotificationRequests(withIdentifiers: [record.requestID])
+            reminderArchive.records.removeAll { $0.id == record.id }
+            persistReminders()
             return
         }
+        guard pendingReminderIDs.insert(record.id).inserted else { return }
+        reminderGeneration &+= 1
 
         center.getNotificationSettings { [weak self] settings in
             guard let self = self else { return }
             switch settings.authorizationStatus {
             case .denied:
                 DispatchQueue.main.async {
+                    self.pendingReminderIDs.remove(record.id)
                     self.showNotificationPermissionDeniedAlert = true
                 }
             case .notDetermined:
                 center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
                     DispatchQueue.main.async {
                         if granted {
-                            self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName)
+                            self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName, record: record)
+                        } else {
+                            self.pendingReminderIDs.remove(record.id)
                         }
                     }
                 }
             case .authorized, .provisional, .ephemeral:
                 DispatchQueue.main.async {
-                    self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName)
+                    self.scheduleAuspiciousDayPayload(day: day, sittingName: sittingName, record: record)
                 }
             @unknown default:
-                break
+                DispatchQueue.main.async { self.pendingReminderIDs.remove(record.id) }
             }
         }
     }
 
-    private func scheduleAuspiciousDayPayload(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String) {
-        let reqID = "tiandi_zeri_\(day.id)"
-        var cal = Calendar.current
+    private func scheduleAuspiciousDayPayload(day: ZeRiEngine.UpcomingAuspiciousDay, sittingName: String,
+                                             record: AuspiciousReminderRecord) {
+        var cal = Calendar(identifier: .gregorian)
         cal.timeZone = .current
         let now = Date()
         var fireDate = cal.date(bySettingHour: 8, minute: 0, second: 0, of: day.date) ?? day.date
@@ -1726,13 +1787,45 @@ public final class RetentionServiceManager: ObservableObject {
         content.sound = .default
         let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireDate)
         let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
-        let req = UNNotificationRequest(identifier: reqID, content: content, trigger: trigger)
+        content.userInfo = ["propertyKey": record.context.propertyKey, "sittingMountain": record.context.sittingMountain,
+                            "reminderID": record.id]
+        let req = UNNotificationRequest(identifier: record.requestID, content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(req) { [weak self] error in
-            if error == nil {
-                DispatchQueue.main.async {
-                    self?.scheduledDayIDs.insert(day.id)
-                    UserDefaults.standard.set(Array(self?.scheduledDayIDs ?? []), forKey: self?.kScheduledDaysKey ?? "tiandi_scheduled_auspicious_days")
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.pendingReminderIDs.remove(record.id)
+                if error == nil {
+                    self.reminderArchive.records.removeAll { $0.id == record.id }
+                    self.reminderArchive.records.append(record)
+                    self.persistReminders()
                 }
+            }
+        }
+    }
+
+    private func persistReminders() {
+        reminderGeneration &+= 1
+        reminderArchive.save(defaults: .standard)
+        scheduledDayIDs = Set(reminderArchive.records.map(\.id))
+        legacyScheduledDayIDs = reminderArchive.legacyIDs
+    }
+
+    public func removeLegacyAuspiciousReminder(id: String) {
+        guard reminderArchive.legacyIDs.contains(id) else { return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["tiandi_zeri_" + id])
+        reminderArchive.legacyIDs.remove(id)
+        persistReminders()
+    }
+
+    public func refreshScheduledReminders() {
+        let generation = reminderGeneration
+        UNUserNotificationCenter.current().getPendingNotificationRequests { [weak self] requests in
+            let ids = Set(requests.map(\.identifier))
+            DispatchQueue.main.async {
+                guard let self, self.reminderGeneration == generation else { return }
+                self.reminderArchive.records.removeAll { !ids.contains($0.requestID) && !self.pendingReminderIDs.contains($0.id) }
+                self.reminderArchive.legacyIDs = self.reminderArchive.legacyIDs.filter { ids.contains("tiandi_zeri_" + $0) }
+                self.persistReminders()
             }
         }
     }

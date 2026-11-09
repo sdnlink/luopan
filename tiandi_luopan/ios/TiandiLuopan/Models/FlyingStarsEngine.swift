@@ -68,6 +68,8 @@ struct XuanKongStarPair {
     let second: Int
     // Generating cycle: Wood, Fire, Earth, Metal, Water.
     private static let elements = [1: 4, 2: 2, 3: 0, 4: 0, 5: 2, 6: 3, 7: 3, 8: 2, 9: 1]
+    var firstElementIndex: Int? { Self.elements[first] }
+    var secondElementIndex: Int? { Self.elements[second] }
     var relation: Relation {
         let a = Self.elements[first] ?? 2, b = Self.elements[second] ?? 2
         if a == b { return .same }
@@ -80,6 +82,117 @@ struct XuanKongStarPair {
     var isStudy: Bool { Set([first, second]) == Set([1, 4]) || Set([first, second]) == Set([1, 6]) }
     var isFriction: Bool { Set([first, second]) == Set([3, 7]) }
     var isHeat: Bool { Set([first, second]) == Set([7, 9]) || (first == 9 && second == 9) }
+}
+
+// Sources carry their actual matches. Only verified, traceable text is quoted;
+// transmitted star rules are explicitly labeled as summaries rather than book quotations.
+struct TraditionalEvidence: Identifiable {
+    enum Kind: Equatable { case classic, rule }
+    let id: String
+    let kind: Kind
+    let titleKey: String
+    var quotes: [String] = []
+    var matches: [String] = []
+    var sourceURL: URL? = nil
+
+    var localizedTitle: String {
+        let lang = LocalizationManager.shared
+        return lang.t(kind == .classic ? "ref_classic" : "ref_rule") + " · " + lang.t(titleKey)
+    }
+
+    var localizedText: String {
+        var lines = [localizedTitle]
+        if !quotes.isEmpty { lines.append("“" + quotes.joined(separator: "；") + "”") }
+        if !matches.isEmpty { lines.append(LocalizationManager.shared.t("ref_matches") + matches.joined(separator: "；")) }
+        return lines.joined(separator: "\n")
+    }
+}
+
+enum TraditionalEvidenceCatalog {
+    // Fixed revisions of the public-domain transcriptions audited for these excerpts.
+    static let mountainWaterURL = URL(string: "https://zh.wikisource.org/w/index.php?oldid=1557328")!
+    static let elementsURL = URL(string: "https://zh.wikisource.org/w/index.php?oldid=7915687")!
+
+    static func merged(_ references: [TraditionalEvidence]) -> [TraditionalEvidence] {
+        var result: [TraditionalEvidence] = []
+        for reference in references {
+            if let index = result.firstIndex(where: { $0.id == reference.id }) {
+                for quote in reference.quotes where !result[index].quotes.contains(quote) { result[index].quotes.append(quote) }
+                for match in reference.matches where !result[index].matches.contains(match) { result[index].matches.append(match) }
+            } else { result.append(reference) }
+        }
+        return result
+    }
+
+    static func text(_ references: [TraditionalEvidence]) -> String {
+        merged(references).map(\.localizedText).joined(separator: "\n\n")
+    }
+
+    static func pattern(_ pattern: XuanKongPattern, context: String) -> [TraditionalEvidence] {
+        let lang = LocalizationManager.shared
+        return [
+            TraditionalEvidence(id: "classic.mountain_water", kind: .classic, titleKey: "ref_mountain_water",
+                quotes: ["山上龍神不下水，水裏龍神不上山。"], matches: [context], sourceURL: mountainWaterURL),
+            TraditionalEvidence(id: "pattern.\(pattern.rawValue)", kind: .rule, titleKey: "ref_pattern_rule",
+                matches: [context + " · " + lang.t(pattern.explanationKey)])
+        ]
+    }
+
+    static func pair(_ first: Int, _ second: Int, context: String) -> [TraditionalEvidence] {
+        let pair = XuanKongStarPair(first: first, second: second)
+        guard let a = pair.firstElementIndex, let b = pair.secondElementIndex else { return [] }
+        let match = context + " \(first)/\(second)"
+        var references: [TraditionalEvidence] = []
+        switch pair.relation {
+        case .same:
+            references.append(TraditionalEvidence(id: "elements.same", kind: .rule,
+                titleKey: "ref_same_element", matches: [match]))
+        case .firstGeneratesSecond, .secondGeneratesFirst:
+            let index = pair.relation == .firstGeneratesSecond ? a : b
+            let excerpt = ["木生火", "火生土", "土生金", "金生水", "水生木"][index]
+            references.append(TraditionalEvidence(id: "elements.generating", kind: .classic,
+                titleKey: "ref_elements_generating", quotes: [excerpt], matches: [match], sourceURL: elementsURL))
+        case .firstControlsSecond, .secondControlsFirst:
+            let index = pair.relation == .firstControlsSecond ? a : b
+            let excerpt = ["木剋土", "火剋金", "土剋水", "金剋木", "水剋火"][index]
+            references.append(TraditionalEvidence(id: "elements.controlling", kind: .classic,
+                titleKey: "ref_elements_controlling", quotes: [excerpt], matches: [match], sourceURL: elementsURL))
+        }
+        func rule(_ id: String, _ key: String) {
+            references.append(TraditionalEvidence(id: id, kind: .rule, titleKey: key, matches: [match]))
+        }
+        if first == 2 || second == 2 { rule("stars.two", "ref_star_two") }
+        if first == 5 || second == 5 { rule("stars.five", "ref_star_five") }
+        if first == 5 && second == 5 { rule("pair.five_five", "ref_pair_five_five") }
+        let stars = Set([first, second])
+        if stars == Set([2, 5]) { rule("pair.two_five", "ref_pair_two_five") }
+        if stars == Set([1, 4]) { rule("pair.one_four", "ref_pair_one_four") }
+        if stars == Set([1, 6]) { rule("pair.one_six", "ref_pair_one_six") }
+        if stars == Set([3, 7]) { rule("pair.three_seven", "ref_pair_three_seven") }
+        if stars == Set([7, 9]) { rule("pair.seven_nine", "ref_pair_seven_nine") }
+        if first == 9 && second == 9 { rule("pair.nine_nine", "ref_pair_nine_nine") }
+        return references
+    }
+
+    static func purpleWhite(year: Int, month: Int, palace: String) -> [TraditionalEvidence] {
+        let lang = LocalizationManager.shared
+        let match = palace + " · " + lang.t("xkd_pair_guests") + " \(year)/\(month)"
+        var references = pair(year, month, context: palace + " · " + lang.t("xkd_pair_guests"))
+        references.append(TraditionalEvidence(id: "purplewhite.timing", kind: .rule,
+            titleKey: "ref_guest_timing", matches: [match]))
+        // Match the advice's branch precedence; an 8/2 palace is a caution,
+        // not a wealth reading with an unrelated Five-Yellow quote attached.
+        if year != 2 && year != 5 && month != 2 && month != 5 {
+            let key: String
+            if year == 9 { key = "ref_year_nine" }
+            else if year == 8 { key = "ref_year_eight" }
+            else if [1, 4, 6].contains(year) { key = "ref_year_study" }
+            else { key = "ref_year_ordinary" }
+            references.append(TraditionalEvidence(id: "purplewhite.year.\(year)", kind: .rule,
+                titleKey: key, matches: [match]))
+        }
+        return merged(references)
+    }
 }
 
 enum XuanKongPracticalAction: CaseIterable, Hashable {
@@ -312,30 +425,6 @@ struct FlyingStarModeSelection {
 
 // MARK: - 玄空九宫飞星排盘引擎 (XuanKong Flying Stars Engine)
 
-/// Classical source notes shared by palace-level evaluations and chart summaries.
-/// Keeping this at file scope prevents localized evaluations from depending on
-/// the `XuanKongChart` instance that owns the chart-level advice.
-private func flyingStarsTraditionalSourceNote(for language: AppLanguage) -> String {
-    switch language {
-    case .en:
-        return "Classical sources: the Purple-White Formula says, ‘When Five Yellow overlaps, illness and calamity arrive; when Two and Five combine, illness is encountered.’ The traditional Xuan-Kong mountain/facing-star formula preserves the wording ‘Wang Shan Wang Xiang prospers people and wealth; Double Stars at Facing prospers wealth but not people; Double Stars at Sitting prospers people but not wealth; Shang Shan Xia Shui brings loss of wealth and people’ (transmitted versions differ). These wealth, people and health statements are traditional symbolic readings, not medical or financial predictions."
-    case .zhHant:
-        return "古籍出處：《紫白訣》云：「五黃重疊，災疾並臨；二五交加，罹疾病。」玄空山向星訣（傳本有異文）保留「到山到向，旺丁旺財；雙星到向，旺財不旺丁；雙星到坐，旺丁不旺財；上山下水，敗財損丁」等原文。上文財丁、健康語句屬傳統文化象徵解讀，不是醫療診斷或財務預測。"
-    case .ja:
-        return "出典：『紫白訣』「五黄が重なれば災疾が臨み、二五が交われば病にかかる」。玄空山向星訣（伝本に異文）は「到山到向は財と人が栄え、双星到向は財、双星到坐は人、上山下水は財と人を損なう」と伝えます。財・人・健康の表現は伝統文化上の象徴であり、医学的・金融的予測ではありません。"
-    case .ko:
-        return "출처: 《자백결》 ‘오황이 겹치면 재질이 임하고 이오가 교차하면 병이 따른다’. 전통 현공 산향성결은 ‘도산도향 왕정왕재, 쌍성도향 왕재불왕정, 쌍성도좌 왕정불왕재, 동산하수 손재손정’으로 전합니다(전본 이문). 재물·사람·건강 표현은 전통문화의 상징이며 의학적·재무 예측이 아닙니다."
-    case .vi:
-        return "Nguồn cổ: 《Tử Bạch Quyết》 ghi ‘Ngũ Hoàng chồng lên thì tai bệnh đến; Nhị Ngũ giao nhau thì gặp bệnh’. Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài bất vượng đinh; song tinh đáo tọa vượng đinh bất vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Đây là biểu tượng truyền thống, không phải dự đoán y khoa hay tài chính."
-    case .th:
-        return "ที่มาโบราณ: 《จื่อไป๋เจวี๋ย》กล่าวว่า ‘ดาวห้าเหลืองซ้อน ภัยและโรคมาเยือน; สองกับห้าประจัน พบโรคภัย’ ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์แต่ไม่คน; ดาวคู่สู่หลังรุ่งเรืองคนแต่ไม่ทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) ถ้อยคำเรื่องทรัพย์ คน และสุขภาพเป็นสัญลักษณ์ดั้งเดิม ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน"
-    case .id:
-        return "Sumber klasik: 《Zi Bai Jue》 menyebut, ‘Saat Lima Kuning bertumpuk, penyakit dan bencana datang; saat Dua dan Lima berpapasan, penyakit ditemui.’ Rumus bintang gunung/hadap Xuan-Kong mempertahankan ungkapan ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta, bintang ganda di duduk memakmurkan orang, Shang Shan Xia Shui merusak harta dan orang’ (versi tradisi berbeda). Ungkapan rezeki, keluarga, dan kesehatan adalah simbol tradisional, bukan prediksi medis atau keuangan."
-    case .auto, .zhHans:
-        return "古籍出处：《紫白诀》云：“五黄重叠，灾疾并临；二五交加，罹疾病。”玄空山向星诀（传本有异文）保留“到山到向，旺丁旺财；双星到向，旺财不旺丁；双星到坐，旺丁不旺财；上山下水，败财损丁”等原文。上文财丁、健康语句属于传统文化象征解读，不是医疗诊断或财务预测。"
-    }
-}
-
 public struct PalaceCell: Identifiable {
     public let id: Int // 0..8 (九宫对应: 0:坎, 1:坤, 2:震, 3:巽, 4:中, 5:乾, 6:兑, 7:艮, 8:离)
     public let palaceName: String
@@ -448,10 +537,13 @@ public struct PalaceCell: Identifiable {
         }
     }
 
+    var sourceReferences: [TraditionalEvidence] {
+        TraditionalEvidenceCatalog.pair(mountainStar, facingStar,
+            context: plainDirectionName + " · " + LocalizationManager.shared.t("xkd_pair_natal"))
+    }
+
     public var localizedEvaluation: String {
-        localizedEvaluationSummary + "\n\n" + flyingStarsTraditionalSourceNote(
-            for: LocalizationManager.shared.effectiveLanguage
-        )
+        localizedEvaluationSummary + "\n\n" + TraditionalEvidenceCatalog.text(sourceReferences)
     }
 
     public var localizedEvaluationSummary: String {
@@ -463,49 +555,49 @@ public struct PalaceCell: Identifiable {
             if facingStar == activePeriod { return "Current Wealth Star at Facing · Open and receive qi" }
             if mountainStar == activePeriod { return "Current Mountain Star returns · People prosper" }
             if isShaWuHuang || isShaErHei { return "Five Yellow and Two Black clash · Calm and use Metal remedy" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "One–Six harmony · Clear Water and Wood nourish Wenchang" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "Mixed fortune · Balanced position"
         case .zhHant:
             if mountainStar == activePeriod && facingStar == activePeriod { return "當運雙星會聚 · 財丁兩旺" }
             if facingStar == activePeriod { return "當旺財星照臨 · 宜開門納氣" }
             if mountainStar == activePeriod { return "當運丁星歸位 · 人丁興旺" }
             if isShaWuHuang || isShaErHei { return "五黃二黑交加 · 宜靜安銅化解" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "一六共宗 · 水清木秀催文昌" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "吉凶相參 · 平和之位"
         case .ja:
             if mountainStar == activePeriod && facingStar == activePeriod { return "当運の双星会聚 · 財丁両旺" }
             if facingStar == activePeriod { return "当旺の財星照臨 · 開門納気に適す" }
             if mountainStar == activePeriod { return "当運の丁星帰位 · 子孫繁栄" }
             if isShaWuHuang || isShaErHei { return "五黄二黒交加 · 静寂と銅器で化解" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "一六共宗 · 文昌栄達を促す" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "吉凶相半 · 平和の気場"
         case .ko:
             if mountainStar == activePeriod && facingStar == activePeriod { return "당운 쌍성 회취 · 재물과 자손 모두 번창" }
             if facingStar == activePeriod { return "당왕 재성 조림 · 문을 열어 기를 받음" }
             if mountainStar == activePeriod { return "당운 정성 귀위 · 자손 번창" }
             if isShaWuHuang || isShaErHei { return "오황 이흑 교가 · 고요히 동기로 화해" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "일육공종 · 문창 학업 성취" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "길흉 상참 · 평화로운 방위"
         case .vi:
             if mountainStar == activePeriod && facingStar == activePeriod { return "Đương vận song tinh hội tụ · Tài đinh lưỡng vượng" }
             if facingStar == activePeriod { return "Đương vượng tài tinh chiếu lâm · Lợi mở cửa nạp khí" }
             if mountainStar == activePeriod { return "Đương vận đinh tinh quy vị · Nhân đinh hưng vượng" }
             if isShaWuHuang || isShaErHei { return "Ngũ Hoàng Nhị Hắc giao gia · Nên tĩnh an đồng hóa giải" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Nhất Lục cộng tông · Văn Xương học nghiệp đại cát" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "Cát hung tương tham · Vị trí bình hòa"
         case .th:
             if mountainStar == activePeriod && facingStar == activePeriod { return "สองดาวมงคลชุมนุม · ร่ำรวยและลูกหลานรุ่งเรือง" }
             if facingStar == activePeriod { return "ดาวโชคลาภส่องสว่าง · เปิดรับพลังงานมงคล" }
             if mountainStar == activePeriod { return "ดาวบุญบารมีคืนตำแหน่ง · ลูกหลานเจริญรุ่งเรือง" }
             if isShaWuHuang || isShaErHei { return "ดาวห้าเหลืองปะทะดาวสองดำ · รักษาความสงบใช้โลหะแก้" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "หนึ่งหกเกื้อหนุน · ส่งเสริมสติปัญญาการเรียน" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "ดีร้ายปะปน · ตำแหน่งสมดุลสงบ"
         case .id:
             if mountainStar == activePeriod && facingStar == activePeriod { return "Bintang Kembar Hadir · Kekayaan & keluarga makmur" }
             if facingStar == activePeriod { return "Bintang Rezeki Menyinari · Sambut sirkulasi energi" }
             if mountainStar == activePeriod { return "Bintang Manusia Kembali · Keturunan berkembang pesat" }
             if isShaWuHuang || isShaErHei { return "Benturan 5 Kuning & 2 Hitam · Tenang & gunakan obat logam" }
-            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return "Harmoni Satu–Enam · Mendukung prestasi akademis" }
+            if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) { return LocalizationManager.shared.t("ref_pair_one_six") }
             return "Campuran peruntungan · Posisi seimbang"
         case .auto, .zhHans:
             return baseEvaluation
@@ -587,9 +679,7 @@ public struct PalaceCell: Identifiable {
     }
     
     public var evaluation: String {
-        baseEvaluation + "\n\n" + flyingStarsTraditionalSourceNote(
-            for: LocalizationManager.shared.effectiveLanguage
-        )
+        baseEvaluation + "\n\n" + TraditionalEvidenceCatalog.text(sourceReferences)
     }
 
     private var baseEvaluation: String {
@@ -602,7 +692,7 @@ public struct PalaceCell: Identifiable {
         } else if mountainStar == activePeriod {
             return "当运丁星归位 · 人丁兴旺"
         } else if (mountainStar == 1 && facingStar == 6) || (mountainStar == 6 && facingStar == 1) {
-            return "一六共宗 · 水清木秀催文昌"
+            return LocalizationManager.shared.t("ref_pair_one_six")
         } else {
             return "吉凶相参 · 平和之位"
         }
@@ -853,7 +943,7 @@ public struct XuanKongChart {
     
     /// 基于九宫飞星排盘动态推导的空间布局复核建议。
     public var remedyAdvice: String {
-        remedyAdviceSummary + "\n\n" + healthSourceNote
+        remedyAdviceSummary + "\n\n" + remedySourceNote
     }
 
     public var remedyAdviceSummary: String {
@@ -959,57 +1049,80 @@ public struct XuanKongChart {
         }
     }
 
-    private var traditionalSourceNote: String {
-        flyingStarsTraditionalSourceNote(
-            for: LocalizationManager.shared.effectiveLanguage
-        )
+    var patternSourceReferences: [TraditionalEvidence] {
+        let context = sittingMountain + "/" + facingMountain + " · " + String(period)
+        var references = TraditionalEvidenceCatalog.pattern(pattern, context: context)
+        if isSanBanGua {
+            references.append(TraditionalEvidence(id: "pattern.sanban", kind: .rule,
+                titleKey: "ref_sanban", matches: [context]))
+        }
+        if isQiXingDaJie {
+            let groups = XuanKongDeepAnalyzer.qiXingSectorGroups(chart: self)
+            let matches = groups.map { ids in
+                ids.compactMap { id in palaces.first { $0.id == id }?.plainDirectionName }.joined(separator: " / ")
+            }
+            references.append(TraditionalEvidence(id: "pattern.qixing", kind: .rule,
+                titleKey: "ref_qixing", matches: matches))
+        }
+        return references
     }
 
-    /// The analysis card displays the shared source and explanation once.
-    public var analysisNote: String { healthSourceNote }
+    func sourceReferences(palaceID: Int, yearStar: Int? = nil, monthStar: Int? = nil) -> [TraditionalEvidence] {
+        guard let cell = palaces.first(where: { $0.id == palaceID }) else { return [] }
+        let lang = LocalizationManager.shared
+        var references = patternSourceReferences.filter { reference in
+            reference.id != "pattern.qixing" || XuanKongDeepAnalyzer.qiXingSectorGroups(chart: self).contains { $0.contains(palaceID) }
+        }
+        references += cell.sourceReferences
+        func appendPair(_ first: Int, _ second: Int?, _ key: String) {
+            guard let second, (1...9).contains(second) else { return }
+            references += TraditionalEvidenceCatalog.pair(first, second,
+                context: cell.plainDirectionName + " · " + lang.t(key))
+        }
+        appendPair(cell.mountainStar, yearStar, "xkd_pair_m_year")
+        appendPair(cell.facingStar, yearStar, "xkd_pair_f_year")
+        appendPair(cell.mountainStar, monthStar, "xkd_pair_m_month")
+        appendPair(cell.facingStar, monthStar, "xkd_pair_f_month")
+        if let yearStar, (1...9).contains(yearStar) { appendPair(yearStar, monthStar, "xkd_pair_guests") }
+        return TraditionalEvidenceCatalog.merged(references)
+    }
+
+    /// Chart-wide sources follow the actual pattern; sector sources require its ID and guest stars.
+    public var analysisNote: String {
+        TraditionalEvidenceCatalog.text(patternSourceReferences) + "\n" + LocalizationManager.shared.t("ref_scope_note")
+    }
 
     private var wealthSourceNote: String {
-        switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
-            return "Classical source: the transmitted Xuan-Kong mountain/facing-star formula (wording varies by edition) uses ‘Wang Shan Wang Xiang prospers people and wealth’, ‘Double Stars at Facing prospers wealth’, and ‘Shang Shan Xia Shui loses wealth and people’. Explanation: wealth, income and prosperity are traditional metaphysical symbols; verify real budgets and decisions independently."
-        case .zhHant:
-            return "古籍出處：玄空山向星訣（傳本有異文）有「到山到向，旺丁旺財；雙星到向，旺財不旺丁；上山下水，敗財損丁」等原文。解釋：財源、收入與旺財是傳統術數象徵，實際預算及決策請獨立核對。"
-        case .ja:
-            return "出典：玄空山向星訣（伝本に異文）には「到山到向は財と人が栄え、双星到向は財、上山下水は財と人を損なう」とあります。解釈：財・収入・繁栄は伝統術数の象徴であり、実際の予算と判断は独立に確認してください。"
-        case .ko:
-            return "출처: 전통 현공 산향성결(전본 이문)은 ‘도산도향 왕정왕재, 쌍성도향 왕재, 동산하수 손재손정’이라 전합니다. 설명: 재물·수입·번영은 전통 술수의 상징이며 실제 예산과 결정은 별도로 확인하세요."
-        case .vi:
-            return "Nguồn: Quyết tinh sơn hướng Huyền Không truyền câu ‘đáo sơn đáo hướng vượng đinh vượng tài; song tinh đáo hướng vượng tài; thượng sơn hạ thủy bại tài tổn đinh’ (bản truyền có dị văn). Giải thích: tài lộc, thu nhập và thịnh vượng là biểu tượng thuật số; hãy tự kiểm tra ngân sách và quyết định thực tế."
-        case .th:
-            return "แหล่งที่มา: ตำราดาวภูเขา-ทิศเสวียนคงสืบคำว่า ‘ถึงเขาถึงทิศรุ่งเรืองคนและทรัพย์; ดาวคู่สู่หน้ารุ่งเรืองทรัพย์; ขึ้นเขาลงน้ำเสียทรัพย์เสียคน’ (ตำราต่างกัน) คำอธิบาย: ทรัพย์ รายได้ และความรุ่งเรืองเป็นสัญลักษณ์ทางโหราศาสตร์ ควรตรวจสอบงบประมาณและการตัดสินใจจริงแยกต่างหาก"
-        case .id:
-            return "Sumber: rumus bintang gunung/hadap Xuan-Kong (versi tradisi berbeda) memuat ‘makmurkan orang dan harta; bintang ganda di hadap memakmurkan harta; Shang Shan Xia Shui merusak harta dan orang’. Penjelasan: rezeki, pendapatan, dan kemakmuran adalah simbol metafisika tradisional; periksa anggaran dan keputusan nyata secara mandiri."
-        case .auto, .zhHans:
-            return "古籍出处：玄空山向星诀（传本有异文）有“到山到向，旺丁旺财；双星到向，旺财不旺丁；上山下水，败财损丁”等原文。解释：财源、收入与旺财是传统术数象征，实际预算及决策请独立核对。"
+        let current = palaces.first { $0.facingStar == period && !$0.hasEarthSha }
+        let nextStar = period % 9 + 1
+        let next = palaces.first { !$0.isCenter && $0.facingStar == nextStar && !$0.hasEarthSha }
+            ?? palaces.first { $0.facingStar == nextStar && !$0.hasEarthSha }
+        let study = palaces.first {
+            !$0.isCenter && (Set([$0.mountainStar, $0.facingStar]) == Set([1, 4])
+                || Set([$0.mountainStar, $0.facingStar]) == Set([1, 6]))
         }
+        let relevant = [current, next, study].compactMap { $0 }.flatMap { $0.sourceReferences }
+        return TraditionalEvidenceCatalog.text(patternSourceReferences + relevant)
+            + "\n" + LocalizationManager.shared.t("ref_scope_note")
     }
 
     private var healthSourceNote: String {
-        let note: String
-        switch LocalizationManager.shared.effectiveLanguage {
-        case .en:
-            note = "Interpretation: Please verify ventilation, daylight, noise, drainage, and structural safety on site; consult qualified professionals for medical or financial matters."
-        case .zhHant:
-            note = "解釋：請結合通風、採光、噪音、排水和結構安全現場複核；涉及健康或財務事項應諮詢相應專業人士。"
-        case .ja:
-            note = "解釈：換気・採光・騒音・排水・構造安全を現地で確認してください。健康や財務に関する事項は専門家にご相談ください。"
-        case .ko:
-            note = "해석: 통풍, 채광, 소음, 배수 및 구조 안전을 현장에서 함께 점검하시고, 건강이나 재무 관련 사항은 전문가와 상담하십시오."
-        case .vi:
-            note = "Giải thích: Vui lòng kết hợp kiểm tra thông gió, ánh sáng, tiếng ồn, thoát nước và an toàn kết cấu tại hiện trường; các vấn đề sức khỏe hoặc tài chính nên tham khảo chuyên gia."
-        case .th:
-            note = "คำอธิบาย: โปรดตรวจสอบการระบายอากาศ แสงสว่าง เสียงรบกวน การระบายน้ำ และความปลอดภัยของโครงสร้างหน้างาน สำหรับเรื่องสุขภาพหรือการเงินควรปรึกษาผู้เชี่ยวชาญ"
-        case .id:
-            note = "Penjelasan: Harap periksa ventilasi, pencahayaan, kebisingan, drainase, dan keamanan struktur di lokasi; konsultasikan masalah kesehatan atau keuangan dengan profesional terkait."
-        case .auto, .zhHans:
-            note = "解释：请结合通风、采光、噪音、排水和结构安全现场复核；涉及健康或财务事项应咨询相应专业人士。"
-        }
-        return traditionalSourceNote + "\n" + note
+        let combined = palaces.first { Set([$0.mountainStar, $0.facingStar]) == Set([2, 5])
+            || ($0.mountainStar == 5 && $0.facingStar == 5) }
+        let five = palaces.first { $0.facingStar == 5 } ?? palaces.first { $0.mountainStar == 5 }
+        let two = palaces.first { $0.facingStar == 2 } ?? palaces.first { $0.mountainStar == 2 }
+        let relevant = [combined, five, two].compactMap { $0 }.flatMap { $0.sourceReferences }
+        return TraditionalEvidenceCatalog.text(relevant) + "\n" + LocalizationManager.shared.t("ref_scope_note")
+    }
+
+    private var remedySourceNote: String {
+        let mountain = palaces.first { $0.mountainStar == period }
+        let facing = palaces.first { $0.facingStar == period }
+        let clash = palaces.first { !$0.isCenter && Set([$0.mountainStar, $0.facingStar]) == Set([3, 7]) }
+            ?? palaces.first { !$0.isCenter && Set([$0.mountainStar, $0.facingStar]) == Set([7, 9]) }
+        let relevant = [mountain, facing, clash].compactMap { $0 }.flatMap { $0.sourceReferences }
+        return TraditionalEvidenceCatalog.text(patternSourceReferences + relevant)
+            + "\n" + LocalizationManager.shared.t("ref_scope_note")
     }
 
 }
@@ -1316,7 +1429,8 @@ public final class FlyingStarsEngine {
         let summary: String
         let sittingName = sitting.localizedName
         let facingName = facing.localizedName
-        let sourceNote = flyingStarsTraditionalSourceNote(for: lang)
+        let sourceNote = TraditionalEvidenceCatalog.text(TraditionalEvidenceCatalog.pattern(patternKind,
+            context: sittingName + "/" + facingName + " · " + String(activePeriod)))
         switch lang {
         case .en:
             summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."

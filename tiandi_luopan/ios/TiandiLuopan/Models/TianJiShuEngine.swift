@@ -6,6 +6,11 @@ public struct TianJiAnalysisSnapshot {
     public let period: Int
     public let useTiGua: Bool
     public let reportDate: Date
+    var homeContext: XuanKongHomeContext? = nil
+    var propertyKey: String? = nil
+    var capturedFloorplanReport: [FloorplanAuditItem] = []
+    var capturedPanoramaArchive: PanoramaFengShuiArchive?
+    var hasSpatialSnapshot = false
 
     public init(heading: Double, period: Int? = nil, useTiGua: Bool? = nil, reportDate: Date = Date()) {
         self.heading = heading
@@ -22,6 +27,34 @@ public struct TianJiAnalysisSnapshot {
             useTiGua: useTiGua,
             date: reportDate
         )
+    }
+
+    func capturing(context: XuanKongHomeContext?, propertyKey: String?,
+                   floorplanReport: [FloorplanAuditItem], panoramaArchive: PanoramaFengShuiArchive?) -> Self {
+        var copy = self
+        copy.homeContext = context
+        copy.propertyKey = propertyKey
+        copy.capturedFloorplanReport = floorplanReport
+        copy.capturedPanoramaArchive = panoramaArchive
+        copy.hasSpatialSnapshot = true
+        return copy
+    }
+
+    func deepAnalysis(chart: XuanKongChart? = nil) -> XuanKongDeepAnalysis {
+        XuanKongDeepAnalyzer.analyze(chart: chart ?? flyingStarsChart(), date: reportDate, context: homeContext)
+    }
+
+    func guidanceText(chart: XuanKongChart? = nil, analysis: XuanKongDeepAnalysis? = nil) -> String {
+        let chart = chart ?? flyingStarsChart()
+        let analysis = analysis ?? deepAnalysis(chart: chart)
+        let lang = LocalizationManager.shared
+        return ([lang.t(analysis.summaryKey)] + analysis.priorities.compactMap { sector -> String? in
+            guard let cell = chart.palaces.first(where: { $0.id == sector.id }) else { return nil }
+            let places = Array(Set(sector.places.map(\.name))).sorted().joined(separator: " / ")
+            let heading = cell.plainDirectionName + " · " + lang.t(sector.use.titleKey)
+                + (places.isEmpty ? "" : " · " + places)
+            return ([heading] + sector.actions.map { "• " + lang.t($0.textKey) }).joined(separator: "\n")
+        }).joined(separator: "\n\n")
     }
 
     public func ganzhiYear(timeZone: TimeZone = .current) -> String {
@@ -54,6 +87,26 @@ public class TianJiShuEngine {
         analysis: TianJiAnalysisSnapshot? = nil
     ) -> UIImage {
         let snapshot = analysis ?? TianJiAnalysisSnapshot(heading: inputHeading, reportDate: inputDate)
+        return renderScrollImage(heading: snapshot.heading, coordsDesc: coordsDesc, solarTimeDesc: solarTimeDesc,
+            language: language, isPro: isPro,
+            floorplanReport: snapshot.hasSpatialSnapshot ? snapshot.capturedFloorplanReport : floorplanReport,
+            panoramaArchive: snapshot.hasSpatialSnapshot ? snapshot.capturedPanoramaArchive : panoramaArchive,
+            reportDate: snapshot.reportDate, analysis: snapshot, canvasHeight: nil)
+    }
+
+    private func renderScrollImage(
+        heading inputHeading: Double,
+        coordsDesc: String,
+        solarTimeDesc: String,
+        language: AppLanguage? = nil,
+        isPro: Bool = true,
+        floorplanReport: [FloorplanAuditItem] = [],
+        panoramaArchive: PanoramaFengShuiArchive? = nil,
+        reportDate inputDate: Date = Date(),
+        analysis: TianJiAnalysisSnapshot? = nil,
+        canvasHeight: CGFloat?
+    ) -> UIImage {
+        let snapshot = analysis ?? TianJiAnalysisSnapshot(heading: inputHeading, reportDate: inputDate)
         let heading = snapshot.heading
         let reportDate = snapshot.reportDate
         // The canvas is extra tall because the scroll renders the full
@@ -71,7 +124,9 @@ public class TianJiShuEngine {
         // Reserve room for the complete nine-palace sections and date-selection
         // details below. The per-record additions cover unusually large
         // floorplan/AR archives without silently drawing past the bitmap.
-        let size = CGSize(width: 1080, height: 15000 + extraArchiveHeight + extraFloorplanHeight)
+        let minimumHeight: CGFloat = 15000 + extraArchiveHeight + extraFloorplanHeight
+        let size = CGSize(width: 1080, height: canvasHeight ?? 1)
+        var requiredHeight: CGFloat = minimumHeight
         // These dimensions describe the exported pixel size. The default
         // renderer scale follows the device's Retina factor and could turn
         // this into a 3240x18000 image, multiplying memory and render time.
@@ -83,7 +138,7 @@ public class TianJiShuEngine {
         // change the app language, so the report must use one stable locale.
         let renderLanguage = language ?? LocalizationManager.shared.effectiveLanguage
         
-        return renderer.image { ctx in
+        let image = renderer.image { ctx in
             let cg = ctx.cgContext
             func tr8(
                 _ hans: String,
@@ -394,6 +449,7 @@ public class TianJiShuEngine {
 
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
             let xkChart = snapshot.flyingStarsChart()
+            let patternSummary = LocalizationManager.shared.t(xkChart.pattern.explanationKey) + "\n\n" + xkChart.analysisNote
             let meta = xkChart.periodMeta
             
             let sec2Title = tr8(
@@ -416,56 +472,56 @@ public class TianJiShuEngine {
                 • Current period: \(meta.label)
                 • Flying-star pattern: [\(mSitting.localizedName) / \(mFacing.localizedName)] \(xkChart.patternType)
                 • Ruling star qi: \(meta.starName) \(meta.element) star enters the center and illuminates the facing bright hall.
-                • Overall analysis: \(xkChart.summaryAnalysis)
+                • Overall analysis: \(patternSummary)
                 """
             case .zhHant:
                 p2Text = """
                 • 當前地運：\(meta.label)
                 • 玄空格局判定：【\(mSitting.localizedName)山\(mFacing.localizedName)向】\(xkChart.patternType)
                 • 當令旺星氣場：\(meta.starName)\(meta.element)星入中當運，主星臨照向首明堂。
-                • 綜合理氣研判：\(xkChart.summaryAnalysis)
+                • 綜合理氣研判：\(patternSummary)
                 """
             case .ja:
                 p2Text = """
                 • 現在の地運：\(meta.label)
                 • 玄空格局判定：【\(mSitting.localizedName)山\(mFacing.localizedName)向】\(xkChart.patternType)
                 • 当令旺星の気：\(meta.starName)\(meta.element)星が中宮に入り、向首明堂を照らします。
-                • 総合理気判断：\(xkChart.summaryAnalysis)
+                • 総合理気判断：\(patternSummary)
                 """
             case .ko:
                 p2Text = """
                 • 현재 지운: \(meta.label)
                 • 현공 격국 판정: 【\(mSitting.localizedName)산 \(mFacing.localizedName)향】\(xkChart.patternType)
                 • 당령 왕성 기운: \(meta.starName)\(meta.element)성이 중궁에 입하여 향수 명당을 비춥니다.
-                • 종합 이기 판단: \(xkChart.summaryAnalysis)
+                • 종합 이기 판단: \(patternSummary)
                 """
             case .vi:
                 p2Text = """
                 • Địa vận hiện tại: \(meta.label)
                 • Phán đoán cục diện: 【Sơn \(mSitting.localizedName) Hướng \(mFacing.localizedName)】\(xkChart.patternType)
                 • Khí trường vượng tinh: Sao \(meta.starName) \(meta.element) nhập trung cung, chiếu sáng minh đường.
-                • Phân tích tổng hợp: \(xkChart.summaryAnalysis)
+                • Phân tích tổng hợp: \(patternSummary)
                 """
             case .th:
                 p2Text = """
                 • ยุคปัจจุบัน: \(meta.label)
                 • รูปแบบผังเสวียนคง: 【พิง\(mSitting.localizedName) หัน\(mFacing.localizedName)】\(xkChart.patternType)
                 • ชี่ดาวเจริญยุค: ดาว\(meta.starName) ธาตุ\(meta.element) เข้าสู่ศูนย์กลาง ส่องสว่างลานหน้าบ้าน
-                • ผลวิเคราะห์ภาพรวม: \(xkChart.summaryAnalysis)
+                • ผลวิเคราะห์ภาพรวม: \(patternSummary)
                 """
             case .id:
                 p2Text = """
                 • Periode Saat Ini: \(meta.label)
                 • Pola Bintang Terbang: [\(mSitting.localizedName) / \(mFacing.localizedName)] \(xkChart.patternType)
                 • Qi Bintang Berkuasa: Bintang \(meta.starName) \(meta.element) masuk ke tengah menyinari ruang depan.
-                • Analisis Keseluruhan: \(xkChart.summaryAnalysis)
+                • Analisis Keseluruhan: \(patternSummary)
                 """
             case .auto, .zhHans:
                 p2Text = """
                 • 当前地运：\(meta.label)
                 • 玄空格局判定：【\(mSitting.localizedName)山\(mFacing.localizedName)向】\(xkChart.patternType)
                 • 当令旺星气场：\(meta.starName)\(meta.element)星入中当运，主星临照向首明堂。
-                • 综合理气研判：\(xkChart.summaryAnalysis)
+                • 综合理气研判：\(patternSummary)
                 """
             }
             curY += drawMeasuredText(
@@ -614,6 +670,7 @@ public class TianJiShuEngine {
             curY += 65
             
             let pwChart = PurpleWhiteEngine.shared.calculateChart(date: reportDate, heading: heading)
+            let deepAnalysis = snapshot.deepAnalysis(chart: xkChart)
             let zeri = ZeRiEngine.shared.analyze(date: reportDate, sitting: mSitting)
             let annualNote = tr8(
                 "• 岁运太岁与择日：太岁在\(pwChart.taiSuiDescription)、岁破在\(pwChart.suiPoDescription)、三煞在\(pwChart.sanShaDescription)；当前四柱【\(zeri.fourPillarsText)】（\(zeri.overallStatus)）。",
@@ -626,9 +683,7 @@ public class TianJiShuEngine {
                 "• Tai Sui Tahunan & Pemilihan Hari: Tai Sui di \(pwChart.taiSuiDescription), Sui Po di \(pwChart.suiPoDescription), San Sha di \(pwChart.sanShaDescription); Empat Pilar [\(zeri.fourPillarsText)] (\(zeri.overallStatus))."
             )
             let p5Text = """
-            \(xkChart.wealthAdvice)
-            \(xkChart.healthAdvice)
-            \(xkChart.remedyAdvice)
+            \(snapshot.guidanceText(chart: xkChart, analysis: deepAnalysis))
             \(annualNote)
             """
             curY += drawMeasuredText(
@@ -648,7 +703,8 @@ public class TianJiShuEngine {
                 curY: curY,
                 vermilion: vermilion,
                 renderLanguage: renderLanguage,
-                chart: xkChart
+                chart: xkChart,
+                analysis: deepAnalysis
             )
             curY = drawQimenDetails(
                 ctx: cg,
@@ -676,7 +732,7 @@ public class TianJiShuEngine {
             }
             
             // 8.2 流年紫白客星调理与催旺（含家人影响维度）
-            curY = drawPurpleWhiteRemedies(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage, pwChart: pwChart)
+            curY = drawPurpleWhiteRemedies(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage, pwChart: pwChart, analysis: deepAnalysis)
             
             // 9. 八宅凶位化解与安镇（含家人影响维度）
             curY = drawBazhaiInjurious(ctx: cg, curY: curY, vermilion: vermilion, renderLanguage: renderLanguage, bz: bz)
@@ -783,7 +839,7 @@ public class TianJiShuEngine {
             ])
             
             // 11. 卷尾合规免责声明 (Compliance & disclaimer)
-            drawDisclaimer(ctx: cg, curY: curY, renderLanguage: renderLanguage)
+            requiredHeight = max(minimumHeight, drawDisclaimer(ctx: cg, curY: curY, renderLanguage: renderLanguage))
 
             // Keep the access policy inside the renderer as well as in the
             // SwiftUI controls. A caller that receives the generated image
@@ -815,8 +871,16 @@ public class TianJiShuEngine {
                 cg.restoreGState()
             }
         }
+        // First pass measures the entire report on a one-pixel canvas. Allocate
+        // the full bitmap only once the content height (including footnotes) is known.
+        if canvasHeight == nil {
+            return renderScrollImage(heading: inputHeading, coordsDesc: coordsDesc, solarTimeDesc: solarTimeDesc,
+                language: renderLanguage, isPro: isPro, floorplanReport: floorplanReport, panoramaArchive: panoramaArchive,
+                reportDate: inputDate, analysis: snapshot, canvasHeight: ceil(requiredHeight))
+        }
+        return image
     }
-    
+
     private func drawSectionHeader(ctx: CGContext, title: String, atY: CGFloat, vermilion: UIColor) {
         ctx.setStrokeColor(vermilion.cgColor)
         ctx.setLineWidth(2)
@@ -893,7 +957,8 @@ public class TianJiShuEngine {
         curY: CGFloat,
         vermilion: UIColor,
         renderLanguage: AppLanguage,
-        chart: XuanKongChart
+        chart: XuanKongChart,
+        analysis: XuanKongDeepAnalysis
     ) -> CGFloat {
         let title = tr8(
             "玄空九宫全盘 · 山向星与逐宫锦囊",
@@ -916,7 +981,12 @@ public class TianJiShuEngine {
         let wuHuangLabel = tr8("五黄", "五黃", "5-Yellow", "五黄", "오황", "Ngũ Hoàng", "5 เหลือง", "5-Kuning", renderLanguage: renderLanguage)
         let erHeiLabel = tr8("二黑", "二黑", "2-Black", "二黒", "이흑", "Nhị Hắc", "2 ดำ", "2-Hitam", renderLanguage: renderLanguage)
         for cell in chart.palaces {
-            let line = "【\(cell.localizedPalaceName)】 · \(mStarLabel) \(cell.mountainStar) · \(fStarLabel) \(cell.facingStar) · \(cell.localizedEvaluation)"
+            let sector = analysis.sectors.first { $0.id == cell.id }
+            let use = sector?.use ?? cell.suggestedUse
+            let sources = chart.sourceReferences(palaceID: cell.id, yearStar: sector?.yearStar, monthStar: sector?.monthStar)
+                .filter { !$0.id.hasPrefix("pattern.") && $0.id != "classic.mountain_water" }
+            let line = "【\(cell.localizedPalaceName)】 · \(mStarLabel) \(cell.mountainStar) · \(fStarLabel) \(cell.facingStar) · "
+                + LocalizationManager.shared.t(use.titleKey) + "\n" + TraditionalEvidenceCatalog.text(sources)
             var displayLine = line
             if cell.isShaWuHuang || cell.isShaErHei {
                 displayLine += " · \(cell.isShaWuHuang ? wuHuangLabel : erHeiLabel)"
@@ -1046,7 +1116,7 @@ public class TianJiShuEngine {
     }
     
     // 8.2 紫白流年客星调理与催旺（含家人影响维度）
-    private func drawPurpleWhiteRemedies(ctx: CGContext, curY: CGFloat, vermilion: UIColor, renderLanguage: AppLanguage, pwChart: PurpleWhiteChart) -> CGFloat {
+    private func drawPurpleWhiteRemedies(ctx: CGContext, curY: CGFloat, vermilion: UIColor, renderLanguage: AppLanguage, pwChart: PurpleWhiteChart, analysis: XuanKongDeepAnalysis) -> CGFloat {
         let secTitle = tr8(
             "紫白流年 · 客星调理与催旺",
             "紫白流年 · 客星調理與催旺",
@@ -1063,7 +1133,12 @@ public class TianJiShuEngine {
         let font = UIFont.systemFont(ofSize: 22)
         let ink = UIColor(red: 40/255.0, green: 35/255.0, blue: 30/255.0, alpha: 1.0)
         for item in pwChart.palaceItems {
-            let line = "「\(item.palaceName)」\(item.advice)"
+            let sector = analysis.sectors.first { $0.id == item.palaceId - 1 }
+            let lang = LocalizationManager.shared
+            let state = sector.map { lang.t($0.use.titleKey) } ?? ""
+            let line = "「\(item.palaceName)」 " + lang.t("xkd_annual") + " \(item.yearGuestStar) · "
+                + lang.t("xkd_monthly") + " \(item.monthGuestStar) · " + state + "\n"
+                + TraditionalEvidenceCatalog.text(item.sourceReferences)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: font,
                 .foregroundColor: ink
@@ -1217,7 +1292,7 @@ public class TianJiShuEngine {
     }
     
     // 11. 卷尾合规免责声明（8 语种）
-    private func drawDisclaimer(ctx: CGContext, curY: CGFloat, renderLanguage: AppLanguage) {
+    private func drawDisclaimer(ctx: CGContext, curY: CGFloat, renderLanguage: AppLanguage) -> CGFloat {
         let disclaimer = tr8(
             "温馨提示：本长卷依据传统堪舆文化整理，仅供文化研究与娱乐参考，不构成医疗、法律、金融或投资建议，亦不承诺任何实际效果。请理性看待，涉及健康、财产等重大事项请咨询相关专业人士。",
             "溫馨提示：本長卷依據傳統堪輿文化整理，僅供文化研究與娛樂參考，不構成醫療、法律、金融或投資建議，亦不承諾任何實際效果。請理性看待，涉及健康、財產等重大事項請諮詢相關專業人士。",
@@ -1241,6 +1316,7 @@ public class TianJiShuEngine {
             context: nil
         ).height) + 8
         disclaimer.draw(in: CGRect(x: 100, y: curY + 260, width: maxWidth, height: neededHeight), withAttributes: attr)
+        return curY + 260 + neededHeight + 80
     }
     
     // 保存至相册

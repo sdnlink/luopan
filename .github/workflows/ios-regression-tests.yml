@@ -17,10 +17,13 @@ concurrency:
 jobs:
   functional-tests:
     runs-on: xcode-27
-    timeout-minutes: 30
+    # 30min tests + 9m45s artifact retries + checkout/summary margin.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Run tests on an available iPhone simulator
+        id: regression_tests
+        timeout-minutes: 30
         shell: bash
         run: |
           set -euo pipefail
@@ -46,8 +49,15 @@ jobs:
             -parallel-testing-enabled NO \
             -resultBundlePath build/ios-regression.xcresult \
             CODE_SIGNING_ALLOWED=NO 2>&1 | tee build/ios-regression.log
-      - name: Upload test results
-        if: always()
+      # xcresult/logs are diagnostics. An ArtifactService outage must not turn
+      # passing tests into a failed test job, or hide the original test failure.
+      # Retry the entire action: its internal CreateArtifact retries can exhaust
+      # before GitHub's service recovers. overwrite also handles partial uploads.
+      - name: Upload test results (attempt 1)
+        id: upload_results_1
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        timeout-minutes: 3
         uses: actions/upload-artifact@v4
         with:
           name: ios-functional-regression-results
@@ -55,3 +65,58 @@ jobs:
             build/ios-regression.xcresult
             build/ios-regression.log
           if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before retrying test result upload
+        if: ${{ !cancelled() && steps.upload_results_1.outcome == 'failure' }}
+        shell: bash
+        run: sleep 15
+
+      - name: Upload test results (attempt 2)
+        id: upload_results_2
+        if: ${{ !cancelled() && steps.upload_results_1.outcome == 'failure' }}
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-functional-regression-results
+          path: |
+            build/ios-regression.xcresult
+            build/ios-regression.log
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Wait before final test result upload
+        if: ${{ !cancelled() && steps.upload_results_2.outcome == 'failure' }}
+        shell: bash
+        run: sleep 30
+
+      - name: Upload test results (attempt 3)
+        id: upload_results_3
+        if: ${{ !cancelled() && steps.upload_results_2.outcome == 'failure' }}
+        continue-on-error: true
+        timeout-minutes: 3
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-functional-regression-results
+          path: |
+            build/ios-regression.xcresult
+            build/ios-regression.log
+          if-no-files-found: ignore
+          overwrite: true
+
+      - name: Report unavailable test result artifact
+        if: ${{ !cancelled() && steps.upload_results_3.outcome == 'failure' }}
+        shell: bash
+        env:
+          TEST_OUTCOME: ${{ steps.regression_tests.outcome }}
+        run: |
+          echo "::warning::Test result upload failed after three attempts. Inspect the test step output for the actual test result. If timeouts persist, check runner connectivity to GitHub's artifact service."
+          {
+            echo '### Test result artifact unavailable'
+            echo
+            printf 'Test step outcome: **%s**.\n\n' "$TEST_OUTCOME"
+            echo 'The artifact upload failed after three attempts. The test output is still available in the simulator test step logs.'
+            echo
+            echo 'For persistent CreateArtifact timeouts, check runner DNS, proxy and HTTPS access to the GitHub artifact endpoints.'
+          } >> "$GITHUB_STEP_SUMMARY"

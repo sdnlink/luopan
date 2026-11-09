@@ -16,6 +16,7 @@ public struct XuanKongGridView: View {
     @State private var analysisDate = Date()
     @State private var followsToday = true
     @State private var cachedDeepAnalysis: XuanKongDeepAnalysis?
+    @State private var lastAnalysisSnapshot: TianJiAnalysisSnapshot?
     private var homeLayout: SavedFloorplanLayout? {
         workspace.snapshot.propertyID == surveyStore.propertyID ? workspace.snapshot.layout : nil
     }
@@ -23,7 +24,7 @@ public struct XuanKongGridView: View {
         XuanKongHomeContextBuilder.facing(layout: homeLayout, survey: surveyStore.latestInterior)
     }
     private var analysisHeading: CompassHeadingState {
-        if selectedFeature == .xuanKong, analyzeHome, let heading = homeFacing {
+        if analyzeHome, let heading = homeFacing {
             return Mountain24Data.shared.resolveHeadingState(heading: heading, pitch: motion.pitch, roll: motion.roll)
         }
         return motion.headingState
@@ -164,7 +165,7 @@ public struct XuanKongGridView: View {
         .sheet(item: $toolRequest) { item in
             switch item.tool {
             case .owner: OwnerLifeGuaView(context: item.context)
-            case .dates: CelestialDateSelectionView(context: item.context)
+            case .dates: CelestialDateSelectionView(context: item.context, propertyKey: item.propertyKey)
             }
         }
         .onAppear {
@@ -188,6 +189,7 @@ public struct XuanKongGridView: View {
         .onChange(of: analysisDate) { _ in refreshChart() }
         .onChange(of: workspace.snapshot.revision) { _ in refreshChart() }
         .onChange(of: surveyStore.propertyID) { _ in
+            lastAnalysisSnapshot = nil
             if homeFacing == nil { analyzeHome = false }
             cachedChart = nil
             starMode.restoreAutomatic()
@@ -238,19 +240,31 @@ public struct XuanKongGridView: View {
             return
         }
         let isFirstChart = cachedChart == nil
-        let updated = FlyingStarsEngine.shared.calculateChart(
-            period: selectedPeriod,
-            sitting: analysisHeading.sittingMountain,
-            facing: analysisHeading.facingMountain,
-            useTiGua: useTiGua, date: analysisDate
-        )
-        let context = analyzeHome && homeFacing != nil
-            ? XuanKongHomeContextBuilder.build(layout: homeLayout, survey: surveyStore.latestInterior,
-                exterior: surveyStore.records, facts: surveyStore.siteFacts) : nil
-        let deep = XuanKongDeepAnalyzer.analyze(chart: updated, date: analysisDate, context: context)
+        let snapshot = captureAnalysis()
+        let updated = snapshot.flyingStarsChart()
+        let deep = snapshot.deepAnalysis(chart: updated)
+        lastAnalysisSnapshot = snapshot
         if isFirstChart { selectedPalaceIdx = deep.priorities.first?.id ?? 4 }
         cachedDeepAnalysis = deep
         cachedChart = updated
+    }
+
+    private func captureAnalysis() -> TianJiAnalysisSnapshot {
+        let usesHome = analyzeHome && homeFacing != nil
+        let heading = usesHome ? (homeFacing ?? motion.headingState.facingAngle) : motion.headingState.facingAngle
+        let headingState = Mountain24Data.shared.resolveHeadingState(heading: heading)
+        let context = analyzeHome && homeFacing != nil
+            ? XuanKongHomeContextBuilder.build(layout: homeLayout, survey: surveyStore.latestInterior,
+                exterior: surveyStore.records, facts: surveyStore.siteFacts) : nil
+        let report = usesHome ? homeLayout.map { layout in
+            FloorplanEngine.shared.auditFloorplan(rooms: layout.rooms,
+                centroid: CGPoint(x: layout.centroidX, y: layout.centroidY), heading: layout.compassRotation,
+                aspectRatio: CGFloat(layout.aspectRatio ?? 1), date: analysisDate).report
+        } ?? [] : []
+        return TianJiAnalysisSnapshot(heading: heading, period: selectedPeriod,
+            useTiGua: starMode.usesTiGua(automatic: headingState.isJianXiang), reportDate: analysisDate)
+            .capturing(context: context, propertyKey: usesHome ? surveyStore.propertyKey : nil,
+                floorplanReport: report, panoramaArchive: usesHome ? surveyStore.archive : nil)
     }
     
     private func consumeFeatureRequest() {
@@ -261,7 +275,7 @@ public struct XuanKongGridView: View {
 
     private func openFeature(_ feature: AnalysisFeature) {
         if feature == .owner || feature == .dates {
-            toolRequest = AnalysisToolRequest(tool: feature == .owner ? .owner : .dates, context: motion.headingState)
+            toolRequest = AnalysisToolRequest(tool: feature == .owner ? .owner : .dates, context: analysisHeading)
         } else {
             if feature == .xuanKong && !didChooseSource {
                 analyzeHome = homeFacing != nil
@@ -335,8 +349,8 @@ public struct XuanKongGridView: View {
 
     // MARK: - P0.1 常驻立极坐向锁定与 24 山手选控制栏 + 今日吉签入口
     private func sittingControlHeader() -> some View {
-        let state = analysisHeading
-        let usesHome = selectedFeature == .xuanKong && analyzeHome
+        let usesHome = (selectedFeature == .xuanKong || selectedFeature == nil) && analyzeHome && homeFacing != nil
+        let state = usesHome ? analysisHeading : motion.headingState
         let pickLabel: String
         let signLabel: String
         switch lang.effectiveLanguage {
@@ -468,9 +482,7 @@ public struct XuanKongGridView: View {
             Spacer()
             
             Button(action: {
-                reportSnapshot = TianJiAnalysisSnapshot(heading: analysisHeading.facingAngle,
-                                                        period: selectedPeriod, useTiGua: useTiGua,
-                                                        reportDate: selectedFeature == .xuanKong ? analysisDate : Date())
+                reportSnapshot = lastAnalysisSnapshot ?? captureAnalysis()
                 showTianJiShuSheet = true
             }) {
                 Text(lang.t("one_click_export"))
@@ -788,8 +800,9 @@ public struct XuanKongGridView: View {
                     if let cell = chart.palaces.first(where: { $0.id == selectedPalaceIdx }),
                        let sector = analysis.sectors.first(where: { $0.id == cell.id }) {
                         sectorEvidence(cell: cell, sector: sector)
+                        sourceEvidence(chart: chart, cell: cell, sector: sector)
                     }
-                    Text(chart.analysisNote)
+                    Text(lang.t("ref_scope_note"))
                         .foregroundColor(.white.opacity(0.55))
                 }
                 .adaptiveFont(size: 11)
@@ -869,6 +882,20 @@ public struct XuanKongGridView: View {
             }
             Text(lang.t("xkd_coverage_hint"))
                 .foregroundColor(.white.opacity(0.5))
+        }
+    }
+
+    private func sourceEvidence(chart: XuanKongChart, cell: PalaceCell, sector: XuanKongSectorAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(chart.sourceReferences(palaceID: cell.id, yearStar: sector.yearStar, monthStar: sector.monthStar)) { reference in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(reference.localizedText)
+                    if let sourceURL = reference.sourceURL {
+                        Link(lang.t("ref_read_original"), destination: sourceURL)
+                            .foregroundColor(Color.yanCyan)
+                    }
+                }
+            }
         }
     }
 

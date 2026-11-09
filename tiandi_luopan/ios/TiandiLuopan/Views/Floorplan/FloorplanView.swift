@@ -26,6 +26,7 @@ struct SavedFloorplanLayout: Codable {
     var depthMeters: Double? = nil
     var houseFacingDegrees: Double? = nil
     var houseFacingWasExplicit: Bool? = nil
+    var surveyMapping: FloorplanSurveyMapping? = nil
 }
 
 /// P1.2 多套户型宅谱档案记录（支持保存多套房源/客户户型、关联 3D 空间测绘模型及各自的已购解锁凭证）
@@ -40,6 +41,7 @@ struct FloorplanCaseRecord: Codable, Identifiable {
     var virtualSpatialSurvey: HouseSpatialSurvey? = nil
     var exteriorRecords: [ExteriorShaRecord]? = nil
     var siteFacts: [XuanKongSiteFact]? = nil
+    var propertyKey: String? = nil
     // Included only in portable JSON backups, never in the defaults archive.
     var backupImageData: Data? = nil
 }
@@ -296,6 +298,7 @@ public struct FloorplanView: View {
     @State private var workspacePropertyID = ShaSurveyStore.shared.propertyID
     @State private var houseFacingOffset: Double?
     @State private var houseFacingWasExplicit: Bool?
+    @State private var surveyMapping: FloorplanSurveyMapping?
     private var savedCases: [FloorplanCaseRecord] { caseStore.records }
     @State private var showCaseArchiveSheet: Bool = false
     @State private var newCaseTitleInput: String = ""
@@ -547,6 +550,7 @@ public struct FloorplanView: View {
                 calibratedWidthText = ""
                 calibratedDepthText = ""
                 houseFacingOffset = nil
+                surveyMapping = nil
                 houseFacingWasExplicit = nil
                 restoredAspectRatio = 1
                 replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
@@ -704,7 +708,8 @@ public struct FloorplanView: View {
         blueprintImage: UIImage?,
         propertyID: UUID,
         compassHeading: Double? = nil,
-        spatialSurvey: HouseSpatialSurvey? = nil
+        spatialSurvey: HouseSpatialSurvey? = nil,
+        surveyMapping: FloorplanSurveyMapping? = nil
     ) -> Bool {
         guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return false }
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
@@ -745,14 +750,13 @@ public struct FloorplanView: View {
             floorplanAccessGrantSignature: previousGrant.2,
             aspectRatio: blueprintImage.map { Double($0.size.width / max(1, $0.size.height)) },
             houseFacingDegrees: spatialSurvey?.resolvedHouseFacing,
-            houseFacingWasExplicit: spatialSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
+            houseFacingWasExplicit: spatialSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) },
+            surveyMapping: surveyMapping
         )
         do {
             guard try FloorplanWorkspaceStore.shared.save(layout: saved, image: blueprintImage, writerID: UUID(),
                                                           expectedPropertyID: propertyID) else { return false }
-            ShaSurveyStore.shared.replaceProperty(measured: spatialSurvey, virtual: nil,
-                                                  exterior: ShaSurveyStore.shared.records,
-                                                  expectedPropertyID: propertyID)
+            ShaSurveyStore.shared.refreshMeasuredSurvey(spatialSurvey, propertyID: propertyID)
             NotificationCenter.default.post(name: .didUpdateMeasuredSpatialSurvey, object: nil)
             return true
         } catch {
@@ -811,6 +815,7 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
+        surveyMapping = saved.surveyMapping
         let sourceSurvey = persistedSpatialSurvey ?? persistedVirtualSpatialSurvey
         houseFacingWasExplicit = saved.houseFacingWasExplicit ?? sourceSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
         let savedFacing = saved.houseFacingDegrees ?? sourceSurvey?.resolvedHouseFacing
@@ -878,9 +883,10 @@ public struct FloorplanView: View {
     }
 
     private func replaceSpatialArchives(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
-                                        siteFacts: [XuanKongSiteFact] = []) {
+                                        siteFacts: [XuanKongSiteFact] = [], propertyKey: String? = nil) {
         reportExportGeneration &+= 1
-        ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior, siteFacts: siteFacts)
+        ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior,
+                                              siteFacts: siteFacts, propertyKey: propertyKey)
         workspacePropertyID = ShaSurveyStore.shared.propertyID
         persistedSpatialSurvey = measured
         persistedVirtualSpatialSurvey = virtual
@@ -915,7 +921,8 @@ public struct FloorplanView: View {
             widthMeters: calibratedWidthMeters.map { Double($0) },
             depthMeters: calibratedDepthMeters.map { Double($0) },
             houseFacingDegrees: houseFacingDegrees,
-            houseFacingWasExplicit: houseFacingWasExplicit
+            houseFacingWasExplicit: houseFacingWasExplicit,
+            surveyMapping: surveyMapping
         )
         guard didRestorePersistedLayout else { return }
         do {
@@ -994,7 +1001,8 @@ public struct FloorplanView: View {
             widthMeters: calibratedWidthMeters.map { Double($0) },
             depthMeters: calibratedDepthMeters.map { Double($0) },
             houseFacingDegrees: houseFacingDegrees,
-            houseFacingWasExplicit: houseFacingWasExplicit
+            houseFacingWasExplicit: houseFacingWasExplicit,
+            surveyMapping: surveyMapping
         )
 
         let record = FloorplanCaseRecord(
@@ -1007,7 +1015,8 @@ public struct FloorplanView: View {
             spatialSurvey: persistedSpatialSurvey,
             virtualSpatialSurvey: persistedVirtualSpatialSurvey,
             exteriorRecords: ShaSurveyStore.shared.records,
-            siteFacts: ShaSurveyStore.shared.siteFacts
+            siteFacts: ShaSurveyStore.shared.siteFacts,
+            propertyKey: ShaSurveyStore.shared.propertyKey
         )
         do { try caseStore.insert(record) }
         catch { caseBackupToastMessage = lang.t("save_failed"); return }
@@ -1035,6 +1044,7 @@ public struct FloorplanView: View {
         )
         compassRotation = Self.normalizedHeading(saved.compassRotation)
         isSyncWithCompass = saved.isSyncWithCompass
+        surveyMapping = saved.surveyMapping
         let sourceSurvey = record.spatialSurvey ?? record.virtualSpatialSurvey
         houseFacingWasExplicit = saved.houseFacingWasExplicit ?? sourceSurvey.map { $0.houseFacingWasExplicit ?? ($0.fixedHouseFacing != nil) }
         let savedFacing = saved.houseFacingDegrees ?? sourceSurvey?.resolvedHouseFacing
@@ -1070,7 +1080,8 @@ public struct FloorplanView: View {
             measured: legacyIsVirtual ? nil : record.spatialSurvey,
             virtual: record.virtualSpatialSurvey ?? (legacyIsVirtual ? record.spatialSurvey : nil),
             exterior: record.exteriorRecords ?? [],
-            siteFacts: record.siteFacts ?? []
+            siteFacts: record.siteFacts ?? [],
+            propertyKey: record.propertyKey ?? record.id
         )
 
         persistLayout()
@@ -1363,11 +1374,12 @@ public struct FloorplanView: View {
         let isCurrent: Bool
     }
 
-    private func evaluatePKMetric(id: String, title: String, rooms: [FloorplanRoom], centroid: CGPoint, heading: Double, aspectRatio: CGFloat, isCurrent: Bool) -> PropertyPKMetric {
+    private func evaluatePKMetric(id: String, title: String, rooms: [FloorplanRoom], centroid: CGPoint,
+                                  heading: Double, houseFacing: Double?, aspectRatio: CGFloat, isCurrent: Bool) -> PropertyPKMetric {
         let audit = FloorplanEngine.shared.auditFloorplan(rooms: rooms, centroid: centroid, heading: heading, aspectRatio: aspectRatio)
-        let sitAngle = (heading + 180.0).truncatingRemainder(dividingBy: 360.0)
-        let sitMtn = Mountain24Data.shared.mountain(for: sitAngle < 0 ? sitAngle + 360.0 : sitAngle)
-        let faceMtn = Mountain24Data.shared.mountain(for: Self.normalizedHeading(heading))
+        let state = FloorplanOrientation(coordinateHeading: heading, houseFacingDegrees: houseFacing).houseHeadingState
+        let sitMtn = state.sittingMountain
+        let faceMtn = state.facingMountain
         let compat = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: sitMtn.palace)
         let ausp = audit.report.filter { $0.isGood }.count
         let warn = audit.report.filter { $0.isWarning }.count
@@ -1433,6 +1445,7 @@ public struct FloorplanView: View {
             rooms: rooms,
             centroid: centroid,
             heading: effectiveHeading,
+            houseFacing: houseFacingDegrees ?? persistedSpatialSurvey?.resolvedHouseFacing ?? persistedVirtualSpatialSurvey?.resolvedHouseFacing,
             aspectRatio: floorplanAspectRatio,
             isCurrent: true
         )
@@ -1443,6 +1456,7 @@ public struct FloorplanView: View {
                 rooms: rec.layout.rooms,
                 centroid: CGPoint(x: rec.layout.centroidX, y: rec.layout.centroidY),
                 heading: rec.layout.compassRotation,
+                houseFacing: rec.layout.houseFacingDegrees ?? rec.spatialSurvey?.resolvedHouseFacing ?? rec.virtualSpatialSurvey?.resolvedHouseFacing,
                 aspectRatio: Self.aspectRatio(for: rec),
                 isCurrent: false
             )
@@ -2184,6 +2198,7 @@ public struct FloorplanView: View {
     private func resetToSampleLayout() {
         workspaceRevision = workspaceStore.snapshot.revision
         houseFacingOffset = nil
+        surveyMapping = nil
         houseFacingWasExplicit = nil
         userFloorplanImage = nil
         calibratedWidthText = ""

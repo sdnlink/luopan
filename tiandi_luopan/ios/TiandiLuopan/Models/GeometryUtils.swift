@@ -11,6 +11,11 @@ struct FloorplanOrientation: Equatable {
     let coordinateHeading: Double
     let houseFacingDegrees: Double?
 
+    var houseHeadingState: CompassHeadingState {
+        let facing = houseFacingDegrees.flatMap { $0.isFinite ? $0 : nil } ?? coordinateHeading
+        return Mountain24Data.shared.resolveHeadingState(heading: facing)
+    }
+
     var relativeFacing: Double? {
         guard let houseFacingDegrees, houseFacingDegrees.isFinite, coordinateHeading.isFinite else { return nil }
         return (houseFacingDegrees - coordinateHeading + 360).truncatingRemainder(dividingBy: 360)
@@ -18,6 +23,26 @@ struct FloorplanOrientation: Equatable {
 
     func facing(afterCalibratingTo heading: Double) -> Double? {
         relativeFacing.map { (heading + $0 + 360).truncatingRemainder(dividingBy: 360) }
+    }
+}
+
+/// RoomPlan's world X/Z to the padded normalized blueprint, frozen at import.
+/// A different survey must be explicitly re-synced before its points can be merged.
+public struct FloorplanSurveyMapping: Codable {
+    let surveyID: UUID
+    let minX: Double
+    let minZ: Double
+    let spanX: Double
+    let spanZ: Double
+    let padding: Double
+
+    func point(x: Float, z: Float, surveyID: UUID) -> CGPoint? {
+        guard self.surveyID == surveyID, x.isFinite, z.isFinite,
+              minX.isFinite, minZ.isFinite, spanX.isFinite, spanZ.isFinite,
+              spanX > 0, spanZ > 0, padding.isFinite, padding >= 0, padding < 0.5 else { return nil }
+        let scale = 1 - 2 * padding
+        return CGPoint(x: (Double(x) - minX) / spanX * scale + padding,
+                       y: (Double(z) - minZ) / spanZ * scale + padding)
     }
 }
 

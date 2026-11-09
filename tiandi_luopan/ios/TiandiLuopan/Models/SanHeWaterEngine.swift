@@ -252,6 +252,23 @@ public struct HuangQuanWaterResult {
     public let badgeText: String
     public let quote: String = "庚丁坤上是黄泉，乙丙须防巽水先。甲癸向中休见艮，辛壬水路怕当乾。"
 
+    static func reference(facingMountain: String, badgeText: String) -> TraditionalEvidence {
+        let key: String
+        switch facingMountain {
+        case "庚", "丁", "坤": key = "ref_hq_kun"
+        case "乙", "丙", "巽": key = "ref_hq_xun"
+        case "甲", "癸", "艮": key = "ref_hq_gen"
+        case "辛", "壬", "乾": key = "ref_hq_qian"
+        default: key = "ref_hq_other"
+        }
+        return TraditionalEvidence(id: "huangquan." + facingMountain, kind: .rule, titleKey: key,
+            matches: [facingMountain + " · " + badgeText])
+    }
+
+    var sourceReference: TraditionalEvidence {
+        Self.reference(facingMountain: facingMountain, badgeText: badgeText)
+    }
+
     public var localizedQuote: String {
         switch LocalizationManager.shared.effectiveLanguage {
         case .en: return "Geng and Ding fear Huangquan in Kun; Yi and Bing guard against Xun water. Jia and Gui avoid Gen; Xin and Ren fear Qian water."
@@ -275,6 +292,15 @@ public struct BaShaResult {
     public let remedy: String
     public let song: String = "坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜。"
     public let xiaoShaRule: String = "生我为生砂（催贵），同我为旺砂（旺丁财），克我为煞砂（大凶血光），我克为奴砂（得财帛），我生为泄砂（虚耗脱白）。"
+
+    static func reference(sittingMountain: String, sittingPalace: String, shaZhi: String) -> TraditionalEvidence {
+        TraditionalEvidence(id: "basha." + sittingPalace, kind: .rule, titleKey: "ref_basha",
+            matches: [sittingMountain + " · " + sittingPalace + " → " + shaZhi])
+    }
+
+    var sourceReference: TraditionalEvidence {
+        Self.reference(sittingMountain: sittingMountain, sittingPalace: sittingPalace, shaZhi: shaZhi)
+    }
 
     public var localizedSong: String {
         switch LocalizationManager.shared.effectiveLanguage {
@@ -351,46 +377,14 @@ public struct BaShaResult {
 public final class SanHeWaterEngine {
     public static let shared = SanHeWaterEngine()
 
-    private func localizedHuangQuanSourceNote(for lang: AppLanguage) -> String {
-        switch lang {
-        case .zhHant:
-            return "出處：楊公八路黃泉水法口訣。解釋：上述疾厄、損丁與財運語句為古法象徵，不是醫療或財務預測；請現場核對排水與安全。"
-        case .ja:
-            return "出典：楊公八路黄泉水法の口訣。健康・家族・財産の表現は古法の象徴であり、医療・金融の予測ではありません。排水と安全を現地で確認してください。"
-        case .ko:
-            return "출처: 양공 팔로황천 수법 구결. 건강·가족·재정 표현은 고법의 상징이며 의료·재정 예측이 아닙니다. 배수와 안전을 현장에서 확인하세요."
-        case .vi:
-            return "Nguồn: khẩu quyết thủy pháp Hoàng Tuyền Bát Lộ của Dương Công. Các câu về sức khỏe, gia đình và tài lộc là biểu tượng cổ, không phải dự đoán y khoa hay tài chính; hãy kiểm tra thoát nước và an toàn tại chỗ."
-        case .th:
-            return "แหล่งที่มา: คาถาวิธีน้ำหวงเฉวียนแปดทางของหยางกง ถ้อยคำเรื่องสุขภาพ ครอบครัว และทรัพย์เป็นสัญลักษณ์โบราณ ไม่ใช่การพยากรณ์ทางการแพทย์หรือการเงิน โปรดตรวจสอบการระบายน้ำและความปลอดภัยหน้างาน"
-        case .id:
-            return "Sumber: mantra tata air Huangquan delapan jalur tradisi Yang Gong. Ungkapan kesehatan, keluarga, dan rezeki bersifat simbolis, bukan prediksi medis atau keuangan; periksa drainase dan keselamatan di lokasi."
-        case .en:
-            return "Source: Yang Gong Eight-Road Huangquan water-method formula. Health, family and wealth wording is a classical symbol, not a medical or financial prediction; verify drainage and safety on site."
-        case .auto, .zhHans:
-            return "出处：杨公八路黄泉水法口诀。解释：上述疾厄、损丁与财运语句为古法象征，不是医疗或财务预测；请现场核对排水与安全。"
-        }
+    private func localizedHuangQuanSourceNote(facingMountain: String, badgeText: String) -> String {
+        HuangQuanWaterResult.reference(facingMountain: facingMountain, badgeText: badgeText).localizedText
+            + "\n" + LocalizationManager.shared.t("ref_scope_note")
     }
 
-    private func localizedBaShaSourceNote(for lang: AppLanguage) -> String {
-        switch lang {
-        case .zhHant:
-            return "出處：傳統八煞曜位歌訣「坎龍坤兔震山猴，巽雞乾馬兌蛇頭，艮虎離豬為煞曜」。解釋：腎疾、脾胃、眼疾、傷損等語句是古籍象徵，不是醫療診斷；請先處理現場結構、噪音、排水和通行安全。"
-        case .ja:
-            return "出典：伝統八煞曜位の歌訣。腎臓・胃腸・眼・けがの表現は古典の象徴で、医学的診断ではありません。構造、騒音、排水、安全を現地で確認してください。"
-        case .ko:
-            return "출처: 전통 팔살요위 구결. 신장·소화·눈·부상 표현은 고전 상징이며 의료 진단이 아닙니다. 구조·소음·배수·통행 안전을 현장에서 확인하세요."
-        case .vi:
-            return "Nguồn: khẩu quyết Bát Sát Diệu vị truyền thống. Các câu về thận, tỳ vị, mắt và thương tổn là biểu tượng cổ, không phải chẩn đoán y khoa; hãy kiểm tra cấu trúc, tiếng ồn, thoát nước và an toàn."
-        case .th:
-            return "แหล่งที่มา: คาถาดาวพิฆาตแปดทิศดั้งเดิม ถ้อยคำเรื่องไต ระบบย่อยอาหาร ดวงตา และการบาดเจ็บเป็นสัญลักษณ์โบราณ ไม่ใช่การวินิจฉัยทางการแพทย์ โปรดตรวจโครงสร้าง เสียง การระบายน้ำ และความปลอดภัย"
-        case .id:
-            return "Sumber: mantra delapan bintang Sha tradisional. Ungkapan ginjal, pencernaan, mata, dan cedera bersifat simbolis, bukan diagnosis medis; periksa struktur, kebisingan, drainase, dan keselamatan."
-        case .en:
-            return "Source: traditional Eight-Sha star formula. Kidney, digestion, eye and injury wording is classical symbolism, not a medical diagnosis; inspect structure, noise, drainage and access safety on site."
-        case .auto, .zhHans:
-            return "出处：传统八煞曜位歌诀“坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”。解释：肾疾、脾胃、眼疾、伤损等语句是古籍象征，不是医疗诊断；请先处理现场结构、噪音、排水和通行安全。"
-        }
+    private func localizedBaShaSourceNote(sitting: Mountain24Item, shaZhi: String) -> String {
+        BaShaResult.reference(sittingMountain: sitting.name, sittingPalace: sitting.palace, shaZhi: shaZhi).localizedText
+            + "\n" + LocalizationManager.shared.t("ref_scope_note")
     }
 
     // 八煞克煞曜位传统映射（口诀：“坎龙坤兔震山猴，巽鸡乾马兑蛇头，艮虎离猪为煞曜”）。
@@ -724,7 +718,7 @@ public final class SanHeWaterEngine {
             }
         }
         
-        desc += "\n\n" + localizedHuangQuanSourceNote(for: lang)
+        desc += "\n\n" + localizedHuangQuanSourceNote(facingMountain: name, badgeText: badge)
 
         return HuangQuanWaterResult(
             facingMountain: name,
@@ -845,7 +839,7 @@ public final class SanHeWaterEngine {
             sittingPalace: palace,
             shaZhi: info.zhi,
             shaDir: info.dir,
-            lore: lore + "\n\n" + localizedBaShaSourceNote(for: lang),
+            lore: lore + "\n\n" + localizedBaShaSourceNote(sitting: sitting, shaZhi: info.zhi),
             remedy: remedy
         )
     }

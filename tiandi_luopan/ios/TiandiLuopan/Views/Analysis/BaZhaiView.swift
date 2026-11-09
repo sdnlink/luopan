@@ -363,7 +363,9 @@ public struct BaZhaiView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .lineSpacing(3)
                     
-                    Text("\(lang.t("song_quote"))：“\(hq.localizedQuote)”")
+                    DisclosureGroup(lang.t("song_quote")) {
+                        Text(hq.localizedQuote)
+                    }
                         .adaptiveFont(size: 10, design: .serif)
                         .foregroundColor(Color(red: 0.83, green: 0.68, blue: 0.21))
                 }
@@ -402,7 +404,9 @@ public struct BaZhaiView: View {
                         .foregroundColor(Color.yellow.opacity(0.9))
                         .lineSpacing(2)
                     
-                    Text("\(lang.t("song_quote"))：“\(basha.localizedSong)”\n\(basha.localizedXiaoShaRule)")
+                    DisclosureGroup(lang.t("song_quote")) {
+                        Text(basha.localizedSong + "\n" + basha.localizedXiaoShaRule)
+                    }
                         .adaptiveFont(size: 10, design: .serif)
                         .foregroundColor(.white.opacity(0.6))
                         .lineSpacing(2)
@@ -645,6 +649,7 @@ struct AnalysisToolRequest: Identifiable {
     let id = UUID()
     let tool: Tool
     let context: CompassHeadingState
+    var propertyKey: String = ShaSurveyStore.shared.propertyKey
 }
 
 /// All owner-gua entry points use the same live StoreKit entitlement gate.
@@ -1127,6 +1132,7 @@ public struct OwnerLifeGuaView: View {
 // MARK: - 独立能力：天星择日
 public struct CelestialDateSelectionView: View {
     private let context: CompassHeadingState
+    private let reminderContext: AuspiciousReminderContext
     @ObservedObject private var lang = LocalizationManager.shared
     @ObservedObject private var kua = UserKuaProfileManager.shared
     @ObservedObject private var retention = RetentionServiceManager.shared
@@ -1146,7 +1152,11 @@ public struct CelestialDateSelectionView: View {
     private static let clockRefreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     private var effectiveDate: Date { isUsingCustomDate ? selectedDate : Date() }
 
-    public init(context: CompassHeadingState) { self.context = context }
+    public init(context: CompassHeadingState, propertyKey: String? = nil) {
+        self.context = context
+        self.reminderContext = AuspiciousReminderContext(propertyKey: propertyKey ?? ShaSurveyStore.shared.propertyKey,
+                                                        sittingMountain: context.sittingMountain.name)
+    }
 
     public var body: some View {
         NavigationView {
@@ -1163,6 +1173,24 @@ public struct CelestialDateSelectionView: View {
                         .foregroundColor(Color.yanCyan)
                         .padding(.horizontal, 16)
                     dateAssessmentCard(zeri: cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: context.sittingMountain, date: effectiveDate))
+                    if !retention.legacyScheduledDayIDs.isEmpty {
+                        DisclosureGroup(lang.t("legacy_reminders_title")) {
+                            Text(lang.t("legacy_reminders_hint"))
+                                .foregroundColor(.white.opacity(0.6))
+                            ForEach(retention.legacyScheduledDayIDs.sorted(), id: \.self) { id in
+                                HStack {
+                                    Text(id)
+                                    Spacer()
+                                    Button(lang.t("cancel")) { retention.removeLegacyAuspiciousReminder(id: id) }
+                                        .foregroundColor(.orange)
+                                        .frame(minHeight: 44)
+                                }
+                            }
+                        }
+                        .adaptiveFont(size: 12)
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.horizontal, 16)
+                    }
                 }
                 .padding(.vertical, 16)
             }
@@ -1175,15 +1203,17 @@ public struct CelestialDateSelectionView: View {
             .sheet(item: $activeSheet) { _ in
                 DailyAuspiciousCardSheet(targetDate: effectiveDate, headingState: context)
             }
-            .onAppear { isVisible = true; refreshAnalysis() }
+            .onAppear { isVisible = true; refreshAnalysis(); retention.refreshScheduledReminders() }
             .onDisappear { isVisible = false }
             .onChange(of: lang.effectiveLanguage) { _ in refreshAnalysis() }
-            .onReceive(Self.clockRefreshTimer) { _ in if isVisible { refreshAnalysis() } }
+            .onReceive(Self.clockRefreshTimer) { _ in
+                if isVisible { refreshAnalysis(); retention.refreshScheduledReminders() }
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
                 if isVisible { refreshAnalysis() }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                if isVisible { refreshAnalysis() }
+                if isVisible { refreshAnalysis(); retention.refreshScheduledReminders() }
             }
             .overlay {
                 if retention.showNotificationPermissionDeniedAlert {
@@ -1633,7 +1663,7 @@ public struct CelestialDateSelectionView: View {
                 )
                 VStack(spacing: 6) {
                     ForEach(upcoming) { day in
-                        let isScheduled = retention.scheduledDayIDs.contains(day.id)
+                        let isScheduled = retention.scheduledDayIDs.contains(reminderContext.key(for: day.date))
                         HStack(spacing: 8) {
                             Button(action: {
                                 selectedDate = day.date
@@ -1664,7 +1694,8 @@ public struct CelestialDateSelectionView: View {
                             Button(action: {
                                 retention.toggleAuspiciousDayReminder(
                                     day: day,
-                                    sittingName: "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))"
+                                    sittingName: "\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))",
+                                    context: reminderContext
                                 )
                             }) {
                                 HStack(spacing: 3) {

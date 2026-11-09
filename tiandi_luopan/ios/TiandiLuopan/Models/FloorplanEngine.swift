@@ -21,22 +21,32 @@ enum XuanKongHomeContextBuilder {
                 result.warningKeys.append("xkd_orientation_conflict")
             }
         }
-        if let layout, layout.compassRotation.isFinite, layout.centroidX.isFinite, layout.centroidY.isFinite {
+        if let layout, let survey = acceptedSurvey,
+           !layout.rooms.isEmpty,
+           layout.surveyMapping?.point(x: survey.centroidX, z: survey.centroidZ, surveyID: survey.id) == nil {
+            acceptedSurvey = nil
+            if !survey.openings.isEmpty || !survey.objects.isEmpty {
+                result.warningKeys.append("xkd_alignment_missing")
+            }
+        }
+        let validRooms = layout?.rooms.filter {
+            $0.rect.minX.isFinite && $0.rect.minY.isFinite && $0.rect.width.isFinite && $0.rect.height.isFinite
+                && $0.rect.width > 0 && $0.rect.height > 0
+        } ?? []
+        let bounds = validRooms.filter { $0.type != .missingCorner }.reduce(CGRect.null) { $0.union($1.rect) }
+        let planRatio = (layout?.aspectRatio).flatMap { $0.isFinite && $0 > 0 ? CGFloat($0) : nil } ?? 1
+        let planRadius = bounds.isNull ? 0.03 : min(bounds.width * planRatio, bounds.height) * 0.12
+        func planSector(_ point: CGPoint, layout: SavedFloorplanLayout) -> Int? {
             let center = CGPoint(x: layout.centroidX, y: layout.centroidY)
-            let ratio = CGFloat(layout.aspectRatio ?? 1)
-            let safeRatio = ratio.isFinite && ratio > 0 ? ratio : 1
-            let rooms = layout.rooms.filter {
-                $0.rect.minX.isFinite && $0.rect.minY.isFinite && $0.rect.width.isFinite && $0.rect.height.isFinite
-                    && $0.rect.width > 0 && $0.rect.height > 0
-            }
-            let bounds = rooms.filter { $0.type != .missingCorner }.reduce(CGRect.null) { $0.union($1.rect) }
-            let radius = bounds.isNull ? 0.03 : min(bounds.width * safeRatio, bounds.height) * 0.12
+            if hypot((point.x - center.x) * planRatio, point.y - center.y) < planRadius { return 4 }
+            return XuanKongDeepAnalyzer.palaceID(bearing:
+                GeometryUtils.bearing(from: center, to: point, aspectRatio: planRatio) + layout.compassRotation)
+        }
+        if let layout, layout.compassRotation.isFinite, layout.centroidX.isFinite, layout.centroidY.isFinite {
             func sector(_ point: CGPoint) -> Int? {
-                let dx = (point.x - center.x) * safeRatio, dy = point.y - center.y
-                if hypot(dx, dy) < radius { return 4 }
-                return XuanKongDeepAnalyzer.palaceID(bearing: GeometryUtils.bearing(from: center, to: point, aspectRatio: safeRatio) + layout.compassRotation)
+                planSector(point, layout: layout)
             }
-            for room in rooms {
+            for room in validRooms {
                 if room.type == .door || room.type == .missingCorner {
                     if let id = sector(FloorplanEngine.roomCentroid(room)) {
                         result.places.append(XuanKongLocatedPlace(id: "plan-\(room.id)-\(id)", palaceID: id, name: room.name,
@@ -66,6 +76,10 @@ enum XuanKongHomeContextBuilder {
             let radius = Double(min(survey.dimensions.totalWidth, survey.dimensions.totalDepth)) * 0.12
             func sector(x: Float, z: Float) -> Int? {
                 guard x.isFinite, z.isFinite, center.x.isFinite, center.z.isFinite else { return nil }
+                if let layout, !layout.rooms.isEmpty {
+                    guard let point = layout.surveyMapping?.point(x: x, z: z, surveyID: survey.id) else { return nil }
+                    return planSector(point, layout: layout)
+                }
                 let dx = Double(x - center.x), dz = Double(z - center.z)
                 if hypot(dx, dz) < max(0.05, radius) { return 4 }
                 return XuanKongDeepAnalyzer.palaceID(bearing: atan2(dx, -dz) * 180 / .pi + survey.compassHeading)

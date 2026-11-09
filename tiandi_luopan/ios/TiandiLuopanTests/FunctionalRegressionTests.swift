@@ -1524,4 +1524,550 @@ final class FunctionalRegressionTests: XCTestCase {
             }
         }
     }
+
+    func testSourceNotesDistinguishASingleFiveFromActualDoubleFiveAndTwoFivePairs() {
+        let single = TraditionalEvidenceCatalog.pair(5, 1, context: "mountain/facing")
+        XCTAssertTrue(single.contains { $0.id == "stars.five" })
+        XCTAssertFalse(single.contains { $0.id == "pair.five_five" || $0.id == "pair.two_five" })
+        let doubled = TraditionalEvidenceCatalog.pair(5, 5, context: "year/month")
+        XCTAssertTrue(doubled.contains { $0.id == "pair.five_five" })
+        XCTAssertFalse(doubled.contains { $0.id == "pair.two_five" || $0.id == "stars.two" })
+        for stars in [(2, 5), (5, 2)] {
+            let pair = TraditionalEvidenceCatalog.pair(stars.0, stars.1, context: "year/month")
+            XCTAssertTrue(pair.contains { $0.id == "pair.two_five" })
+            XCTAssertFalse(pair.contains { $0.id == "pair.five_five" })
+        }
+    }
+
+    @MainActor
+    func testOneSixSourceAndEvaluationUseMetalWaterRatherThanWaterWood() throws {
+        let references = TraditionalEvidenceCatalog.pair(1, 6, context: "N")
+        let generating = try XCTUnwrap(references.first { $0.id == "elements.generating" })
+        XCTAssertEqual(generating.quotes, ["金生水"])
+        XCTAssertEqual(generating.sourceURL, TraditionalEvidenceCatalog.elementsURL)
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        for language in AppLanguage.allCases where language != .auto {
+            manager.effectiveLanguage = language
+            XCTAssertEqual(guidanceCell(mountain: 1, facing: 6, period: 9).localizedEvaluationSummary,
+                           manager.t("ref_pair_one_six"))
+        }
+    }
+
+    func testTheSameBookSectionSelectsDifferentExcerptsForDifferentPairs() throws {
+        let wood = try XCTUnwrap(TraditionalEvidenceCatalog.pair(3, 7, context: "N").first { $0.id == "elements.controlling" })
+        let metal = try XCTUnwrap(TraditionalEvidenceCatalog.pair(7, 9, context: "N").first { $0.id == "elements.controlling" })
+        XCTAssertEqual(wood.sourceURL, metal.sourceURL)
+        XCTAssertEqual(wood.quotes, ["金剋木"])
+        XCTAssertEqual(metal.quotes, ["火剋金"])
+        XCTAssertNotEqual(wood.matches, metal.matches)
+    }
+
+    func testEveryStarPairSourceHasItsOwnMatchAndOnlyVerifiedEntriesHaveQuotations() {
+        for first in 1...9 {
+            for second in 1...9 {
+                let references = TraditionalEvidenceCatalog.pair(first, second, context: "selected")
+                XCTAssertFalse(references.isEmpty)
+                XCTAssertEqual(Set(references.map(\.id)).count, references.count)
+                for reference in references {
+                    XCTAssertEqual(reference.matches, ["selected \(first)/\(second)"])
+                    if reference.kind == .classic {
+                        XCTAssertEqual(reference.sourceURL, TraditionalEvidenceCatalog.elementsURL)
+                        XCTAssertFalse(reference.quotes.isEmpty)
+                    } else {
+                        XCTAssertNil(reference.sourceURL)
+                        XCTAssertTrue(reference.quotes.isEmpty)
+                    }
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testChangingSelectedPalaceChangesTheSourceMatchesWithoutRebuildingTheChart() {
+        let chart = TianJiAnalysisSnapshot(heading: 180, period: 9, useTiGua: false).flyingStarsChart()
+        var matches: Set<String> = []
+        for cell in chart.palaces {
+            let references = chart.sourceReferences(palaceID: cell.id)
+            let pairReferences = references.filter { $0.id.hasPrefix("elements.") || $0.id.hasPrefix("pair.") || $0.id.hasPrefix("stars.") }
+            let expected = cell.plainDirectionName + " · " + LocalizationManager.shared.t("xkd_pair_natal")
+                + " \(cell.mountainStar)/\(cell.facingStar)"
+            XCTAssertFalse(pairReferences.isEmpty)
+            for reference in pairReferences { XCTAssertEqual(reference.matches, [expected]) }
+            matches.insert(expected)
+            XCTAssertTrue(cell.localizedEvaluation.contains(expected))
+        }
+        XCTAssertEqual(matches.count, 9)
+    }
+
+    @MainActor
+    func testChartSourcesContainOnlyTheCurrentPatternInsteadOfAllFourStockJudgments() {
+        var patterns: Set<Int> = []
+        for period in 1...9 {
+            for heading in stride(from: 0, to: 360, by: 45) {
+                let chart = TianJiAnalysisSnapshot(heading: Double(heading), period: period, useTiGua: false).flyingStarsChart()
+                let source = chart.patternSourceReferences.filter { $0.id.hasPrefix("pattern.") && $0.id != "pattern.sanban" && $0.id != "pattern.qixing" }
+                XCTAssertEqual(source.map(\.id), ["pattern.\(chart.pattern.rawValue)"])
+                XCTAssertTrue(chart.analysisNote.contains(LocalizationManager.shared.t(chart.pattern.explanationKey)))
+                patterns.insert(chart.pattern.rawValue)
+            }
+        }
+        XCTAssertGreaterThan(patterns.count, 1)
+    }
+
+    @MainActor
+    func testGuestSourceMatchesChangeWithTheYearMonthPairOnTheSameNatalChart() {
+        let chart = deepChart()
+        let first = chart.sourceReferences(palaceID: 0, yearStar: 2, monthStar: 5)
+        let next = chart.sourceReferences(palaceID: 0, yearStar: 2, monthStar: 6)
+        XCTAssertTrue(first.contains { $0.id == "pair.two_five" })
+        XCTAssertFalse(first.contains { $0.id == "pair.five_five" })
+        XCTAssertFalse(next.contains { $0.id == "pair.two_five" })
+        XCTAssertTrue(next.contains { $0.id == "pair.one_six" })
+        let cross = chart.sourceReferences(palaceID: 0, yearStar: 3, monthStar: 7)
+        XCTAssertTrue(cross.contains { $0.id == "pair.three_seven" })
+        XCTAssertTrue(cross.contains { $0.id == "pair.seven_nine" })
+        XCTAssertFalse(next.contains { $0.id == "pair.three_seven" || $0.id == "pair.seven_nine" })
+    }
+
+    @MainActor
+    func testInvalidGuestNumbersDoNotInventSourcesAndUnknownPalaceDoesNotReuseLastSources() {
+        let chart = deepChart()
+        let original = chart.sourceReferences(palaceID: 0)
+        let invalid = chart.sourceReferences(palaceID: 0, yearStar: 0, monthStar: 10)
+        XCTAssertEqual(original.map(\.localizedText), invalid.map(\.localizedText))
+        XCTAssertTrue(chart.sourceReferences(palaceID: -1, yearStar: 2, monthStar: 5).isEmpty)
+        XCTAssertTrue(TraditionalEvidenceCatalog.pair(0, 5, context: "unknown").isEmpty)
+    }
+
+    func testPurpleWhiteSourcesFollowTheAdviceBranchAndActualGuestNumbers() {
+        let wealth = TraditionalEvidenceCatalog.purpleWhite(year: 8, month: 1, palace: "N")
+        XCTAssertTrue(wealth.contains { $0.titleKey == "ref_year_eight" })
+        XCTAssertFalse(wealth.contains { $0.id == "stars.five" || $0.titleKey == "ref_year_nine" })
+        let caution = TraditionalEvidenceCatalog.purpleWhite(year: 8, month: 2, palace: "N")
+        XCTAssertTrue(caution.contains { $0.id == "stars.two" })
+        XCTAssertFalse(caution.contains { $0.titleKey == "ref_year_eight" || $0.id == "stars.five" })
+        let joy = TraditionalEvidenceCatalog.purpleWhite(year: 9, month: 1, palace: "N")
+        XCTAssertTrue(joy.contains { $0.titleKey == "ref_year_nine" })
+        XCTAssertFalse(joy.contains { $0.titleKey == "ref_year_eight" || $0.id == "pair.five_five" })
+        let cautionOverJoy = TraditionalEvidenceCatalog.purpleWhite(year: 9, month: 5, palace: "N")
+        XCTAssertFalse(cautionOverJoy.contains { $0.titleKey == "ref_year_nine" })
+    }
+
+    func testEightMansionsSourcesSelectOneStarInsteadOfRepeatingAllEight() {
+        let sources = StarLuckType.allCases.map(\.sourceReference)
+        XCTAssertEqual(Set(sources.map(\.id)).count, 8)
+        XCTAssertEqual(Set(sources.map(\.titleKey)).count, 8)
+        for star in StarLuckType.allCases {
+            let source = star.sourceReference
+            XCTAssertEqual(source.matches, [star.localizedName])
+            XCTAssertEqual(source.kind, .rule)
+            XCTAssertTrue(source.quotes.isEmpty)
+            XCTAssertNil(source.sourceURL)
+        }
+    }
+
+    func testQimenSourcesFollowTheSelectedGateInsteadOfListingAllEight() {
+        for (names, key) in [(["休门", "生门", "开门"], "ref_qimen_good"),
+                             (["死门", "惊门", "伤门"], "ref_qimen_bad"),
+                             (["杜门", "景门"], "ref_qimen_neutral")] {
+            for name in names {
+                let door = QimenDoor(name: name, palace: 6, isAuspicious: key == "ref_qimen_good", luckType: "", lore: "")
+                XCTAssertEqual(door.sourceReference.titleKey, key)
+                XCTAssertEqual(door.sourceReference.matches, [door.localizedName + " · 6"])
+                XCTAssertEqual(door.sourceReference.kind, .rule)
+                XCTAssertTrue(door.sourceReference.quotes.isEmpty)
+                XCTAssertTrue(door.localizedLore.contains(door.sourceReference.localizedText))
+            }
+        }
+    }
+
+    @MainActor
+    func testHuangQuanReferencesFollowFacingAndNonMatchingDirectionsUseTheirOwnRule() {
+        let groups = [(Set(["庚", "丁", "坤"]), "ref_hq_kun"), (Set(["乙", "丙", "巽"]), "ref_hq_xun"),
+                      (Set(["甲", "癸", "艮"]), "ref_hq_gen"), (Set(["辛", "壬", "乾"]), "ref_hq_qian")]
+        for heading in stride(from: 0, to: 360, by: 15) {
+            let mountain = Mountain24Data.shared.mountain(for: Double(heading))
+            let result = SanHeWaterEngine.shared.resolveHuangQuanWater(facing: mountain)
+            let expected = groups.first { $0.0.contains(mountain.name) }?.1 ?? "ref_hq_other"
+            XCTAssertEqual(result.sourceReference.titleKey, expected)
+            XCTAssertTrue(result.waterDesc.contains(result.sourceReference.localizedText))
+            XCTAssertEqual(result.sourceReference.matches, [mountain.name + " · " + result.badgeText])
+        }
+    }
+
+    @MainActor
+    func testBaShaReferencesTrackTheCurrentSittingTrigramAndMatchedBranch() {
+        var ids: Set<String> = []
+        for heading in stride(from: 0, to: 360, by: 45) {
+            let mountain = Mountain24Data.shared.mountain(for: Double(heading))
+            let result = SanHeWaterEngine.shared.resolveBaSha(sitting: mountain)
+            XCTAssertEqual(result.sourceReference.matches, [mountain.name + " · " + mountain.palace + " → " + result.shaZhi])
+            XCTAssertTrue(result.lore.contains(result.sourceReference.localizedText))
+            ids.insert(result.sourceReference.id)
+        }
+        XCTAssertEqual(ids.count, 8)
+    }
+
+    @MainActor
+    func testSpecialPatternReferencesAppearOnlyForTheCurrentlyMatchedPatternsAndGroups() {
+        var checked = 0
+        for period in 1...9 {
+            for heading in stride(from: 0, to: 360, by: 15) {
+                let chart = TianJiAnalysisSnapshot(heading: Double(heading), period: period, useTiGua: false).flyingStarsChart()
+                XCTAssertEqual(chart.patternSourceReferences.contains { $0.id == "pattern.sanban" }, chart.isSanBanGua)
+                XCTAssertEqual(chart.patternSourceReferences.contains { $0.id == "pattern.qixing" }, chart.isQiXingDaJie)
+                guard chart.isQiXingDaJie else { continue }
+                checked += 1
+                let linked = Set(XuanKongDeepAnalyzer.qiXingSectorGroups(chart: chart).flatMap { $0 })
+                for cell in chart.palaces {
+                    XCTAssertEqual(chart.sourceReferences(palaceID: cell.id).contains { $0.id == "pattern.qixing" }, linked.contains(cell.id))
+                }
+            }
+        }
+        XCTAssertGreaterThan(checked, 0)
+    }
+
+    @MainActor
+    func testSourceMatchesRefreshAcrossLiChunWithTheSameNatalChart() throws {
+        let boundary = liChunBoundary()
+        let natal = TianJiAnalysisSnapshot(heading: 180, period: 9, useTiGua: false).flyingStarsChart()
+        let before = PurpleWhiteEngine.shared.calculateChart(date: boundary.addingTimeInterval(-1))
+        let after = PurpleWhiteEngine.shared.calculateChart(date: boundary.addingTimeInterval(1))
+        let old = try XCTUnwrap(before.palaceItems.first { $0.palaceId == 1 })
+        let new = try XCTUnwrap(after.palaceItems.first { $0.palaceId == 1 })
+        let oldSources = natal.sourceReferences(palaceID: 0, yearStar: old.yearGuestStar, monthStar: old.monthGuestStar)
+        let newSources = natal.sourceReferences(palaceID: 0, yearStar: new.yearGuestStar, monthStar: new.monthGuestStar)
+        XCTAssertNotEqual(oldSources.map(\.localizedText), newSources.map(\.localizedText))
+        XCTAssertNotEqual(old.sourceReferences.map(\.localizedText), new.sourceReferences.map(\.localizedText))
+    }
+
+    func testSourceDeduplicationPreservesAllMatchingPairsAndDistinctExcerpts() throws {
+        let first = TraditionalEvidenceCatalog.pair(1, 9, context: "mountain/year")
+        let second = TraditionalEvidenceCatalog.pair(3, 7, context: "facing/month")
+        let merged = TraditionalEvidenceCatalog.merged(first + second + first)
+        XCTAssertEqual(Set(merged.map(\.id)).count, merged.count)
+        let source = try XCTUnwrap(merged.first { $0.id == "elements.controlling" })
+        XCTAssertEqual(source.quotes, ["水剋火", "金剋木"])
+        XCTAssertEqual(source.matches, ["mountain/year 1/9", "facing/month 3/7"])
+    }
+
+    @MainActor
+    func testDynamicSourceLabelsTranslateAndQuotationsRemainVerbatim() {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        for language in AppLanguage.allCases where language != .auto {
+            manager.effectiveLanguage = language
+            var sources = StarLuckType.allCases.map(\.sourceReference)
+            for first in 1...9 {
+                for second in 1...9 { sources += TraditionalEvidenceCatalog.pair(first, second, context: "test") }
+            }
+            for pattern in XuanKongPattern.allCases { sources += TraditionalEvidenceCatalog.pattern(pattern, context: "test") }
+            for star in 1...9 { sources += TraditionalEvidenceCatalog.purpleWhite(year: star, month: 1, palace: "test") }
+            for mountain in ["庚", "乙", "甲", "辛", "子"] {
+                sources.append(HuangQuanWaterResult.reference(facingMountain: mountain, badgeText: "test"))
+            }
+            sources.append(BaShaResult.reference(sittingMountain: "子", sittingPalace: "坎", shaZhi: "辰"))
+            for name in ["休门", "死门", "杜门", "unknown"] {
+                sources.append(QimenDoor(name: name, palace: 1, isAuspicious: false, luckType: "", lore: "").sourceReference)
+            }
+            let keys = Set(sources.map(\.titleKey) + ["ref_classic", "ref_rule", "ref_matches", "ref_read_original",
+                "ref_scope_note", "ref_sanban", "ref_qixing"])
+            for key in keys {
+                XCTAssertNotEqual(manager.t(key), key, "\(language): \(key)")
+                XCTAssertFalse(manager.t(key).isEmpty)
+            }
+            XCTAssertTrue(TraditionalEvidenceCatalog.text(TraditionalEvidenceCatalog.pair(1, 6, context: "test")).contains("金生水"))
+        }
+    }
+
+    @MainActor
+    func testReportSnapshotKeepsHouseDatePeriodAndModeAfterLeavingAnalysis() throws {
+        let date = instant("2026-11-09T04:00:00Z")
+        var facts = XuanKongHomeContext(facts: [XuanKongSiteFact(palaceID: 8, kind: .noise)])
+        let snapshot = TianJiAnalysisSnapshot(heading: 180, period: 8, useTiGua: true, reportDate: date)
+            .capturing(context: facts, propertyKey: "home-A", floorplanReport: [], panoramaArchive: nil)
+        // A menu transition/phone movement must have no authority over this value snapshot.
+        let live = Mountain24Data.shared.resolveHeadingState(heading: 90)
+        facts.facts.removeAll()
+        XCTAssertEqual(snapshot.heading, 180)
+        XCTAssertEqual(snapshot.reportDate, date)
+        XCTAssertEqual(snapshot.period, 8)
+        XCTAssertTrue(snapshot.useTiGua)
+        XCTAssertNotEqual(snapshot.heading, live.facingAngle)
+        XCTAssertEqual(snapshot.homeContext?.facts.count, 1)
+        XCTAssertTrue(snapshot.hasSpatialSnapshot)
+        XCTAssertEqual(snapshot.propertyKey, "home-A")
+        XCTAssertEqual(snapshot.flyingStarsChart().period, 8)
+        XCTAssertTrue(snapshot.flyingStarsChart().isTiGua)
+    }
+
+    @MainActor
+    func testYearFiveAtTheNatalFacingNineExportsQuietGuidanceInsteadOfWaterActivation() throws {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        manager.effectiveLanguage = .zhHans
+        let snapshot = TianJiAnalysisSnapshot(heading: 345, period: 9, useTiGua: false,
+            reportDate: instant("2026-11-09T04:00:00Z"))
+        let chart = snapshot.flyingStarsChart()
+        let south = try XCTUnwrap(chart.palaces.first { $0.id == 8 })
+        let sector = try XCTUnwrap(snapshot.deepAnalysis(chart: chart).sectors.first { $0.id == 8 })
+        XCTAssertEqual(south.facingStar, 9)
+        XCTAssertEqual(sector.yearStar, 5)
+        XCTAssertEqual(sector.use, .quiet)
+        let text = snapshot.guidanceText(chart: chart)
+        XCTAssertTrue(text.contains(south.plainDirectionName + " · " + manager.t("xk_use_quiet")))
+        XCTAssertTrue(text.contains(manager.t(XuanKongPracticalAction.reduceNoise.textKey)))
+        XCTAssertFalse(text.contains("鱼缸"))
+        XCTAssertFalse(text.contains("安设动水"))
+    }
+
+    @MainActor
+    func testExportUsesEveryComputedRoomActionAndRetainsTheOriginalHouseContext() throws {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        manager.effectiveLanguage = .en
+        var home = XuanKongHomeContext(places: [XuanKongLocatedPlace(id: "bed", palaceID: 2,
+            name: "Guest bed", kind: .bed, roomType: nil)], facts: [XuanKongSiteFact(palaceID: 2, kind: .glare)])
+        let snapshot = TianJiAnalysisSnapshot(heading: 90, period: 9, useTiGua: false)
+            .capturing(context: home, propertyKey: "original", floorplanReport: [], panoramaArchive: nil)
+        home.places.removeAll()
+        home.facts.removeAll()
+        let deep = snapshot.deepAnalysis()
+        let text = snapshot.guidanceText(analysis: deep)
+        XCTAssertTrue(text.contains("Guest bed"))
+        for sector in deep.sectors {
+            for action in sector.actions { XCTAssertTrue(text.contains(manager.t(action.textKey))) }
+        }
+        XCTAssertTrue(try XCTUnwrap(deep.sectors.first { $0.id == 2 }).actions.contains(.protectSleep))
+        XCTAssertTrue(try XCTUnwrap(deep.sectors.first { $0.id == 2 }).actions.contains(.reduceGlare))
+    }
+
+    @MainActor
+    func testExplicitCompassReportSnapshotDoesNotInheritOtherHouseSpatialData() {
+        let snapshot = TianJiAnalysisSnapshot(heading: 90).capturing(context: nil, propertyKey: nil,
+            floorplanReport: [], panoramaArchive: nil)
+        XCTAssertTrue(snapshot.hasSpatialSnapshot)
+        XCTAssertNil(snapshot.propertyKey)
+        XCTAssertNil(snapshot.homeContext)
+        XCTAssertNil(snapshot.capturedPanoramaArchive)
+        XCTAssertTrue(snapshot.capturedFloorplanReport.isEmpty)
+    }
+
+    private func mappedSurvey() -> HouseSpatialSurvey {
+        HouseSpatialSurvey(scanMethod: "RoomPlan", dimensions: HouseDimensions(totalWidth: 12, totalDepth: 8,
+            ceilingHeight: 3, grossFloorArea: 96, usableFloorArea: 96), walls: [], openings: [], beams: [],
+            rooms: [SpatialRoom3D(name: "bedroom", type: .masterBedroom, center: SIMD3(7.8, 1, 4), size: SIMD3(1, 3, 1))],
+            objects: [SpatialObject3D(category: "bed", position: SIMD3(7.8, 0.5, 4), size: SIMD3(1, 1, 1))],
+            centroid: SIMD3(6, 0, 4), compassHeading: 0, shaItems: [], fengshuiScore: 80, houseFacingDegrees: 180)
+    }
+
+    func testMeasuredBedMovesWithTheCurrentBlueprintTaiJiRatherThanTheOldSurveyCenter() throws {
+        let survey = mappedSurvey()
+        let room = FloorplanRoom(name: "bedroom", type: .masterBedroom,
+            rect: CGRect(x: 0.59, y: 0.48, width: 0.12, height: 0.04))
+        var layout = deepLayout(rooms: [room])
+        layout.surveyMapping = FloorplanSurveyMapping(surveyID: survey.id, minX: 0, minZ: 0,
+            spanX: 12, spanZ: 8, padding: 0)
+        let before = XuanKongHomeContextBuilder.build(layout: layout, survey: survey, exterior: [], facts: [])
+        XCTAssertEqual(before.places.first { $0.kind == .bed }?.palaceID, 2)
+        let shifted = SavedFloorplanLayout(rooms: layout.rooms, centroidX: 0.8, centroidY: 0.5,
+            compassRotation: 0, isSyncWithCompass: false, hasFloorplanAccess: false,
+            floorplanAccessGrantID: nil, floorplanAccessGrantSignature: nil,
+            aspectRatio: 1, houseFacingDegrees: 180, surveyMapping: layout.surveyMapping)
+        let after = XuanKongHomeContextBuilder.build(layout: shifted, survey: survey, exterior: [], facts: [])
+        XCTAssertEqual(after.places.first { $0.kind == .bed }?.palaceID, 6)
+        XCTAssertEqual(Set(after.places.filter { $0.roomType == .masterBedroom }.map(\.palaceID)), Set([6]))
+        XCTAssertFalse(after.warningKeys.contains("xkd_alignment_missing"))
+    }
+
+    func testUnalignedOrReplacedSurveyDoesNotMergeBedPointsIntoTheBlueprint() {
+        let survey = mappedSurvey()
+        let room = FloorplanRoom(name: "bedroom", type: .masterBedroom,
+            rect: CGRect(x: 0.59, y: 0.48, width: 0.12, height: 0.04))
+        var layout = deepLayout(rooms: [room])
+        for mapping in [nil, FloorplanSurveyMapping(surveyID: UUID(), minX: 0, minZ: 0, spanX: 12, spanZ: 8, padding: 0)] {
+            layout.surveyMapping = mapping
+            let context = XuanKongHomeContextBuilder.build(layout: layout, survey: survey, exterior: [], facts: [])
+            XCTAssertFalse(context.places.contains { $0.kind == .bed })
+            XCTAssertTrue(context.warningKeys.contains("xkd_alignment_missing"))
+            XCTAssertTrue(context.missingKeys.contains("xkd_missing_bed"))
+            XCTAssertTrue(context.places.contains { $0.roomType == .masterBedroom })
+        }
+    }
+
+    func testRoomPlanMappingRestoresItsPaddingAndSurvivesLayoutEncoding() throws {
+        let id = UUID()
+        var layout = deepLayout(rooms: [])
+        layout.surveyMapping = FloorplanSurveyMapping(surveyID: id, minX: -2, minZ: 3,
+            spanX: 10, spanZ: 20, padding: 0.1)
+        let restored = try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONEncoder().encode(layout))
+        let mapping = try XCTUnwrap(restored.surveyMapping)
+        let point = try XCTUnwrap(mapping.point(x: 3, z: 13, surveyID: id))
+        XCTAssertEqual(point.x, 0.5, accuracy: 0.000001)
+        XCTAssertEqual(point.y, 0.5, accuracy: 0.000001)
+        XCTAssertNil(mapping.point(x: 3, z: 13, surveyID: UUID()))
+        XCTAssertNil(mapping.point(x: .nan, z: 13, surveyID: id))
+        XCTAssertNil(try JSONDecoder().decode(SavedFloorplanLayout.self,
+            from: JSONEncoder().encode(deepLayout(rooms: []))).surveyMapping)
+        let corrected = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "RoomPlan", walls: [], openings: [],
+            beams: [], rooms: [], objects: [], compassHeading: 0, surveyID: id)
+        XCTAssertEqual(corrected.id, id)
+        XCTAssertNotNil(mapping.point(x: 3, z: 13, surveyID: corrected.id))
+    }
+
+    func testRepeatedVirtualSavesRefreshTheActiveModelAndTheDurableSnapshot() throws {
+        let suite = "virtual-refresh-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults), id = store.propertyID
+        let first = survey("VR first"), updated = survey("VR updated")
+        XCTAssertTrue(store.saveSurvey(first, key: SpatialSurveyArchiveKeys.virtual, propertyID: id))
+        XCTAssertTrue(store.saveSurvey(updated, key: SpatialSurveyArchiveKeys.virtual, propertyID: id))
+        XCTAssertEqual(store.latestInterior?.id, updated.id)
+        XCTAssertEqual(store.interiorSource, .virtual)
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).latestInterior?.id, updated.id)
+    }
+
+    func testLegacySurveySnapshotMigratesItsSourceAndDurableHouseIdentity() throws {
+        let suite = "legacy-survey-source-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let oldSurvey = survey("VR legacy")
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(oldSurvey))
+        let data = try JSONSerialization.data(withJSONObject: ["records": [], "latestInterior": object])
+        defaults.set(data, forKey: "tianji.sha_survey_store.v1")
+        let migrated = ShaSurveyStore(defaults: defaults)
+        XCTAssertEqual(migrated.interiorSource, .virtual)
+        let updated = survey("VR corrected")
+        XCTAssertTrue(migrated.saveSurvey(updated, key: SpatialSurveyArchiveKeys.virtual, propertyID: migrated.propertyID))
+        let relaunched = ShaSurveyStore(defaults: defaults)
+        XCTAssertEqual(relaunched.propertyKey, migrated.propertyKey)
+        XCTAssertEqual(relaunched.interiorSource, .virtual)
+        XCTAssertEqual(relaunched.latestInterior?.id, updated.id)
+    }
+
+    func testVirtualEditDoesNotOverwriteAMeasuredArchiveOrAnExplicitProjection() throws {
+        let suite = "measured-priority-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults), id = store.propertyID
+        let measured = survey("RoomPlan"), virtual = survey("VR")
+        XCTAssertTrue(store.saveSurvey(measured, key: SpatialSurveyArchiveKeys.measured, propertyID: id))
+        XCTAssertTrue(store.saveSurvey(virtual, key: SpatialSurveyArchiveKeys.virtual, propertyID: id))
+        XCTAssertEqual(store.latestInterior?.id, measured.id)
+        XCTAssertEqual(store.interiorSource, .measured)
+        let projection = survey("projection")
+        XCTAssertTrue(store.updateInterior(projection, propertyID: id))
+        XCTAssertTrue(store.saveSurvey(survey("VR changed"), key: SpatialSurveyArchiveKeys.virtual, propertyID: id))
+        XCTAssertEqual(store.latestInterior?.id, projection.id)
+        XCTAssertEqual(store.interiorSource, .projection)
+    }
+
+    func testSamePropertyRoomPlanRefreshPreservesFactsExteriorAndIdentity() throws {
+        let suite = "same-house-import-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults), id = store.propertyID, key = store.propertyKey
+        store.setSiteFact(.noise, palaceID: 0, present: true, propertyID: id)
+        let exterior = ExteriorShaRecord(shaID: "luchong", bearingDegrees: 180)
+        XCTAssertTrue(store.addRecord(exterior, propertyID: id))
+        let measured = survey("RoomPlan update")
+        XCTAssertTrue(store.refreshMeasuredSurvey(measured, propertyID: id))
+        XCTAssertEqual(store.propertyID, id)
+        XCTAssertEqual(store.propertyKey, key)
+        XCTAssertEqual(store.siteFacts, [XuanKongSiteFact(palaceID: 0, kind: .noise)])
+        XCTAssertEqual(store.records, [exterior])
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).siteFacts, store.siteFacts)
+        XCTAssertFalse(store.refreshMeasuredSurvey(survey("stale"), propertyID: UUID()))
+        XCTAssertEqual(store.latestInterior?.id, measured.id)
+    }
+
+    func testDurableHouseIdentitySurvivesRelaunchAndArchiveRestorationWhileWriterIDsChange() throws {
+        let suite = "property-reminders-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = ShaSurveyStore(defaults: defaults), relaunched = ShaSurveyStore(defaults: defaults)
+        let originalKey = first.propertyKey
+        XCTAssertEqual(relaunched.propertyKey, originalKey)
+        XCTAssertNotEqual(relaunched.propertyID, first.propertyID)
+        relaunched.replaceProperty(measured: nil, virtual: nil, exterior: [])
+        XCTAssertNotEqual(relaunched.propertyKey, originalKey)
+        let previousWriter = relaunched.propertyID
+        relaunched.replaceProperty(measured: nil, virtual: nil, exterior: [], propertyKey: originalKey)
+        XCTAssertEqual(relaunched.propertyKey, originalKey)
+        XCTAssertNotEqual(relaunched.propertyID, previousWriter)
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).propertyKey, originalKey)
+    }
+
+    @MainActor
+    func testPkHouseFacingRemainsStableAcrossDifferentBlueprintAxes() {
+        let expected = Mountain24Data.shared.resolveHeadingState(heading: 180)
+        for coordinate in [0.0, 90, 180, 270] {
+            let orientation = FloorplanOrientation(coordinateHeading: coordinate, houseFacingDegrees: 180)
+            XCTAssertEqual(orientation.houseHeadingState.sittingMountain.id, expected.sittingMountain.id)
+            XCTAssertEqual(orientation.houseHeadingState.facingMountain.id, expected.facingMountain.id)
+        }
+        XCTAssertEqual(FloorplanOrientation(coordinateHeading: 90, houseFacingDegrees: nil).houseHeadingState.facingAngle, 90)
+    }
+
+    func testReminderKeysSeparateHomesSittingMountainsAndFullCalendarYears() {
+        let date = instant("2026-11-09T04:00:00Z"), zone = TimeZone(secondsFromGMT: 8 * 3600)!
+        let first = AuspiciousReminderContext(propertyKey: "house-A", sittingMountain: "子")
+        let second = AuspiciousReminderContext(propertyKey: "house-B", sittingMountain: "子")
+        let otherSitting = AuspiciousReminderContext(propertyKey: "house-A", sittingMountain: "午")
+        XCTAssertNotEqual(first.key(for: date, timeZone: zone), second.key(for: date, timeZone: zone))
+        XCTAssertNotEqual(first.key(for: date, timeZone: zone), otherSitting.key(for: date, timeZone: zone))
+        XCTAssertTrue(first.key(for: date, timeZone: zone).hasPrefix("2026-11-09-"))
+        XCTAssertNotEqual(first.key(for: date, timeZone: zone), first.key(for: instant("2027-11-09T04:00:00Z"), timeZone: zone))
+        XCTAssertEqual(first.key(for: date, timeZone: zone), first.key(for: date.addingTimeInterval(3600), timeZone: zone))
+    }
+
+    func testReminderArchiveMigratesUnassignedRequestsWithoutAssigningThemToTheCurrentHouse() throws {
+        let suite = "legacy-reminders-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let legacy = ["11-09-甲子", "11-10-乙丑"]
+        defaults.set(legacy, forKey: AuspiciousReminderArchive.legacyKey)
+        var archive = AuspiciousReminderArchive.restore(defaults: defaults)
+        XCTAssertEqual(archive.legacyIDs, Set(legacy))
+        XCTAssertTrue(archive.records.isEmpty)
+        XCTAssertNil(defaults.object(forKey: AuspiciousReminderArchive.legacyKey))
+        let date = instant("2026-11-09T04:00:00Z")
+        let record = AuspiciousReminderRecord(date: date,
+            context: AuspiciousReminderContext(propertyKey: "current", sittingMountain: "子"))
+        archive.records.append(record)
+        archive.save(defaults: defaults)
+        let restored = AuspiciousReminderArchive.restore(defaults: defaults)
+        XCTAssertEqual(restored.records, [record])
+        XCTAssertEqual(restored.legacyIDs, Set(legacy))
+        XCTAssertFalse(restored.legacyIDs.contains(record.id))
+        XCTAssertEqual(record.requestID, "tiandi_zeri_" + record.id)
+    }
+
+    func testArchivedPropertyKeepsItsReminderIdentityAndOldRecordsRemainReadable() throws {
+        var record = self.record(image: nil)
+        record.propertyKey = "durable-house"
+        let data = try JSONEncoder().encode(record)
+        XCTAssertEqual(try JSONDecoder().decode(FloorplanCaseRecord.self, from: data).propertyKey, "durable-house")
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json.removeValue(forKey: "propertyKey")
+        XCTAssertNil(try JSONDecoder().decode(FloorplanCaseRecord.self, from: JSONSerialization.data(withJSONObject: json)).propertyKey)
+    }
+
+    @MainActor
+    func testLongReportAllocatesEnoughHeightForAllRoomGuidanceAndSources() {
+        autoreleasepool {
+            let place = XuanKongLocatedPlace(id: "long-room", palaceID: 0,
+                name: String(repeating: "房间", count: 12_000), kind: .room, roomType: .study)
+            let snapshot = TianJiAnalysisSnapshot(heading: 345, period: 9, useTiGua: false,
+                reportDate: instant("2026-11-09T04:00:00Z"))
+                .capturing(context: XuanKongHomeContext(places: [place]), propertyKey: "large-report",
+                    floorplanReport: [], panoramaArchive: nil)
+            let image = TianJiShuEngine.shared.generateScrollImage(heading: snapshot.heading,
+                coordsDesc: "", solarTimeDesc: "", isPro: true, analysis: snapshot)
+            XCTAssertEqual(image.size.width, 1080)
+            XCTAssertGreaterThan(image.size.height, 15_000)
+        }
+    }
 }

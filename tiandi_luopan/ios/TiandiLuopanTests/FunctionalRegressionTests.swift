@@ -2055,6 +2055,304 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(FloorplanCaseRecord.self, from: JSONSerialization.data(withJSONObject: json)).propertyKey)
     }
 
+    private func allocationRoom(_ id: String, _ type: FloorplanRoomType, x: CGFloat, y: CGFloat) -> FloorplanRoom {
+        FloorplanRoom(id: id, name: id, type: type, rect: CGRect(x: x, y: y, width: 0.1, height: 0.1))
+    }
+
+    func testFamilyRoomServiceRequiresVerifiedAnnualSubscription() {
+        let now = instant("2026-11-09T00:00:00Z")
+        var mirror = StoreKitIAPManager.EntitlementMirror(verifiedAt: now, isAuthoritative: true,
+            isLifetime: true, vipActive: false, vipExpireDate: 0, floorplanCredits: 5, tianjiCredits: 5,
+            purchasedProductIDs: [IAPProductID.proLifetime.rawValue, IAPProductID.vipYearly.rawValue])
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now)) // Product history and credits are insufficient.
+        mirror.vipExpireDate = now.addingTimeInterval(10).timeIntervalSince1970
+        XCTAssertTrue(mirror.allowsFamilyRoomAllocation(at: now))
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now.addingTimeInterval(10)))
+        mirror.vipActive = true // Apple-confirmed grace period remains usable.
+        XCTAssertTrue(mirror.allowsFamilyRoomAllocation(at: now.addingTimeInterval(20)))
+        mirror.isAuthoritative = false
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now))
+        mirror.isAuthoritative = true
+        mirror.revokePaidProduct(IAPProductID.vipYearly.rawValue)
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now))
+    }
+
+    @MainActor
+    func testNavigationRequestsWakeMountedViewsAndSurviveWithoutSubscribers() {
+        let center = NotificationCenter()
+        let router = AppNavigationRouter(notificationCenter: center)
+        var deliveredTab: Int?
+        let subscription = center.publisher(for: .didRequestAppNavigation).sink { _ in
+            deliveredTab = router.consumeTabRoute()?.tab
+        }
+        router.requestRoute(tab: 2)
+        XCTAssertEqual(deliveredTab, 2)
+        XCTAssertNil(router.consumeTabRoute())
+        subscription.cancel()
+        router.requestRoute(tab: 1)
+        XCTAssertEqual(router.consumeTabRoute()?.tab, 1)
+        router.requestAlmanac()
+        XCTAssertTrue(router.consumeAlmanac())
+        XCTAssertFalse(router.consumeAlmanac())
+    }
+
+    @MainActor
+    func testFamilyExportHonorsVisibilityAndAnnualAccessForBothTextAndLabels() {
+        let rooms = [allocationRoom("bed", .masterBedroom, x: 0.45, y: 0.75)]
+        let people = [FamilyRoomPerson(id: "owner", name: "Private name", guaKey: "坎")]
+        let manual = [FamilyRoomAssignment(personID: "owner", roomID: "bed")]
+        for access in [false, true] {
+            for visible in [false, true] where !access || !visible {
+                let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
+                    centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
+                    hasAnnualAccess: access, includePeople: visible)
+                XCTAssertTrue(snapshot.labels.isEmpty)
+                XCTAssertTrue(snapshot.report.isEmpty)
+            }
+        }
+    }
+
+    @MainActor
+    func testFamilyExportIncludesSuggestionStatusAndPeopleWithoutBedrooms() throws {
+        let rooms = [allocationRoom("south-bed", .masterBedroom, x: 0.45, y: 0.75)]
+        let people = [FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎"),
+                      FamilyRoomPerson(id: "elder", name: "Elder", guaKey: "乾")]
+        let snapshot = FamilyRoomExportSnapshot(manual: nil, rooms: rooms, people: people,
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
+            hasAnnualAccess: true, includePeople: true)
+        let roomItem = try XCTUnwrap(snapshot.report.first { $0.id == "family-room-south-bed" })
+        XCTAssertTrue(roomItem.title.contains(LocalizationManager.shared.t("fra_suggested")))
+        XCTAssertTrue(roomItem.isGood)
+        let unassigned = try XCTUnwrap(snapshot.report.first { $0.id == "family-unassigned" })
+        XCTAssertTrue(unassigned.lore.contains("Elder"))
+        XCTAssertFalse(unassigned.lore.contains("Owner"))
+    }
+
+    @MainActor
+    func testManualFamilyExportAndDiagramFlagWeakMatches() throws {
+        let rooms = [allocationRoom("south-bed", .masterBedroom, x: 0.45, y: 0.75)]
+        let people = [FamilyRoomPerson(id: "elder", name: "Elder", guaKey: "乾")]
+        let manual = [FamilyRoomAssignment(personID: "elder", roomID: "south-bed")]
+        let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
+            hasAnnualAccess: true, includePeople: true)
+        XCTAssertTrue(try XCTUnwrap(snapshot.labels["south-bed"]).hasPrefix("⚠︎"))
+        let item = try XCTUnwrap(snapshot.report.first)
+        XCTAssertTrue(item.title.contains(LocalizationManager.shared.t("fra_assigned")))
+        XCTAssertTrue(item.lore.contains(LocalizationManager.shared.t("fra_review")))
+        XCTAssertFalse(item.isGood)
+        XCTAssertEqual(FamilyRoomAllocationEngine.reviewRoomIDs(assignments: manual, rooms: rooms, people: people,
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1), Set(["south-bed"]))
+    }
+
+    func testChangingRoomUseClearsAssignmentsWithoutRevivingOldOccupants() throws {
+        let manual = [FamilyRoomAssignment(personID: "owner", roomID: "changed"),
+                      FamilyRoomAssignment(personID: "child", roomID: "other")]
+        XCTAssertEqual(FamilyRoomAllocationEngine.afterChangingRoomUse(manual, roomID: "changed",
+            from: .masterBedroom, to: .secondBedroom), manual)
+        let changed = try XCTUnwrap(FamilyRoomAllocationEngine.afterChangingRoomUse(manual, roomID: "changed",
+            from: .masterBedroom, to: .kitchen))
+        XCTAssertEqual(changed, [manual[1]])
+        XCTAssertEqual(FamilyRoomAllocationEngine.afterChangingRoomUse(changed, roomID: "changed",
+            from: .kitchen, to: .masterBedroom), changed)
+        XCTAssertEqual(FamilyRoomAllocationEngine.afterChangingRoomUse(manual, roomID: "changed",
+            from: .masterBedroom, to: .study), [manual[1]])
+        XCTAssertNil(FamilyRoomAllocationEngine.afterChangingRoomUse(nil, roomID: "changed",
+            from: .masterBedroom, to: .study))
+    }
+
+    @MainActor
+    func testFloorplanReportPositionsLongParagraphsWithoutOverlap() {
+        let item = FloorplanAuditItem(id: "family", title: String(repeating: "Family room recommendation ", count: 10),
+            palace: "", severity: "", lore: String(repeating: "Member · This bedroom is a closer match for rest.\n", count: 8),
+            solution: String(repeating: "Check actual bed space and clear access. ", count: 8))
+        let layout = FloorplanReportRowLayout(item: item, solutionPrefix: "Action:", width: 200)
+        XCTAssertGreaterThan(layout.titleRect.height, FloorplanReportRowLayout.titleFont.lineHeight * 2)
+        XCTAssertGreaterThan(layout.loreRect.height, FloorplanReportRowLayout.bodyFont.lineHeight * 8)
+        XCTAssertGreaterThanOrEqual(layout.loreRect.minY, layout.titleRect.maxY + 8)
+        XCTAssertGreaterThanOrEqual(layout.solutionRect.minY, layout.loreRect.maxY + 8)
+        XCTAssertGreaterThanOrEqual(layout.height - 12, layout.solutionRect.maxY + 16)
+    }
+
+    @MainActor
+    func testFamilyExportSnapshotRetainsCapturedNamesAndAssignments() {
+        let rooms = [allocationRoom("bed", .masterBedroom, x: 0.45, y: 0.75)]
+        var people = [FamilyRoomPerson(id: "owner", name: "Original name", guaKey: "坎")]
+        var manual = [FamilyRoomAssignment(personID: "owner", roomID: "bed")]
+        let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
+            hasAnnualAccess: true, includePeople: true)
+        people[0] = FamilyRoomPerson(id: "owner", name: "New name", guaKey: "乾")
+        manual.removeAll()
+        XCTAssertEqual(snapshot.labels["bed"], "Original name")
+        XCTAssertTrue(snapshot.report.first?.lore.contains("Original name") == true)
+        XCTAssertFalse(snapshot.report.first?.lore.contains("New name") == true)
+    }
+
+    @MainActor
+    func testFamilyRoomSuggestionsRankBedroomsAndStudySeparately() {
+        let rooms = [allocationRoom("north-bed", .secondBedroom, x: 0.45, y: 0.15),
+                     allocationRoom("south-bed", .masterBedroom, x: 0.45, y: 0.75),
+                     allocationRoom("north-study", .study, x: 0.45, y: 0.15),
+                     allocationRoom("south-study", .study, x: 0.45, y: 0.75),
+                     allocationRoom("kitchen", .kitchen, x: 0.75, y: 0.45)]
+        let person = FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎")
+        let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: [person],
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+        XCTAssertEqual(plan, [FamilyRoomAssignment(personID: "owner", roomID: "south-bed"),
+                              FamilyRoomAssignment(personID: "owner", roomID: "north-study")])
+        XCTAssertEqual(plan, FamilyRoomAllocationEngine.recommend(rooms: Array(rooms.reversed()), people: [person],
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true))
+    }
+
+    @MainActor
+    func testFamilySuggestionsEvaluateEveryPersonAndAllowSharedUse() {
+        let rooms = [allocationRoom("south-bed", .masterBedroom, x: 0.45, y: 0.75),
+                     allocationRoom("southwest-bed", .secondBedroom, x: 0.15, y: 0.75),
+                     allocationRoom("north-study", .study, x: 0.45, y: 0.15),
+                     allocationRoom("west-study", .study, x: 0.15, y: 0.45)]
+        let people = [FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎"),
+                      FamilyRoomPerson(id: "elder", name: "Elder", guaKey: "乾"),
+                      FamilyRoomPerson(id: "child", name: "Child", guaKey: "坎")]
+        let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: people,
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+        XCTAssertEqual(plan.count, 6)
+        XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "owner", roomID: "south-bed")))
+        XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "elder", roomID: "southwest-bed")))
+        XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "elder", roomID: "west-study")))
+        XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "child", roomID: "south-bed")))
+        let names = FamilyRoomAllocationEngine.labels(assignments: plan, people: people)
+        XCTAssertEqual(names["south-bed"], "Owner、Child")
+    }
+
+    @MainActor
+    func testFamilyRoomSuggestionsDoNotForceUnfavorableOrCentralRooms() {
+        let rooms = [allocationRoom("west-bed", .secondBedroom, x: 0.15, y: 0.45),
+                     allocationRoom("center-bed", .masterBedroom, x: 0.45, y: 0.45)]
+        let person = FamilyRoomPerson(id: "child", name: "Child", guaKey: "坎")
+        let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: [person],
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+        XCTAssertTrue(plan.isEmpty)
+        let fit = FamilyRoomAllocationEngine.fits(room: rooms[1], rooms: rooms, people: [person],
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1).first
+        XCTAssertNil(fit?.star)
+        XCTAssertEqual(fit?.reasonKey, "fra_center")
+    }
+
+    func testFamilyRoomDirectionsRespectAspectRatioAndBlueprintNorth() {
+        let room = allocationRoom("diagonal", .secondBedroom, x: 0.65, y: 0.25)
+        let center = CGPoint(x: 0.5, y: 0.5)
+        XCTAssertEqual(FamilyRoomAllocationEngine.palace(room: room, rooms: [room], centroid: center,
+            heading: 0, aspectRatio: 1), "艮")
+        XCTAssertEqual(FamilyRoomAllocationEngine.palace(room: room, rooms: [room], centroid: center,
+            heading: 0, aspectRatio: 3), "震")
+        XCTAssertEqual(FamilyRoomAllocationEngine.palace(room: room, rooms: [room], centroid: center,
+            heading: 90, aspectRatio: 3), "离")
+        XCTAssertEqual(FamilyRoomAllocationEngine.palace(room: room, rooms: [room], centroid: center,
+            heading: -270, aspectRatio: 3), "离")
+        XCTAssertNil(FamilyRoomAllocationEngine.palace(room: room, rooms: [room], centroid: center,
+            heading: .nan, aspectRatio: 1))
+    }
+
+    func testManualFamilyMovesPreserveStudyAndAllowSharedBedrooms() {
+        let rooms = [allocationRoom("a", .masterBedroom, x: 0.2, y: 0.2),
+                     allocationRoom("b", .secondBedroom, x: 0.7, y: 0.7),
+                     allocationRoom("study", .study, x: 0.7, y: 0.2)]
+        let people = [FamilyRoomPerson(id: "one", name: "One", guaKey: "坎"),
+                      FamilyRoomPerson(id: "two", name: "Two", guaKey: "乾")]
+        var plan = [FamilyRoomAssignment(personID: "one", roomID: "a"),
+                    FamilyRoomAssignment(personID: "one", roomID: "study"),
+                    FamilyRoomAssignment(personID: "two", roomID: "b")]
+        plan = FamilyRoomAllocationEngine.toggling(personID: "one", room: rooms[1], assignments: plan, rooms: rooms, people: people)
+        XCTAssertFalse(plan.contains { $0.personID == "one" && $0.roomID == "a" })
+        XCTAssertTrue(plan.contains { $0.personID == "one" && $0.roomID == "study" })
+        XCTAssertEqual(plan.filter { $0.roomID == "b" }.count, 2)
+        plan = FamilyRoomAllocationEngine.toggling(personID: "one", room: rooms[1], assignments: plan, rooms: rooms, people: people)
+        XCTAssertFalse(plan.contains { $0.personID == "one" && $0.roomID == "b" })
+        XCTAssertTrue(plan.contains { $0.personID == "two" && $0.roomID == "b" })
+    }
+
+    func testRemovedFamilyAndNonResidentialRoomsCannotRemainAssigned() {
+        let rooms = [allocationRoom("bed", .secondBedroom, x: 0.2, y: 0.2),
+                     allocationRoom("bath", .bathroom, x: 0.7, y: 0.7)]
+        let people = [FamilyRoomPerson(id: "live", name: "Renamed", guaKey: "坎")]
+        let raw = [FamilyRoomAssignment(personID: "removed", roomID: "bed"),
+                   FamilyRoomAssignment(personID: "live", roomID: "removed-room"),
+                   FamilyRoomAssignment(personID: "live", roomID: "bath"),
+                   FamilyRoomAssignment(personID: "live", roomID: "bed"),
+                   FamilyRoomAssignment(personID: "live", roomID: "bed")]
+        let cleaned = FamilyRoomAllocationEngine.cleaned(raw, rooms: rooms, people: people)
+        XCTAssertEqual(cleaned, [FamilyRoomAssignment(personID: "live", roomID: "bed")])
+        XCTAssertEqual(FamilyRoomAllocationEngine.labels(assignments: cleaned, people: people)["bed"], "Renamed")
+    }
+
+    @MainActor
+    func testClearedFamilyPlanAndExpiredAccessNeverRestoreAutomaticAssignments() {
+        let rooms = [allocationRoom("bed", .masterBedroom, x: 0.45, y: 0.75)]
+        let people = [FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎")]
+        let center = CGPoint(x: 0.5, y: 0.5)
+        XCTAssertFalse(FamilyRoomAllocationEngine.resolve(manual: nil, rooms: rooms, people: people,
+            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: true).isEmpty)
+        XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: [], rooms: rooms, people: people,
+            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: true).isEmpty)
+        let manual = [FamilyRoomAssignment(personID: "owner", roomID: "bed")]
+        XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: manual, rooms: rooms, people: people,
+            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: false).isEmpty)
+        XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: nil, rooms: rooms, people: people,
+            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: false).isEmpty)
+    }
+
+    func testFamilyAssignmentsRoundTripWithCaseAndDecodeLegacyPlans() throws {
+        var layout = record(image: nil).layout
+        layout.familyRoomAssignments = [FamilyRoomAssignment(personID: "family:stable-id", roomID: "bed")]
+        let savedCase = FloorplanCaseRecord(id: "house-a", title: "A", createdAt: Date(), sittingSummary: "", layout: layout, imageFileName: nil)
+        let restored = try JSONDecoder().decode(FloorplanCaseRecord.self, from: JSONEncoder().encode(savedCase))
+        XCTAssertEqual(restored.layout.familyRoomAssignments, layout.familyRoomAssignments)
+        XCTAssertNil(record(image: nil).layout.familyRoomAssignments) // A separate house does not inherit the plan.
+        layout.familyRoomAssignments = []
+        XCTAssertEqual(try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONEncoder().encode(layout)).familyRoomAssignments, [])
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+        json.removeValue(forKey: "familyRoomAssignments")
+        XCTAssertNil(try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONSerialization.data(withJSONObject: json)).familyRoomAssignments)
+    }
+
+    @MainActor
+    func testLegacyFamilyIDsAreRepairedAndRemainStableAfterReload() throws {
+        let profiles = [FamilyMemberProfile(id: "first", role: .father, birthYear: 1960, isMale: true),
+                        FamilyMemberProfile(id: "second", role: .mother, birthYear: 1963, isMale: false),
+                        FamilyMemberProfile(id: "duplicate", role: .son, birthYear: 2010, isMale: true),
+                        FamilyMemberProfile(id: "duplicate", role: .daughter, birthYear: 2012, isMale: false)]
+        var rows = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(profiles)) as? [[String: Any]])
+        rows[0].removeValue(forKey: "id")
+        rows[1]["id"] = " "
+        let restored = try UserKuaProfileManager.restoringFamilyMembers(from: JSONSerialization.data(withJSONObject: rows))
+        XCTAssertEqual(Set(restored.profiles.map(\.id)).count, 4)
+        XCTAssertFalse(restored.profiles.contains { $0.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        let migrated = try XCTUnwrap(restored.migratedData)
+        let reloaded = try UserKuaProfileManager.restoringFamilyMembers(from: migrated)
+        XCTAssertEqual(reloaded.profiles, restored.profiles)
+        XCTAssertNil(reloaded.migratedData)
+    }
+
+    @MainActor
+    func testFamilyPeopleUseStableIDsAndHonorDisabledProfile() {
+        let profile = UserKuaProfileManager.shared
+        let oldEnabled = profile.isProfileEnabled
+        let oldFamily = profile.familyMembers
+        defer { profile.familyMembers = oldFamily; profile.isProfileEnabled = oldEnabled }
+        profile.familyMembers = [FamilyMemberProfile(id: "child-id", role: .daughter, customName: "Child",
+                                                     birthYear: 2015, isMale: false)]
+        profile.isProfileEnabled = true
+        let people = FamilyRoomAllocationEngine.people(profile: profile)
+        XCTAssertEqual(people.map(\.id), ["owner", "family:child-id"])
+        XCTAssertEqual(people[1].guaKey, profile.familyMembers[0].guaKey)
+        profile.updateFamilyMember(id: "child-id", customName: "New name")
+        XCTAssertEqual(FamilyRoomAllocationEngine.people(profile: profile)[1].id, "family:child-id")
+        XCTAssertEqual(FamilyRoomAllocationEngine.people(profile: profile)[1].name, "New name")
+        profile.isProfileEnabled = false
+        XCTAssertTrue(FamilyRoomAllocationEngine.people(profile: profile).isEmpty)
+    }
+
     @MainActor
     func testLongReportAllocatesEnoughHeightForAllRoomGuidanceAndSources() {
         autoreleasepool {

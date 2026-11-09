@@ -27,6 +27,8 @@ struct SavedFloorplanLayout: Codable {
     var houseFacingDegrees: Double? = nil
     var houseFacingWasExplicit: Bool? = nil
     var surveyMapping: FloorplanSurveyMapping? = nil
+    /// nil follows live recommendations; an empty array is an explicitly cleared plan.
+    var familyRoomAssignments: [FamilyRoomAssignment]? = nil
 }
 
 /// P1.2 多套户型宅谱档案记录（支持保存多套房源/客户户型、关联 3D 空间测绘模型及各自的已购解锁凭证）
@@ -227,6 +229,33 @@ struct FloorplanReportSnapshot {
     }
 }
 
+/// The renderer uses these same measured rectangles, so additional family members
+/// and wrapped translations push the next paragraph down instead of overlapping it.
+struct FloorplanReportRowLayout {
+    static let titleFont = UIFont.boldSystemFont(ofSize: 22)
+    static let bodyFont = UIFont.systemFont(ofSize: 17)
+    static let solutionFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
+    let titleRect: CGRect
+    let loreRect: CGRect
+    let solutionRect: CGRect
+    let height: CGFloat
+
+    init(item: FloorplanAuditItem, solutionPrefix: String, width: CGFloat = 920) {
+        let bodyWidth = max(1, width)
+        func measuredHeight(_ text: String, font: UIFont) -> CGFloat {
+            ceil((text as NSString).boundingRect(
+                with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: font], context: nil
+            ).height)
+        }
+        titleRect = CGRect(x: 90, y: 16, width: bodyWidth, height: measuredHeight(item.title, font: Self.titleFont))
+        loreRect = CGRect(x: 90, y: titleRect.maxY + 8, width: bodyWidth, height: measuredHeight(item.lore, font: Self.bodyFont))
+        solutionRect = CGRect(x: 90, y: loreRect.maxY + 8, width: bodyWidth,
+                              height: measuredHeight(solutionPrefix + " " + item.solution, font: Self.solutionFont))
+        height = max(138, ceil(solutionRect.maxY + 16 + 12))
+    }
+}
+
 /// 识别候选：矩形框 + 可选的真实轮廓多边形（相对坐标 0..1）
 private struct RoomCandidate: Equatable {
     var rect: CGRect
@@ -238,6 +267,7 @@ public struct FloorplanView: View {
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @ObservedObject private var familyProfile = UserKuaProfileManager.shared
     
     @State private var rooms: [FloorplanRoom] = FloorplanEngine.shared.generateSampleRooms()
     @State private var centroid: CGPoint = CGPoint(x: 0.5, y: 0.5) // 归一化重心
@@ -299,6 +329,8 @@ public struct FloorplanView: View {
     @State private var houseFacingOffset: Double?
     @State private var houseFacingWasExplicit: Bool?
     @State private var surveyMapping: FloorplanSurveyMapping?
+    @State private var familyRoomAssignments: [FamilyRoomAssignment]?
+    @State private var showFamilyRoomLabels = true
     private var savedCases: [FloorplanCaseRecord] { caseStore.records }
     @State private var showCaseArchiveSheet: Bool = false
     @State private var newCaseTitleInput: String = ""
@@ -375,6 +407,27 @@ public struct FloorplanView: View {
         isLargeLayout ? 560 : 340
     }
     
+    private var activeFamilyRoomAssignments: [FamilyRoomAssignment] {
+        guard iap.canUseFamilyRoomAllocation, familyProfile.isProfileEnabled else { return [] }
+        let people = FamilyRoomAllocationEngine.people(profile: familyProfile)
+        return FamilyRoomAllocationEngine.resolve(manual: familyRoomAssignments, rooms: rooms, people: people, centroid: centroid,
+            heading: effectiveHeading, aspectRatio: floorplanAspectRatio, hasAnnualAccess: true)
+    }
+
+    private var familyRoomLabels: [String: String] {
+        guard showFamilyRoomLabels, iap.canUseFamilyRoomAllocation, familyProfile.isProfileEnabled else { return [:] }
+        let people = FamilyRoomAllocationEngine.people(profile: familyProfile)
+        return FamilyRoomAllocationEngine.labels(assignments: activeFamilyRoomAssignments, people: people)
+    }
+
+    private var familyRoomReviewIDs: Set<String> {
+        guard showFamilyRoomLabels, familyRoomAssignments != nil, iap.canUseFamilyRoomAllocation,
+              familyProfile.isProfileEnabled else { return [] }
+        return FamilyRoomAllocationEngine.reviewRoomIDs(assignments: activeFamilyRoomAssignments, rooms: rooms,
+            people: FamilyRoomAllocationEngine.people(profile: familyProfile), centroid: centroid,
+            heading: effectiveHeading, aspectRatio: floorplanAspectRatio)
+    }
+
     public var body: some View {
         // CompassMotionManager publishes tilt and magnetic-field samples more
         // often than the floorplan audit inputs change. Reuse the last audit
@@ -382,6 +435,8 @@ public struct FloorplanView: View {
         // Render the editable source rooms until the first audit finishes so
         // the canvas never flashes empty during the initial appearance.
         let roomsForCanvas = auditedRooms.isEmpty ? rooms : auditedRooms
+        let personLabels = familyRoomLabels
+        let roomReviewIDs = familyRoomReviewIDs
         let auditResult: (auditedRooms: [FloorplanRoom], report: [FloorplanAuditItem]) = isActive
             ? (roomsForCanvas, auditReport)
             : (rooms, [])
@@ -434,10 +489,22 @@ public struct FloorplanView: View {
                                     }
                                 }
                                 
-                                floorplanCanvasView(auditedRooms: auditResult.auditedRooms)
+                                floorplanCanvasView(auditedRooms: auditResult.auditedRooms, personLabels: personLabels,
+                                                    reviewRoomIDs: roomReviewIDs)
                                     .frame(width: isLargeLayout ? canvasSide : nil, height: canvasSide)
                                     .frame(maxWidth: .infinity)
                                     .padding(.horizontal, isLargeLayout ? 0 : 16)
+
+                                FamilyRoomAllocationSection(rooms: auditResult.auditedRooms, centroid: centroid,
+                                    heading: effectiveHeading, aspectRatio: floorplanAspectRatio,
+                                    houseContext: floorplanHeadingState, manualAssignments: familyRoomAssignments,
+                                    showLabels: $showFamilyRoomLabels) { updated in
+                                    guard iap.canUseFamilyRoomAllocation, familyProfile.isProfileEnabled else { return }
+                                    familyRoomAssignments = updated
+                                    persistLayout()
+                                }
+                                .id(workspacePropertyID)
+                                .frame(maxWidth: contentMax)
 
                                 if !isSyncWithCompass {
                                     manualHeadingControl()
@@ -541,6 +608,7 @@ public struct FloorplanView: View {
                     // silently carry the previous plan's room geometry into
                     // it; start from editable sample frames instead.
                     rooms = FloorplanEngine.shared.generateSampleRooms()
+                    familyRoomAssignments = nil
                     centroid = CGPoint(x: 0.5, y: 0.5)
                     isEditingRooms = true
                     selectedRoom = nil
@@ -662,6 +730,15 @@ public struct FloorplanView: View {
         .onChange(of: iap.hasUnlockedVIP) { _ in
             FloorplanAuditStore.shared.clear()
             refreshAudit(force: true)
+        }
+        .onChange(of: iap.canUseFamilyRoomAllocation) { _ in
+            reportExportGeneration &+= 1
+            exportedReportImage = nil
+        }
+        .onChange(of: showFamilyRoomLabels) { _ in
+            // A previous export may still be rendering when names are hidden.
+            reportExportGeneration &+= 1
+            exportedReportImage = nil
         }
         .onChange(of: effectiveHeading) { _ in
             refreshAudit()
@@ -788,6 +865,7 @@ public struct FloorplanView: View {
         currentFloorplanSurvey = nil
         exportedReportImage = nil
         reloadSpatialSurveyArchives()
+        familyRoomAssignments = nil
         guard let saved = snapshot.layout else { return }
         var restoredIDs = Set<String>()
         let restoredRooms = saved.rooms.map { room -> FloorplanRoom in
@@ -809,6 +887,7 @@ public struct FloorplanView: View {
             return restored
         }
         rooms = restoredRooms
+        familyRoomAssignments = saved.familyRoomAssignments
         centroid = CGPoint(
             x: Self.clampedUnit(saved.centroidX, fallback: 0.5),
             y: Self.clampedUnit(saved.centroidY, fallback: 0.5)
@@ -922,7 +1001,8 @@ public struct FloorplanView: View {
             depthMeters: calibratedDepthMeters.map { Double($0) },
             houseFacingDegrees: houseFacingDegrees,
             houseFacingWasExplicit: houseFacingWasExplicit,
-            surveyMapping: surveyMapping
+            surveyMapping: surveyMapping,
+            familyRoomAssignments: familyRoomAssignments
         )
         guard didRestorePersistedLayout else { return }
         do {
@@ -1002,7 +1082,8 @@ public struct FloorplanView: View {
             depthMeters: calibratedDepthMeters.map { Double($0) },
             houseFacingDegrees: houseFacingDegrees,
             houseFacingWasExplicit: houseFacingWasExplicit,
-            surveyMapping: surveyMapping
+            surveyMapping: surveyMapping,
+            familyRoomAssignments: familyRoomAssignments
         )
 
         let record = FloorplanCaseRecord(
@@ -1033,6 +1114,7 @@ public struct FloorplanView: View {
         selectedEditingRoomID = nil
         roomForTypeEditing = nil
         let saved = record.layout
+        familyRoomAssignments = saved.familyRoomAssignments
         rooms = saved.rooms.map { r in
             var copy = Self.sanitizedRoom(r)
             copy.name = copy.type.localizedName
@@ -2196,6 +2278,7 @@ public struct FloorplanView: View {
     }
 
     private func resetToSampleLayout() {
+        familyRoomAssignments = nil
         workspaceRevision = workspaceStore.snapshot.revision
         houseFacingOffset = nil
         surveyMapping = nil
@@ -2655,6 +2738,8 @@ public struct FloorplanView: View {
 
     private func updateRoomType(roomID: String, type: FloorplanRoomType) {
         guard let index = rooms.firstIndex(where: { $0.id == roomID }) else { return }
+        familyRoomAssignments = FamilyRoomAllocationEngine.afterChangingRoomUse(familyRoomAssignments,
+            roomID: roomID, from: rooms[index].type, to: type)
         rooms[index].type = type
         rooms[index].name = type.localizedName
         roomsBeforeDetection = nil
@@ -2716,6 +2801,7 @@ public struct FloorplanView: View {
     }
 
     private func deleteRoom(roomID: String) {
+        familyRoomAssignments = familyRoomAssignments.map { $0.filter { $0.roomID != roomID } }
         rooms.removeAll { $0.id == roomID }
         roomsBeforeDetection = nil
         centroidBeforeDetection = nil
@@ -2742,7 +2828,8 @@ public struct FloorplanView: View {
     }
     
     // MARK: - 户型交互画布
-    private func floorplanCanvasView(auditedRooms: [FloorplanRoom]) -> some View {
+    private func floorplanCanvasView(auditedRooms: [FloorplanRoom], personLabels: [String: String],
+                                     reviewRoomIDs: Set<String>) -> some View {
         GeometryReader { geo in
             let layoutRect = floorplanContentRect(in: geo.size)
             let centerPt = CGPoint(
@@ -2770,7 +2857,8 @@ public struct FloorplanView: View {
                 
                 // 户型外墙与房间隔断
                 ForEach(auditedRooms) { room in
-                    roomBlockView(room: room, layoutRect: layoutRect)
+                    roomBlockView(room: room, layoutRect: layoutRect, personLabel: personLabels[room.id],
+                                  needsFamilyReview: reviewRoomIDs.contains(room.id))
                 }
                 
                 // 随动半透明罗盘八宫扇区与十字天心
@@ -2789,7 +2877,7 @@ public struct FloorplanView: View {
                                     in: CGRect(origin: .zero, size: canvasSize))
     }
 
-    private func roomBlockView(room: FloorplanRoom, layoutRect: CGRect) -> some View {
+    private func roomBlockView(room: FloorplanRoom, layoutRect: CGRect, personLabel: String?, needsFamilyReview: Bool) -> some View {
         let rx = room.rect.origin.x * layoutRect.width
         let ry = room.rect.origin.y * layoutRect.height
         let rw = room.rect.size.width * layoutRect.width
@@ -2896,6 +2984,16 @@ public struct FloorplanView: View {
                         .foregroundColor(.white.opacity(0.65))
                         .lineLimit(2)
                         .minimumScaleFactor(0.7)
+                    if let personLabel {
+                        Label(personLabel, systemImage: needsFamilyReview ? "exclamationmark.triangle.fill" : "person.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(needsFamilyReview ? .orange : .cyan)
+                            .lineLimit(3)
+                            .minimumScaleFactor(0.7)
+                            .padding(3)
+                            .background(Color.black.opacity(0.75))
+                            .cornerRadius(4)
+                    }
                 }
                 .padding(isLargeLayout ? 4 : 2)
             }
@@ -3314,7 +3412,12 @@ public struct FloorplanView: View {
         let snapshot = FloorplanReportSnapshot(rooms: rooms, centroid: centroid, heading: effectiveHeading,
                                                aspectRatio: floorplanAspectRatio, image: userFloorplanImage)
         let roomsToDraw = snapshot.rooms
-        let report = snapshot.report
+        let familySnapshot = FamilyRoomExportSnapshot(manual: familyRoomAssignments, rooms: roomsToDraw,
+            people: FamilyRoomAllocationEngine.people(profile: familyProfile), centroid: snapshot.centroid,
+            heading: snapshot.heading, aspectRatio: snapshot.aspectRatio,
+            hasAnnualAccess: iap.canUseFamilyRoomAllocation, includePeople: showFamilyRoomLabels)
+        let personLabels = familySnapshot.labels
+        let report = snapshot.report + familySnapshot.report
         let heading = snapshot.heading
         let state = floorplanHeadingState
         let bgImage = snapshot.image
@@ -3364,36 +3467,8 @@ public struct FloorplanView: View {
             // silently dropped when the image is generated.
             let listTop: CGFloat = 1000
             let bottomPadding: CGFloat = 48
-            let titleFont = UIFont.boldSystemFont(ofSize: 22)
-            let bodyFont = UIFont.systemFont(ofSize: 17)
-            let solutionFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
-            let bodyWidth: CGFloat = 920
-            func measuredRowHeight(_ item: FloorplanAuditItem) -> CGFloat {
-                let titleHeight = (item.title as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
-                    options: [.usesLineFragmentOrigin, .usesFontLeading],
-                    attributes: [.font: titleFont],
-                    context: nil
-                ).height
-                let loreHeight = (item.lore as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
-                    options: [.usesLineFragmentOrigin, .usesFontLeading],
-                    attributes: [.font: bodyFont],
-                    context: nil
-                ).height
-                let solution = "\(solutionPrefix) \(item.solution)"
-                let solutionHeight = (solution as NSString).boundingRect(
-                    with: CGSize(width: bodyWidth, height: CGFloat.greatestFiniteMagnitude),
-                    options: [.usesLineFragmentOrigin, .usesFontLeading],
-                    attributes: [.font: solutionFont],
-                    context: nil
-                ).height
-                // Keep the compact card for short Chinese strings, while
-                // allowing localized or user-authored remedies to wrap fully.
-                return max(138, ceil(16 + titleHeight + 8 + loreHeight + 8 + solutionHeight + 16))
-            }
-            let rowHeights = report.map(measuredRowHeight)
-            let canvasHeight = max(1920, listTop + rowHeights.reduce(0, +) + bottomPadding)
+            let rowLayouts = report.map { FloorplanReportRowLayout(item: $0, solutionPrefix: solutionPrefix) }
+            let canvasHeight = max(1920, listTop + rowLayouts.reduce(0) { $0 + $1.height } + bottomPadding)
             let canvasSize = CGSize(width: 1080, height: canvasHeight)
             let format = UIGraphicsImageRendererFormat()
             format.scale = 1
@@ -3467,11 +3542,13 @@ public struct FloorplanView: View {
                 rPath.lineWidth = 2.5
                 rPath.stroke()
 
-                let label = "\(room.name)\n\(room.palaceName)"
+                let personLabel = personLabels[room.id].map { "\n" + $0 } ?? ""
+                let label = "\(room.name)\n\(room.palaceName)\(personLabel)"
                 let pStyle = NSMutableParagraphStyle()
                 pStyle.alignment = .center
                 label.draw(
-                    in: CGRect(x: rRect.minX + 4, y: rRect.midY - 22, width: max(20, rRect.width - 8), height: 48),
+                    in: CGRect(x: rRect.minX + 4, y: rRect.midY - (personLabel.isEmpty ? 22 : 32),
+                               width: max(20, rRect.width - 8), height: personLabel.isEmpty ? 48 : 72),
                     withAttributes: [
                         .font: UIFont.boldSystemFont(ofSize: 17),
                         .foregroundColor: UIColor.white,
@@ -3499,8 +3576,8 @@ public struct FloorplanView: View {
 
             // 3. 底部全屋体检清单
             var cursorY: CGFloat = listTop
-            for (item, rowHeight) in zip(report, rowHeights) {
-                let rowRect = CGRect(x: 40, y: cursorY, width: 1000, height: rowHeight - 12)
+            for (item, rowLayout) in zip(report, rowLayouts) {
+                let rowRect = CGRect(x: 40, y: cursorY, width: 1000, height: rowLayout.height - 12)
                 UIColor(red: 0.12, green: 0.12, blue: 0.16, alpha: 1.0).setFill()
                 UIBezierPath(roundedRect: rowRect, cornerRadius: 14).fill()
 
@@ -3508,23 +3585,23 @@ public struct FloorplanView: View {
                 tagColor.setFill()
                 cg.fillEllipse(in: CGRect(x: 64, y: cursorY + 24, width: 14, height: 14))
 
-                item.title.draw(in: CGRect(x: 90, y: cursorY + 16, width: 920, height: rowHeight - 16), withAttributes: [
-                    .font: titleFont,
+                item.title.draw(in: rowLayout.titleRect.offsetBy(dx: 0, dy: cursorY), withAttributes: [
+                    .font: FloorplanReportRowLayout.titleFont,
                     .foregroundColor: UIColor.white
                 ])
-                item.lore.draw(in: CGRect(x: 90, y: cursorY + 48, width: 920, height: rowHeight - 48), withAttributes: [
-                    .font: bodyFont,
+                item.lore.draw(in: rowLayout.loreRect.offsetBy(dx: 0, dy: cursorY), withAttributes: [
+                    .font: FloorplanReportRowLayout.bodyFont,
                     .foregroundColor: UIColor.white.withAlphaComponent(0.78)
                 ])
                 let solution = "\(solutionPrefix) \(item.solution)"
                 solution.draw(
-                    in: CGRect(x: 90, y: cursorY + 84, width: 920, height: rowHeight - 84),
+                    in: rowLayout.solutionRect.offsetBy(dx: 0, dy: cursorY),
                     withAttributes: [
-                        .font: solutionFont,
+                        .font: FloorplanReportRowLayout.solutionFont,
                         .foregroundColor: UIColor(red: 0.95, green: 0.82, blue: 0.35, alpha: 1.0)
                     ]
                 )
-                cursorY += rowHeight
+                cursorY += rowLayout.height
             }
         }
 

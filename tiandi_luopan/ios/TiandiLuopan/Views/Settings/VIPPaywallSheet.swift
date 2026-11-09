@@ -121,6 +121,7 @@ public struct VIPLockCardView: View {
 // MARK: - 全功能专业版 VIP 收银台弹窗 (VIP Paywall Sheet)
 
 public struct VIPPaywallSheet: View {
+    private let annualOnly: Bool
     @Environment(\.openURL) private var openURL
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var iap = StoreKitIAPManager.shared
@@ -132,8 +133,9 @@ public struct VIPPaywallSheet: View {
     @State private var alertIsError: Bool = false
     @State private var showAlert: Bool = false
     
-    public init(defaultProductId: IAPProductID = .vipYearly) {
-        _selectedProductId = State(initialValue: defaultProductId.rawValue)
+    public init(defaultProductId: IAPProductID = .vipYearly, annualOnly: Bool = false) {
+        self.annualOnly = annualOnly
+        _selectedProductId = State(initialValue: annualOnly ? IAPProductID.vipYearly.rawValue : defaultProductId.rawValue)
     }
     
     public var body: some View {
@@ -153,13 +155,13 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 .padding(.top, 12)
                             
-                            Text(selectedIsSingleProduct
+                            Text(annualOnly ? lang.t("fra_title") : selectedIsSingleProduct
                                  ? selectedIAPProduct.title
                                  : LocalizationManager.shared.t("vip_sheet_title"))
                                 .adaptiveFont(size: 18, weight: .bold)
                                 .foregroundColor(.white)
                             
-                            Text(selectedIsSingleProduct
+                            Text(annualOnly ? lang.t("fra_paywall") : selectedIsSingleProduct
                                  ? selectedIAPProduct.desc
                                  : LocalizationManager.shared.t("vip_sheet_subtitle"))
                                 .adaptiveFont(size: 11)
@@ -169,13 +171,18 @@ public struct VIPPaywallSheet: View {
                         // 2. 核心特权清单。单次商品只展示它实际解锁的
                         // 一项服务，避免把一次导出误解成全量 VIP。
                         VStack(spacing: 8) {
-                            if selectedIsSingleProduct {
+                            if annualOnly {
+                                privilegeItem(icon: "person.2.fill", title: lang.t("fra_title"), desc: lang.t("fra_paywall"))
+                            } else if selectedIsSingleProduct {
                                 privilegeItem(
                                     icon: selectedProductId == IAPProductID.floorplanSingle.rawValue ? "house.fill" : "scroll.fill",
                                     title: selectedIAPProduct.title,
                                     desc: selectedIAPProduct.desc
                                 )
                             } else {
+                                if selectedIAPProduct == .vipYearly {
+                                    privilegeItem(icon: "person.2.fill", title: lang.t("fra_title"), desc: lang.t("fra_paywall"))
+                                }
                                 privilegeItem(icon: "person.2.fill", title: LocalizationManager.shared.t("bz_tool_owner"), desc: LocalizationManager.shared.t("bz_owner_vip_desc"))
                                 privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
                                 privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
@@ -198,23 +205,25 @@ public struct VIPPaywallSheet: View {
                                 isSelected: selectedProductId == IAPProductID.vipYearly.rawValue
                             )
                             
-                            productChoiceCard(
-                                id: .proLifetime,
-                                tag: LocalizationManager.shared.t("product_pro_lifetime_tag"),
-                                isSelected: selectedProductId == IAPProductID.proLifetime.rawValue
-                            )
+                            if !annualOnly {
+                                productChoiceCard(
+                                    id: .proLifetime,
+                                    tag: LocalizationManager.shared.t("product_pro_lifetime_tag"),
+                                    isSelected: selectedProductId == IAPProductID.proLifetime.rawValue
+                                )
                             
-                            productChoiceCard(
-                                id: .floorplanSingle,
-                                tag: LocalizationManager.shared.t("product_floorplan_single_tag"),
-                                isSelected: selectedProductId == IAPProductID.floorplanSingle.rawValue
-                            )
+                                productChoiceCard(
+                                    id: .floorplanSingle,
+                                    tag: LocalizationManager.shared.t("product_floorplan_single_tag"),
+                                    isSelected: selectedProductId == IAPProductID.floorplanSingle.rawValue
+                                )
                             
-                            productChoiceCard(
-                                id: .tianjiSingle,
-                                tag: LocalizationManager.shared.t("product_tianji_single_tag"),
-                                isSelected: selectedProductId == IAPProductID.tianjiSingle.rawValue
-                            )
+                                productChoiceCard(
+                                    id: .tianjiSingle,
+                                    tag: LocalizationManager.shared.t("product_tianji_single_tag"),
+                                    isSelected: selectedProductId == IAPProductID.tianjiSingle.rawValue
+                                )
+                            }
                         }
                         .padding(.horizontal, 16)
 
@@ -328,13 +337,13 @@ public struct VIPPaywallSheet: View {
             iap.refreshProductsIfNeeded()
         }
         .onReceive(iap.$isVIPUser) { isVip in
-            if isVip {
+            if isVip && (!annualOnly || iap.canUseFamilyRoomAllocation) {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }
         }
         .onReceive(iap.$isLifetimeUser) { isLifetime in
-            if isLifetime {
+            if isLifetime && !annualOnly {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }

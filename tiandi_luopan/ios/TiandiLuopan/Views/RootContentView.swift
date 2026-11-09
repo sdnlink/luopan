@@ -768,6 +768,9 @@ public struct RootContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .didTapAlmanacWidget)) { _ in
             consumePendingAlmanacRoute()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didRequestAppNavigation).receive(on: DispatchQueue.main)) { _ in
+            consumePendingAlmanacRoute()
+        }
         .onOpenURL { url in
             // SwiftUI 原生兜底：若系统把 URL 交给视图层，也能定位到目标页。
             SceneDelegate.routeWidgetURL(url)

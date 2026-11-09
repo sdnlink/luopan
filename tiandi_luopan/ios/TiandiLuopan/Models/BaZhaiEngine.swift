@@ -965,9 +965,39 @@ public final class UserKuaProfileManager: ObservableObject {
         if let fData = (shared?.data(forKey: kFamilyMembersKey))
             ?? UserDefaults.standard.data(forKey: kFamilyMembersKey)
             ?? cloud.data(forKey: kFamilyMembersKey),
-           let decoded = try? JSONDecoder().decode([FamilyMemberProfile].self, from: fData) {
-            self.familyMembers = decoded
+           let restored = try? Self.restoringFamilyMembers(from: fData) {
+            self.familyMembers = restored.profiles
+            // Property observers do not run during initialization. Persist repaired IDs now,
+            // before a floorplan can refer to an ID that would change on the next launch.
+            if let migratedData = restored.migratedData {
+                UserDefaults.standard.set(migratedData, forKey: kFamilyMembersKey)
+                shared?.set(migratedData, forKey: kFamilyMembersKey)
+                cloud.set(migratedData, forKey: kFamilyMembersKey)
+            }
         }
+    }
+
+    static func restoringFamilyMembers(from data: Data) throws -> (profiles: [FamilyMemberProfile], migratedData: Data?) {
+        var profiles = try JSONDecoder().decode([FamilyMemberProfile].self, from: data)
+        let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        var seen = Set<String>()
+        var repaired = false
+        for index in profiles.indices {
+            let storedID = rows?[index]["id"] as? String
+            var id = profiles[index].id.trimmingCharacters(in: .whitespacesAndNewlines)
+            if storedID == nil || id.isEmpty || seen.contains(id) {
+                repeat { id = UUID().uuidString } while seen.contains(id)
+                repaired = true
+            } else if id != profiles[index].id {
+                repaired = true
+            }
+            profiles[index].id = id
+            seen.insert(id)
+        }
+        let migratedData: Data?
+        if repaired { migratedData = try JSONEncoder().encode(profiles) }
+        else { migratedData = nil }
+        return (profiles, migratedData)
     }
 
     public static func gregorianCalendar(timeZone: TimeZone = .current) -> Calendar {
@@ -1079,36 +1109,6 @@ public final class UserKuaProfileManager: ObservableObject {
 
     public func removeFamilyMember(role: FamilyRole) {
         familyMembers.removeAll { $0.role == role }
-    }
-
-    /// 智能分房推荐：根据房间落宫八卦，自动匹配最适合居住/使用该房间的家庭成员（如子女文昌伏位、长辈天医位、夫妻延年/生气位）
-    public func recommendFamilyMemberForPalace(canonGua: String) -> String? {
-        guard canUsePersonalAnalysis, canonGua != "中", !familyMembers.isEmpty else { return nil }
-        for member in familyMembers {
-            let chart = BaZhaiEngine.shared.analyze(sittingPalace: member.guaKey, facingPalace: "离")
-            if let item = chart.items.first(where: { $0.guaName == canonGua }), item.star.isAuspicious {
-                let sName = item.star.localizedName
-                switch LocalizationManager.shared.effectiveLanguage {
-                case .en:
-                    return "[Smart Room Fit] Best for \(member.displayName) (\(member.birthYear), \(sName))"
-                case .zhHant:
-                    return "【智能分房推薦】極利「\(member.displayName)（\(member.birthYear)年）」居住或學習（落其本命\(sName)）"
-                case .ja:
-                    return "【部屋割推奨】「\(member.displayName)（\(member.birthYear)年）」に最適（本命\(sName)）"
-                case .ko:
-                    return "[맞춤 방 추천] '\(member.displayName)(\(member.birthYear)년)'에게 최적 (본명 \(sName))"
-                case .vi:
-                    return "[Gợi Ý Phân Phòng] Rất hợp cho \(member.displayName) (\(member.birthYear), \(sName))"
-                case .th:
-                    return "[แนะนำจัดห้อง] เหมาะกับ\(member.displayName) (\(member.birthYear), \(sName))"
-                case .id:
-                    return "[Rekomendasi Kamar] Cocok untuk \(member.displayName) (\(member.birthYear), \(sName))"
-                case .auto, .zhHans:
-                    return "【智能分房推荐】极利「\(member.displayName)（\(member.birthYear)年）」居住或学习（落其本命\(sName)）"
-                }
-            }
-        }
-        return nil
     }
 
     /// 根据后天洛书命卦公式计算本命卦洛书数 (1..9，5男寄坤2、女寄艮8)

@@ -1024,9 +1024,6 @@ public class FloorplanEngine {
                     )
                 )
             }
-            if let familyRec = kuaProfile.recommendFamilyMemberForPalace(canonGua: canonGua) {
-                parts.append(familyRec)
-            }
         }
 
         return parts.joined(separator: " · ")

@@ -208,6 +208,10 @@ public class StoreKitIAPManager: ObservableObject {
         /// one persisted state transition.
         var processedTransactionIDs: [String]
 
+        func allowsFamilyRoomAllocation(at date: Date) -> Bool {
+            isAuthoritative && (vipActive || vipExpireDate > date.timeIntervalSince1970)
+        }
+
         mutating func revokePaidProduct(_ productID: String) {
             if productID == IAPProductID.proLifetime.rawValue {
                 isLifetime = false
@@ -515,6 +519,11 @@ public class StoreKitIAPManager: ObservableObject {
     public var canUseFloorplan: Bool {
         guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
         return hasUnlockedVIP || mirror.floorplanCredits > 0
+    }
+
+    /// Family room allocation is an annual subscription service, separate from case credits.
+    public var canUseFamilyRoomAllocation: Bool {
+        currentMirror()?.allowsFamilyRoomAllocation(at: Date()) == true
     }
 
     public var canUseTianji: Bool {

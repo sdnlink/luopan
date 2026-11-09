@@ -711,6 +711,18 @@ public struct OwnerLifeGuaView: View {
                             .foregroundColor(Color.yanCyan)
                             .padding(.horizontal, 16)
                         ownerKuaCard(sittingPalace: context.sittingMountain.palace)
+                        Button {
+                            presentationMode.wrappedValue.dismiss()
+                            AppNavigationRouter.shared.requestRoute(tab: 2)
+                        } label: {
+                            Label(lang.t("fra_open_plan") + " · " + lang.t("fra_annual"), systemImage: "person.2.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(12)
+                                .background(Color.yanCyan.opacity(0.12))
+                                .cornerRadius(10)
+                        }
+                        .padding(.horizontal, 16)
                     }
                 }
                 .padding(.vertical, 16)

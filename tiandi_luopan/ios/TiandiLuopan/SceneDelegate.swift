@@ -71,14 +71,20 @@ public final class AppNavigationRouter: ObservableObject {
     @Published public private(set) var pendingAlmanacRoute = false
     @Published public private(set) var pendingTabRoute: (tab: Int, subTab: Int?, openDailyCard: Bool, feature: AnalysisFeature?)? = nil
 
-    init() {}
+    private let notificationCenter: NotificationCenter
+
+    init(notificationCenter: NotificationCenter = .default) {
+        self.notificationCenter = notificationCenter
+    }
 
     public func requestAlmanac() {
         pendingAlmanacRoute = true
+        notificationCenter.post(name: .didRequestAppNavigation, object: self)
     }
 
     public func requestRoute(tab: Int, subTab: Int? = nil, openDailyCard: Bool = false, feature: AnalysisFeature? = nil) {
         pendingTabRoute = (tab: tab, subTab: subTab, openDailyCard: openDailyCard, feature: feature)
+        notificationCenter.post(name: .didRequestAppNavigation, object: self)
     }
 
     /// 幂等消费：只有第一个消费者拿到 true，避免冷/热启动两条路径重复跳转。
@@ -96,6 +102,7 @@ public final class AppNavigationRouter: ObservableObject {
 }
 
 extension Notification.Name {
+    public static let didRequestAppNavigation = Notification.Name("com.yanxiang.compass.didRequestAppNavigation")
     /// 保留给已有监听方使用（热启动即时性），冷启动以 AppNavigationRouter 为准。
     public static let didTapAlmanacWidget = Notification.Name("com.yanxiang.compass.didTapAlmanacWidget")
 }

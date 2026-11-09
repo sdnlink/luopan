@@ -71,6 +71,8 @@
 		1077 /* GeometryUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2077 /* GeometryUtils.swift */; };
 		1078 /* VRSpatialSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2078 /* VRSpatialSurveyView.swift */; };
 		1079 /* TraditionalEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2079 /* TraditionalEvidence.swift */; };
+		1081 /* FamilyRoomAllocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2081 /* FamilyRoomAllocationView.swift */; };
+		1080 /* FamilyRoomAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2080 /* FamilyRoomAllocation.swift */; };
 		9100 /* WidgetAlmanacSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9200 /* WidgetAlmanacSnapshot.swift */; };
 		9101 /* TiandiLuopanAlmanacWidget.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9201 /* TiandiLuopanAlmanacWidget.swift */; };
 		9102 /* AlmanacWidgetViews.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9202 /* AlmanacWidgetViews.swift */; };
@@ -170,6 +172,8 @@
 		2077 /* GeometryUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/GeometryUtils.swift"; sourceTree = "<group>"; };
 		2078 /* VRSpatialSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/VRSpatialSurveyView.swift"; sourceTree = "<group>"; };
 		2079 /* TraditionalEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/TraditionalEvidence.swift"; sourceTree = "<group>"; };
+		2081 /* FamilyRoomAllocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Floorplan/FamilyRoomAllocationView.swift"; sourceTree = "<group>"; };
+		2080 /* FamilyRoomAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/FamilyRoomAllocation.swift"; sourceTree = "<group>"; };
 		9200 /* WidgetAlmanacSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WidgetAlmanacSnapshot.swift"; sourceTree = "<group>"; };
 		9201 /* TiandiLuopanAlmanacWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TiandiLuopanAlmanacWidget.swift; sourceTree = "<group>"; };
 		9202 /* AlmanacWidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlmanacWidgetViews.swift; sourceTree = "<group>"; };
@@ -273,6 +277,8 @@
 				2021 /* Hexagram64.swift */,
 				2022 /* FlyingStarsEngine.swift */,
 				2079 /* TraditionalEvidence.swift */,
+				2081 /* FamilyRoomAllocationView.swift */,
+				2080 /* FamilyRoomAllocation.swift */,
 				2023 /* BaZhaiEngine.swift */,
 				2024 /* SanHeWaterEngine.swift */,
 				2025 /* SolarTimeCalculator.swift */,
@@ -591,6 +597,8 @@
 				1077 /* GeometryUtils.swift in Sources */,
 				1078 /* VRSpatialSurveyView.swift in Sources */,
 				1079 /* TraditionalEvidence.swift in Sources */,
+				1081 /* FamilyRoomAllocationView.swift in Sources */,
+				1080 /* FamilyRoomAllocation.swift in Sources */,
 				9100 /* WidgetAlmanacSnapshot.swift in Sources */,
 
 

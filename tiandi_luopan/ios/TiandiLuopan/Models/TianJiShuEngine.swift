@@ -328,6 +328,7 @@ public class TianJiShuEngine {
 
             // 1.5 宅主本命卦人宅配卦与当日财神喜神吉位 (P1.1 & P2.1 全案长卷集成)
             let kuaMgr = UserKuaProfileManager.shared
+            if kuaMgr.canUsePersonalAnalysis {
             let compat = kuaMgr.evaluateCompatibility(sittingPalace: mSitting.palace)
             let dailyGods = ZeRiEngine.shared.dailyCompassDirections(for: reportDate)
             let p1KuaText: String
@@ -389,6 +390,8 @@ public class TianJiShuEngine {
                 minimumHeight: 60
             ) + 20
             
+            }
+
             // 5. 第二部：玄空飞星九宫方阵 (根据实时天文学历法动态排盘)
             let xkChart = snapshot.flyingStarsChart()
             let meta = xkChart.periodMeta

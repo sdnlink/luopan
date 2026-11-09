@@ -460,10 +460,14 @@ public struct PurpleWhiteView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if iap.hasUnlockedVIP {
-                Text(item.advice)
-                    .adaptiveFont(size: 12)
-                    .foregroundColor(.white.opacity(0.85))
-                    .lineSpacing(3)
+                DisclosureGroup(lang.t("xkd_evidence")) {
+                    Text(item.advice)
+                        .adaptiveFont(size: 12)
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineSpacing(3)
+                }
+                .adaptiveFont(size: 12)
+                .foregroundColor(Color.yanCyan)
             }
         }
         .padding(12)

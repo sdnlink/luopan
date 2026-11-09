@@ -8,7 +8,7 @@ import CoreSpotlight
 
 // MARK: - 八宅风水与大游年九星吉凶模型 (BaZhai Engine)
 
-public enum StarLuckType: String, Codable {
+public enum StarLuckType: String, Codable, CaseIterable {
     case shengQi = "生气 (贪狼大吉)"
     case yanNian = "延年 (武曲大吉)"
     case tianYi  = "天医 (巨门中吉)"
@@ -302,6 +302,55 @@ public struct BaZhaiPalaceItem: Identifiable {
             }
         }
         return direction
+    }
+}
+
+/// Plain-language uses for the house chart, independent of personal birth gua.
+public enum BaZhaiSuggestedUse: CaseIterable, Equatable {
+    case activity, rest, study, review
+
+    var titleKey: String {
+        switch self {
+        case .activity: return "bz_use_activity"
+        case .rest: return "bz_use_rest"
+        case .study: return "bz_use_study"
+        case .review: return "bz_use_review"
+        }
+    }
+    var actionKey: String {
+        switch self {
+        case .activity: return "bz_action_activity"
+        case .rest: return "bz_action_rest"
+        case .study: return "bz_action_study"
+        case .review: return "bz_action_review"
+        }
+    }
+    var avoidKey: String {
+        switch self {
+        case .activity: return "bz_avoid_activity"
+        case .rest: return "bz_avoid_rest"
+        case .study: return "bz_avoid_study"
+        case .review: return "bz_avoid_review"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .activity: return "sun.max.fill"
+        case .rest: return "sofa.fill"
+        case .study: return "book.fill"
+        case .review: return "magnifyingglass"
+        }
+    }
+}
+
+extension StarLuckType {
+    public var suggestedHouseUse: BaZhaiSuggestedUse {
+        switch self {
+        case .shengQi: return .activity
+        case .yanNian, .tianYi: return .rest
+        case .fuWei: return .study
+        case .jueMing, .wuGui, .liuSha, .huoHai: return .review
+        }
     }
 }
 
@@ -830,6 +879,8 @@ struct BirthDateEditorState {
 
 public final class UserKuaProfileManager: ObservableObject {
     public static let shared = UserKuaProfileManager()
+    /// Preserve saved profiles while gating personal interpretations on VIP.
+    public var canUsePersonalAnalysis: Bool { isProfileEnabled && StoreKitIAPManager.shared.hasUnlockedVIP }
 
     private let kBirthYearKey = "tiandi_owner_birth_year"
     private let kBirthDateKey = "tiandi_owner_birth_date"
@@ -1034,7 +1085,7 @@ public final class UserKuaProfileManager: ObservableObject {
 
     /// 智能分房推荐：根据房间落宫八卦，自动匹配最适合居住/使用该房间的家庭成员（如子女文昌伏位、长辈天医位、夫妻延年/生气位）
     public func recommendFamilyMemberForPalace(canonGua: String) -> String? {
-        guard isProfileEnabled, canonGua != "中", !familyMembers.isEmpty else { return nil }
+        guard canUsePersonalAnalysis, canonGua != "中", !familyMembers.isEmpty else { return nil }
         for member in familyMembers {
             let chart = BaZhaiEngine.shared.analyze(sittingPalace: member.guaKey, facingPalace: "离")
             if let item = chart.items.first(where: { $0.guaName == canonGua }), item.star.isAuspicious {
@@ -1697,15 +1748,16 @@ private extension Collection {
 
 public struct DailyAuspiciousCardSheet: View {
     public let targetDate: Date
-    @ObservedObject private var motion = CompassMotionManager.shared
+    let headingState: CompassHeadingState
     @ObservedObject private var lang = LocalizationManager.shared
     @Environment(\.presentationMode) private var presentationMode
     @State private var renderedImage: UIImage? = nil
     @State private var showShareSheet = false
     @State private var savedToast = false
 
-    public init(targetDate: Date = Date(), sittingMountain: Mountain24Item? = nil) {
+    public init(targetDate: Date = Date(), sittingMountain: Mountain24Item? = nil, headingState: CompassHeadingState? = nil) {
         self.targetDate = targetDate
+        self.headingState = headingState ?? CompassMotionManager.shared.headingState
     }
 
     public var body: some View {
@@ -1811,7 +1863,7 @@ public struct DailyAuspiciousCardSheet: View {
                 }
             }
             .onAppear {
-                renderedImage = Self.renderPoster(date: targetDate, state: motion.headingState)
+                renderedImage = Self.renderPoster(date: targetDate, state: headingState)
             }
         }
         .preferredColorScheme(.dark)
@@ -1999,7 +2051,9 @@ public struct DailyAuspiciousCardSheet: View {
                 withAttributes: [.font: UIFont.boldSystemFont(ofSize: 22), .foregroundColor: cyan]
             )
 
-            let bodyText = [wealthLine, joyLine, qimenLine, sittingLine, kuaLine].joined(separator: "\n")
+            let lines = [wealthLine, joyLine, qimenLine, sittingLine]
+                + (UserKuaProfileManager.shared.canUsePersonalAnalysis ? [kuaLine] : [])
+            let bodyText = lines.joined(separator: "\n")
             (bodyText as NSString).draw(
                 in: CGRect(x: 92, y: 356, width: 566, height: 262),
                 withAttributes: [
@@ -2146,12 +2200,14 @@ public struct OnboardingGuideSheet: View {
                                 .pickerStyle(.segmented)
                                 .frame(width: 120)
                             }
+                            if kua.canUsePersonalAnalysis {
                             let compat = kua.evaluateCompatibility(sittingPalace: "坎")
                             HStack {
                                 Text("🌟 \(compat.localizedOwnerGuaName) · \(compat.localizedLifeGroup) (\(compat.localizedZodiacName))")
                                     .adaptiveFont(size: 12, weight: .bold)
                                     .foregroundColor(Color.yanCyan)
                                 Spacer()
+                            }
                             }
                         }
                         .padding(14)

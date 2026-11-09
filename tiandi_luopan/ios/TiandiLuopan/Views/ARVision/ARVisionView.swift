@@ -1396,7 +1396,7 @@ public struct ARVisionView: View {
         let baShaZhi = SanHeWaterEngine.shared.resolveBaSha(sitting: sitting).shaZhi
         let gods = ZeRiEngine.shared.dailyCompassDirections(for: Date())
         let kuaProfile = UserKuaProfileManager.shared
-        let ownerCompatibility = kuaProfile.isProfileEnabled
+        let ownerCompatibility = kuaProfile.canUsePersonalAnalysis
             ? kuaProfile.evaluateCompatibility(sittingPalace: sitting.palace)
             : nil
         let ownerPalaces: [BaZhaiPalaceItem] = ownerCompatibility.map {

@@ -176,6 +176,7 @@ public struct VIPPaywallSheet: View {
                                     desc: selectedIAPProduct.desc
                                 )
                             } else {
+                                privilegeItem(icon: "person.2.fill", title: LocalizationManager.shared.t("bz_tool_owner"), desc: LocalizationManager.shared.t("bz_owner_vip_desc"))
                                 privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
                                 privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
                                 privilegeItem(icon: "drop.triangle.fill", title: LocalizationManager.shared.t("privilege_sanhe_title"), desc: LocalizationManager.shared.t("privilege_sanhe_desc"))

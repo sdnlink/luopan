@@ -1,6 +1,120 @@
 import Foundation
 import CoreGraphics
 
+/// Converts blueprint axes and AR coordinates independently into geographic sectors.
+/// A room may cover several sectors. Point objects always keep their own measured position.
+enum XuanKongHomeContextBuilder {
+    static func facing(layout: SavedFloorplanLayout?, survey: HouseSpatialSurvey?) -> Double? {
+        [layout?.houseFacingDegrees, survey?.resolvedHouseFacing].compactMap { $0 }.first { $0.isFinite }
+    }
+
+    static func build(layout: SavedFloorplanLayout?, survey: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
+                      facts: [XuanKongSiteFact]) -> XuanKongHomeContext {
+        var result = XuanKongHomeContext(exterior: exterior.filter { $0.bearingDegrees.isFinite },
+                                        facts: facts.filter { (0...8).contains($0.palaceID) })
+        var acceptedSurvey = survey
+        if let a = layout?.houseFacingDegrees, let b = survey?.resolvedHouseFacing,
+           a.isFinite, b.isFinite {
+            let delta = abs(a - b).truncatingRemainder(dividingBy: 360)
+            if min(delta, 360 - delta) > 7.5 {
+                acceptedSurvey = nil
+                result.warningKeys.append("xkd_orientation_conflict")
+            }
+        }
+        if let layout, layout.compassRotation.isFinite, layout.centroidX.isFinite, layout.centroidY.isFinite {
+            let center = CGPoint(x: layout.centroidX, y: layout.centroidY)
+            let ratio = CGFloat(layout.aspectRatio ?? 1)
+            let safeRatio = ratio.isFinite && ratio > 0 ? ratio : 1
+            let rooms = layout.rooms.filter {
+                $0.rect.minX.isFinite && $0.rect.minY.isFinite && $0.rect.width.isFinite && $0.rect.height.isFinite
+                    && $0.rect.width > 0 && $0.rect.height > 0
+            }
+            let bounds = rooms.filter { $0.type != .missingCorner }.reduce(CGRect.null) { $0.union($1.rect) }
+            let radius = bounds.isNull ? 0.03 : min(bounds.width * safeRatio, bounds.height) * 0.12
+            func sector(_ point: CGPoint) -> Int? {
+                let dx = (point.x - center.x) * safeRatio, dy = point.y - center.y
+                if hypot(dx, dy) < radius { return 4 }
+                return XuanKongDeepAnalyzer.palaceID(bearing: GeometryUtils.bearing(from: center, to: point, aspectRatio: safeRatio) + layout.compassRotation)
+            }
+            for room in rooms {
+                if room.type == .door || room.type == .missingCorner {
+                    if let id = sector(FloorplanEngine.roomCentroid(room)) {
+                        result.places.append(XuanKongLocatedPlace(id: "plan-\(room.id)-\(id)", palaceID: id, name: room.name,
+                            kind: room.type == .door ? .entrance : .room, roomType: room.type))
+                    }
+                    continue
+                }
+                var counts: [Int: Int] = [:]
+                for x in 0..<11 {
+                    for y in 0..<11 {
+                        let point = CGPoint(x: room.rect.minX + room.rect.width * (CGFloat(x) + 0.5) / 11,
+                                            y: room.rect.minY + room.rect.height * (CGFloat(y) + 0.5) / 11)
+                        guard FloorplanEngine.roomContains(room, point: point), let id = sector(point) else { continue }
+                        counts[id, default: 0] += 1
+                    }
+                }
+                let total = max(1, counts.values.reduce(0, +))
+                for id in counts.keys.sorted() {
+                    let count = counts[id] ?? 0
+                    result.places.append(XuanKongLocatedPlace(id: "plan-\(room.id)-\(id)", palaceID: id,
+                        name: room.name, kind: .room, roomType: room.type, coverage: max(1, Int((Double(count) / Double(total) * 100).rounded()))))
+                }
+            }
+        }
+        if let survey = acceptedSurvey, survey.compassHeading.isFinite {
+            let center = survey.centroid
+            let radius = Double(min(survey.dimensions.totalWidth, survey.dimensions.totalDepth)) * 0.12
+            func sector(x: Float, z: Float) -> Int? {
+                guard x.isFinite, z.isFinite, center.x.isFinite, center.z.isFinite else { return nil }
+                let dx = Double(x - center.x), dz = Double(z - center.z)
+                if hypot(dx, dz) < max(0.05, radius) { return 4 }
+                return XuanKongDeepAnalyzer.palaceID(bearing: atan2(dx, -dz) * 180 / .pi + survey.compassHeading)
+            }
+            // Blueprint room polygons take precedence over AR bounding boxes for room coverage.
+            if result.places.allSatisfy({ $0.kind != .room }) {
+                for room in survey.rooms {
+                    var counts: [Int: Int] = [:]
+                    let angle = Double(room.rotationY ?? 0), c = Float(cos(angle)), s = Float(sin(angle))
+                    for x in 0..<11 {
+                        for z in 0..<11 {
+                            let lx = room.sizeX * (Float(x) + 0.5) / 11 - room.sizeX / 2
+                            let lz = room.sizeZ * (Float(z) + 0.5) / 11 - room.sizeZ / 2
+                            if let id = sector(x: room.centerX + lx * c - lz * s, z: room.centerZ + lx * s + lz * c) {
+                                counts[id, default: 0] += 1
+                            }
+                        }
+                    }
+                    let total = max(1, counts.values.reduce(0, +))
+                    for id in counts.keys.sorted() {
+                        result.places.append(XuanKongLocatedPlace(id: "room-\(room.id)-\(id)", palaceID: id,
+                            name: room.name, kind: .room, roomType: room.type,
+                            coverage: max(1, Int((Double(counts[id] ?? 0) / Double(total) * 100).rounded()))))
+                    }
+                }
+            }
+            for opening in survey.openings {
+                guard let id = sector(x: opening.posX, z: opening.posZ) else { continue }
+                let kind: XuanKongPlaceKind = opening.type == .entranceDoor ? .entrance
+                    : (opening.type == .window || opening.type == .balconyDoor ? .window : .interiorDoor)
+                result.places.append(XuanKongLocatedPlace(id: "opening-\(opening.id)", palaceID: id,
+                    name: opening.type.localizedName, kind: kind, roomType: nil))
+            }
+            for object in survey.objects {
+                guard object.category == "bed" || object.category == "stove" || object.category == "oven",
+                      let id = sector(x: object.posX, z: object.posZ) else { continue }
+                result.places.append(XuanKongLocatedPlace(id: "object-\(object.id)", palaceID: id,
+                    name: object.localizedCategoryName, kind: object.category == "bed" ? .bed : .stove, roomType: nil))
+            }
+        }
+        if result.places.isEmpty { result.missingKeys.append("xkd_missing_plan") }
+        if !result.places.contains(where: { $0.kind == .window }) { result.missingKeys.append("xkd_missing_window") }
+        if !result.places.contains(where: { $0.kind == .bed }) { result.missingKeys.append("xkd_missing_bed") }
+        if !result.places.contains(where: { $0.kind == .stove }) { result.missingKeys.append("xkd_missing_stove") }
+        if result.exterior.isEmpty && result.facts.isEmpty { result.missingKeys.append("xkd_missing_exterior") }
+        return result
+    }
+}
+
 // MARK: - 户型空间立极与全屋风水体检引擎 (PRD 5.3 & 第7章)
 
 struct FloorplanAuditTimeKey: Equatable {
@@ -879,7 +993,7 @@ public class FloorplanEngine {
         }
 
         let kuaProfile = UserKuaProfileManager.shared
-        if kuaProfile.isProfileEnabled && canonGua != "中" {
+        if kuaProfile.canUsePersonalAnalysis && canonGua != "中" {
             let ownerBz = BaZhaiEngine.shared.analyze(sittingPalace: kuaProfile.ownerGuaKey, facingPalace: "离")
             if let ownerItem = ownerBz.items.first(where: { $0.guaName == canonGua }) {
                 let sName = ownerItem.star.localizedName

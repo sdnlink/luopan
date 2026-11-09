@@ -3,6 +3,64 @@ import WidgetKit
 import Combine
 import CoreSpotlight
 
+public enum AnalysisFeature: String, CaseIterable, Identifiable, Hashable {
+    case xuanKong, baZhai, sanHe, owner, dates, purpleWhite, qimen
+    public var id: String { rawValue }
+    var requiresVIP: Bool { self == .owner || self == .sanHe }
+    var legacySubTab: Int? {
+        switch self {
+        case .xuanKong: return 0
+        case .baZhai, .sanHe: return 1
+        case .purpleWhite: return 2
+        case .qimen: return 3
+        case .owner, .dates: return nil
+        }
+    }
+    static func fromLegacySubTab(_ index: Int) -> AnalysisFeature? {
+        let features: [AnalysisFeature] = [.xuanKong, .baZhai, .purpleWhite, .qimen]
+        return features.indices.contains(index) ? features[index] : nil
+    }
+    var titleKey: String {
+        switch self {
+        case .xuanKong: return "xuankong_stars"
+        case .baZhai: return "bazhai_tab_title"
+        case .sanHe: return "sanhe_tab_title"
+        case .owner: return "bz_tool_owner"
+        case .dates: return "bz_tool_dates"
+        case .purpleWhite: return "purple_white"
+        case .qimen: return "qimen_dunjia"
+        }
+    }
+    var subtitleKey: String {
+        switch self {
+        case .xuanKong: return "analysis_xk_hint"
+        case .baZhai: return "analysis_bz_hint"
+        case .sanHe: return "analysis_water_hint"
+        case .owner: return "bz_tool_owner_hint"
+        case .dates: return "bz_tool_dates_hint"
+        case .purpleWhite: return "analysis_pw_hint"
+        case .qimen: return "analysis_qimen_hint"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .xuanKong: return "square.grid.3x3.fill"
+        case .baZhai: return "house.fill"
+        case .sanHe: return "water.waves"
+        case .owner: return "person.2.fill"
+        case .dates: return "calendar.badge.clock"
+        case .purpleWhite: return "sparkles"
+        case .qimen: return "safari"
+        }
+    }
+}
+
+public struct AnalysisFeatureRequest: Identifiable {
+    public let id = UUID()
+    public let feature: AnalysisFeature
+    public init(feature: AnalysisFeature) { self.feature = feature }
+}
+
 /// 小组件深链与主屏快捷指令（Quick Actions / Spotlight）的待处理路由。
 /// 不能用 NotificationCenter 直接投递：冷启动时 SceneDelegate 同步发通知，
 /// SwiftUI 视图树尚未挂载，.onReceive 订阅者还不存在，通知会被静默吞掉。
@@ -11,16 +69,16 @@ public final class AppNavigationRouter: ObservableObject {
     public static let shared = AppNavigationRouter()
 
     @Published public private(set) var pendingAlmanacRoute = false
-    @Published public private(set) var pendingTabRoute: (tab: Int, subTab: Int?, openDailyCard: Bool)? = nil
+    @Published public private(set) var pendingTabRoute: (tab: Int, subTab: Int?, openDailyCard: Bool, feature: AnalysisFeature?)? = nil
 
-    private init() {}
+    init() {}
 
     public func requestAlmanac() {
         pendingAlmanacRoute = true
     }
 
-    public func requestRoute(tab: Int, subTab: Int? = nil, openDailyCard: Bool = false) {
-        pendingTabRoute = (tab: tab, subTab: subTab, openDailyCard: openDailyCard)
+    public func requestRoute(tab: Int, subTab: Int? = nil, openDailyCard: Bool = false, feature: AnalysisFeature? = nil) {
+        pendingTabRoute = (tab: tab, subTab: subTab, openDailyCard: openDailyCard, feature: feature)
     }
 
     /// 幂等消费：只有第一个消费者拿到 true，避免冷/热启动两条路径重复跳转。
@@ -30,7 +88,7 @@ public final class AppNavigationRouter: ObservableObject {
         return true
     }
 
-    public func consumeTabRoute() -> (tab: Int, subTab: Int?, openDailyCard: Bool)? {
+    public func consumeTabRoute() -> (tab: Int, subTab: Int?, openDailyCard: Bool, feature: AnalysisFeature?)? {
         guard let route = pendingTabRoute else { return nil }
         pendingTabRoute = nil
         return route
@@ -110,6 +168,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: shouldOpenDailyCard)
         case "floorplan":
             AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
+        case "analysis":
+            let rawFeature = queryItems.first(where: { $0.name == "feature" })?.value
+            guard let rawFeature, let feature = AnalysisFeature(rawValue: rawFeature) else { return }
+            AppNavigationRouter.shared.requestRoute(tab: 3, feature: feature)
         case "qimen":
             AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
         case "tab":
@@ -137,7 +199,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             CompassLayerManager.shared.showDailyGodMarkers = true
             AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
         case "com.yanxiang.compass.shortcut.zeri":
-            AppNavigationRouter.shared.requestAlmanac()
+            AppNavigationRouter.shared.requestRoute(tab: 3, feature: .dates)
         case "com.yanxiang.compass.shortcut.floorplan":
             AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
         case "com.yanxiang.compass.shortcut.qimen":
@@ -153,7 +215,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
               let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String else { return }
         switch id {
         case "spotlight.zeri":
-            AppNavigationRouter.shared.requestAlmanac()
+            AppNavigationRouter.shared.requestRoute(tab: 3, feature: .dates)
         case "tiandiluopan://compass?guide=dailyGods":
             CompassLayerManager.shared.showDailyGodMarkers = true
             AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)

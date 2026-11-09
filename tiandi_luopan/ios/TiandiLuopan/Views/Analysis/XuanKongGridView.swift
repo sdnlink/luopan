@@ -4,17 +4,38 @@ import SwiftUI
 
 public struct XuanKongGridView: View {
     public var isActive: Bool = true
-    /// 0: 玄空九星, 1: 八宅三合, 2: 紫白客星, 3: 时家奇门。
-    /// 由根视图持有，使小组件深链可以直接落到「八宅三合」里的日课卡。
+    /// 旧子页索引保留给已有链接；首页与新导航使用功能菜单。
     @Binding public var selectedSubTab: Int
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
+    @ObservedObject private var workspace = FloorplanWorkspaceStore.shared
+    @ObservedObject private var surveyStore = ShaSurveyStore.shared
+    @State private var analyzeHome = false
+    @State private var didChooseSource = false
+    @State private var analysisDate = Date()
+    @State private var followsToday = true
+    @State private var cachedDeepAnalysis: XuanKongDeepAnalysis?
+    private var homeLayout: SavedFloorplanLayout? {
+        workspace.snapshot.propertyID == surveyStore.propertyID ? workspace.snapshot.layout : nil
+    }
+    private var homeFacing: Double? {
+        XuanKongHomeContextBuilder.facing(layout: homeLayout, survey: surveyStore.latestInterior)
+    }
+    private var analysisHeading: CompassHeadingState {
+        if selectedFeature == .xuanKong, analyzeHome, let heading = homeFacing {
+            return Mountain24Data.shared.resolveHeadingState(heading: heading, pitch: motion.pitch, roll: motion.roll)
+        }
+        return motion.headingState
+    }
     @State private var selectedPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     // 手动替卦锁定：nil=跟随传感器 isJianXiang；非 nil=用户手动指定，传感器不再覆盖。
     // 换坐/向山后重置回跟随，避免用户已看清的盘被高频传感器样本突然改写。
     @State private var starMode = FlyingStarModeSelection()
-    private var useTiGua: Bool { starMode.usesTiGua(automatic: motion.headingState.isJianXiang) }
+    private var useTiGua: Bool { starMode.usesTiGua(automatic: analysisHeading.isJianXiang) }
+    @Binding private var featureRequest: AnalysisFeatureRequest?
+    @State private var selectedFeature: AnalysisFeature?
+    @State private var toolRequest: AnalysisToolRequest?
     @State private var reportSnapshot: TianJiAnalysisSnapshot?
     @State private var showTianJiShuSheet: Bool = false
     @State private var showDailySignSheet: Bool = false
@@ -22,6 +43,7 @@ public struct XuanKongGridView: View {
     @State private var showMountainPickerSheet: Bool = false
     @State private var cachedChart: XuanKongChart?
     @State private var selectedPalaceIdx: Int = 4
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var lastCurrentPeriod: Int = FlyingStarsEngine.shared.currentPeriod(for: Date())
     private static let periodRefreshTimer = Timer.publish(
         every: 60,
@@ -52,51 +74,66 @@ public struct XuanKongGridView: View {
         isLargeLayout && !isSplitLayout
     }
     
-    public init(isActive: Bool = true, selectedSubTab: Binding<Int> = .constant(0)) {
+    public init(isActive: Bool = true, selectedSubTab: Binding<Int> = .constant(0),
+                featureRequest: Binding<AnalysisFeatureRequest?> = .constant(nil)) {
         self.isActive = isActive
         self._selectedSubTab = selectedSubTab
+        self._featureRequest = featureRequest
     }
     
     public var body: some View {
         // The other three sub-tabs have their own engines. Avoid rebuilding
         // the complete nine-palace flying-star chart for every compass sample
         // while one of those tabs is active.
-        let chart: XuanKongChart? = isActive && selectedSubTab == 0
+        let chart: XuanKongChart? = isActive && selectedFeature == .xuanKong
             ? (cachedChart ?? FlyingStarsEngine.shared.calculateChart(
                 period: selectedPeriod,
-                sitting: motion.headingState.sittingMountain,
-                facing: motion.headingState.facingMountain,
-                useTiGua: useTiGua
+                sitting: analysisHeading.sittingMountain,
+                facing: analysisHeading.facingMountain,
+                useTiGua: useTiGua, date: analysisDate
             ))
             : nil
         
+        ScrollViewReader { scroll in
         ScrollView {
             if isActive {
                 VStack(spacing: 14) {
-                // 1. 四大学派理气子 Tab 切换条
-                subTabBar()
-
-                // 1.5 常驻坐向锁定与 24 山手动选山控制栏 (P0.1 解决跨 Tab 看盘传感器晃动跳变痛点)
-                sittingControlHeader()
-                    .padding(.horizontal, isLargeLayout ? 0 : 16)
-                
-                // 2. 天机书长卷一键生成入口 Banner
-                tianJiShuBanner()
+                Color.clear.frame(height: 1).id("analysisRootTop")
+                if let feature = selectedFeature {
+                    HStack {
+                        Button(action: { selectedFeature = nil; cachedChart = nil }) {
+                            Label(lang.t("analysis_back_menu"), systemImage: "chevron.left")
+                                .adaptiveFont(size: 13, weight: .semibold)
+                                .foregroundColor(Color.yanCyan)
+                                .frame(minHeight: 44)
+                        }
+                        Spacer()
+                        Text(lang.t(feature.titleKey))
+                            .adaptiveFont(size: 15, weight: .bold)
+                            .foregroundColor(.white)
+                    }
                     .padding(.horizontal, 16)
-                
-                if selectedSubTab == 0, let chart = chart {
-                    // 板块 1: 玄空九星三元九运排盘
-                    xuanKongContent(chart: chart)
-                } else if selectedSubTab == 1 {
-                    // 板块 2: 八宅明镜与三合水法
-                    BaZhaiView(isEmbedded: true, isActive: isActive && selectedSubTab == 1)
-                } else if selectedSubTab == 2 {
-                    // 板块 3: 紫白飞星流年流月客星与太岁三煞
-                    PurpleWhiteView(isActive: isActive && selectedSubTab == 2)
+                    if feature == .xuanKong { analysisSourceBar().padding(.horizontal, 16) }
+                    sittingControlHeader()
+                        .padding(.horizontal, isLargeLayout ? 0 : 16)
+                    switch feature {
+                    case .xuanKong:
+                        if let chart { xuanKongContent(chart: chart) }
+                    case .baZhai, .sanHe:
+                        BaZhaiView(isEmbedded: true, isActive: isActive,
+                                   section: feature == .sanHe ? .water : .house, showsSectionPicker: false)
+                            .id(feature)
+                    case .purpleWhite:
+                        PurpleWhiteView(isActive: isActive)
+                    case .qimen:
+                        QimenDunjiaView(isActive: isActive)
+                    case .owner, .dates:
+                        EmptyView()
+                    }
                 } else {
-                    // 板块 4: 三式绝学时家奇门遁甲全息排盘
-                    QimenDunjiaView(isActive: isActive && selectedSubTab == 3)
+                    analysisMenu()
                 }
+
             }
             // 分栏态不设固定上限：两栏已按当前有效宽度分配，画板铺满左栏；
             // 单列宽屏仍 1100，合上外屏 / 普通 iPhone 全宽（与手机一致）。
@@ -106,12 +143,17 @@ public struct XuanKongGridView: View {
             .padding(.bottom, 24)
             }
         }
+        .onChange(of: selectedFeature) { _ in
+            scroll.scrollTo("analysisRootTop", anchor: .top)
+        }
+        }
         .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         .sheet(isPresented: $showTianJiShuSheet) {
             if let reportSnapshot { TianJiShuView(analysis: reportSnapshot) }
         }
         .sheet(isPresented: $showDailySignSheet) {
-            DailyAuspiciousCardSheet()
+            DailyAuspiciousCardSheet(targetDate: selectedFeature == .xuanKong ? analysisDate : Date(),
+                                    headingState: analysisHeading)
         }
         .sheet(isPresented: $showPaywall) {
             VIPPaywallSheet(defaultProductId: .vipYearly)
@@ -119,10 +161,21 @@ public struct XuanKongGridView: View {
         .sheet(isPresented: $showMountainPickerSheet) {
             Mountain24PickerSheet(isPresented: $showMountainPickerSheet)
         }
+        .sheet(item: $toolRequest) { item in
+            switch item.tool {
+            case .owner: OwnerLifeGuaView(context: item.context)
+            case .dates: CelestialDateSelectionView(context: item.context)
+            }
+        }
         .onAppear {
+            if followsToday { analysisDate = Date() }
+            consumeFeatureRequest()
             refreshChart()
         }
+        .onChange(of: featureRequest?.id) { _ in consumeFeatureRequest() }
         .onChange(of: isActive) { _ in
+            if isActive && followsToday { analysisDate = Date() }
+            consumeFeatureRequest()
             refreshChart()
         }
         .onChange(of: selectedSubTab) { _ in
@@ -131,19 +184,32 @@ public struct XuanKongGridView: View {
         .onChange(of: selectedPeriod) { _ in
             refreshChart()
         }
+        .onChange(of: analyzeHome) { _ in starMode.restoreAutomatic(); refreshChart() }
+        .onChange(of: analysisDate) { _ in refreshChart() }
+        .onChange(of: workspace.snapshot.revision) { _ in refreshChart() }
+        .onChange(of: surveyStore.propertyID) { _ in
+            if homeFacing == nil { analyzeHome = false }
+            cachedChart = nil
+            starMode.restoreAutomatic()
+            refreshChart()
+        }
+        .onReceive(surveyStore.objectWillChange) { _ in
+            // @Published emits before the value changes. Read one coherent property snapshot next run loop.
+            DispatchQueue.main.async { refreshChart() }
+        }
         .onChange(of: useTiGua) { _ in
             refreshChart()
         }
-        .onChange(of: motion.headingState.isJianXiang) { isJian in
+        .onChange(of: analysisHeading.isJianXiang) { isJian in
             // 仅跟随模式（用户未手动锁定）下才随传感器切换下卦/替卦。
             guard starMode.manualOverride == nil else { return }
             refreshChart()
         }
-        .onChange(of: motion.headingState.sittingMountain.id) { _ in
+        .onChange(of: analysisHeading.sittingMountain.id) { _ in
             starMode.restoreAutomatic()
             refreshChart()
         }
-        .onChange(of: motion.headingState.facingMountain.id) { _ in
+        .onChange(of: analysisHeading.facingMountain.id) { _ in
             starMode.restoreAutomatic()
             refreshChart()
         }
@@ -152,6 +218,7 @@ public struct XuanKongGridView: View {
         }
         .onReceive(Self.periodRefreshTimer) { _ in
             guard isActive else { return }
+            if followsToday { analysisDate = Date() }
             let currentPeriod = FlyingStarsEngine.shared.currentPeriod(for: Date())
             // If the user was following the previously current period, keep
             // following it across the Li Chun/20-year boundary. A deliberate
@@ -165,49 +232,111 @@ public struct XuanKongGridView: View {
     }
 
     private func refreshChart() {
-        guard isActive, selectedSubTab == 0 else {
+        guard isActive, selectedFeature == .xuanKong else {
             cachedChart = nil
+            cachedDeepAnalysis = nil
             return
         }
-        cachedChart = FlyingStarsEngine.shared.calculateChart(
+        let isFirstChart = cachedChart == nil
+        let updated = FlyingStarsEngine.shared.calculateChart(
             period: selectedPeriod,
-            sitting: motion.headingState.sittingMountain,
-            facing: motion.headingState.facingMountain,
-            useTiGua: useTiGua
+            sitting: analysisHeading.sittingMountain,
+            facing: analysisHeading.facingMountain,
+            useTiGua: useTiGua, date: analysisDate
         )
+        let context = analyzeHome && homeFacing != nil
+            ? XuanKongHomeContextBuilder.build(layout: homeLayout, survey: surveyStore.latestInterior,
+                exterior: surveyStore.records, facts: surveyStore.siteFacts) : nil
+        let deep = XuanKongDeepAnalyzer.analyze(chart: updated, date: analysisDate, context: context)
+        if isFirstChart { selectedPalaceIdx = deep.priorities.first?.id ?? 4 }
+        cachedDeepAnalysis = deep
+        cachedChart = updated
     }
     
-    // MARK: - 子 Tab 切换栏
-    private func subTabBar() -> some View {
-        HStack(spacing: 0) {
-            tabButton(title: lang.t("xuankong_stars"), index: 0)
-            tabButton(title: lang.t("bazhai_sanhe"), index: 1)
-            tabButton(title: lang.t("purple_white"), index: 2)
-            tabButton(title: lang.t("qimen_dunjia"), index: 3)
+    private func consumeFeatureRequest() {
+        guard isActive, let request = featureRequest else { return }
+        featureRequest = nil
+        openFeature(request.feature)
+    }
+
+    private func openFeature(_ feature: AnalysisFeature) {
+        if feature == .owner || feature == .dates {
+            toolRequest = AnalysisToolRequest(tool: feature == .owner ? .owner : .dates, context: motion.headingState)
+        } else {
+            if feature == .xuanKong && !didChooseSource {
+                analyzeHome = homeFacing != nil
+                didChooseSource = true
+            }
+            selectedFeature = feature
+            selectedSubTab = feature.legacySubTab ?? 0
+            refreshChart()
         }
-        .background(Color.white.opacity(0.08))
-        .cornerRadius(8)
-        .padding(.horizontal, isLargeLayout ? 0 : 16)
     }
-    
-    private func tabButton(title: String, index: Int) -> some View {
-        Button(action: {
-            selectedSubTab = index
-        }) {
+
+    private func analysisMenu() -> some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(lang.t("analysis_menu_title"))
+                    .adaptiveFont(size: 25, weight: .bold)
+                    .foregroundColor(.white)
+            }
+            sittingControlHeader()
+            menuGroup(title: lang.t("analysis_group_house"), features: [.xuanKong, .baZhai, .sanHe])
+            menuGroup(title: lang.t("analysis_group_people"), features: [.owner])
+            menuGroup(title: lang.t("analysis_group_time"), features: [.dates, .purpleWhite, .qimen])
+            Text(lang.t("analysis_group_report"))
+                .adaptiveFont(size: 14, weight: .bold)
+                .foregroundColor(Color.yanGold)
+            tianJiShuBanner()
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func menuGroup(title: String, features: [AnalysisFeature]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .adaptiveFont(size: 12, weight: selectedSubTab == index ? .bold : .medium)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, isRoomyLayout ? 10 : 8)
-                .background(selectedSubTab == index ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
-                .foregroundColor(selectedSubTab == index ? .black : .white.opacity(0.75))
+                .adaptiveFont(size: 14, weight: .bold)
+                .foregroundColor(Color.yanGold)
+            ForEach(features) { feature in
+                Button(action: { openFeature(feature) }) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Image(systemName: feature.symbol)
+                            .font(.system(size: 22))
+                            .foregroundColor(Color.yanCyan)
+                            .frame(width: 30)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(lang.t(feature.titleKey))
+                                .adaptiveFont(size: 15, weight: .bold)
+                                .foregroundColor(.white)
+                            Text(lang.t(feature.subtitleKey))
+                                .adaptiveFont(size: 12)
+                                .foregroundColor(.white.opacity(0.65))
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        if feature.requiresVIP {
+                            Label(lang.t("vip_badge_title"), systemImage: iap.hasUnlockedVIP ? "crown.fill" : "lock.fill")
+                                .adaptiveFont(size: 10, weight: .bold)
+                                .foregroundColor(Color.yanGold)
+                        }
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                    .background(Color.white.opacity(0.05))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
-    
+
     // MARK: - P0.1 常驻立极坐向锁定与 24 山手选控制栏 + 今日吉签入口
     private func sittingControlHeader() -> some View {
-        let state = motion.headingState
+        let state = analysisHeading
+        let usesHome = selectedFeature == .xuanKong && analyzeHome
         let pickLabel: String
         let signLabel: String
         switch lang.effectiveLanguage {
@@ -240,10 +369,11 @@ public struct XuanKongGridView: View {
         return HStack(spacing: 8) {
             // 当前坐山朝向与度数（支持点击直接调出 24 山选向弹窗）
             Button(action: {
-                showMountainPickerSheet = true
+                if usesHome { AppNavigationRouter.shared.requestRoute(tab: 2) }
+                else { showMountainPickerSheet = true }
             }) {
                 HStack(spacing: 4) {
-                    Image(systemName: motion.isLocked ? "lock.fill" : "location.north.line.fill")
+                    Image(systemName: usesHome ? "house.fill" : (motion.isLocked ? "lock.fill" : "location.north.line.fill"))
                         .font(.system(size: 11, weight: .bold))
                         .foregroundColor(motion.isLocked ? Color.red : Color(red: 0.95, green: 0.85, blue: 0.45))
                     Text("\(state.sittingMountain.localizedName)\(lang.t("mountain_suffix"))\(state.facingMountain.localizedName)\(lang.t("facing_suffix")) · \(String(format: "%.1f°", state.facingAngle))")
@@ -257,39 +387,42 @@ public struct XuanKongGridView: View {
 
             Spacer(minLength: 4)
 
-            // 锁定 / 解锁盘面按钮
-            Button(action: {
-                motion.toggleLock()
-            }) {
-                Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
-                    .adaptiveFont(size: 11, weight: .bold)
-                    .lineLimit(1)
+            if !usesHome {
+                // 锁定 / 解锁盘面按钮
+                Button(action: {
+                    motion.toggleLock()
+                }) {
+                    Text(motion.isLocked ? lang.t("locked_heading") : lang.t("lock_heading"))
+                        .adaptiveFont(size: 11, weight: .bold)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(motion.isLocked ? Color.red.opacity(0.22) : Color.white.opacity(0.1))
+                        .foregroundColor(motion.isLocked ? .red : .white)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                // 24 山手选快速选向按钮（打开 24 山专业选向面板，彻底解决手选无法点击选定问题）
+                Button(action: {
+                    analyzeHome = false
+                    showMountainPickerSheet = true
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "dial.medium.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text(pickLabel)
+                            .adaptiveFont(size: 11, weight: .semibold)
+                            .lineLimit(1)
+                    }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
-                    .background(motion.isLocked ? Color.red.opacity(0.22) : Color.white.opacity(0.1))
-                    .foregroundColor(motion.isLocked ? .red : .white)
+                    .background(Color.yanCyan.opacity(0.18))
+                    .foregroundColor(Color.yanCyan)
                     .cornerRadius(6)
-            }
-            .buttonStyle(PlainButtonStyle())
-
-            // 24 山手选快速选向按钮（打开 24 山专业选向面板，彻底解决手选无法点击选定问题）
-            Button(action: {
-                showMountainPickerSheet = true
-            }) {
-                HStack(spacing: 3) {
-                    Image(systemName: "dial.medium.fill")
-                        .font(.system(size: 10, weight: .bold))
-                    Text(pickLabel)
-                        .adaptiveFont(size: 11, weight: .semibold)
-                        .lineLimit(1)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.yanCyan.opacity(0.18))
-                .foregroundColor(Color.yanCyan)
-                .cornerRadius(6)
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
 
             // 今日吉方日签海报按钮
             Button(action: {
@@ -335,8 +468,9 @@ public struct XuanKongGridView: View {
             Spacer()
             
             Button(action: {
-                reportSnapshot = TianJiAnalysisSnapshot(heading: motion.headingState.facingAngle,
-                                                        period: selectedPeriod, useTiGua: useTiGua)
+                reportSnapshot = TianJiAnalysisSnapshot(heading: analysisHeading.facingAngle,
+                                                        period: selectedPeriod, useTiGua: useTiGua,
+                                                        reportDate: selectedFeature == .xuanKong ? analysisDate : Date())
                 showTianJiShuSheet = true
             }) {
                 Text(lang.t("one_click_export"))
@@ -376,7 +510,16 @@ public struct XuanKongGridView: View {
             VStack(spacing: 14) {
                 periodPickerBar(chart: chart)
                 patternBadgeView(chart: chart)
-                ninePalacesGrid(chart: chart)
+                if isSplitLayout {
+                    ninePalacesGrid(chart: chart)
+                } else {
+                    DisclosureGroup(lang.t("xkd_chart")) {
+                        ninePalacesGrid(chart: chart).padding(.top, 8)
+                    }
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(Color.yanCyan)
+                    .padding(.horizontal, 16)
+                }
             }
         } analysis: {
             VStack(spacing: 12) {
@@ -447,7 +590,7 @@ public struct XuanKongGridView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 
-                Text(chart.patternType)
+                Text(chart.patternType.components(separatedBy: " (").first ?? chart.patternType)
                     .adaptiveFont(size: 12, weight: .bold)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -458,7 +601,7 @@ public struct XuanKongGridView: View {
                     .minimumScaleFactor(0.7)
                 
                 Button(action: {
-                    starMode.toggle(automatic: motion.headingState.isJianXiang)
+                    starMode.toggle(automatic: analysisHeading.isJianXiang)
                     // 手动切换后锁定该选择，传感器 isJianXiang 不再覆盖；
                     // 换坐/向山后自动回到跟随模式。
                 }) {
@@ -511,10 +654,12 @@ public struct XuanKongGridView: View {
         return LazyVGrid(columns: columns, spacing: 8) {
             ForEach(gridDisplayOrder, id: \.self) { idx in
                 let cell = chart.palaces[idx]
-                palaceCellView(cell: cell)
-                    .onTapGesture {
-                        selectedPalaceIdx = cell.id
-                    }
+                Button(action: { selectGuidancePalace(cell.id) }) {
+                    palaceCellView(cell: cell)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(cell.plainDirectionName + ", " + lang.t(cell.suggestedUse.titleKey))
+                .accessibilityAddTraits(cell.id == selectedPalaceIdx ? .isSelected : [])
             }
         }
         // 分栏时铺满左栏（两栏已按有效宽度分配），单列宽屏仍 580、手机全宽
@@ -523,11 +668,10 @@ public struct XuanKongGridView: View {
     }
     
     private func palaceCellView(cell: XuanKongPalace) -> some View {
-        let isDanger25 = (cell.sittingStar == 2 && cell.facingStar == 5) || (cell.sittingStar == 5 && cell.facingStar == 2)
-        let isDouble9 = cell.sittingStar == cell.activePeriod && cell.facingStar == cell.activePeriod
+        let use = cell.suggestedUse
         let isSelected = cell.id == selectedPalaceIdx
-        let borderColor = isSelected ? Color.yanCyan : (isDanger25 ? Color.red : (isDouble9 ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.white.opacity(0.12)))
-        let bgColor = isDanger25 ? Color.red.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
+        let borderColor = isSelected ? Color.yanCyan : (use == .quiet ? Color.orange : (use == .separateUses ? Color.yanGold : Color.white.opacity(0.12)))
+        let bgColor = use == .quiet ? Color.orange.opacity(0.1) : Color(red: 0.12, green: 0.12, blue: 0.16)
         
         return VStack {
             HStack {
@@ -564,164 +708,295 @@ public struct XuanKongGridView: View {
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(borderColor, lineWidth: (isSelected || isDanger25 || isDouble9) ? 1.5 : 1)
+                .stroke(borderColor, lineWidth: (isSelected || use == .quiet || use == .separateUses) ? 1.5 : 1)
         )
     }
     
-    // MARK: - 深度分析卡
-    private func analysisCard(chart: XuanKongChart) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(lang.t("xuankong_deep_analysis"))
-                .adaptiveFont(size: 14, weight: .bold)
-                .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-            
-            Text(chart.patternDesc)
-                .adaptiveFont(size: 13)
-                .foregroundColor(.white.opacity(0.85))
-                .lineSpacing(4)
-            
-            Divider().background(Color.white.opacity(0.1))
-            
-            if chart.palaces.indices.contains(selectedPalaceIdx) {
-                let sel = chart.palaces[selectedPalaceIdx]
-                let isDanger25 = (sel.sittingStar == 2 && sel.facingStar == 5) || (sel.sittingStar == 5 && sel.facingStar == 2) || sel.sittingStar == 5 || sel.facingStar == 5
-                let isWang = (sel.sittingStar == sel.activePeriod || sel.facingStar == sel.activePeriod || sel.facingStar == 1 || sel.facingStar == 8 || sel.facingStar == 9)
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 6) {
-                        Text("【\(sel.localizedPalaceName)】")
-                            .adaptiveFont(size: 12, weight: .bold)
-                            .foregroundColor(Color.yanCyan)
-                        Text("\(sel.sittingStar)-\(sel.facingStar) · \(sel.periodStar)")
-                            .adaptiveFont(size: 11, weight: .semibold, design: .monospaced)
-                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        Spacer()
-                        Text(sel.localizedEvaluation)
-                            .adaptiveFont(size: 11, weight: .medium)
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
+    private func analysisSourceBar() -> some View {
+        VStack(spacing: 8) {
+            Picker(lang.t("xkd_source"), selection: $analyzeHome) {
+                Text(lang.t("xkd_source_compass")).tag(false)
+                if homeFacing != nil { Text(lang.t("xkd_source_home")).tag(true) }
+            }
+            .pickerStyle(.segmented)
+            HStack {
+                DatePicker(lang.t("xkd_date"), selection: Binding(get: { analysisDate }, set: {
+                    followsToday = false
+                    analysisDate = $0
+                }), displayedComponents: [.date, .hourAndMinute])
+                .adaptiveFont(size: 12)
+                Button(lang.t("xkd_today")) { followsToday = true; analysisDate = Date() }
+                    .foregroundColor(followsToday ? Color.yanGold : Color.yanCyan)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .foregroundColor(.white)
+        }
+    }
 
-                    Text(plainXuanKongSummary(sel: sel, isDanger25: isDanger25, isWang: isWang))
-                        .adaptiveFont(size: 11, weight: .semibold)
-                        .foregroundColor(isDanger25 ? Color.orange : (isWang ? Color.green : Color.white.opacity(0.85)))
-                        .fixedSize(horizontal: false, vertical: true)
+    // MARK: - 结论、位置、行动；依据按需展开
+    private func analysisCard(chart: XuanKongChart) -> some View {
+        let analysis = cachedDeepAnalysis ?? XuanKongDeepAnalyzer.analyze(chart: chart, date: analysisDate)
+        return VStack(alignment: .leading, spacing: 14) {
+            Text(lang.t(analysis.summaryKey))
+                .adaptiveFont(size: 18, weight: .bold)
+                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(lang.t("xk_guide_priority"))
+                    .adaptiveFont(size: 11, weight: .semibold)
+                    .foregroundColor(.white.opacity(0.7))
+                HStack(spacing: 8) {
+                    ForEach(Array(analysis.priorities.prefix(3))) { sector in
+                        Button(action: { selectGuidancePalace(sector.id) }) {
+                            Label(chart.palaces.first { $0.id == sector.id }?.plainDirectionName ?? "",
+                                  systemImage: sector.use.symbol)
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .padding(.horizontal, 4)
+                                .background(guidanceColor(sector.use).opacity(0.15))
+                                .foregroundColor(guidanceColor(sector.use))
+                                .cornerRadius(8)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .padding(.vertical, 6)
-                .padding(.horizontal, 8)
-                .background(Color.white.opacity(0.05))
-                .cornerRadius(6)
             }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(chart.wealthAdvice)
-                Text(chart.healthAdvice)
-                Text(chart.remedyAdvice)
+            guidanceMap(chart: chart, analysis: analysis)
+            if let selected = chart.palaces.first(where: { $0.id == selectedPalaceIdx }),
+               let sector = analysis.sectors.first(where: { $0.id == selected.id }) {
+                sectorActionCard(cell: selected, sector: sector)
+                if analyzeHome { siteFactsEditor(palaceID: selected.id) }
             }
-            .adaptiveFont(size: 11)
-            .foregroundColor(.white.opacity(0.7))
+            ForEach(analysis.patternChecks) { check in
+                DisclosureGroup {
+                    Text(check.palaceIDs.compactMap { id in chart.palaces.first { $0.id == id }?.plainDirectionName }.joined(separator: " · "))
+                    Text(lang.t(check.actionKey)).padding(.top, 6)
+                } label: {
+                    Text(lang.t(check.titleKey) + " · " + lang.t(check.statusKey))
+                }
+                .adaptiveFont(size: 12)
+                .foregroundColor(Color.yanCyan)
+            }
+            if !analysis.missingKeys.isEmpty || !analysis.warningKeys.isEmpty {
+                homeDataLinks(analysis: analysis)
+            }
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(lang.t(chart.pattern.titleKey)).bold()
+                    Text(lang.t(chart.pattern.explanationKey))
+                    Text(lang.t("xk_guide_terms"))
+                    if let cell = chart.palaces.first(where: { $0.id == selectedPalaceIdx }),
+                       let sector = analysis.sectors.first(where: { $0.id == cell.id }) {
+                        sectorEvidence(cell: cell, sector: sector)
+                    }
+                    Text(chart.analysisNote)
+                        .foregroundColor(.white.opacity(0.55))
+                }
+                .adaptiveFont(size: 11)
+                .foregroundColor(.white.opacity(0.75))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+            } label: {
+                Text(lang.t("xkd_evidence"))
+                    .adaptiveFont(size: 12, weight: .medium)
+                    .foregroundColor(Color.yanCyan)
+            }
+            .accentColor(Color.yanCyan)
+        }
+        .padding(16)
+        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+
+    private func homeDataLinks(analysis: XuanKongDeepAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(analysis.warningKeys, id: \.self) { key in
+                Text(lang.t(key)).foregroundColor(.orange)
+            }
+            if !analysis.missingKeys.isEmpty {
+                Text(lang.t("xkd_missing") + analysis.missingKeys.map { lang.t($0) }.joined(separator: " / "))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            HStack {
+                Button(lang.t("xkd_edit_home")) { AppNavigationRouter.shared.requestRoute(tab: 2) }
+                Spacer()
+                Button(lang.t("xkd_edit_exterior")) { AppNavigationRouter.shared.requestRoute(tab: 1) }
+            }
+            .foregroundColor(Color.yanCyan)
+            .frame(minHeight: 44)
+        }
+        .adaptiveFont(size: 11)
+    }
+
+    private func siteFactsEditor(palaceID: Int) -> some View {
+        let propertyID = surveyStore.propertyID
+        return DisclosureGroup {
+            Text(lang.t("xkd_facts_hint"))
+                .adaptiveFont(size: 11).foregroundColor(.white.opacity(0.55))
+            ForEach(XuanKongSiteFactKind.allCases, id: \.self) { kind in
+                Toggle(lang.t(kind.titleKey), isOn: Binding(get: {
+                    surveyStore.siteFacts.contains { $0.palaceID == palaceID && $0.kind == kind }
+                }, set: { present in
+                    surveyStore.setSiteFact(kind, palaceID: palaceID, present: present, propertyID: propertyID)
+                }))
+                .tint(Color.yanCyan)
+                .frame(minHeight: 44)
+            }
+        } label: {
+            Text(lang.t("xkd_facts"))
+        }
+        .adaptiveFont(size: 12)
+        .foregroundColor(.white.opacity(0.85))
+    }
+
+    private func sectorEvidence(cell: PalaceCell, sector: XuanKongSectorAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(lang.t("xkd_natal")) \(cell.periodStar) · \(cell.mountainStar) / \(cell.facingStar)")
+            Text("\(lang.t("xkd_annual")) \(sector.yearStar) · \(lang.t("xkd_monthly")) \(sector.monthStar)")
+            ForEach(Array(sector.pairs.enumerated()), id: \.offset) { index, pair in
+                Text(lang.t(["xkd_pair_natal", "xkd_pair_m_year", "xkd_pair_f_year", "xkd_pair_m_month", "xkd_pair_f_month", "xkd_pair_guests"][index])
+                     + " \(pair.first) / \(pair.second) · " + lang.t(pair.relation.titleKey))
+            }
+            ForEach(sector.reasonKeys, id: \.self) { Text(lang.t($0)) }
+            ForEach(sector.places) { place in
+                Text(place.name + (place.kind == .room ? " · \(place.coverage)%" : ""))
+            }
+            ForEach(sector.exterior) { record in
+                Text((ExteriorShaEngine.shared.database.first { $0.id == record.shaID }?.localizedName ?? record.shaID)
+                     + " · " + String(format: "%.0f°", record.bearingDegrees)
+                     + (record.distanceMeters.map { String(format: " · %.1fm", Double($0)) } ?? ""))
+            }
+            Text(lang.t("xkd_coverage_hint"))
+                .foregroundColor(.white.opacity(0.5))
+        }
+    }
+
+    private func selectGuidancePalace(_ id: Int) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+            selectedPalaceIdx = id
+        }
+    }
+
+    private func guidanceColor(_ use: XuanKongSectorUse) -> Color {
+        switch use {
+        case .quiet: return .orange
+        case .separateUses: return Color(red: 0.8, green: 0.67, blue: 1)
+        case .activity: return .yanGold
+        case .rest: return .yanCyan
+        case .everyday: return .white.opacity(0.7)
+        }
+    }
+
+    private func guidanceMap(chart: XuanKongChart, analysis: XuanKongDeepAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(lang.t("xk_guide_map"), systemImage: "square.grid.3x3.fill")
+                .adaptiveFont(size: 13, weight: .bold)
+                .foregroundColor(.white)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(gridDisplayOrder, id: \.self) { id in
+                    if let cell = chart.palaces.first(where: { $0.id == id }),
+                       let sector = analysis.sectors.first(where: { $0.id == id }) {
+                        guidanceMapCell(cell: cell, chart: chart, sector: sector)
+                    }
+                }
+            }
+        }
+    }
+
+    private func guidanceMapCell(cell: PalaceCell, chart: XuanKongChart, sector: XuanKongSectorAnalysis) -> some View {
+        let use = sector.use
+        let selected = selectedPalaceIdx == cell.id
+        let color = guidanceColor(use)
+        return Button(action: { selectGuidancePalace(cell.id) }) {
+            VStack(spacing: 5) {
+                Text(cell.plainDirectionName)
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .foregroundColor(.white)
+                Image(systemName: use.symbol)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(color)
+                    .accessibilityHidden(true)
+                Text(lang.t(use.titleKey))
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .foregroundColor(color)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let place = sector.places.first(where: { $0.kind == .bed || $0.kind == .stove || $0.kind == .entrance })
+                    ?? sector.places.first {
+                    Text(place.name)
+                        .adaptiveFont(size: 9)
+                        .foregroundColor(.white.opacity(0.75))
+                        .lineLimit(1)
+                }
+                if cell.id == chart.facingPalaceID || cell.id == chart.sittingPalaceID {
+                    Text(lang.t(cell.id == chart.facingPalaceID ? "xk_guide_front" : "xk_guide_back"))
+                        .adaptiveFont(size: 9)
+                        .foregroundColor(.white.opacity(0.65))
+                }
+            }
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 105)
+            .background(color.opacity(selected ? 0.2 : 0.08))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? color : Color.white.opacity(0.08), lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(cell.plainDirectionName + ", " + lang.t(use.titleKey))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func sectorActionCard(cell: PalaceCell, sector: XuanKongSectorAnalysis) -> some View {
+        let use = sector.use
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: use.symbol)
+                    .foregroundColor(guidanceColor(use))
+                    .font(.system(size: 22))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(cell.plainDirectionName)
+                        .adaptiveFont(size: 17, weight: .bold)
+                        .foregroundColor(.white)
+                    Text(lang.t(use.titleKey))
+                        .adaptiveFont(size: 12, weight: .semibold)
+                        .foregroundColor(guidanceColor(use))
+                }
+                Spacer(minLength: 0)
+            }
+            if !sector.places.isEmpty {
+                Text(Array(Set(sector.places.map(\.name))).sorted().joined(separator: " · "))
+                    .adaptiveFont(size: 11)
+                    .foregroundColor(.white.opacity(0.65))
+            }
+            ForEach(Array(sector.actions.prefix(3)), id: \.self) { action in
+                Label(lang.t(action.textKey), systemImage: "checkmark.circle.fill")
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if sector.actions.count > 3 {
+                DisclosureGroup(lang.t("xkd_more_actions")) {
+                    ForEach(Array(sector.actions.dropFirst(3)), id: \.self) { action in
+                        Text(lang.t(action.textKey)).padding(.top, 6)
+                    }
+                }
+                .adaptiveFont(size: 11)
+                .foregroundColor(.white.opacity(0.7))
+            }
         }
         .padding(14)
-        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(guidanceColor(use).opacity(0.08))
         .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-    
-    private func sanBanGuaBadgeText() -> String {
-        switch lang.effectiveLanguage {
-        case .en: return "San Ban Gua (Auspicious Triad)"
-        case .zhHant, .ja: return "三般卦吉格 · 通氣連珠"
-        case .ko: return "삼반괘 길격"
-        case .vi: return "Tam Ban Quái Cát Cách"
-        case .th: return "ซานปานกั้ว (ผังมงคลสามประสาน)"
-        case .id: return "Pola San Ban Gua"
-        case .auto, .zhHans: return "三般卦吉格 · 通气连珠"
-        }
-    }
-    
-    private func qiXingDaJieBadgeText() -> String {
-        switch lang.effectiveLanguage {
-        case .en: return "Qi Xing Da Jie (Seven-Star Robbery)"
-        case .zhHant, .ja: return "七星打劫大吉局"
-        case .ko: return "칠성타겁 대길국"
-        case .vi: return "Thất Tinh Đả Kiếp Đại Cát Cục"
-        case .th: return "ชีซิงต่าเจี๋ย (ผังเจ็ดดาวมงคลใหญ่)"
-        case .id: return "Formasi Qi Xing Da Jie"
-        case .auto, .zhHans: return "七星打劫大吉局"
-        }
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(guidanceColor(use).opacity(0.35), lineWidth: 1))
     }
 
-    private func plainXuanKongSummary(sel: XuanKongPalace, isDanger25: Bool, isWang: Bool) -> String {
-        switch lang.effectiveLanguage {
-        case .en:
-            if isDanger25 {
-                return "⚠️ Plain Summary: 2-Black/5-Yellow Sha present here. Keep quiet, avoid red decor or drilling, and hang a 6-coin brass cure."
-            } else if isWang {
-                return "✅ Plain Summary: Prosperous Mountain/Facing stars (\(sel.sittingStar)-\(sel.facingStar)). Ideal for main door, master bed, or work desk."
-            } else {
-                return "💡 Plain Summary: Balanced sector (\(sel.sittingStar)-\(sel.facingStar)). Keep bright, ventilated, and tidy."
-            }
-        case .zhHant:
-            if isDanger25 {
-                return "⚠️ 【白話速斷】本宮見二黑/五黃煞氣（山\(sel.sittingStar)向\(sel.facingStar)），宜靜不宜動，忌放紅色或動土，建議懸掛六帝銅錢或銅葫蘆化煞。"
-            } else if isWang {
-                return "✅ 【白話速斷】本宮得當令旺生吉星（山\(sel.sittingStar)向\(sel.facingStar)），氣場生旺，極宜設為入戶門、主臥安床或書桌財位。"
-            } else {
-                return "💡 【白話速斷】本宮星氣平穩（山\(sel.sittingStar)向\(sel.facingStar)），日常保持採光通風與整潔即可。"
-            }
-        case .ja:
-            if isDanger25 {
-                return "⚠️ 【平易解説】二黒・五黄の凶星（山\(sel.sittingStar)・向\(sel.facingStar)）が巡っています。動土や赤い装飾を避け、六帝古銭や銅製ひょうたんで化殺してください。"
-            } else if isWang {
-                return "✅ 【平易解説】当運の旺星（山\(sel.sittingStar)・向\(sel.facingStar)）が巡る大吉方位です。玄関・主寝室・書斎デスクの配置に最適です。"
-            } else {
-                return "💡 【平易解説】気場が安定した方位（山\(sel.sittingStar)・向\(sel.facingStar)）です。採光と風通しを良くし清潔に保ちましょう。"
-            }
-        case .ko:
-            if isDanger25 {
-                return "⚠️ [쉬운 해설] 이흑·오황 살기(산\(sel.sittingStar)·향\(sel.facingStar))가 비임했습니다. 공사와 붉은색 장식을 피하고 육제동전이나 동호리병으로 화살하세요."
-            } else if isWang {
-                return "✅ [쉬운 해설] 당령 왕성 길성(산\(sel.sittingStar)·향\(sel.facingStar))이 모인 대길 방위입니다. 현관문, 안방 침대, 책상 재물자리로 매우 좋습니다."
-            } else {
-                return "💡 [쉬운 해설] 기운이 평온한 방위(산\(sel.sittingStar)·향\(sel.facingStar))입니다. 채광과 환기를 유지하고 정돈해 두세요."
-            }
-        case .vi:
-            if isDanger25 {
-                return "⚠️ [Tóm tắt dễ hiểu] Cung này gặp Nhị Hắc/Ngũ Hoàng sát (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), kỵ động thổ hoặc đồ màu đỏ; nên treo tiền đồng Lục Đế hoặc hồ lô đồng."
-            } else if isWang {
-                return "✅ [Tóm tắt dễ hiểu] Cung này đón sao đương vượng (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), rất tốt để đặt cửa chính, giường ngủ hoặc bàn làm việc."
-            } else {
-                return "💡 [Tóm tắt dễ hiểu] Khí trường bình ổn (Sơn \(sel.sittingStar) Hướng \(sel.facingStar)), chỉ cần giữ thoáng sáng và gọn gàng."
-            }
-        case .th:
-            if isDanger25 {
-                return "⚠️ [สรุปเข้าใจง่าย] วังนี้มีดาวร้าย ٢ดำ/٥เหลือง (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) งดเจาะทุบหรือใช้สีแดง แนะนำแขวนเหรียญจีน ٦ จักรพรรดิหรือน้ำเต้าทองเหลือง"
-            } else if isWang {
-                return "✅ [สรุปเข้าใจง่าย] วังนี้ได้ดาวมงคลประจำยุค (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) เหมาะตั้งประตูหลัก เตียงนอน หรือโต๊ะทำงาน"
-            } else {
-                return "💡 [สรุปเข้าใจง่าย] พลังดาวสมดุล (เขา\(sel.sittingStar)-หน้า\(sel.facingStar)) เพียงรักษาความสะอาดและเปิดรับแสงลม"
-            }
-        case .id:
-            if isDanger25 {
-                return "⚠️ [Ringkasan] Sektor ini terkena Sha 2-Hitam/5-Kuning (\(sel.sittingStar)-\(sel.facingStar)). Hindari renovasi & warna merah; gunakan 6 koin logam/labu kuningan."
-            } else if isWang {
-                return "✅ [Ringkasan] Bintang makmur (\(sel.sittingStar)-\(sel.facingStar)) hadir di sini. Sangat baik untuk pintu utama, ranjang utama, atau meja kerja."
-            } else {
-                return "💡 [Ringkasan] Energi sektor stabil (\(sel.sittingStar)-\(sel.facingStar)). Jaga tetap terang, rapi, dan berventilasi baik."
-            }
-        case .auto, .zhHans:
-            if isDanger25 {
-                return "⚠️ 【白话速断】本宫见二黑/五黄煞气（山\(sel.sittingStar)向\(sel.facingStar)），宜静不宜动，忌放红色或动土，建议悬挂六帝铜钱或铜葫芦化煞。"
-            } else if isWang {
-                return "✅ 【白话速断】本宫得当令旺生吉星（山\(sel.sittingStar)向\(sel.facingStar)），气场生旺，极宜设为入户门、主卧安床或书桌财位。"
-            } else {
-                return "💡 【白话速断】本宫星气平稳（山\(sel.sittingStar)向\(sel.facingStar)），日常保持采光通风与整洁即可。"
-            }
-        }
-    }
+    private func sanBanGuaBadgeText() -> String { lang.t("xkd_sanban") }
+    private func qiXingDaJieBadgeText() -> String { lang.t("xkd_qixing") }
+
+
 }
 
 // MARK: - 二十四山专业选向与排盘锁定面板 (Mountain24PickerSheet)

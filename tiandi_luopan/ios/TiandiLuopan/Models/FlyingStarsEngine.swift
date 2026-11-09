@@ -1,5 +1,307 @@
 import Foundation
 
+// MARK: - 房屋事实与综合方位分析
+
+public enum XuanKongSiteFactKind: String, CaseIterable, Codable, Hashable {
+    case openBright, solidBacking, movingWater, noise, glare, blockedAccess
+
+    var titleKey: String {
+        switch self {
+        case .openBright: return "xkd_fact_open"
+        case .solidBacking: return "xkd_fact_backing"
+        case .movingWater: return "xkd_fact_water"
+        case .noise: return "xkd_fact_noise"
+        case .glare: return "xkd_fact_glare"
+        case .blockedAccess: return "xkd_fact_blocked"
+        }
+    }
+}
+
+public struct XuanKongSiteFact: Codable, Equatable, Identifiable {
+    public let palaceID: Int
+    public let kind: XuanKongSiteFactKind
+    public var id: String { "\(palaceID)-\(kind.rawValue)" }
+    public init(palaceID: Int, kind: XuanKongSiteFactKind) {
+        self.palaceID = palaceID
+        self.kind = kind
+    }
+}
+
+enum XuanKongPlaceKind: Equatable {
+    case room, entrance, window, bed, stove, interiorDoor
+}
+
+struct XuanKongLocatedPlace: Identifiable {
+    let id: String
+    let palaceID: Int
+    let name: String
+    let kind: XuanKongPlaceKind
+    let roomType: FloorplanRoomType?
+    /// Fraction of this room's sampled footprint, never a claim about a bed/stove position.
+    var coverage: Int = 100
+}
+
+struct XuanKongHomeContext {
+    var places: [XuanKongLocatedPlace] = []
+    var exterior: [ExteriorShaRecord] = []
+    var facts: [XuanKongSiteFact] = []
+    var missingKeys: [String] = []
+    var warningKeys: [String] = []
+}
+
+/// All 81 ordered star pairs have a deterministic elemental relationship.
+/// Motifs supplement the relation; they do not turn an observed room into a prediction.
+struct XuanKongStarPair {
+    enum Relation: CaseIterable, Equatable {
+        case same, firstGeneratesSecond, secondGeneratesFirst, firstControlsSecond, secondControlsFirst
+        var titleKey: String {
+            switch self {
+            case .same: return "xkd_pair_same"
+            case .firstGeneratesSecond: return "xkd_pair_generate_forward"
+            case .secondGeneratesFirst: return "xkd_pair_generate_back"
+            case .firstControlsSecond: return "xkd_pair_control_forward"
+            case .secondControlsFirst: return "xkd_pair_control_back"
+            }
+        }
+    }
+    let first: Int
+    let second: Int
+    // Generating cycle: Wood, Fire, Earth, Metal, Water.
+    private static let elements = [1: 4, 2: 2, 3: 0, 4: 0, 5: 2, 6: 3, 7: 3, 8: 2, 9: 1]
+    var relation: Relation {
+        let a = Self.elements[first] ?? 2, b = Self.elements[second] ?? 2
+        if a == b { return .same }
+        if (a + 1) % 5 == b { return .firstGeneratesSecond }
+        if (b + 1) % 5 == a { return .secondGeneratesFirst }
+        if (a + 2) % 5 == b { return .firstControlsSecond }
+        return .secondControlsFirst
+    }
+    var hasEarthCaution: Bool { [first, second].contains { $0 == 2 || $0 == 5 } }
+    var isStudy: Bool { Set([first, second]) == Set([1, 4]) || Set([first, second]) == Set([1, 6]) }
+    var isFriction: Bool { Set([first, second]) == Set([3, 7]) }
+    var isHeat: Bool { Set([first, second]) == Set([7, 9]) || (first == 9 && second == 9) }
+}
+
+enum XuanKongPracticalAction: CaseIterable, Hashable {
+    case clearAccess, reduceNoise, reduceGlare, protectSleep, kitchen, window, study, edges, heat
+    case wetRoom, verifyCorner, exteriorTraffic, exteriorWind, exteriorPrivacy, exteriorStructure
+    case waterReview, workReview, separateUses, rest, everyday, sanban, qixing
+
+    var textKey: String {
+        switch self {
+        case .clearAccess: return "xkd_action_access"
+        case .reduceNoise: return "xkd_action_noise"
+        case .reduceGlare: return "xkd_action_glare"
+        case .protectSleep: return "xkd_action_sleep"
+        case .kitchen: return "xkd_action_kitchen"
+        case .window: return "xkd_action_window"
+        case .study: return "xkd_action_study"
+        case .edges: return "xkd_action_edges"
+        case .heat: return "xkd_action_heat"
+        case .wetRoom: return "xkd_action_wet"
+        case .verifyCorner: return "xkd_action_corner"
+        case .exteriorTraffic: return "xkd_action_traffic"
+        case .exteriorWind: return "xkd_action_wind"
+        case .exteriorPrivacy: return "xkd_action_privacy"
+        case .exteriorStructure: return "xkd_action_structure"
+        case .waterReview: return "xkd_action_water"
+        case .workReview: return "xkd_action_work"
+        case .separateUses: return "xkd_action_separate"
+        case .rest: return "xkd_action_rest"
+        case .everyday: return "xkd_action_everyday"
+        case .sanban: return "xkd_action_sanban"
+        case .qixing: return "xkd_action_qixing"
+        }
+    }
+}
+
+struct XuanKongSectorAnalysis: Identifiable {
+    var id: Int { palaceID }
+    let palaceID: Int
+    let use: XuanKongSectorUse
+    let yearStar: Int
+    let monthStar: Int
+    let places: [XuanKongLocatedPlace]
+    let exterior: [ExteriorShaRecord]
+    let facts: [XuanKongSiteFactKind]
+    let pairs: [XuanKongStarPair]
+    let reasonKeys: [String]
+    let actions: [XuanKongPracticalAction]
+    /// Lower first: observed disturbance, occupied caution, unoccupied caution, other sectors.
+    let priority: Int
+}
+
+struct XuanKongPatternCheck: Identifiable {
+    let id: String
+    let titleKey: String
+    let statusKey: String
+    let palaceIDs: [Int]
+    let actionKey: String
+}
+
+struct XuanKongDeepAnalysis {
+    let date: Date
+    let sectors: [XuanKongSectorAnalysis]
+    let patternChecks: [XuanKongPatternCheck]
+    let missingKeys: [String]
+    let warningKeys: [String]
+    var summaryKey: String {
+        switch priorities.first?.priority ?? 3 {
+        case 0: return "xkd_summary_observed"
+        case 1: return "xkd_summary_occupied"
+        case 2: return "xkd_summary_quiet"
+        default: return "xkd_summary_uses"
+        }
+    }
+    var priorities: [XuanKongSectorAnalysis] {
+        sectors.sorted {
+            if $0.priority != $1.priority { return $0.priority < $1.priority }
+            if $0.use.priority != $1.use.priority { return $0.use.priority < $1.use.priority }
+            return $0.palaceID < $1.palaceID
+        }
+    }
+}
+
+enum XuanKongDeepAnalyzer {
+    static func qiXingSectorGroups(chart: XuanKongChart) -> [[Int]] {
+        guard chart.isQiXingDaJie else { return [] }
+        let sets: [Set<Int>] = [Set([1, 4, 7]), Set([2, 5, 8]), Set([3, 6, 9])]
+        return [[8, 2, 5], [0, 6, 3]].filter { group in
+            sets.contains(Set(group.compactMap { id in chart.palaces.first { $0.id == id }?.facingStar }))
+        }
+    }
+    static func palaceID(bearing: Double) -> Int? {
+        guard bearing.isFinite else { return nil }
+        let normalized = (bearing.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        return [0, 7, 2, 3, 8, 1, 6, 5][Int((normalized + 22.5).truncatingRemainder(dividingBy: 360) / 45)]
+    }
+
+    static func analyze(chart: XuanKongChart, date: Date, context: XuanKongHomeContext? = nil,
+                        temporal: PurpleWhiteChart? = nil) -> XuanKongDeepAnalysis {
+        // PalaceCell IDs are zero based in the same order as PurpleWhite's Luo Shu IDs 1...9.
+        let time = temporal ?? PurpleWhiteEngine.shared.calculateChart(date: date)
+        let home = context ?? XuanKongHomeContext(missingKeys: ["xkd_missing_home"])
+        let qiXingGroups = qiXingSectorGroups(chart: chart)
+        let linkedPalaces = Set(qiXingGroups.flatMap { $0 })
+        let sectors = chart.palaces.map { cell -> XuanKongSectorAnalysis in
+            let guest = time.palaceItems.first { $0.palaceId == cell.id + 1 }
+            let year = guest?.yearGuestStar ?? 0, month = guest?.monthGuestStar ?? 0
+            let natal = XuanKongStarPair(first: cell.mountainStar, second: cell.facingStar)
+            let pairs = [natal,
+                         XuanKongStarPair(first: cell.mountainStar, second: year),
+                         XuanKongStarPair(first: cell.facingStar, second: year),
+                         XuanKongStarPair(first: cell.mountainStar, second: month),
+                         XuanKongStarPair(first: cell.facingStar, second: month),
+                         XuanKongStarPair(first: year, second: month)]
+            let seasonalCaution = [year, month].contains { $0 == 2 || $0 == 5 }
+            let caution = natal.hasEarthCaution || seasonalCaution
+            var use: XuanKongSectorUse = caution ? .quiet : cell.suggestedUse
+            let places = home.places.filter { $0.palaceID == cell.id }
+            let outside = home.exterior.filter { palaceID(bearing: $0.bearingDegrees) == cell.id }
+            let facts = home.facts.filter { $0.palaceID == cell.id }.map(\.kind)
+            var reasons: [String] = []
+            var actions: [XuanKongPracticalAction] = []
+            func add(_ action: XuanKongPracticalAction) { if !actions.contains(action) { actions.append(action) } }
+            let hasBed = places.contains { $0.kind == .bed || $0.roomType == .masterBedroom || $0.roomType == .secondBedroom }
+            let hasKitchen = places.contains { $0.kind == .stove || $0.roomType == .kitchen }
+            let hasEntrance = places.contains { $0.kind == .entrance || $0.roomType == .door }
+            let hasWindow = places.contains { $0.kind == .window }
+            let isWetRoom = places.contains { $0.roomType == .bathroom }
+            let missingOnly = !places.isEmpty && places.allSatisfy { $0.roomType == .missingCorner }
+            let canStudy = !hasBed && !hasKitchen && !isWetRoom
+                && places.contains { $0.roomType == .study || $0.roomType == .livingRoom }
+            let bedActivityConflict = hasBed && (use == .activity || use == .separateUses)
+            if facts.contains(.noise) { use = .quiet }
+            else if bedActivityConflict && !caution { use = hasEntrance ? .separateUses : .rest }
+            if facts.contains(.blockedAccess) { reasons.append("xkd_reason_blocked"); add(.clearAccess) }
+            if facts.contains(.noise) { reasons.append("xkd_reason_noise"); add(.reduceNoise) }
+            if facts.contains(.glare) { reasons.append("xkd_reason_glare"); add(.reduceGlare) }
+            for record in outside {
+                switch record.shaID {
+                case "luchong", "fangong", "gejiao": add(.exteriorTraffic)
+                case "tianzhan": add(.exteriorWind)
+                case "tantou": add(.exteriorPrivacy)
+                case "huoxing": add(.heat)
+                default: add(.exteriorStructure)
+                }
+            }
+            if !outside.isEmpty { reasons.append("xkd_reason_exterior") }
+            if natal.hasEarthCaution { reasons.append("xkd_reason_natal") }
+            if seasonalCaution { reasons.append("xkd_reason_season") }
+            if caution && facts.contains(.movingWater) { reasons.append("xkd_reason_water"); add(.waterReview) }
+            if hasBed {
+                reasons.append(bedActivityConflict ? "xkd_reason_bed_active" : "xkd_reason_bed")
+                add(.protectSleep)
+            }
+            if hasKitchen { reasons.append("xkd_reason_kitchen"); add(.kitchen) }
+            if hasEntrance { reasons.append("xkd_reason_entrance"); add(.clearAccess); if caution { add(.reduceNoise) } }
+            if hasWindow { add(.window) }
+            // Elemental control changes the use plan, rather than prescribing purchases or demolition.
+            if natal.relation == .firstControlsSecond || natal.relation == .secondControlsFirst {
+                reasons.append("xkd_reason_control")
+                if !caution && !hasBed && !hasKitchen && !isWetRoom && !missingOnly { add(.separateUses) }
+            } else if !caution && canStudy {
+                add(.study)
+            }
+            if places.contains(where: { $0.roomType == .bathroom }) { add(.wetRoom) }
+            if places.contains(where: { $0.roomType == .missingCorner }) { add(.verifyCorner) }
+            if pairs.contains(where: \.isHeat) { reasons.append("xkd_reason_heat"); if !missingOnly { add(.heat) } }
+            if pairs.contains(where: \.isFriction) { reasons.append("xkd_reason_friction"); if !missingOnly { add(.edges) } }
+            if pairs.contains(where: \.isStudy) { reasons.append("xkd_reason_study"); if !caution && canStudy { add(.study) } }
+            if guest?.isTaiSui == true || guest?.isSuiPo == true || guest?.isSanSha == true {
+                reasons.append("xkd_reason_works"); add(.workReview)
+            }
+            if linkedPalaces.contains(cell.id) { add(.qixing) }
+            if chart.isSanBanGua { add(.sanban) }
+            if !missingOnly {
+                switch use {
+                case .quiet: add(.reduceNoise)
+                case .separateUses: if !hasKitchen && !isWetRoom { add(.separateUses) }
+                case .activity: if !hasBed && !hasKitchen && !isWetRoom { add(.clearAccess) }
+                case .rest: if !hasKitchen && !isWetRoom && !hasBed { add(.rest) }
+                case .everyday: break
+                }
+            }
+            if actions.isEmpty { add(.everyday) }
+            let outsidePriority = outside.map { record -> Int in
+                guard let item = ExteriorShaEngine.shared.database.first(where: { $0.id == record.shaID }) else { return 2 }
+                switch ExteriorShaSeverityResolver.effectiveSeverity(staticSeverity: item.severity, distanceMeters: record.distanceMeters) {
+                case .critical: return 0
+                case .warning: return 1
+                case .minor: return 2
+                case .notice: return 3
+                }
+            }.min() ?? 3
+            let observed = facts.contains(.noise) || facts.contains(.glare) || facts.contains(.blockedAccess)
+                || (caution && facts.contains(.movingWater))
+            let occupied = hasBed || hasKitchen || hasEntrance
+            let roomPriority = observed ? 0 : (caution && occupied ? 1 : (caution ? 2 : (pairs.contains(where: \.isHeat) && hasKitchen ? 1 : 3)))
+            let priority = min(outsidePriority, roomPriority)
+            return XuanKongSectorAnalysis(palaceID: cell.id, use: use, yearStar: year, monthStar: month,
+                places: places, exterior: outside, facts: facts, pairs: pairs, reasonKeys: reasons,
+                actions: actions, priority: priority)
+        }
+        var checks: [XuanKongPatternCheck] = []
+        func check(_ id: String, title: String, ids: [Int], action: String) {
+            let relevant = sectors.filter { ids.contains($0.id) }
+            let conflict = relevant.contains { $0.priority < 2 || ($0.use == .quiet && $0.facts.contains(.movingWater)) }
+            let observedConditions = relevant.contains { $0.facts.contains(.openBright) || $0.facts.contains(.solidBacking) }
+            let status = conflict ? "xkd_pattern_conflict" : (observedConditions ? "xkd_pattern_partial" : "xkd_pattern_unknown")
+            checks.append(XuanKongPatternCheck(id: id, titleKey: title, statusKey: status, palaceIDs: ids, actionKey: action))
+        }
+        if chart.isSanBanGua {
+            check("sanban", title: "xkd_sanban", ids: Array(0...8), action: "xkd_action_sanban")
+        }
+        if chart.isQiXingDaJie {
+            for (index, ids) in qiXingGroups.enumerated() {
+                check("qixing-\(index)", title: "xkd_qixing", ids: ids, action: "xkd_action_qixing")
+            }
+        }
+        return XuanKongDeepAnalysis(date: date, sectors: sectors, patternChecks: checks,
+                                   missingKeys: home.missingKeys, warningKeys: home.warningKeys)
+    }
+}
+
 struct FlyingStarModeSelection {
     var manualOverride: Bool?
 
@@ -50,6 +352,19 @@ public struct PalaceCell: Identifiable {
     public let isShaErHei: Bool     // 是否二黑病符
     
     public var sittingStar: Int { mountainStar }
+    public var plainDirectionName: String {
+        Direction8(rawValue: direction)?.localizedName ?? LocalizationManager.shared.t("xk_guide_center")
+    }
+
+    /// One rule drives the diagram, selected-sector explanation and actions.
+    /// A caution always takes priority over the ruling stars, including periods 2/5.
+    public var suggestedUse: XuanKongSectorUse {
+        if hasEarthSha { return .quiet }
+        if mountainStar == activePeriod && facingStar == activePeriod { return .separateUses }
+        if facingStar == activePeriod { return .activity }
+        if mountainStar == activePeriod { return .rest }
+        return .everyday
+    }
     public var guaName: String { trigram }
     public var element: String {
         switch id {
@@ -134,12 +449,12 @@ public struct PalaceCell: Identifiable {
     }
 
     public var localizedEvaluation: String {
-        baseLocalizedEvaluation + "\n\n" + flyingStarsTraditionalSourceNote(
+        localizedEvaluationSummary + "\n\n" + flyingStarsTraditionalSourceNote(
             for: LocalizationManager.shared.effectiveLanguage
         )
     }
 
-    private var baseLocalizedEvaluation: String {
+    public var localizedEvaluationSummary: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         if hasEarthSha { return localizedEarthShaEvaluation(lang) }
         switch lang {
@@ -308,26 +623,131 @@ public struct PeriodMeta {
     public let label: String
 }
 
+public enum XuanKongPattern: Int, CaseIterable, Equatable {
+    case balancedFrontBack, bothAtFacing, bothAtSitting, reversed, distributed
+
+    var titleKey: String {
+        switch self {
+        case .balancedFrontBack: return "xk_pattern_balanced_title"
+        case .bothAtFacing: return "xk_pattern_front_title"
+        case .bothAtSitting: return "xk_pattern_back_title"
+        case .reversed: return "xk_pattern_reversed_title"
+        case .distributed: return "xk_pattern_distributed_title"
+        }
+    }
+
+    var explanationKey: String {
+        switch self {
+        case .balancedFrontBack: return "xk_pattern_balanced_body"
+        case .bothAtFacing: return "xk_pattern_front_body"
+        case .bothAtSitting: return "xk_pattern_back_body"
+        case .reversed: return "xk_pattern_reversed_body"
+        case .distributed: return "xk_pattern_distributed_body"
+        }
+    }
+}
+
+public enum XuanKongSectorUse: CaseIterable, Equatable {
+    case quiet, separateUses, activity, rest, everyday
+
+    var titleKey: String {
+        switch self {
+        case .quiet: return "xk_use_quiet"
+        case .separateUses: return "xk_use_separate"
+        case .activity: return "xk_use_activity"
+        case .rest: return "xk_use_rest"
+        case .everyday: return "xk_use_everyday"
+        }
+    }
+
+    var reasonKey: String {
+        switch self {
+        case .quiet: return "xk_reason_quiet"
+        case .separateUses: return "xk_reason_separate"
+        case .activity: return "xk_reason_activity"
+        case .rest: return "xk_reason_rest"
+        case .everyday: return "xk_reason_everyday"
+        }
+    }
+
+    var actionKey: String {
+        switch self {
+        case .quiet: return "xk_action_quiet"
+        case .separateUses: return "xk_action_separate"
+        case .activity: return "xk_action_activity"
+        case .rest: return "xk_action_rest"
+        case .everyday: return "xk_action_everyday"
+        }
+    }
+
+    var avoidKey: String {
+        switch self {
+        case .quiet: return "xk_avoid_quiet"
+        case .separateUses: return "xk_avoid_separate"
+        case .activity: return "xk_avoid_activity"
+        case .rest: return "xk_avoid_rest"
+        case .everyday: return "xk_avoid_everyday"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .quiet: return "hand.raised.fill"
+        case .separateUses: return "rectangle.split.2x1"
+        case .activity: return "sun.max.fill"
+        case .rest: return "moon.fill"
+        case .everyday: return "checkmark.circle"
+        }
+    }
+
+    var priority: Int {
+        switch self {
+        case .quiet: return 0
+        case .separateUses: return 1
+        case .activity: return 2
+        case .rest: return 3
+        case .everyday: return 4
+        }
+    }
+}
+
 public struct XuanKongChart {
     public let period: Int                // 所选排盘元运 (1..9)
     public let sittingMountain: String   // 坐山
     public let facingMountain: String    // 向山
     public let patternType: String       // 到山到向 / 上山下水 / 双星到向 / 双星到坐
+    public let pattern: XuanKongPattern
+    public let sittingPalaceID: Int
+    public let facingPalaceID: Int
     public let isSanBanGua: Bool         // 父母三般卦或连珠三般卦
     public let isQiXingDaJie: Bool       // 七星打劫局
     public let isTiGua: Bool             // 是否为兼向替卦排盘
     public let chartModeTitle: String    // 排盘模式 (下卦 / 替卦)
     public let palaces: [PalaceCell]     // 九宫格数据
     public let summaryAnalysis: String   // 综合格局断语
-    public var patternDesc: String { summaryAnalysis }
+    public let patternDesc: String       // 卡片正文；共用出处由卡片统一展示
     public let periodMeta: PeriodMeta    // 动态历法元信息
+
+    public var priorityPalaces: [PalaceCell] {
+        palaces.sorted {
+            if $0.suggestedUse.priority != $1.suggestedUse.priority {
+                return $0.suggestedUse.priority < $1.suggestedUse.priority
+            }
+            let firstCautions = ($0.mountainStar == 2 || $0.mountainStar == 5 ? 1 : 0)
+                + ($0.facingStar == 2 || $0.facingStar == 5 ? 1 : 0)
+            let secondCautions = ($1.mountainStar == 2 || $1.mountainStar == 5 ? 1 : 0)
+                + ($1.facingStar == 2 || $1.facingStar == 5 ? 1 : 0)
+            if firstCautions != secondCautions { return firstCautions > secondCautions }
+            return $0.id < $1.id
+        }
+    }
     
     /// 基于九宫飞星排盘动态推导的【催财旺气建议】
     public var wealthAdvice: String {
-        baseWealthAdvice + "\n\n" + wealthSourceNote
+        wealthAdviceSummary + "\n\n" + wealthSourceNote
     }
 
-    private var baseWealthAdvice: String {
+    public var wealthAdviceSummary: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         // Never recommend activation in a 5-Yellow/2-Black palace. The
         // current-period star does not override an earth-sha warning.
@@ -373,10 +793,10 @@ public struct XuanKongChart {
 
     /// 基于九宫飞星排盘动态推导的空间环境复核建议。
     public var healthAdvice: String {
-        baseHealthAdvice + "\n\n" + healthSourceNote
+        healthAdviceSummary + "\n\n" + healthSourceNote
     }
 
-    private var baseHealthAdvice: String {
+    public var healthAdviceSummary: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let clash25Palace = palaces.first(where: { ($0.mountainStar == 2 && $0.facingStar == 5) || ($0.mountainStar == 5 && $0.facingStar == 2) || ($0.mountainStar == 5 && $0.facingStar == 5) })
         let wuHuangPalace = palaces.first(where: { $0.facingStar == 5 }) ?? palaces.first(where: { $0.mountainStar == 5 })
@@ -433,10 +853,10 @@ public struct XuanKongChart {
     
     /// 基于九宫飞星排盘动态推导的空间布局复核建议。
     public var remedyAdvice: String {
-        baseRemedyAdvice + "\n\n" + healthSourceNote
+        remedyAdviceSummary + "\n\n" + healthSourceNote
     }
 
-    private var baseRemedyAdvice: String {
+    public var remedyAdviceSummary: String {
         let lang = LocalizationManager.shared.effectiveLanguage
         let dingPalace = palaces.first(where: { $0.mountainStar == period })
         let caiPalace = palaces.first(where: { $0.facingStar == period })
@@ -544,6 +964,9 @@ public struct XuanKongChart {
             for: LocalizationManager.shared.effectiveLanguage
         )
     }
+
+    /// The analysis card displays the shared source and explanation once.
+    public var analysisNote: String { healthSourceNote }
 
     private var wealthSourceNote: String {
         switch LocalizationManager.shared.effectiveLanguage {
@@ -831,36 +1254,36 @@ public final class FlyingStarsEngine {
         let mountainStarAtFacing = mountainStars[sittingFacingIdx]
         let facingStarAtMount = facingStars[sittingMountIdx]
         
-        let patternKind: Int
+        let patternKind: XuanKongPattern
         if facingStarAtFacing == activePeriod && mountainStarAtMount == activePeriod {
-            patternKind = 0
+            patternKind = .balancedFrontBack
         } else if facingStarAtFacing == activePeriod && mountainStarAtFacing == activePeriod {
-            patternKind = 1
+            patternKind = .bothAtFacing
         } else if facingStarAtMount == activePeriod && mountainStarAtMount == activePeriod {
-            patternKind = 2
+            patternKind = .bothAtSitting
         } else if facingStarAtMount == activePeriod && mountainStarAtFacing == activePeriod {
-            patternKind = 3
+            patternKind = .reversed
         } else {
-            patternKind = 4
+            patternKind = .distributed
         }
         let pattern: String
         switch lang {
         case .en:
-            pattern = ["Wang Shan Wang Xiang (Supreme Wealth & Health)", "Double Stars at Facing (Auspicious Wealth)", "Double Stars at Sitting (Auspicious Health)", "Shang Shan Xia Shui (Reverse Chart)", "Balanced Harmony Chart"][patternKind]
+            pattern = ["Wang Shan Wang Xiang (Supreme Wealth & Health)", "Double Stars at Facing (Auspicious Wealth)", "Double Stars at Sitting (Auspicious Health)", "Shang Shan Xia Shui (Reverse Chart)", "Balanced Harmony Chart"][patternKind.rawValue]
         case .zhHant:
-            pattern = ["到山到向 (旺丁旺財最吉)", "雙星到向 (旺財不旺丁 · 宜向前有水後有山)", "雙星到坐 (旺丁不旺財 · 宜向後有水水後有山)", "上山下水 (敗財損丁凶局 · 需借勢顛倒用法)", "吉凶平和局"][patternKind]
+            pattern = ["到山到向 (旺丁旺財最吉)", "雙星到向 (旺財不旺丁 · 宜向前有水後有山)", "雙星到坐 (旺丁不旺財 · 宜向後有水水後有山)", "上山下水 (敗財損丁凶局 · 需借勢顛倒用法)", "吉凶平和局"][patternKind.rawValue]
         case .ja:
-            pattern = ["到山到向 (旺丁旺財の大吉)", "双星到向 (旺財不旺丁 · 前方に水、後方に山が吉)", "双星到坐 (旺丁不旺財 · 後方に水、その奥に山が吉)", "上山下水 (敗財損丁の凶局 · 顛倒勢の借用が必要)", "吉凶相半の平和局"][patternKind]
+            pattern = ["到山到向 (旺丁旺財の大吉)", "双星到向 (旺財不旺丁 · 前方に水、後方に山が吉)", "双星到坐 (旺丁不旺財 · 後方に水、その奥に山が吉)", "上山下水 (敗財損丁の凶局 · 顛倒勢の借用が必要)", "吉凶相半の平和局"][patternKind.rawValue]
         case .ko:
-            pattern = ["도산도향 (왕정왕재 대길)", "쌍성도향 (재물 번창 · 앞에 물 뒤에 산이 길함)", "쌍성도좌 (자손 번창 · 뒤에 물과 산이 길함)", "동산하수 (손재패가 흉국 · 전도법 응용 필요)", "길흉 평화국"][patternKind]
+            pattern = ["도산도향 (왕정왕재 대길)", "쌍성도향 (재물 번창 · 앞에 물 뒤에 산이 길함)", "쌍성도좌 (자손 번창 · 뒤에 물과 산이 길함)", "동산하수 (손재패가 흉국 · 전도법 응용 필요)", "길흉 평화국"][patternKind.rawValue]
         case .vi:
-            pattern = ["Đáo Sơn Đáo Hướng (Vượng đinh vượng tài đại cát)", "Song Tinh Đáo Hướng (Vượng tài · Trước có nước sau có núi)", "Song Tinh Đáo Tọa (Vượng đinh · Sau có nước sau nước có núi)", "Thượng Sơn Hạ Thủy (Bại tài tổn đinh hung cục · Cần phép điên đảo)", "Cát hung bình hòa cục"][patternKind]
+            pattern = ["Đáo Sơn Đáo Hướng (Vượng đinh vượng tài đại cát)", "Song Tinh Đáo Hướng (Vượng tài · Trước có nước sau có núi)", "Song Tinh Đáo Tọa (Vượng đinh · Sau có nước sau nước có núi)", "Thượng Sơn Hạ Thủy (Bại tài tổn đinh hung cục · Cần phép điên đảo)", "Cát hung bình hòa cục"][patternKind.rawValue]
         case .th:
-            pattern = ["ถึงเขาถึงทิศ (เจริญทั้งคนและทรัพย์ มงคลยิ่ง)", "สองดาวสู่ทิศหน้า (รุ่งเรืองทรัพย์สิน · หน้าควรมีน้ำหลังมีเขา)", "สองดาวสู่หลังพิง (ลูกหลานรุ่งเรือง · หลังควรมีน้ำและมีเขา)", "ขึ้นเขาลงน้ำ (สูญเสียทรัพย์และคน เคราะห์ร้าย · ต้องกลับทิศแก้เคล็ด)", "สมดุลปานกลาง"][patternKind]
+            pattern = ["ถึงเขาถึงทิศ (เจริญทั้งคนและทรัพย์ มงคลยิ่ง)", "สองดาวสู่ทิศหน้า (รุ่งเรืองทรัพย์สิน · หน้าควรมีน้ำหลังมีเขา)", "สองดาวสู่หลังพิง (ลูกหลานรุ่งเรือง · หลังควรมีน้ำและมีเขา)", "ขึ้นเขาลงน้ำ (สูญเสียทรัพย์และคน เคราะห์ร้าย · ต้องกลับทิศแก้เคล็ด)", "สมดุลปานกลาง"][patternKind.rawValue]
         case .id:
-            pattern = ["Wang Shan Wang Xiang (Makmur Keluarga & Harta)", "Bintang Kembar di Hadap (Kaya Harta · Air di Depan, Gunung di Belakang)", "Bintang Kembar di Duduk (Banyak Keturunan · Air & Gunung di Belakang)", "Shang Shan Xia Shui (Peta Terbalik · Rawan Kerugian Harta & Fisik)", "Peta Harmonis Seimbang"][patternKind]
+            pattern = ["Wang Shan Wang Xiang (Makmur Keluarga & Harta)", "Bintang Kembar di Hadap (Kaya Harta · Air di Depan, Gunung di Belakang)", "Bintang Kembar di Duduk (Banyak Keturunan · Air & Gunung di Belakang)", "Shang Shan Xia Shui (Peta Terbalik · Rawan Kerugian Harta & Fisik)", "Peta Harmonis Seimbang"][patternKind.rawValue]
         case .auto, .zhHans:
-            pattern = ["到山到向 (旺丁旺财最吉)", "双星到向 (旺财不旺丁 · 宜向前有水后有山)", "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)", "上山下水 (败财损丁凶局 · 需借势颠倒用法)", "吉凶平和局"][patternKind]
+            pattern = ["到山到向 (旺丁旺财最吉)", "双星到向 (旺财不旺丁 · 宜向前有水后有山)", "双星到坐 (旺丁不旺财 · 宜向后有水水后有山)", "上山下水 (败财损丁凶局 · 需借势颠倒用法)", "吉凶平和局"][patternKind.rawValue]
         }
         
         // 5. 组合九宫格模型
@@ -896,21 +1319,21 @@ public final class FlyingStarsEngine {
         let sourceNote = flyingStarsTraditionalSourceNote(for: lang)
         switch lang {
         case .en:
-            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony.\n\n\(sourceNote)"
+            summary = "\(meta.label). Sitting \(sittingName) Facing \(facingName) presents [\(pattern)]. Cultivate auspicious Qi at the facing palace, solidify sitting mountain for harmony."
         case .zhHant:
-            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "當前正值" : "玄空排盤：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星當令）。\(sittingName)山\(facingName)向在此元運呈現【\(pattern)】。宜重點佈局向首明堂引納\(meta.element)氣，坐後穩實以固人丁。"
         case .ja:
-            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "現在は" : "玄空飛星：")\(meta.yuan)\(activePeriod)運（\(meta.startYear)—\(meta.endYear)年、\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向はこの元運で【\(pattern)】となります。向首明堂に吉気を引込み、坐後を堅固にして子孫健康を守ると吉。"
         case .ko:
-            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다.\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "현재는 " : "현공 비성: ")\(meta.yuan) \(activePeriod)운 (\(meta.startYear)—\(meta.endYear)년, \(meta.starName) \(meta.element)성 당령). \(sittingName)산 \(facingName)향은 이 원운에서 【\(pattern)】을 이룹니다. 향수 명당에 기운을 받아들이고 좌산을 든든히 하여 인정을 보존함이 길합니다."
         case .vi:
-            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh.\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "Hiện tại chính là " : "Huyền Không bài bàn: ")\(meta.yuan) Vận \(activePeriod) (\(meta.startYear)—\(meta.endYear), \(meta.starName) \(meta.element) tinh đương lệnh). \(sittingName) sơn \(facingName) hướng trong nguyên vận này biểu hiện 【\(pattern)】. Nên bố trí minh đường nạp khí, tọa sơn vững chãi vượng nhân đinh."
         case .th:
-            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "ปัจจุบันเข้าสู่ " : "ผังเหวินคง: ")\(meta.yuan) ยุค \(activePeriod) (\(meta.startYear)—\(meta.endYear), ดาว\(meta.starName) ธาตุ\(meta.element)). \(sittingName)พิง \(facingName)หัน ในยุคนี้ปรากฏเป็น 【\(pattern)】 ควรจัดหมุนเวียนพลังงานด้านหน้า และรักษาความมั่นคงด้านหลังเพื่อเสริมสิริมงคล"
         case .id:
-            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)—\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga.\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "Saat ini berada pada " : "Bagan Xuan Kong: ")\(meta.yuan) Periode \(activePeriod) (\(meta.startYear)—\(meta.endYear), Bintang \(meta.starName) Unsur \(meta.element)). Posisi Duduk \(sittingName) Hadap \(facingName) membentuk [\(pattern)]. Atur tata ruang hadap untuk menyerap energi positif dan perkuat posisi duduk demi ketentraman keluarga."
         case .auto, .zhHans:
-            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。\n\n\(sourceNote)"
+            summary = "\(meta.isCurrent ? "当前正值" : "玄空排盘：")\(meta.yuan)\(activePeriod)运（\(meta.startYear)—\(meta.endYear)年，\(meta.starName)\(meta.element)星当令）。\(sittingName)山\(facingName)向在此元运呈现【\(pattern)】。宜重点布局向首明堂引纳\(meta.element)气，坐后稳实以固人丁。"
         }
         
         let modeTitle = useTiGua
@@ -922,12 +1345,16 @@ public final class FlyingStarsEngine {
             sittingMountain: sittingName,
             facingMountain: facingName,
             patternType: pattern,
+            pattern: patternKind,
+            sittingPalaceID: sittingPalaceIdx,
+            facingPalaceID: facingPalaceIdx,
             isSanBanGua: Self.checkSanBanGua(cells: cells),
             isQiXingDaJie: Self.checkQiXingDaJie(cells: cells, activePeriod: activePeriod, facingPalaceIdx: sittingFacingIdx),
             isTiGua: useTiGua,
             chartModeTitle: modeTitle,
             palaces: cells,
-            summaryAnalysis: summary,
+            summaryAnalysis: summary + "\n\n" + sourceNote,
+            patternDesc: summary,
             periodMeta: meta
         )
     }

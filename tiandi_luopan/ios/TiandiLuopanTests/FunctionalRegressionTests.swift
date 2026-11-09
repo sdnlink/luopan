@@ -1026,4 +1026,502 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: boundary.addingTimeInterval(1)).ganzhiYear(timeZone: zone), "丙午")
         XCTAssertEqual(TianJiAnalysisSnapshot(heading: 0, reportDate: instant("2026-01-01T04:00:00Z")).ganzhiYear(timeZone: zone), "乙巳")
     }
+
+    private func guidanceCell(mountain: Int, facing: Int, period: Int) -> PalaceCell {
+        PalaceCell(id: 0, palaceName: "坎一宫", trigram: "坎", direction: "正北", periodStar: period,
+                   activePeriod: period, mountainStar: mountain, facingStar: facing, isCenter: false,
+                   isWangMountain: mountain == period, isWangFacing: facing == period,
+                   isShaWuHuang: mountain == 5 || facing == 5, isShaErHei: mountain == 2 || facing == 2)
+    }
+
+    func testPlainSectorGuideSeparatesActivityRestAndOrdinaryUse() {
+        XCTAssertEqual(guidanceCell(mountain: 9, facing: 9, period: 9).suggestedUse, .separateUses)
+        XCTAssertEqual(guidanceCell(mountain: 1, facing: 9, period: 9).suggestedUse, .activity)
+        XCTAssertEqual(guidanceCell(mountain: 9, facing: 1, period: 9).suggestedUse, .rest)
+        XCTAssertEqual(guidanceCell(mountain: 8, facing: 1, period: 9).suggestedUse, .everyday)
+        XCTAssertEqual(guidanceCell(mountain: 8, facing: 1, period: 8).suggestedUse, .rest)
+        XCTAssertEqual(guidanceCell(mountain: 1, facing: 8, period: 8).suggestedUse, .activity)
+    }
+
+    func testPlainSectorGuideNeverActivatesACautionEvenInPeriodsTwoOrFive() {
+        for period in 1...9 {
+            for other in 1...9 {
+                for caution in [2, 5] {
+                    XCTAssertEqual(guidanceCell(mountain: other, facing: caution, period: period).suggestedUse, .quiet)
+                    XCTAssertEqual(guidanceCell(mountain: caution, facing: other, period: period).suggestedUse, .quiet)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testPlainPatternAndFacingSidesMatchTheActualStarsForEveryChartMode() {
+        let date = instant("2026-11-09T04:00:00Z")
+        let palaceIDs = ["坎": 0, "坤": 1, "震": 2, "巽": 3, "乾": 5, "兑": 6, "艮": 7, "离": 8]
+        for period in 1...9 {
+            for heading in stride(from: 0, to: 360, by: 15) {
+                let sitting = Mountain24Data.shared.mountain(for: Double((heading + 180) % 360))
+                let facing = Mountain24Data.shared.mountain(for: Double(heading))
+                for useTiGua in [false, true] {
+                    let chart = FlyingStarsEngine.shared.calculateChart(period: period, sitting: sitting, facing: facing,
+                                                                        useTiGua: useTiGua, date: date)
+                    XCTAssertEqual(chart.sittingPalaceID, palaceIDs[sitting.palace])
+                    XCTAssertEqual(chart.facingPalaceID, palaceIDs[facing.palace])
+                    let front = chart.palaces[chart.facingPalaceID], back = chart.palaces[chart.sittingPalaceID]
+                    let expected: XuanKongPattern
+                    if front.facingStar == period && back.mountainStar == period { expected = .balancedFrontBack }
+                    else if front.facingStar == period && front.mountainStar == period { expected = .bothAtFacing }
+                    else if back.facingStar == period && back.mountainStar == period { expected = .bothAtSitting }
+                    else if back.facingStar == period && front.mountainStar == period { expected = .reversed }
+                    else { expected = .distributed }
+                    XCTAssertEqual(chart.pattern, expected)
+                    XCTAssertEqual(chart.isTiGua, useTiGua)
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testGuidePriorityShowsCautionsBeforeActivityAndKeepsAllSectorsReachable() {
+        let chart = TianJiAnalysisSnapshot(heading: 90, period: 9, useTiGua: false).flyingStarsChart()
+        let ordered = chart.priorityPalaces
+        XCTAssertEqual(Set(ordered.map(\.id)), Set(0..<9))
+        XCTAssertEqual(ordered.count, 9)
+        XCTAssertEqual(ordered.first?.suggestedUse, .quiet)
+        let priorities = ordered.map { $0.suggestedUse.priority }
+        XCTAssertEqual(priorities, priorities.sorted())
+        let cautions = ordered.filter { $0.suggestedUse == .quiet }
+        let counts = cautions.map { ($0.mountainStar == 2 || $0.mountainStar == 5 ? 1 : 0)
+            + ($0.facingStar == 2 || $0.facingStar == 5 ? 1 : 0) }
+        XCTAssertEqual(counts, counts.sorted(by: >))
+    }
+
+    @MainActor
+    func testGuideActionsAndExplanationsAreTranslatedInEveryLanguage() {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        let chart = TianJiAnalysisSnapshot(heading: 90, period: 9, useTiGua: false).flyingStarsChart()
+        for language in AppLanguage.allCases where language != .auto {
+            manager.effectiveLanguage = language
+            var keys = XuanKongPattern.allCases.flatMap { [$0.titleKey, $0.explanationKey] }
+            keys += XuanKongSectorUse.allCases.flatMap { [$0.titleKey, $0.reasonKey, $0.actionKey, $0.avoidKey] }
+            keys += ["xk_guide_center", "xk_guide_front", "xk_guide_back",
+                     "xk_guide_priority", "xk_guide_map", "xk_guide_terms"]
+            for key in keys {
+                XCTAssertFalse(manager.t(key).isEmpty, "\(language): \(key)")
+                XCTAssertNotEqual(manager.t(key), key, "\(language): \(key)")
+            }
+            for cell in chart.palaces where !cell.isCenter {
+                XCTAssertEqual(cell.plainDirectionName, Direction8(rawValue: cell.direction)?.localizedName)
+            }
+            XCTAssertEqual(chart.palaces[4].plainDirectionName, manager.t("xk_guide_center"))
+        }
+    }
+
+    func testHouseGuidePreservesEightDirectionsAndSeparatesPersonalGua() {
+        let guas = ["坎", "坤", "震", "巽", "乾", "兑", "艮", "离"]
+        for sitting in guas {
+            for facing in guas {
+                let chart = BaZhaiEngine.shared.analyze(sittingPalace: sitting, facingPalace: facing)
+                XCTAssertEqual(chart.houseGua, sitting + "宅")
+                XCTAssertEqual(Set(chart.items.map(\.guaName)), Set(guas))
+                XCTAssertEqual(chart.items.count, 8)
+                XCTAssertEqual(chart.items.filter { $0.star.isAuspicious }.count, 4)
+                XCTAssertEqual(chart.items.filter { $0.star.suggestedHouseUse == .review }.count, 4)
+                XCTAssertEqual(chart.items.first { $0.guaName == sitting }?.star.suggestedHouseUse, .study)
+                XCTAssertEqual(chart.gateStar, chart.items.first { $0.guaName == facing }?.star)
+            }
+        }
+    }
+
+    @MainActor
+    func testAnalysisMenuHasDistinctFeaturesAndAnExplicitOwnerVipRequirement() {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        XCTAssertEqual(AnalysisFeature.allCases.count, 7)
+        XCTAssertTrue(AnalysisFeature.owner.requiresVIP)
+        XCTAssertTrue(AnalysisFeature.sanHe.requiresVIP)
+        XCTAssertFalse(AnalysisFeature.dates.requiresVIP)
+        XCTAssertFalse(AnalysisFeature.baZhai.requiresVIP)
+        for language in AppLanguage.allCases where language != .auto {
+            manager.effectiveLanguage = language
+            for feature in AnalysisFeature.allCases {
+                XCTAssertNotEqual(manager.t(feature.titleKey), feature.titleKey)
+                XCTAssertNotEqual(manager.t(feature.subtitleKey), feature.subtitleKey)
+            }
+            for use in BaZhaiSuggestedUse.allCases {
+                for key in [use.titleKey, use.actionKey, use.avoidKey] {
+                    XCTAssertNotEqual(manager.t(key), key)
+                    XCTAssertFalse(manager.t(key).isEmpty)
+                }
+            }
+            XCTAssertNotEqual(manager.t("bz_owner_vip_desc"), "bz_owner_vip_desc")
+        }
+    }
+
+    func testLegacyAnalysisRoutesStillResolveToTheRightMenuFeature() {
+        XCTAssertEqual(AnalysisFeature.fromLegacySubTab(0), .xuanKong)
+        XCTAssertEqual(AnalysisFeature.fromLegacySubTab(1), .baZhai)
+        XCTAssertEqual(AnalysisFeature.fromLegacySubTab(2), .purpleWhite)
+        XCTAssertEqual(AnalysisFeature.fromLegacySubTab(3), .qimen)
+        XCTAssertNil(AnalysisFeature.fromLegacySubTab(-1))
+        XCTAssertNil(AnalysisFeature.fromLegacySubTab(4))
+        XCTAssertNotEqual(AnalysisFeature.baZhai, .sanHe)
+    }
+
+    @MainActor
+    func testMenuRoutesSurviveUntilConsumedAndCanOpenTheSameFeatureAgain() throws {
+        let router = AppNavigationRouter()
+        for feature in AnalysisFeature.allCases {
+            router.requestRoute(tab: 3, feature: feature)
+            XCTAssertEqual(router.pendingTabRoute?.feature, feature)
+            let route = try XCTUnwrap(router.consumeTabRoute())
+            XCTAssertEqual(route.tab, 3)
+            XCTAssertEqual(route.feature, feature)
+            XCTAssertNil(router.consumeTabRoute())
+            router.requestRoute(tab: 3, feature: feature)
+            XCTAssertEqual(router.consumeTabRoute()?.feature, feature)
+        }
+        XCTAssertNotEqual(AnalysisFeatureRequest(feature: .dates).id, AnalysisFeatureRequest(feature: .dates).id)
+    }
+
+    @MainActor
+    func testIndependentToolsAndDatePosterKeepTheOpeningHouseOrientation() {
+        var live = Mountain24Data.shared.resolveHeadingState(heading: 94)
+        let request = AnalysisToolRequest(tool: .dates, context: live)
+        live = Mountain24Data.shared.resolveHeadingState(heading: 184)
+        let card = DailyAuspiciousCardSheet(targetDate: instant("2026-11-09T04:00:00Z"), headingState: request.context)
+        XCTAssertEqual(request.context.facingAngle, 94, accuracy: 0.000001)
+        XCTAssertEqual(card.headingState.facingAngle, request.context.facingAngle)
+        XCTAssertEqual(card.headingState.sittingMountain.id, request.context.sittingMountain.id)
+        XCTAssertNotEqual(card.headingState.sittingMountain.id, live.sittingMountain.id)
+    }
+
+    private func deepLayout(rooms: [FloorplanRoom], heading: Double = 0, facing: Double = 180,
+                            aspectRatio: Double = 1) -> SavedFloorplanLayout {
+        SavedFloorplanLayout(rooms: rooms, centroidX: 0.5, centroidY: 0.5,
+            compassRotation: heading, isSyncWithCompass: false, hasFloorplanAccess: false,
+            floorplanAccessGrantID: nil, floorplanAccessGrantSignature: nil,
+            aspectRatio: aspectRatio, houseFacingDegrees: facing)
+    }
+
+    @MainActor
+    private func deepChart(mountain: Int = 1, facing: Int = 9, sanban: Bool = false) -> XuanKongChart {
+        let base = TianJiAnalysisSnapshot(heading: 180, period: 9, useTiGua: false).flyingStarsChart()
+        return XuanKongChart(period: 9, sittingMountain: base.sittingMountain, facingMountain: base.facingMountain,
+            patternType: base.patternType, pattern: base.pattern, sittingPalaceID: base.sittingPalaceID,
+            facingPalaceID: base.facingPalaceID, isSanBanGua: sanban, isQiXingDaJie: false,
+            isTiGua: false, chartModeTitle: base.chartModeTitle,
+            palaces: [guidanceCell(mountain: mountain, facing: facing, period: 9)],
+            summaryAnalysis: base.summaryAnalysis, patternDesc: base.patternDesc, periodMeta: base.periodMeta)
+    }
+
+    private func deepTime(year: Int = 1, month: Int = 1) -> PurpleWhiteChart {
+        PurpleWhiteChart(year: 2026, month: 11, yearCentralStar: year, monthCentralStar: month,
+            currentFacingPalace: 1, taiSuiDescription: "", suiPoDescription: "", sanShaDescription: "",
+            palaceItems: (1...9).map { id in
+                PurpleWhitePalaceItem(palaceId: id, palaceName: "", direction: "", originalStar: id,
+                    yearGuestStar: year, monthGuestStar: month, starName: "", isDanger25: false,
+                    isTaiSui: false, isSuiPo: false, isSanSha: false, advice: "")
+            })
+    }
+
+    func testAllEightyOneOrderedPairsHaveReciprocalElementRelations() {
+        var counts = [Int](repeating: 0, count: 5)
+        for a in 1...9 {
+            for b in 1...9 {
+                let relation = XuanKongStarPair(first: a, second: b).relation
+                let reverse = XuanKongStarPair(first: b, second: a).relation
+                switch relation {
+                case .same: counts[0] += 1; XCTAssertEqual(reverse, .same)
+                case .firstGeneratesSecond: counts[1] += 1; XCTAssertEqual(reverse, .secondGeneratesFirst)
+                case .secondGeneratesFirst: counts[2] += 1; XCTAssertEqual(reverse, .firstGeneratesSecond)
+                case .firstControlsSecond: counts[3] += 1; XCTAssertEqual(reverse, .secondControlsFirst)
+                case .secondControlsFirst: counts[4] += 1; XCTAssertEqual(reverse, .firstControlsSecond)
+                }
+            }
+        }
+        XCTAssertEqual(counts, [19, 15, 15, 16, 16])
+        XCTAssertEqual(XuanKongStarPair(first: 1, second: 4).relation, .firstGeneratesSecond)
+        XCTAssertEqual(XuanKongStarPair(first: 9, second: 6).relation, .firstControlsSecond)
+    }
+
+    func testDeepSectorMappingUsesCenteredSectorsAndHandlesWraparound() {
+        XCTAssertEqual(XuanKongDeepAnalyzer.palaceID(bearing: -1), 0)
+        XCTAssertEqual(XuanKongDeepAnalyzer.palaceID(bearing: 22.499), 0)
+        XCTAssertEqual(XuanKongDeepAnalyzer.palaceID(bearing: 22.5), 7)
+        XCTAssertEqual(XuanKongDeepAnalyzer.palaceID(bearing: 360), 0)
+        XCTAssertNil(XuanKongDeepAnalyzer.palaceID(bearing: .nan))
+        for (angle, id) in zip(stride(from: 0, to: 360, by: 45), [0, 7, 2, 3, 8, 1, 6, 5]) {
+            XCTAssertEqual(XuanKongDeepAnalyzer.palaceID(bearing: Double(angle)), id)
+        }
+    }
+
+    func testRoomCoverageSpansSectorsWithoutInventingBedOrStovePositions() {
+        let bedroom = FloorplanRoom(name: "wide bedroom", type: .masterBedroom,
+            rect: CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.2))
+        let home = XuanKongHomeContextBuilder.build(layout: deepLayout(rooms: [bedroom]), survey: nil,
+            exterior: [], facts: [])
+        XCTAssertTrue(Set(home.places.map(\.palaceID)).isSuperset(of: Set([0, 5, 7])))
+        XCTAssertTrue(home.places.allSatisfy { $0.kind == .room })
+        XCTAssertLessThanOrEqual(abs(home.places.reduce(0) { $0 + $1.coverage } - 100), 2)
+        XCTAssertTrue(home.missingKeys.contains("xkd_missing_bed"))
+        XCTAssertTrue(home.missingKeys.contains("xkd_missing_stove"))
+    }
+
+    func testBlueprintNorthAndAspectRatioBothAffectTheLocatedEntrance() {
+        let door = FloorplanRoom(name: "door", type: .door,
+            rect: CGRect(x: 0.59, y: 0.19, width: 0.02, height: 0.02))
+        func sector(_ heading: Double, _ ratio: Double) -> Int? {
+            XuanKongHomeContextBuilder.build(layout: deepLayout(rooms: [door], heading: heading, aspectRatio: ratio),
+                survey: nil, exterior: [], facts: []).places.first?.palaceID
+        }
+        XCTAssertEqual(sector(0, 1), 0)
+        XCTAssertEqual(sector(0, 3), 7)
+        XCTAssertEqual(sector(90, 1), 2)
+    }
+
+    @MainActor
+    func testArMarkersKeepGeographicSectorsWhenTheScanBasisRotates() {
+        func home(heading: Double, bed: SIMD3<Float>) -> XuanKongHomeContext {
+            let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "test", walls: [], openings: [], beams: [],
+                rooms: [SpatialRoom3D(name: "room", type: .masterBedroom, center: SIMD3(0, 1, 0), size: SIMD3(8, 3, 8))],
+                objects: [SpatialObject3D(category: "bed", position: bed, size: SIMD3(2, 1, 2))],
+                compassHeading: heading, centroidOverride: .zero, houseFacingDegrees: 180)
+            return XuanKongHomeContextBuilder.build(layout: nil, survey: survey, exterior: [], facts: [])
+        }
+        let first = home(heading: 0, bed: SIMD3(0, 0.5, -3))
+        let rotated = home(heading: 90, bed: SIMD3(-3, 0.5, 0))
+        XCTAssertEqual(first.places.first { $0.kind == .bed }?.palaceID, 0)
+        XCTAssertEqual(rotated.places.first { $0.kind == .bed }?.palaceID, 0)
+        XCTAssertFalse(first.missingKeys.contains("xkd_missing_bed"))
+    }
+
+    @MainActor
+    func testRotatedRoomCoverageUsesTheSameYawConventionAsTheSurveyGeometry() {
+        let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "test", walls: [], openings: [], beams: [],
+            rooms: [SpatialRoom3D(name: "rotated", type: .study, center: SIMD3(0, 1, -3),
+                size: SIMD3(6, 3, 1), rotationY: .pi / 4)], objects: [],
+            compassHeading: 0, centroidOverride: .zero, houseFacingDegrees: 180)
+        let home = XuanKongHomeContextBuilder.build(layout: nil, survey: survey, exterior: [], facts: [])
+        let northeast = home.places.first { $0.palaceID == 7 }?.coverage ?? 0
+        let northwest = home.places.first { $0.palaceID == 5 }?.coverage ?? 0
+        XCTAssertGreaterThan(northeast, northwest)
+    }
+
+    @MainActor
+    func testConflictingSurveyFacingDoesNotContaminateBlueprintMarkers() {
+        let door = entrance(position: SIMD3(0, 1, -4), normal: SIMD3(0, 0, -1))
+        let survey = facingSurvey(door: door, explicit: 180)
+        let exterior = ExteriorShaRecord(shaID: "luchong", bearingDegrees: 90)
+        let home = XuanKongHomeContextBuilder.build(layout: deepLayout(rooms: [], facing: 0),
+            survey: survey, exterior: [exterior], facts: [])
+        XCTAssertTrue(home.warningKeys.contains("xkd_orientation_conflict"))
+        XCTAssertFalse(home.places.contains { $0.kind == .entrance })
+        XCTAssertEqual(home.exterior, [exterior])
+    }
+
+    @MainActor
+    func testYearAndMonthCautionsOverrideAnActiveNatalSector() throws {
+        let chart = deepChart()
+        let date = instant("2026-11-09T04:00:00Z")
+        let original = XuanKongDeepAnalyzer.analyze(chart: chart, date: date, temporal: deepTime())
+        XCTAssertEqual(original.sectors.first?.use, .activity)
+        for star in [2, 5] {
+            for time in [deepTime(year: star), deepTime(month: star)] {
+                let sector = try XCTUnwrap(XuanKongDeepAnalyzer.analyze(chart: chart, date: date, temporal: time).sectors.first)
+                XCTAssertEqual(sector.use, .quiet)
+                XCTAssertTrue(sector.actions.contains(.reduceNoise))
+                XCTAssertFalse(sector.actions.contains(.study))
+                XCTAssertTrue(sector.reasonKeys.contains("xkd_reason_season"))
+            }
+        }
+    }
+
+    @MainActor
+    func testSeasonalStarsJoinTheCorrectLuoShuPalaceWithoutReversingTheGrid() {
+        let chart = TianJiAnalysisSnapshot(heading: 180, period: 9).flyingStarsChart()
+        let date = instant("2026-11-09T04:00:00Z")
+        let temporal = PurpleWhiteEngine.shared.calculateChart(date: date)
+        let analysis = XuanKongDeepAnalyzer.analyze(chart: chart, date: date)
+        for sector in analysis.sectors {
+            let guest = temporal.palaceItems.first { $0.palaceId == sector.palaceID + 1 }
+            XCTAssertEqual(sector.yearStar, guest?.yearGuestStar)
+            XCTAssertEqual(sector.monthStar, guest?.monthGuestStar)
+        }
+    }
+
+    @MainActor
+    func testDeepAnalysisRecomputesAtLiChunAndWithinMonthSolarBoundaries() {
+        let chart = deepChart()
+        let spring = liChunBoundary()
+        let before = XuanKongDeepAnalyzer.analyze(chart: chart, date: spring.addingTimeInterval(-1))
+        let after = XuanKongDeepAnalyzer.analyze(chart: chart, date: spring.addingTimeInterval(1))
+        XCTAssertNotEqual(before.sectors.first?.yearStar, after.sectors.first?.yearStar)
+        var low = instant("2026-11-06T00:00:00Z"), high = instant("2026-11-09T00:00:00Z")
+        while high.timeIntervalSince(low) > 0.01 {
+            let middle = low.addingTimeInterval(high.timeIntervalSince(low) / 2)
+            if SolarTimeCalculator.shared.solarTermIndex(for: middle) < 20 { low = middle } else { high = middle }
+        }
+        let old = XuanKongDeepAnalyzer.analyze(chart: chart, date: high.addingTimeInterval(-1))
+        let new = XuanKongDeepAnalyzer.analyze(chart: chart, date: high.addingTimeInterval(1))
+        XCTAssertNotEqual(old.sectors.first?.monthStar, new.sectors.first?.monthStar)
+        XCTAssertEqual(chart.period, 9)
+    }
+
+    @MainActor
+    func testObservedSleepNeedsOverrideActivityAndActionsAreDeduplicated() throws {
+        let context = XuanKongHomeContext(places: [XuanKongLocatedPlace(id: "bed", palaceID: 0, name: "bed",
+            kind: .bed, roomType: nil)], facts: [XuanKongSiteFact(palaceID: 0, kind: .glare)])
+        let result = XuanKongDeepAnalyzer.analyze(chart: deepChart(), date: Date(), context: context, temporal: deepTime())
+        let sector = try XCTUnwrap(result.sectors.first)
+        XCTAssertEqual(sector.use, .rest)
+        XCTAssertTrue(sector.actions.contains(.protectSleep))
+        XCTAssertEqual(sector.actions.first, .reduceGlare)
+        XCTAssertFalse(sector.actions.contains(.study))
+        XCTAssertEqual(Set(sector.actions).count, sector.actions.count)
+    }
+
+    @MainActor
+    func testBathroomNeverBecomesAStudyThroughAnAuspiciousPair() throws {
+        let context = XuanKongHomeContext(places: [XuanKongLocatedPlace(id: "bath", palaceID: 0, name: "bath",
+            kind: .room, roomType: .bathroom)])
+        let result = XuanKongDeepAnalyzer.analyze(chart: deepChart(mountain: 1, facing: 4), date: Date(),
+            context: context, temporal: deepTime())
+        let sector = try XCTUnwrap(result.sectors.first)
+        XCTAssertTrue(sector.actions.contains(.wetRoom))
+        XCTAssertFalse(sector.actions.contains(.study))
+    }
+
+    @MainActor
+    func testKitchenAndMissingCornerDoNotReceiveSeatOrFurnitureInstructions() throws {
+        let kitchen = XuanKongHomeContext(places: [XuanKongLocatedPlace(id: "kitchen", palaceID: 0, name: "kitchen",
+            kind: .room, roomType: .kitchen)])
+        let resting = XuanKongDeepAnalyzer.analyze(chart: deepChart(mountain: 9, facing: 1), date: Date(),
+            context: kitchen, temporal: deepTime())
+        XCTAssertTrue(resting.sectors.first?.actions.contains(.kitchen) == true)
+        XCTAssertFalse(resting.sectors.first?.actions.contains(.rest) == true)
+        let missing = XuanKongHomeContext(places: [XuanKongLocatedPlace(id: "corner", palaceID: 0, name: "corner",
+            kind: .room, roomType: .missingCorner)])
+        let absent = XuanKongDeepAnalyzer.analyze(chart: deepChart(), date: Date(), context: missing, temporal: deepTime())
+        XCTAssertEqual(try XCTUnwrap(absent.sectors.first).actions, [.verifyCorner])
+    }
+
+    @MainActor
+    func testQuietSectorWithRecordedWaterProducesReviewInsteadOfActivation() throws {
+        let context = XuanKongHomeContext(facts: [XuanKongSiteFact(palaceID: 0, kind: .movingWater),
+            XuanKongSiteFact(palaceID: 0, kind: .noise)])
+        let result = XuanKongDeepAnalyzer.analyze(chart: deepChart(), date: Date(), context: context, temporal: deepTime(year: 5))
+        let sector = try XCTUnwrap(result.sectors.first)
+        XCTAssertEqual(sector.use, .quiet)
+        XCTAssertTrue(sector.actions.contains(.waterReview))
+        XCTAssertEqual(Set(sector.actions).count, sector.actions.count)
+    }
+
+    @MainActor
+    func testObservedProblemsTakePriorityOverUnoccupiedStarCautions() throws {
+        let chart = TianJiAnalysisSnapshot(heading: 0, period: 9).flyingStarsChart()
+        let context = XuanKongHomeContext(facts: [XuanKongSiteFact(palaceID: 8, kind: .blockedAccess)])
+        let result = XuanKongDeepAnalyzer.analyze(chart: chart, date: Date(), context: context, temporal: deepTime())
+        XCTAssertEqual(result.priorities.first?.palaceID, 8)
+        XCTAssertEqual(result.priorities.first?.actions.first, .clearAccess)
+        XCTAssertEqual(result.summaryKey, "xkd_summary_observed")
+    }
+
+    @MainActor
+    func testExteriorDistanceChangesReviewPriorityWithoutRotatingItsBearing() throws {
+        func sector(distance: Float) throws -> XuanKongSectorAnalysis {
+            let context = XuanKongHomeContext(exterior: [ExteriorShaRecord(shaID: "luchong", bearingDegrees: 0,
+                distanceMeters: distance)])
+            return try XCTUnwrap(XuanKongDeepAnalyzer.analyze(chart: deepChart(), date: Date(),
+                context: context, temporal: deepTime()).sectors.first)
+        }
+        let near = try sector(distance: 10), far = try sector(distance: 200)
+        XCTAssertEqual(near.palaceID, far.palaceID)
+        XCTAssertLessThan(near.priority, far.priority)
+        XCTAssertTrue(near.actions.contains(.exteriorTraffic))
+        XCTAssertTrue(far.actions.contains(.exteriorTraffic))
+    }
+
+    @MainActor
+    func testSpecialPatternChecksChangeWithRecordedConditions() throws {
+        let chart = deepChart(sanban: true)
+        let date = Date()
+        let empty = XuanKongDeepAnalyzer.analyze(chart: chart, date: date, temporal: deepTime())
+        XCTAssertEqual(empty.patternChecks.first?.statusKey, "xkd_pattern_unknown")
+        let context = XuanKongHomeContext(facts: [XuanKongSiteFact(palaceID: 0, kind: .openBright)])
+        let partial = XuanKongDeepAnalyzer.analyze(chart: chart, date: date, context: context, temporal: deepTime())
+        XCTAssertEqual(partial.patternChecks.first?.statusKey, "xkd_pattern_partial")
+        let noisy = XuanKongHomeContext(facts: [XuanKongSiteFact(palaceID: 0, kind: .noise)])
+        let conflict = XuanKongDeepAnalyzer.analyze(chart: chart, date: date, context: noisy, temporal: deepTime())
+        XCTAssertEqual(conflict.patternChecks.first?.statusKey, "xkd_pattern_conflict")
+        XCTAssertTrue(conflict.sectors.first?.actions.contains(.sanban) == true)
+    }
+
+    @MainActor
+    func testSevenStarGroupsProduceLinkedActionsOnlyForTheirActualPalaces() {
+        var checked = 0
+        for period in 1...9 {
+            for heading in stride(from: 0, to: 360, by: 15) {
+                let chart = TianJiAnalysisSnapshot(heading: Double(heading), period: period, useTiGua: false).flyingStarsChart()
+                guard chart.isQiXingDaJie else { continue }
+                checked += 1
+                let groups = XuanKongDeepAnalyzer.qiXingSectorGroups(chart: chart)
+                XCTAssertFalse(groups.isEmpty)
+                let linked = Set(groups.flatMap { $0 })
+                let result = XuanKongDeepAnalyzer.analyze(chart: chart, date: Date(), temporal: deepTime())
+                for sector in result.sectors {
+                    XCTAssertEqual(sector.actions.contains(.qixing), linked.contains(sector.id))
+                }
+                for check in result.patternChecks where check.id.hasPrefix("qixing") {
+                    XCTAssertEqual(check.palaceIDs.count, 3)
+                }
+            }
+        }
+        XCTAssertGreaterThan(checked, 0)
+    }
+
+    func testSiteFactsPersistAndCannotLeakAcrossAPropertySwitch() throws {
+        let suite = "site-facts-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults), oldProperty = store.propertyID
+        store.setSiteFact(.noise, palaceID: 0, present: true, propertyID: oldProperty)
+        store.setSiteFact(.noise, palaceID: 0, present: true, propertyID: oldProperty)
+        XCTAssertEqual(store.siteFacts.count, 1)
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).siteFacts, store.siteFacts)
+        store.replaceProperty(measured: nil, virtual: nil, exterior: [])
+        store.setSiteFact(.movingWater, palaceID: 0, present: true, propertyID: oldProperty)
+        XCTAssertTrue(store.siteFacts.isEmpty)
+        let restored = [XuanKongSiteFact(palaceID: 2, kind: .solidBacking)]
+        store.replaceProperty(measured: nil, virtual: nil, exterior: [], siteFacts: restored)
+        XCTAssertEqual(ShaSurveyStore(defaults: defaults).siteFacts, restored)
+    }
+
+    func testCaseBackupKeepsSiteFactsAndOldCasesStillDecode() throws {
+        var record = FloorplanCaseRecord(id: "case", title: "home", createdAt: Date(), sittingSummary: "",
+            layout: deepLayout(rooms: []))
+        record.siteFacts = [XuanKongSiteFact(palaceID: 8, kind: .openBright)]
+        let data = try JSONEncoder().encode(record)
+        XCTAssertEqual(try JSONDecoder().decode(FloorplanCaseRecord.self, from: data).siteFacts, record.siteFacts)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        json.removeValue(forKey: "siteFacts")
+        XCTAssertNil(try JSONDecoder().decode(FloorplanCaseRecord.self, from: JSONSerialization.data(withJSONObject: json)).siteFacts)
+    }
+
+    @MainActor
+    func testDeepActionsAndFactsHaveTranslationsInAllLanguages() {
+        let manager = LocalizationManager.shared, previous = LocalizationManager.shared.effectiveLanguage
+        defer { manager.effectiveLanguage = previous }
+        let keys = XuanKongPracticalAction.allCases.map(\.textKey)
+            + XuanKongSiteFactKind.allCases.map(\.titleKey)
+            + XuanKongStarPair.Relation.allCases.map(\.titleKey)
+        for language in AppLanguage.allCases where language != .auto {
+            manager.effectiveLanguage = language
+            for key in keys {
+                XCTAssertFalse(manager.t(key).isEmpty)
+                XCTAssertNotEqual(manager.t(key), key)
+            }
+        }
+    }
 }

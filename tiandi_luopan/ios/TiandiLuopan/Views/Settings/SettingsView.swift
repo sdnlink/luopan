@@ -503,7 +503,7 @@ public struct SettingsView: View {
     }
 
     private var kuaProfileSubtitle: String {
-        if kuaProfile.isProfileEnabled {
+        if kuaProfile.canUsePersonalAnalysis {
             return "\(kuaProfile.birthYear) · \(kuaProfile.localizedLifeKuaName(language: lang.effectiveLanguage))"
         } else {
             return ""
@@ -768,6 +768,7 @@ public struct MasterVIPPageView: View {
 
 public struct OwnerKuaReminderPageView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ObservedObject private var iap = StoreKitIAPManager.shared
     @ObservedObject var kuaProfile = UserKuaProfileManager.shared
     @ObservedObject var retention = RetentionServiceManager.shared
     @ObservedObject var lang = LocalizationManager.shared
@@ -790,6 +791,7 @@ public struct OwnerKuaReminderPageView: View {
 
     public var body: some View {
         List {
+            if iap.hasUnlockedVIP {
             // 1. 宅主本命卦人宅配卦
             Section(header: Text(SettingsLocalizationHelpers.ownerBirthYearTitle(lang))) {
                 Toggle(SettingsLocalizationHelpers.ownerProfileEnableTitle(lang), isOn: $kuaProfile.isProfileEnabled)
@@ -975,6 +977,10 @@ public struct OwnerKuaReminderPageView: View {
                 }
             }
 
+            } else {
+                Section { OwnerGuaVIPGate { EmptyView() } }
+            }
+
             // 3. 二十四节气交节与九星换月提醒
             Section(
                 header: Text(SettingsLocalizationHelpers.solarTermNotifyTitle(lang)),
@@ -995,6 +1001,7 @@ public struct OwnerKuaReminderPageView: View {
         .navigationBarTitle(lang.t("settings_menu_kua_reminder"), displayMode: .inline)
         .preferredColorScheme(.dark)
         .sheet(item: $activeSheet) { sheet in
+            OwnerGuaVIPGate {
             switch sheet {
             case .editOwnerKua:
                 EditOwnerKuaDialog(
@@ -1018,6 +1025,7 @@ public struct OwnerKuaReminderPageView: View {
                         activeSheet = nil
                     }
                 )
+            }
             }
         }
     }

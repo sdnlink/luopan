@@ -3,40 +3,25 @@ import UIKit
 
 // MARK: - 八宅明镜与三合水法全景研判视图 (BaZhai & SanHe Water View)
 
+public enum BaZhaiSection: Int { case house, water }
+
 public struct BaZhaiView: View {
     public var isActive: Bool = true
     @ObservedObject var motion = CompassMotionManager.shared
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
-    @ObservedObject var kua = UserKuaProfileManager.shared
     @ObservedObject var retention = RetentionServiceManager.shared
-    public enum ActiveSheet: Identifiable {
+    private enum ActiveSheet: String, Identifiable {
         case paywall
-        case dailySign
-        case addFamilyMember
-        case editOwnerKua
-
-        public var id: String {
-            switch self {
-            case .paywall: return "paywall"
-            case .dailySign: return "dailySign"
-            case .addFamilyMember: return "addFamilyMember"
-            case .editOwnerKua: return "editOwnerKua"
-            }
-        }
+        var id: String { rawValue }
     }
-
-    @State private var activeSheet: ActiveSheet? = nil
-    @State private var selectedSubTab: Int = 0 // 0: 八宅明镜, 1: 三合水法
-    @State private var selectedDate: Date = Date()
-    @State private var isUsingCustomDate: Bool = false
-    @State private var showUpcomingDays: Bool = false
-    @State private var showShichenTable: Bool = true
-    @State private var showFamilySection: Bool = true
-    @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
+    @State private var activeSheet: ActiveSheet?
+    @State private var selectedSubTab: BaZhaiSection
+    private let showsSectionPicker: Bool
+    @State private var selectedGuaName: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var cachedAnalysis: BaZhaiAnalysis?
     @State private var cachedWaterItems: [SanHeWaterItem]?
-    @State private var cachedZeRi: ZeRiAnalysis?
     public var isEmbedded: Bool = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -48,15 +33,11 @@ public struct BaZhaiView: View {
         AdaptiveLayout.isTwoPane(horizontal: horizontalSizeClass,
                                       vertical: verticalSizeClass, form: layoutForm)
     }
-    private static let clockRefreshTimer = Timer.publish(
-        every: 60,
-        on: .main,
-        in: .common
-    ).autoconnect()
-    
-    public init(isEmbedded: Bool = false, isActive: Bool = true) {
+    public init(isEmbedded: Bool = false, isActive: Bool = true, section: BaZhaiSection = .house, showsSectionPicker: Bool = true) {
         self.isEmbedded = isEmbedded
         self.isActive = isActive
+        self._selectedSubTab = State(initialValue: section)
+        self.showsSectionPicker = showsSectionPicker
     }
     
     public var body: some View {
@@ -84,19 +65,7 @@ public struct BaZhaiView: View {
         .onChange(of: isActive) { active in
             if active { refreshAnalysis() }
         }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
-            refreshAnalysis()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            refreshAnalysis()
-        }
-        .onReceive(Self.clockRefreshTimer) { _ in
-            // ZeRi includes the current hour pillar. Refresh at a low rate so
-            // an open page crosses an hour boundary without showing stale
-            // recommendations, while hidden tabs do no calendar work.
-            guard isActive else { return }
-            refreshAnalysis()
-        }
+        .onChange(of: selectedSubTab) { _ in refreshAnalysis() }
     }
 
     /// Build the expensive analysis only while the embedded sub-tab is
@@ -105,153 +74,68 @@ public struct BaZhaiView: View {
     /// every compass sample even when the user was viewing another tab.
     @ViewBuilder
     private func activeContent(state: CompassHeadingState) -> some View {
-        let effectiveDate = isUsingCustomDate ? selectedDate : Date()
-        let bz = cachedAnalysis ?? BaZhaiEngine.shared.analyze(
-            sittingPalace: state.sittingMountain.palace,
-            facingPalace: state.facingMountain.palace
-        )
-        let shItems = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain, facing: state.facingMountain)
-        let zeri = cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: state.sittingMountain, date: effectiveDate)
-
         let content = VStack(spacing: 16) {
-            subTabBar()
+            if showsSectionPicker { subTabBar() }
 
-            if selectedSubTab == 0 {
-                baZhaiContent(bz: bz, zeri: zeri, state: state)
+            if selectedSubTab == .house {
+                let bz = cachedAnalysis ?? BaZhaiEngine.shared.analyze(sittingPalace: state.sittingMountain.palace,
+                                                                      facingPalace: state.facingMountain.palace)
+                baZhaiContent(bz: bz, state: state)
             } else {
-                sanHeContent(shItems: shItems, state: state)
+                let items = cachedWaterItems ?? SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain,
+                                                                                          facing: state.facingMountain)
+                sanHeContent(shItems: items, state: state)
             }
         }
         .padding(.top, isEmbedded ? 0 : 12)
         .padding(.bottom, isEmbedded ? 0 : 24)
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .paywall:
-                VIPPaywallSheet(defaultProductId: .vipYearly)
-            case .dailySign:
-                DailyAuspiciousCardSheet(targetDate: effectiveDate)
-            case .addFamilyMember:
-                AddFamilyMemberDialog(
-                    isPresented: Binding(
-                        get: { activeSheet == .addFamilyMember },
-                        set: { if !$0 { activeSheet = nil } }
-                    ),
-                    ownerBirthYear: kua.birthYear,
-                    ownerIsMale: kua.isMale,
-                    onConfirm: { role, customName, birthDate, year, isMale in
-                        kua.addFamilyMember(role: role, customName: customName, birthDate: birthDate, birthYear: year, isMale: isMale)
-                        withAnimation {
-                            showFamilySection = true
-                        }
-                        refreshAnalysis()
-                        activeSheet = nil
-                    }
-                )
-            case .editOwnerKua:
-                EditOwnerKuaDialog(
-                    isPresented: Binding(
-                        get: { activeSheet == .editOwnerKua },
-                        set: { if !$0 { activeSheet = nil } }
-                    ),
-                    sittingPalace: state.sittingMountain.palace,
-                    onSaved: {
-                        refreshAnalysis()
-                        activeSheet = nil
-                    }
-                )
-            }
-        }
-        .onChange(of: selectedDate) { _ in
-            isUsingCustomDate = true
-            refreshAnalysis()
-        }
+        .sheet(item: $activeSheet) { _ in VIPPaywallSheet(defaultProductId: .vipYearly) }
 
-        if isEmbedded {
-            content
-                .overlay(
-                    Group {
-                        if retention.showNotificationPermissionDeniedAlert {
-                            FloorplanConfirmDialog(
-                                title: notificationPermissionDeniedTitle(),
-                                message: notificationPermissionDeniedMessage(),
-                                confirmTitle: goToSettingsTitle(),
-                                cancelTitle: lang.t("cancel"),
-                                confirmColor: Color.yanCyan,
-                                onConfirm: {
-                                    retention.showNotificationPermissionDeniedAlert = false
-                                    retention.openSystemNotificationSettings()
-                                },
-                                onCancel: {
-                                    retention.showNotificationPermissionDeniedAlert = false
-                                }
-                            )
-                        }
-                    }
-                )
-        } else {
-            ScrollView {
-                content
-            }
-            .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
-            .overlay(
-                Group {
-                    if retention.showNotificationPermissionDeniedAlert {
-                        FloorplanConfirmDialog(
-                            title: notificationPermissionDeniedTitle(),
-                            message: notificationPermissionDeniedMessage(),
-                            confirmTitle: goToSettingsTitle(),
-                            cancelTitle: lang.t("cancel"),
-                            confirmColor: Color.yanCyan,
-                            onConfirm: {
-                                retention.showNotificationPermissionDeniedAlert = false
-                                retention.openSystemNotificationSettings()
-                            },
-                            onCancel: {
-                                retention.showNotificationPermissionDeniedAlert = false
-                            }
-                        )
-                    }
-                }
-            )
+        if isEmbedded { content }
+        else {
+            ScrollView { content }
+                .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
         }
     }
 
     private func refreshAnalysis() {
         guard isActive else { return }
         let state = motion.headingState
-        let effectiveDate = isUsingCustomDate ? selectedDate : Date()
-        cachedAnalysis = BaZhaiEngine.shared.analyze(
-            sittingPalace: state.sittingMountain.palace,
-            facingPalace: state.facingMountain.palace
-        )
-        cachedWaterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain, facing: state.facingMountain)
-        cachedZeRi = ZeRiEngine.shared.analyze(sitting: state.sittingMountain, date: effectiveDate)
+        if selectedSubTab == .house {
+            let updated = BaZhaiEngine.shared.analyze(sittingPalace: state.sittingMountain.palace,
+                                                    facingPalace: state.facingMountain.palace)
+            if cachedAnalysis?.houseGua != updated.houseGua { selectedGuaName = state.facingMountain.palace }
+            cachedAnalysis = updated
+        } else {
+            cachedWaterItems = SanHeWaterEngine.shared.resolveWaterMethod(sitting: state.sittingMountain,
+                                                                         facing: state.facingMountain)
+        }
     }
-    
+
     // MARK: - 子 Tab 切换栏
     private func subTabBar() -> some View {
         let lang = LocalizationManager.shared
         return HStack(spacing: 0) {
-            Button(action: { selectedSubTab = 0 }) {
+            Button(action: { selectedSubTab = .house }) {
                 Text(lang.t("bazhai_tab_title"))
-                    .adaptiveFont(size: 13, weight: selectedSubTab == 0 ? .bold : .medium)
+                    .adaptiveFont(size: 13, weight: selectedSubTab == .house ? .bold : .medium)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(selectedSubTab == 0 ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
-                    .foregroundColor(selectedSubTab == 0 ? .black : .white.opacity(0.7))
+                    .background(selectedSubTab == .house ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
+                    .foregroundColor(selectedSubTab == .house ? .black : .white.opacity(0.7))
             }
             
-            Button(action: { selectedSubTab = 1 }) {
+            Button(action: { selectedSubTab = .water }) {
                 Text(lang.t("sanhe_tab_title"))
-                    .adaptiveFont(size: 13, weight: selectedSubTab == 1 ? .bold : .medium)
+                    .adaptiveFont(size: 13, weight: selectedSubTab == .water ? .bold : .medium)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(selectedSubTab == 1 ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
-                    .foregroundColor(selectedSubTab == 1 ? .black : .white.opacity(0.7))
+                    .background(selectedSubTab == .water ? Color(red: 0.83, green: 0.68, blue: 0.21) : Color.clear)
+                    .foregroundColor(selectedSubTab == .water ? .black : .white.opacity(0.7))
             }
         }
         .background(Color.white.opacity(0.1))
@@ -259,189 +143,182 @@ public struct BaZhaiView: View {
         .padding(.horizontal, 16)
     }
     
-    // MARK: - 八宅明镜内容
-    private func baZhaiContent(bz: BaZhaiAnalysis, zeri: ZeRiAnalysis, state: CompassHeadingState) -> some View {
-        // iPhone Duo 展开态双栏：左栏 = 宅型概览与八方游年星（命盘核心），
-        // 右栏 = 天星择日日课（分析解释）；折叠态保持原单列纵排。
-        FoldableTwoPane(compactSpacing: 12) {
-        VStack(spacing: 12) {
-            // 宅型概览卡
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(bz.localizedHouseGua)
-                            .adaptiveFont(size: 20, weight: .bold, design: .serif)
-                            .foregroundColor(.white)
-                        Text(bz.localizedHouseType)
-                            .adaptiveFont(size: 12, weight: .bold)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.2))
-                            .foregroundColor(Color.orange)
-                            .cornerRadius(4)
-                    }
-                    Text("\(lang.t("gate_facing_prefix"))：\(bz.localizedGateDirection) · \(lang.t("na_qi_prefix"))【\(bz.gateStar.localizedName)】")
-                        .adaptiveFont(size: 13)
-                        .foregroundColor(bz.gateStar.isAuspicious ? Color.green : Color.red)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+    // MARK: - 住宅方位：宅卦概览 → 八方图 → 选中方位的行动
+    private func baZhaiContent(bz: BaZhaiAnalysis, state: CompassHeadingState) -> some View {
+        FoldableTwoPane(compactSpacing: 14) {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(lang.t("bz_house_title"))
+                        .adaptiveFont(size: 13, weight: .semibold)
+                        .foregroundColor(Color.yanGold)
+                    Text(bz.localizedHouseGua + " · " + bz.localizedHouseType)
+                        .adaptiveFont(size: 22, weight: .bold)
+                        .foregroundColor(.white)
                 }
-                Spacer()
-            }
-            .padding(14)
-            .background(Color(red: 0.12, green: 0.12, blue: 0.16))
-            .cornerRadius(12)
-            .padding(.horizontal, 16)
-            
-            // 宅主命卦与人宅合一配对卡 (P1.1 + 全家成员命卦分房)
-            ownerKuaCard(sittingPalace: state.sittingMountain.palace)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(12)
 
-            // 21天气场调理打卡追踪清单
-            if !retention.remedyTasks.isEmpty {
-                remedyTrackerCard()
-            }
-
-            // 八方游年星列表
-            VStack(spacing: 8) {
-                ForEach(bz.items) { item in
-                    let taskID = "bazhai-\(state.sittingMountain.palace)-\(item.guaName)"
-                    let isSavedTask = retention.remedyTasks.contains(where: { $0.id == taskID })
-                    // 固定 120pt 的方向列会把建议文字挤成竖排单字；改为纵向堆叠，
-                    // 方向/星名一行、建议说明整行，所有语言都能完整换行。
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Text(item.localizedDirection)
-                                .adaptiveFont(size: 14, weight: .bold)
-                                .foregroundColor(.white)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(item.star.localizedName)
-                                .adaptiveFont(size: 12, weight: .semibold)
-                                .foregroundColor(item.star.isAuspicious ? Color(red: 0.4, green: 0.85, blue: 0.4) : Color(red: 0.95, green: 0.4, blue: 0.4))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
-                            Button(action: {
-                                retention.toggleRemedyTask(
-                                    id: taskID,
-                                    palaceDirection: item.localizedDirection,
-                                    title: item.star.localizedName,
-                                    remedyAction: item.star.plainLanguageSummary
-                                )
-                            }) {
-                                HStack(spacing: 3) {
-                                    Image(systemName: isSavedTask ? "checkmark.circle.fill" : "plus.circle")
-                                        .font(.system(size: 10))
-                                    Text(remedyButtonLabel(isSaved: isSavedTask))
-                                        .adaptiveFont(size: 10, weight: .bold)
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(isSavedTask ? Color.green.opacity(0.22) : Color.white.opacity(0.08))
-                                .foregroundColor(isSavedTask ? .green : .white.opacity(0.8))
-                                .cornerRadius(5)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        // 顶置白话吉凶速断 (P2.1)
-                        Text(item.star.plainLanguageSummary)
-                            .adaptiveFont(size: 11, weight: .semibold)
-                            .foregroundColor(item.star.isAuspicious ? Color(red: 0.95, green: 0.85, blue: 0.45) : Color.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(item.star.localizedSuggestion)
-                            .adaptiveFont(size: 12)
-                            .foregroundColor(.white.opacity(0.85))
-                            .lineSpacing(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(10)
-                    .background(Color(red: 0.11, green: 0.11, blue: 0.14))
-                    .cornerRadius(8)
+                houseDirectionMap(bz: bz)
+                DisclosureGroup(lang.t("analysis_usage")) {
+                    Text(lang.t("bz_house_intro"))
+                    Text(lang.t("bz_house_basis")).padding(.top, 6)
+                    Text(lang.t("bz_map_hint")).padding(.top, 6)
                 }
+                .adaptiveFont(size: 11)
+                .foregroundColor(.white.opacity(0.6))
             }
             .padding(.horizontal, 16)
-            }
-            } analysis: {
-            // 天星择日 · 动土安门日课自检卡（展开态右栏 / 折叠态底部）
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    HStack(spacing: 5) {
-                        Image(systemName: "calendar.badge.clock")
-                            .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        Text(lang.t("zeri_title"))
-                            .adaptiveFont(size: 14, weight: .bold)
-                            .foregroundColor(.white)
-                    }
-                    Spacer()
-                    Text(zeri.overallStatus)
-                        .adaptiveFont(size: 11, weight: .bold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(zeri.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
-                        .foregroundColor(zeri.isAuspicious ? Color.green : Color.red)
-                        .cornerRadius(4)
+        } analysis: {
+            VStack(alignment: .leading, spacing: 14) {
+                if let selected = bz.items.first(where: { $0.guaName == selectedGuaName })
+                    ?? bz.items.first(where: { $0.guaName == state.facingMountain.palace }) {
+                    houseDirectionAdvice(item: selected, sittingPalace: state.sittingMountain.palace)
                 }
-
-                // P0.3 日期/时辰穿越拨盘
-                zeRiDateControlBar()
-                
-                Text("\(lang.t("current_four_pillars"))：\(zeri.fourPillarsText)")
-                    .adaptiveFont(size: 12, weight: .semibold, design: .serif)
-                    .foregroundColor(Color.yanCyan)
-                
-                Text(zeri.detailsText)
-                    .adaptiveFont(size: 12)
-                    .foregroundColor(.white.opacity(0.85))
-                    .lineSpacing(2)
-                
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Text(lang.t("auspicious_fit"))
-                            .adaptiveFont(size: 10, weight: .bold)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.green.opacity(0.2))
+                if !retention.remedyTasks.isEmpty {
+                    DisclosureGroup {
+                        remedyTrackerCard()
+                    } label: {
+                        Text(lang.t("bz_action_list"))
+                            .adaptiveFont(size: 13, weight: .semibold)
                             .foregroundColor(.green)
-                            .cornerRadius(3)
-                        Text(zeri.yiActivities.joined(separator: " · "))
-                            .adaptiveFont(size: 11)
-                            .foregroundColor(.white.opacity(0.8))
                     }
-                    Spacer()
+                    .accentColor(.green)
                 }
-                
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Text(lang.t("inauspicious_avoid"))
-                            .adaptiveFont(size: 10, weight: .bold)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.red.opacity(0.2))
-                            .foregroundColor(.red)
-                            .cornerRadius(3)
-                        Text(zeri.jiActivities.joined(separator: " · "))
-                            .adaptiveFont(size: 11)
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    Spacer()
-                }
-
-                Divider().background(Color.white.opacity(0.1))
-
-                // 当日十二时辰黄黑道吉凶表
-                shichenTableSection()
-
-                Divider().background(Color.white.opacity(0.1))
-
-                // 未来 30 天黄道吉日一键筛选与提醒 (P0.3 & P1.3)
-                upcomingAuspiciousDaysSection(state: state)
             }
-            .padding(12)
-            .background(Color(red: 0.12, green: 0.12, blue: 0.16))
-            .cornerRadius(12)
             .padding(.horizontal, 16)
         }
     }
-    
+
+    private func houseUseColor(_ use: BaZhaiSuggestedUse) -> Color {
+        switch use {
+        case .activity: return .yanGold
+        case .rest: return .yanCyan
+        case .study: return .green
+        case .review: return .orange
+        }
+    }
+
+    private func houseDirectionMap(bz: BaZhaiAnalysis) -> some View {
+        // Same south-at-top orientation as the Xuan Kong chart. Center is not a ninth star.
+        let order: [Int?] = [3, 7, 1, 2, nil, 5, 6, 0, 4]
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(lang.t("bz_map_title"))
+                .adaptiveFont(size: 14, weight: .bold)
+                .foregroundColor(.white)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(order.indices, id: \.self) { position in
+                    if let id = order[position], let item = bz.items.first(where: { $0.id == id }) {
+                        houseMapButton(item: item, isFacing: item.guaName == bz.gateDirection)
+                    } else {
+                        VStack(spacing: 5) {
+                            Image(systemName: "house.fill").foregroundColor(Color.yanGold)
+                            Text(bz.localizedHouseGua)
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 105)
+                        .background(Color.white.opacity(0.03))
+                        .cornerRadius(10)
+                    }
+                }
+            }
+        }
+    }
+
+    private func houseMapButton(item: BaZhaiPalaceItem, isFacing: Bool) -> some View {
+        let use = item.star.suggestedHouseUse
+        let selected = selectedGuaName == item.guaName || (selectedGuaName == nil && isFacing)
+        let color = houseUseColor(use)
+        return Button(action: {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { selectedGuaName = item.guaName }
+        }) {
+            VStack(spacing: 5) {
+                Text(item.localizedDirection)
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .foregroundColor(.white)
+                Image(systemName: use.symbol)
+                    .font(.system(size: 20))
+                    .foregroundColor(color)
+                    .accessibilityHidden(true)
+                Text(lang.t(use.titleKey))
+                    .adaptiveFont(size: 10, weight: .semibold)
+                    .foregroundColor(color)
+                if isFacing {
+                    Text(lang.t("bz_facing_side"))
+                        .adaptiveFont(size: 9)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 105)
+            .background(color.opacity(selected ? 0.18 : 0.06))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? color : Color.white.opacity(0.08), lineWidth: selected ? 2 : 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.localizedDirection + ", " + lang.t(use.titleKey))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func houseDirectionAdvice(item: BaZhaiPalaceItem, sittingPalace: String) -> some View {
+        let use = item.star.suggestedHouseUse
+        let taskID = "bazhai-\(sittingPalace)-\(item.guaName)"
+        let saved = retention.remedyTasks.contains(where: { $0.id == taskID })
+        return VStack(alignment: .leading, spacing: 14) {
+            Label(item.localizedDirection, systemImage: use.symbol)
+                .adaptiveFont(size: 18, weight: .bold)
+                .foregroundColor(houseUseColor(use))
+            Text(lang.t(use.titleKey))
+                .adaptiveFont(size: 15, weight: .semibold)
+                .foregroundColor(.white)
+            Label(lang.t("bz_do_now"), systemImage: "checkmark.circle.fill")
+                .adaptiveFont(size: 12, weight: .bold)
+                .foregroundColor(.green)
+            Text(lang.t(use.actionKey))
+                .adaptiveFont(size: 13)
+                .foregroundColor(.white.opacity(0.9))
+            Text(lang.t(use.avoidKey))
+                .adaptiveFont(size: 12)
+                .foregroundColor(.white.opacity(0.65))
+
+            Button(action: {
+                retention.toggleRemedyTask(id: taskID, palaceDirection: item.localizedDirection,
+                                           title: lang.t(use.titleKey), remedyAction: lang.t(use.actionKey))
+            }) {
+                Label(lang.t(saved ? "bz_task_saved" : "bz_task_add"), systemImage: saved ? "checkmark.circle.fill" : "plus.circle")
+                    .adaptiveFont(size: 12, weight: .semibold)
+                    .foregroundColor(saved ? .green : Color.yanCyan)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+
+            DisclosureGroup {
+                Text(item.star.localizedName + "\n\n" + item.star.localizedSuggestion)
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(.white.opacity(0.7))
+                    .padding(.top, 8)
+            } label: {
+                Text(lang.t("bz_traditional_basis"))
+                    .adaptiveFont(size: 12)
+                    .foregroundColor(Color.yanCyan)
+            }
+            .accentColor(Color.yanCyan)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(houseUseColor(use).opacity(0.08))
+        .cornerRadius(12)
+    }
+
     // MARK: - 三合与杨公八煞黄泉消砂内容
     private func sanHeContent(shItems: [SanHeWaterItem], state: CompassHeadingState) -> some View {
         let hq = SanHeWaterEngine.shared.resolveHuangQuanWater(facing: state.facingMountain)
@@ -672,6 +549,199 @@ public struct BaZhaiView: View {
         .padding(.horizontal, 16)
     }
 
+    private func remedyDayCycleBadge(days: Int) -> String {
+        switch lang.effectiveLanguage {
+        case .en: return "Day \(days)/21"
+        case .zhHant, .ja: return "第\(days)/21天"
+        case .ko: return "\(days)/21일차"
+        case .vi: return "Ngày \(days)/21"
+        case .th: return "วันที่ \(days)/21"
+        case .id: return "Hari \(days)/21"
+        case .auto, .zhHans: return "第\(days)/21天"
+        }
+    }
+
+    // MARK: - 21天气场调理与化煞催旺打卡清单
+    private func remedyTrackerCard() -> some View {
+        let title: String
+        switch lang.effectiveLanguage {
+        case .en: title = "My Fengshui Remedy & Activation Tracker (\(retention.remedyTasks.count))"
+        case .zhHant: title = "我家化煞催旺調理打卡清單（\(retention.remedyTasks.count)項 · 換月複盤）"
+        case .ja: title = "我が家の風水対策・催旺チェックリスト（\(retention.remedyTasks.count)件）"
+        case .ko: title = "우리집 풍수 비보·최왕 실천 체크리스트 (\(retention.remedyTasks.count)건)"
+        case .vi: title = "Danh Sách Hóa Sát & Kích Tài Lộc Gia Đình (\(retention.remedyTasks.count))"
+        case .th: title = "รายการปรับฮวงจุ้ยและเสริมมงคลประจำบ้าน (\(retention.remedyTasks.count))"
+        case .id: title = "Daftar Pelacak Solusi Fengshui Rumah (\(retention.remedyTasks.count))"
+        case .auto, .zhHans: title = "我家化煞催旺调理打卡清单（\(retention.remedyTasks.count)项 · 换月复盘）"
+        }
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "checklist.checked")
+                    .foregroundColor(.green)
+                Text(title)
+                    .adaptiveFont(size: 12, weight: .bold)
+                    .foregroundColor(.green)
+                Spacer()
+            }
+
+            ForEach(retention.remedyTasks) { task in
+                let elapsedDays = max(1, min(21, (UserKuaProfileManager.gregorianCalendar().dateComponents([.day], from: task.createdAt, to: Date()).day ?? 0) + 1))
+                HStack(alignment: .top, spacing: 8) {
+                    Button(action: {
+                        retention.toggleRemedyCompletion(id: task.id)
+                    }) {
+                        Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
+                            .foregroundColor(task.isCompleted ? .green : .white.opacity(0.6))
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("\(task.palaceDirection) · \(task.title)")
+                                .adaptiveFont(size: 11, weight: .bold)
+                                .foregroundColor(task.isCompleted ? .white.opacity(0.5) : .white)
+                                .strikethrough(task.isCompleted)
+                            Text(remedyDayCycleBadge(days: elapsedDays))
+                                .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.18))
+                                .foregroundColor(.green)
+                                .cornerRadius(4)
+                        }
+                        Text(task.remedyAction)
+                            .adaptiveFont(size: 10)
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: {
+                        retention.removeRemedyTask(id: task.id)
+                    }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.45))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(7)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(Color(red: 0.11, green: 0.13, blue: 0.12))
+        .cornerRadius(12)
+        .padding(.horizontal, 16)
+    }
+
+
+}
+
+// MARK: - 理气页公共工具入口，打开时冻结住宅上下文
+struct AnalysisToolRequest: Identifiable {
+    enum Tool { case owner, dates }
+    let id = UUID()
+    let tool: Tool
+    let context: CompassHeadingState
+}
+
+/// All owner-gua entry points use the same live StoreKit entitlement gate.
+struct OwnerGuaVIPGate<Content: View>: View {
+    @ObservedObject private var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
+    @State private var showPaywall = false
+    private let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) { self.content = content }
+
+    var body: some View {
+        Group {
+            if iap.hasUnlockedVIP { content() }
+            else {
+                VIPLockCardView(title: lang.t("bz_tool_owner"), featureDesc: lang.t("bz_owner_vip_desc"),
+                                badge: lang.t("vip_badge_title"), targetProductId: .vipYearly,
+                                onUnlockTap: { showPaywall = true })
+                    .padding(16)
+            }
+        }
+        .sheet(isPresented: $showPaywall) { VIPPaywallSheet(defaultProductId: .vipYearly) }
+    }
+}
+
+// MARK: - 独立能力：宅主与家属命卦
+public struct OwnerLifeGuaView: View {
+    private let context: CompassHeadingState
+    @ObservedObject private var lang = LocalizationManager.shared
+    @ObservedObject private var kua = UserKuaProfileManager.shared
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var showFamilySection = true
+    @State private var activeSheet: Sheet?
+    private enum Sheet: String, Identifiable {
+        case editOwnerKua, addFamilyMember
+        var id: String { rawValue }
+    }
+
+    public init(context: CompassHeadingState) { self.context = context }
+
+    public var body: some View {
+        NavigationView {
+            ScrollView {
+                OwnerGuaVIPGate {
+                VStack(alignment: .leading, spacing: 14) {
+                    DisclosureGroup(lang.t("analysis_usage")) {
+                        Text(lang.t("bz_owner_intro"))
+                    }
+                        .adaptiveFont(size: 12)
+                        .foregroundColor(.white.opacity(0.75))
+                        .padding(.horizontal, 16)
+                    Toggle(lang.t("bz_owner_enable"), isOn: $kua.isProfileEnabled)
+                        .adaptiveFont(size: 13)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                    if kua.isProfileEnabled {
+                        Text(lang.t("bz_tool_context") + " · " + context.sittingMountain.localizedName + lang.t("mountain_suffix"))
+                            .adaptiveFont(size: 11)
+                            .foregroundColor(Color.yanCyan)
+                            .padding(.horizontal, 16)
+                        ownerKuaCard(sittingPalace: context.sittingMountain.palace)
+                    }
+                }
+                .padding(.vertical, 16)
+                }
+            }
+            .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
+            .navigationTitle(lang.t("bz_tool_owner"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+                Button(lang.t("done")) { presentationMode.wrappedValue.dismiss() }
+            } }
+            .sheet(item: $activeSheet) { sheet in
+                OwnerGuaVIPGate {
+                switch sheet {
+                case .editOwnerKua:
+                    EditOwnerKuaDialog(isPresented: Binding(get: { activeSheet == .editOwnerKua },
+                                                           set: { if !$0 { activeSheet = nil } }),
+                                       sittingPalace: context.sittingMountain.palace,
+                                       onSaved: { activeSheet = nil })
+                case .addFamilyMember:
+                    AddFamilyMemberDialog(isPresented: Binding(get: { activeSheet == .addFamilyMember },
+                                                               set: { if !$0 { activeSheet = nil } }),
+                                          ownerBirthYear: kua.birthYear, ownerIsMale: kua.isMale,
+                                          onConfirm: { role, name, birthDate, year, male in
+                        kua.addFamilyMember(role: role, customName: name, birthDate: birthDate, birthYear: year, isMale: male)
+                        showFamilySection = true
+                        activeSheet = nil
+                    })
+                }
+                }
+            }
+        }
+        .navigationViewStyle(.stack)
+        .preferredColorScheme(.dark)
+    }
+
     // MARK: - P1.1 宅主命卦画像与「人宅合一」配对卡
     private func ownerKuaCard(sittingPalace: String) -> some View {
         let compat = kua.evaluateCompatibility(sittingPalace: sittingPalace)
@@ -775,7 +845,6 @@ public struct BaZhaiView: View {
                 // 性别切换
                 Button(action: {
                     kua.isMale.toggle()
-                    refreshAnalysis()
                 }) {
                     Text(kua.isMale ? maleLabel : femaleLabel)
                         .adaptiveFont(size: 11, weight: .bold)
@@ -980,7 +1049,7 @@ public struct BaZhaiView: View {
                                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 Spacer()
                                 Menu {
-                                    ForEach((1930...2026).reversed(), id: \.self) { yr in
+                                    ForEach((1900...UserKuaProfileManager.gregorianCalendar().component(.year, from: Date())).reversed(), id: \.self) { yr in
                                         Button(action: {
                                             kua.updateFamilyMember(id: member.id, birthYear: yr)
                                         }) {
@@ -1053,105 +1122,166 @@ public struct BaZhaiView: View {
         }
     }
 
-    private func remedyButtonLabel(isSaved: Bool) -> String {
-        switch lang.effectiveLanguage {
-        case .en: return isSaved ? "Tracked" : "+ Track"
-        case .zhHant: return isSaved ? "已入清單" : "+ 調理打卡"
-        case .ja: return isSaved ? "登録済" : "+ 対策記録"
-        case .ko: return isSaved ? "등록됨" : "+ 조리체크"
-        case .vi: return isSaved ? "Đã lưu" : "+ Theo dõi"
-        case .th: return isSaved ? "บันทึกแล้ว" : "+ ติดตาม"
-        case .id: return isSaved ? "Tersimpan" : "+ Lacak"
-        case .auto, .zhHans: return isSaved ? "已入清单" : "+ 调理打卡"
+}
+
+// MARK: - 独立能力：天星择日
+public struct CelestialDateSelectionView: View {
+    private let context: CompassHeadingState
+    @ObservedObject private var lang = LocalizationManager.shared
+    @ObservedObject private var kua = UserKuaProfileManager.shared
+    @ObservedObject private var retention = RetentionServiceManager.shared
+    @Environment(\.presentationMode) private var presentationMode
+    @State private var selectedDate = Date()
+    @State private var isUsingCustomDate = false
+    @State private var showUpcomingDays = false
+    @State private var showShichenTable = true
+    @State private var selectedZeRiCategory: ZeRiEngine.ZeRiActivityCategory = .all
+    @State private var cachedZeRi: ZeRiAnalysis?
+    @State private var activeSheet: Sheet?
+    @State private var isVisible = false
+    private enum Sheet: String, Identifiable {
+        case dailySign
+        var id: String { rawValue }
+    }
+    private static let clockRefreshTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    private var effectiveDate: Date { isUsingCustomDate ? selectedDate : Date() }
+
+    public init(context: CompassHeadingState) { self.context = context }
+
+    public var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    DisclosureGroup(lang.t("analysis_usage")) {
+                        Text(lang.t("bz_date_intro"))
+                    }
+                        .adaptiveFont(size: 12)
+                        .foregroundColor(.white.opacity(0.75))
+                        .padding(.horizontal, 16)
+                    Text(lang.t("bz_tool_context") + " · " + context.sittingMountain.localizedName + lang.t("mountain_suffix"))
+                        .adaptiveFont(size: 11)
+                        .foregroundColor(Color.yanCyan)
+                        .padding(.horizontal, 16)
+                    dateAssessmentCard(zeri: cachedZeRi ?? ZeRiEngine.shared.analyze(sitting: context.sittingMountain, date: effectiveDate))
+                }
+                .padding(.vertical, 16)
+            }
+            .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
+            .navigationTitle(lang.t("bz_tool_dates"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+                Button(lang.t("done")) { presentationMode.wrappedValue.dismiss() }
+            } }
+            .sheet(item: $activeSheet) { _ in
+                DailyAuspiciousCardSheet(targetDate: effectiveDate, headingState: context)
+            }
+            .onAppear { isVisible = true; refreshAnalysis() }
+            .onDisappear { isVisible = false }
+            .onChange(of: lang.effectiveLanguage) { _ in refreshAnalysis() }
+            .onReceive(Self.clockRefreshTimer) { _ in if isVisible { refreshAnalysis() } }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+                if isVisible { refreshAnalysis() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                if isVisible { refreshAnalysis() }
+            }
+            .overlay {
+                if retention.showNotificationPermissionDeniedAlert {
+                    FloorplanConfirmDialog(title: notificationPermissionDeniedTitle(), message: notificationPermissionDeniedMessage(),
+                                           confirmTitle: goToSettingsTitle(), cancelTitle: lang.t("cancel"), confirmColor: Color.yanCyan,
+                                           onConfirm: { retention.showNotificationPermissionDeniedAlert = false; retention.openSystemNotificationSettings() },
+                                           onCancel: { retention.showNotificationPermissionDeniedAlert = false })
+                }
+            }
         }
+        .navigationViewStyle(.stack)
+        .preferredColorScheme(.dark)
     }
 
-    private func remedyDayCycleBadge(days: Int) -> String {
-        switch lang.effectiveLanguage {
-        case .en: return "Day \(days)/21"
-        case .zhHant, .ja: return "第\(days)/21天"
-        case .ko: return "\(days)/21일차"
-        case .vi: return "Ngày \(days)/21"
-        case .th: return "วันที่ \(days)/21"
-        case .id: return "Hari \(days)/21"
-        case .auto, .zhHans: return "第\(days)/21天"
-        }
+    private func refreshAnalysis() {
+        cachedZeRi = ZeRiEngine.shared.analyze(sitting: context.sittingMountain, date: effectiveDate)
     }
 
-    // MARK: - 21天气场调理与化煞催旺打卡清单
-    private func remedyTrackerCard() -> some View {
-        let title: String
-        switch lang.effectiveLanguage {
-        case .en: title = "My Fengshui Remedy & Activation Tracker (\(retention.remedyTasks.count))"
-        case .zhHant: title = "我家化煞催旺調理打卡清單（\(retention.remedyTasks.count)項 · 換月複盤）"
-        case .ja: title = "我が家の風水対策・催旺チェックリスト（\(retention.remedyTasks.count)件）"
-        case .ko: title = "우리집 풍수 비보·최왕 실천 체크리스트 (\(retention.remedyTasks.count)건)"
-        case .vi: title = "Danh Sách Hóa Sát & Kích Tài Lộc Gia Đình (\(retention.remedyTasks.count))"
-        case .th: title = "รายการปรับฮวงจุ้ยและเสริมมงคลประจำบ้าน (\(retention.remedyTasks.count))"
-        case .id: title = "Daftar Pelacak Solusi Fengshui Rumah (\(retention.remedyTasks.count))"
-        case .auto, .zhHans: title = "我家化煞催旺调理打卡清单（\(retention.remedyTasks.count)项 · 换月复盘）"
-        }
-
-        return VStack(alignment: .leading, spacing: 8) {
+    private func dateAssessmentCard(zeri: ZeRiAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: "checklist.checked")
-                    .foregroundColor(.green)
-                Text(title)
-                    .adaptiveFont(size: 12, weight: .bold)
-                    .foregroundColor(.green)
+                HStack(spacing: 5) {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+                    Text(lang.t("zeri_title"))
+                        .adaptiveFont(size: 14, weight: .bold)
+                        .foregroundColor(.white)
+                }
+                Spacer()
+                Text(zeri.overallStatus)
+                    .adaptiveFont(size: 11, weight: .bold)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(zeri.isAuspicious ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
+                    .foregroundColor(zeri.isAuspicious ? Color.green : Color.red)
+                    .cornerRadius(4)
+            }
+
+            // P0.3 日期/时辰穿越拨盘
+            zeRiDateControlBar()
+
+            Text("\(lang.t("current_four_pillars"))：\(zeri.fourPillarsText)")
+                .adaptiveFont(size: 12, weight: .semibold, design: .serif)
+                .foregroundColor(Color.yanCyan)
+
+            Text(zeri.detailsText)
+                .adaptiveFont(size: 12)
+                .foregroundColor(.white.opacity(0.85))
+                .lineSpacing(2)
+
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Text(lang.t("auspicious_fit"))
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundColor(.green)
+                        .cornerRadius(3)
+                    Text(zeri.yiActivities.joined(separator: " · "))
+                        .adaptiveFont(size: 11)
+                        .foregroundColor(.white.opacity(0.8))
+                }
                 Spacer()
             }
 
-            ForEach(retention.remedyTasks) { task in
-                let elapsedDays = max(1, min(21, (UserKuaProfileManager.gregorianCalendar().dateComponents([.day], from: task.createdAt, to: Date()).day ?? 0) + 1))
-                HStack(alignment: .top, spacing: 8) {
-                    Button(action: {
-                        retention.toggleRemedyCompletion(id: task.id)
-                    }) {
-                        Image(systemName: task.isCompleted ? "checkmark.square.fill" : "square")
-                            .foregroundColor(task.isCompleted ? .green : .white.opacity(0.6))
-                            .font(.system(size: 14))
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Text("\(task.palaceDirection) · \(task.title)")
-                                .adaptiveFont(size: 11, weight: .bold)
-                                .foregroundColor(task.isCompleted ? .white.opacity(0.5) : .white)
-                                .strikethrough(task.isCompleted)
-                            Text(remedyDayCycleBadge(days: elapsedDays))
-                                .adaptiveFont(size: 9, weight: .bold, design: .monospaced)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Color.green.opacity(0.18))
-                                .foregroundColor(.green)
-                                .cornerRadius(4)
-                        }
-                        Text(task.remedyAction)
-                            .adaptiveFont(size: 10)
-                            .foregroundColor(.white.opacity(0.75))
-                            .lineLimit(2)
-                    }
-                    Spacer(minLength: 0)
-                    Button(action: {
-                        retention.removeRemedyTask(id: task.id)
-                    }) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.45))
-                    }
-                    .buttonStyle(PlainButtonStyle())
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Text(lang.t("inauspicious_avoid"))
+                        .adaptiveFont(size: 10, weight: .bold)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 1)
+                        .background(Color.red.opacity(0.2))
+                        .foregroundColor(.red)
+                        .cornerRadius(3)
+                    Text(zeri.jiActivities.joined(separator: " · "))
+                        .adaptiveFont(size: 11)
+                        .foregroundColor(.white.opacity(0.8))
                 }
-                .padding(7)
-                .background(Color.white.opacity(0.04))
-                .cornerRadius(6)
+                Spacer()
             }
+
+            Divider().background(Color.white.opacity(0.1))
+
+            // 当日十二时辰黄黑道吉凶表
+            shichenTableSection()
+
+            Divider().background(Color.white.opacity(0.1))
+
+            // 未来 30 天黄道吉日一键筛选与提醒 (P0.3 & P1.3)
+            upcomingAuspiciousDaysSection(state: context)
         }
         .padding(12)
-        .background(Color(red: 0.11, green: 0.13, blue: 0.12))
+        .background(Color(red: 0.12, green: 0.12, blue: 0.16))
         .cornerRadius(12)
         .padding(.horizontal, 16)
     }
+
 
     // MARK: - P0.3 择日日期与时辰穿越拨盘
     private func zeRiDateControlBar() -> some View {
@@ -1178,7 +1308,8 @@ public struct BaZhaiView: View {
             prevLabel = "前一日"; nextLabel = "后一日"; nowLabel = "回到今日"; signBtn = "生成吉签"
         }
 
-        return HStack(spacing: 6) {
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
             Button(action: {
                 let base = isUsingCustomDate ? selectedDate : Date()
                 selectedDate = UserKuaProfileManager.gregorianCalendar().date(byAdding: .day, value: -1, to: base) ?? base
@@ -1194,14 +1325,7 @@ public struct BaZhaiView: View {
                     .cornerRadius(5)
             }
 
-            DatePicker(
-                "",
-                selection: $selectedDate,
-                displayedComponents: [.date, .hourAndMinute]
-            )
-            .labelsHidden()
-            .colorScheme(.dark)
-            .scaleEffect(0.88)
+
 
             Button(action: {
                 let base = isUsingCustomDate ? selectedDate : Date()
@@ -1251,6 +1375,19 @@ public struct BaZhaiView: View {
                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                 .cornerRadius(5)
             }
+            }
+            DatePicker(
+                "",
+                selection: Binding(get: { effectiveDate }, set: { date in
+                    selectedDate = date
+                    isUsingCustomDate = true
+                    refreshAnalysis()
+                }),
+                displayedComponents: [.date, .hourAndMinute]
+            )
+            .labelsHidden()
+            .colorScheme(.dark)
+            .datePickerStyle(.compact)
         }
     }
 
@@ -1487,8 +1624,8 @@ public struct BaZhaiView: View {
                 }
 
                 let upcoming = ZeRiEngine.shared.findUpcomingAuspiciousDays(
-                    sitting: state.sittingMountain,
-                    from: Date(),
+                    sitting: context.sittingMountain,
+                    from: max(Date(), effectiveDate),
                     days: 30,
                     ownerBirthYear: kua.isProfileEnabled ? kua.birthYear : nil,
                     category: selectedZeRiCategory,
@@ -1599,8 +1736,7 @@ public struct BaZhaiView: View {
         case .id: return "Buka Pengaturan"
         case .auto, .zhHans: return "前往设置"
         }
-    }
-}
+    }}
 
 // MARK: - 添加家庭成员弹窗 (AddFamilyMemberDialog)
 

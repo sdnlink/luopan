@@ -211,6 +211,7 @@ public final class ShaSurveyStore: ObservableObject {
     @Published public private(set) var records: [ExteriorShaRecord] = []
     /// 最近一次室内体检（RoomPlan/LiDAR/户型图路径）
     @Published public private(set) var latestInterior: HouseSpatialSurvey?
+    @Published public private(set) var siteFacts: [XuanKongSiteFact] = []
 
     private let storageKey = "tianji.sha_survey_store.v1"
     private let defaults: UserDefaults
@@ -221,15 +222,17 @@ public final class ShaSurveyStore: ObservableObject {
               let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         records = snapshot.records
         latestInterior = snapshot.latestInterior
+        siteFacts = snapshot.siteFacts ?? []
     }
 
     private struct Snapshot: Codable {
         let records: [ExteriorShaRecord]
         let latestInterior: HouseSpatialSurvey?
+        var siteFacts: [XuanKongSiteFact]? = nil
     }
 
     private func persist() {
-        let snapshot = Snapshot(records: records, latestInterior: latestInterior)
+        let snapshot = Snapshot(records: records, latestInterior: latestInterior, siteFacts: siteFacts)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(data, forKey: storageKey)
     }
@@ -238,6 +241,7 @@ public final class ShaSurveyStore: ObservableObject {
     /// Updating one slot in isolation would retain another property's model.
     @discardableResult
     public func replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
+                                siteFacts: [XuanKongSiteFact] = [],
                                 expectedPropertyID: UUID? = nil) -> Bool {
         if let expectedPropertyID, !isCurrentProperty(expectedPropertyID) { return false }
         if expectedPropertyID == nil { propertyID = UUID() }
@@ -245,8 +249,17 @@ public final class ShaSurveyStore: ObservableObject {
         defaults.set(virtual.flatMap { try? JSONEncoder().encode($0) }, forKey: SpatialSurveyArchiveKeys.virtual)
         records = exterior
         latestInterior = measured ?? virtual
+        self.siteFacts = siteFacts.filter { (0...8).contains($0.palaceID) }
         persist()
         return true
+    }
+
+    public func setSiteFact(_ kind: XuanKongSiteFactKind, palaceID: Int, present: Bool, propertyID: UUID) {
+        guard isCurrentProperty(propertyID), (0...8).contains(palaceID) else { return }
+        let fact = XuanKongSiteFact(palaceID: palaceID, kind: kind)
+        siteFacts.removeAll { $0.id == fact.id }
+        if present { siteFacts.append(fact) }
+        persist()
     }
 
     public func isCurrentProperty(_ id: UUID) -> Bool { propertyID == id }

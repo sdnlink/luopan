@@ -548,9 +548,9 @@ public struct RootContentView: View {
     private let motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var selectedTab: Int
-    /// 理气页的子 Tab（0 玄空九星 / 1 八宅三合日课 / 2 紫白 / 3 奇门）。
-    /// 由根视图持有，小组件深链可把日课子页一并定位。
+    /// 保留旧子页索引用于链接兼容；菜单导航使用独立功能请求。
     @State private var analysisSubTab: Int = 0
+    @State private var analysisFeatureRequest: AnalysisFeatureRequest?
     @State private var showOnboarding: Bool = false
     @State private var showShortcutDailyCard: Bool = false
     // 读取 size class 建立环境依赖：折叠/展开（或 iPad 分屏拖动）切换时本视图
@@ -691,7 +691,7 @@ public struct RootContentView: View {
             
             // Tab 4: 玄空理气与三式绝学 (玄空飞星、八宅三合、流年紫白、时家奇门、天机长卷)
             XuanKongGridView(isActive: selectedTab == 3,
-                             selectedSubTab: $analysisSubTab)
+                             selectedSubTab: $analysisSubTab, featureRequest: $analysisFeatureRequest)
                 .tabItem {
                     Image(systemName: "square.grid.3x3.fill")
                     Text(lang.t("tab_analysis"))
@@ -787,16 +787,20 @@ public struct RootContentView: View {
     }
 
     /// 消费小组件深链与主屏快捷入口的待处理意图（幂等）。
-    /// Tab 3 = 理气页，子 Tab 1 = 八宅三合里的天星择日日课卡。
+    /// Tab 3 = 理气菜单；旧黄历请求直接打开独立天星择日工具。
     private func consumePendingAlmanacRoute() {
         if AppNavigationRouter.shared.consumeAlmanac() {
             selectedTab = 3
             analysisSubTab = 1
+            analysisFeatureRequest = AnalysisFeatureRequest(feature: .dates)
         }
         if let route = AppNavigationRouter.shared.consumeTabRoute() {
             selectedTab = route.tab
             if let sub = route.subTab {
                 analysisSubTab = sub
+            }
+            if route.tab == 3, let feature = route.feature ?? route.subTab.flatMap(AnalysisFeature.fromLegacySubTab) {
+                analysisFeatureRequest = AnalysisFeatureRequest(feature: feature)
             }
             if route.openDailyCard {
                 showOnboarding = false

@@ -39,6 +39,7 @@ struct FloorplanCaseRecord: Codable, Identifiable {
     var spatialSurvey: HouseSpatialSurvey? = nil
     var virtualSpatialSurvey: HouseSpatialSurvey? = nil
     var exteriorRecords: [ExteriorShaRecord]? = nil
+    var siteFacts: [XuanKongSiteFact]? = nil
     // Included only in portable JSON backups, never in the defaults archive.
     var backupImageData: Data? = nil
 }
@@ -654,6 +655,10 @@ public struct FloorplanView: View {
         .onReceive(UserKuaProfileManager.shared.objectWillChange.receive(on: DispatchQueue.main)) { _ in
             refreshAudit(force: true)
         }
+        .onChange(of: iap.hasUnlockedVIP) { _ in
+            FloorplanAuditStore.shared.clear()
+            refreshAudit(force: true)
+        }
         .onChange(of: effectiveHeading) { _ in
             refreshAudit()
         }
@@ -872,9 +877,10 @@ public struct FloorplanView: View {
         }
     }
 
-    private func replaceSpatialArchives(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord]) {
+    private func replaceSpatialArchives(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: [ExteriorShaRecord],
+                                        siteFacts: [XuanKongSiteFact] = []) {
         reportExportGeneration &+= 1
-        ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior)
+        ShaSurveyStore.shared.replaceProperty(measured: measured, virtual: virtual, exterior: exterior, siteFacts: siteFacts)
         workspacePropertyID = ShaSurveyStore.shared.propertyID
         persistedSpatialSurvey = measured
         persistedVirtualSpatialSurvey = virtual
@@ -1000,7 +1006,8 @@ public struct FloorplanView: View {
             imageFileName: imgFileName,
             spatialSurvey: persistedSpatialSurvey,
             virtualSpatialSurvey: persistedVirtualSpatialSurvey,
-            exteriorRecords: ShaSurveyStore.shared.records
+            exteriorRecords: ShaSurveyStore.shared.records,
+            siteFacts: ShaSurveyStore.shared.siteFacts
         )
         do { try caseStore.insert(record) }
         catch { caseBackupToastMessage = lang.t("save_failed"); return }
@@ -1062,7 +1069,8 @@ public struct FloorplanView: View {
         replaceSpatialArchives(
             measured: legacyIsVirtual ? nil : record.spatialSurvey,
             virtual: record.virtualSpatialSurvey ?? (legacyIsVirtual ? record.spatialSurvey : nil),
-            exterior: record.exteriorRecords ?? []
+            exterior: record.exteriorRecords ?? [],
+            siteFacts: record.siteFacts ?? []
         )
 
         persistLayout()
@@ -1364,7 +1372,8 @@ public struct FloorplanView: View {
         let ausp = audit.report.filter { $0.isGood }.count
         let warn = audit.report.filter { $0.isWarning }.count
         let sev  = audit.report.filter { $0.isSevere }.count
-        let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (compat.isMatchedWithHouse ? 8 : -4)
+        let personalAccess = UserKuaProfileManager.shared.canUsePersonalAnalysis
+        let rawScore = 82 + ausp * 4 - warn * 5 - sev * 11 + (personalAccess ? (compat.isMatchedWithHouse ? 8 : -4) : 0)
         let clampedScore = max(38, min(99, rawScore))
         let sitLabel = "\(sitMtn.localizedName)\(lang.t("mountain_suffix"))\(faceMtn.localizedName)\(lang.t("facing_suffix"))"
         return PropertyPKMetric(
@@ -1373,7 +1382,7 @@ public struct FloorplanView: View {
             sittingText: sitLabel,
             score: clampedScore,
             isKuaMatch: compat.isMatchedWithHouse,
-            kuaBadge: compat.matchBadgeTitle,
+            kuaBadge: personalAccess ? compat.matchBadgeTitle : "",
             auspiciousCount: ausp,
             shaCount: warn + sev,
             isCurrent: isCurrent
@@ -1474,9 +1483,11 @@ public struct FloorplanView: View {
                             Text(m.sittingText)
                                 .adaptiveFont(size: 10)
                                 .foregroundColor(.white.opacity(0.7))
-                            Text(m.kuaBadge)
-                                .adaptiveFont(size: 9, weight: .semibold)
-                                .foregroundColor(m.isKuaMatch ? .green : .orange)
+                            if !m.kuaBadge.isEmpty {
+                                Text(m.kuaBadge)
+                                    .adaptiveFont(size: 9, weight: .semibold)
+                                    .foregroundColor(m.isKuaMatch ? .green : .orange)
+                            }
                             Text(pkCountSummaryText(auspicious: m.auspiciousCount, sha: m.shaCount))
                                 .adaptiveFont(size: 9, design: .monospaced)
                                 .foregroundColor(.white.opacity(0.65))
@@ -3300,7 +3311,8 @@ public struct FloorplanView: View {
             solarCaption = "\(solarInfo.localizedDayPillar) \(solarInfo.trueSolarTimeString)"
         } else { solarCaption = lang.t("location_unavailable") }
         let kuaMatch = UserKuaProfileManager.shared.evaluateCompatibility(sittingPalace: state.sittingMountain.palace)
-        let kuaSuffix = " · \(kuaMatch.localizedOwnerGuaName) (\(kuaMatch.matchBadgeTitle))"
+        let kuaSuffix = UserKuaProfileManager.shared.canUsePersonalAnalysis
+            ? " · \(kuaMatch.localizedOwnerGuaName) (\(kuaMatch.matchBadgeTitle))" : ""
         let reportMainTitle: String
         let reportSubHeadline: String
         switch lang.effectiveLanguage {

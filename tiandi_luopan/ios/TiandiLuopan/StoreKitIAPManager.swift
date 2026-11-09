@@ -116,6 +116,50 @@ public enum IAPProductID: String, CaseIterable, Equatable {
     }
 }
 
+/// A purchase disclosure is usable only when the App Store supplies a complete
+/// title, storefront price and billing period. Product names never imply cadence.
+struct SubscriptionPurchaseTerms: Equatable {
+    enum Unit: CaseIterable, Equatable {
+        case day, week, month, year
+
+        func formatKey(value: Int) -> String {
+            switch (self, value == 1) {
+            case (.day, true): return "subscription_period_day_one"
+            case (.day, false): return "subscription_period_day_many"
+            case (.week, true): return "subscription_period_week_one"
+            case (.week, false): return "subscription_period_week_many"
+            case (.month, true): return "subscription_period_month_one"
+            case (.month, false): return "subscription_period_month_many"
+            case (.year, true): return "subscription_period_year_one"
+            case (.year, false): return "subscription_period_year_many"
+            }
+        }
+    }
+
+    let title: String
+    let displayPrice: String
+    let periodValue: Int
+    let periodUnit: Unit
+
+    init?(title: String, displayPrice: String, periodValue: Int, periodUnit: Unit) {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let price = displayPrice.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty, !price.isEmpty, periodValue > 0 else { return nil }
+        self.title = title
+        self.displayPrice = price
+        self.periodValue = periodValue
+        self.periodUnit = periodUnit
+    }
+
+    var localizedPeriod: String {
+        String(format: LocalizationManager.shared.t(periodUnit.formatKey(value: periodValue)), periodValue)
+    }
+
+    var localizedPricePerPeriod: String {
+        String(format: LocalizationManager.shared.t("subscription_price_per_period"), displayPrice, localizedPeriod)
+    }
+}
+
 /// Product identifiers used by released builds.  Product IDs are immutable in
 /// App Store Connect, so an app update must continue to recognize identifiers
 /// from older builds while presenting the current canonical IDs to StoreKit.
@@ -885,6 +929,12 @@ public class StoreKitIAPManager: ObservableObject {
             return
         }
 
+        guard let productID = IAPProductID(rawValue: id), canPurchaseProduct(for: productID) else {
+            failPurchase(id: id, message: LocalizationManager.shared.t("iap_err_product_unavailable"))
+            fetchProducts()
+            return
+        }
+
         isProcessingPurchase = true
         Task {
             do {
@@ -1101,6 +1151,31 @@ public class StoreKitIAPManager: ObservableObject {
 
     public func hasProduct(for productID: IAPProductID) -> Bool {
         availableProducts[productID.rawValue] != nil
+    }
+
+    func subscriptionPurchaseTerms(for productID: IAPProductID) -> SubscriptionPurchaseTerms? {
+        guard let product = availableProducts[productID.rawValue], product.type == .autoRenewable,
+              let period = product.subscription?.subscriptionPeriod else { return nil }
+        let unit: SubscriptionPurchaseTerms.Unit
+        switch period.unit {
+        case .day: unit = .day
+        case .week: unit = .week
+        case .month: unit = .month
+        case .year: unit = .year
+        @unknown default: return nil
+        }
+        return SubscriptionPurchaseTerms(title: product.displayName, displayPrice: product.displayPrice,
+                                         periodValue: period.value, periodUnit: unit)
+    }
+
+    func canPurchaseProduct(for productID: IAPProductID) -> Bool {
+        guard let product = availableProducts[productID.rawValue],
+              !product.displayPrice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        return productID != .vipYearly || subscriptionPurchaseTerms(for: productID) != nil
+    }
+
+    func localizedBillingPrice(for productID: IAPProductID) -> String {
+        subscriptionPurchaseTerms(for: productID)?.localizedPricePerPeriod ?? localizedPrice(for: productID)
     }
 
     public func localizedPrice(for productID: IAPProductID) -> String {

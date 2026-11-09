@@ -205,6 +205,74 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertTrue(mirror.purchasedProductIDs.isEmpty)
     }
 
+    func testIncompleteSubscriptionDisclosuresCannotBeUsedForPurchasing() {
+        XCTAssertNil(SubscriptionPurchaseTerms(title: " ", displayPrice: "$19.99", periodValue: 1, periodUnit: .year))
+        XCTAssertNil(SubscriptionPurchaseTerms(title: "Annual VIP", displayPrice: "\n", periodValue: 1, periodUnit: .year))
+        XCTAssertNil(SubscriptionPurchaseTerms(title: "Annual VIP", displayPrice: "$19.99", periodValue: 0, periodUnit: .year))
+        XCTAssertNil(SubscriptionPurchaseTerms(title: "Annual VIP", displayPrice: "$19.99", periodValue: -1, periodUnit: .month))
+    }
+
+    @MainActor
+    func testSubscriptionDisclosureUsesTheActualStorefrontPriceAndBillingPeriod() throws {
+        let lang = LocalizationManager.shared
+        let oldLanguage = lang.effectiveLanguage
+        defer { lang.effectiveLanguage = oldLanguage }
+        lang.effectiveLanguage = .en
+        let annual = try XCTUnwrap(SubscriptionPurchaseTerms(title: "StoreKit Subscription Name", displayPrice: "€29,99",
+                                                           periodValue: 1, periodUnit: .year))
+        XCTAssertEqual(annual.title, "StoreKit Subscription Name")
+        XCTAssertEqual(annual.localizedPeriod, "1 year")
+        XCTAssertEqual(annual.localizedPricePerPeriod, "€29,99 / 1 year")
+        let quarterly = try XCTUnwrap(SubscriptionPurchaseTerms(title: "VIP", displayPrice: "฿399.00",
+                                                              periodValue: 3, periodUnit: .month))
+        XCTAssertEqual(quarterly.localizedPeriod, "3 months")
+        XCTAssertEqual(quarterly.localizedPricePerPeriod, "฿399.00 / 3 months")
+    }
+
+    @MainActor
+    func testSubscriptionDisclosurePeriodsAreLocalizedWithoutLosingValuesOrCurrency() throws {
+        let lang = LocalizationManager.shared
+        let oldLanguage = lang.effectiveLanguage
+        defer { lang.effectiveLanguage = oldLanguage }
+        for language in AppLanguage.allCases where language != .auto {
+            lang.effectiveLanguage = language
+            for unit in SubscriptionPurchaseTerms.Unit.allCases {
+                for value in [1, 3] {
+                    let terms = try XCTUnwrap(SubscriptionPurchaseTerms(title: "VIP", displayPrice: "NT$990",
+                                                                      periodValue: value, periodUnit: unit))
+                    XCTAssertTrue(terms.localizedPeriod.contains(String(value)), "\(language) \(unit)")
+                    XCTAssertFalse(terms.localizedPeriod.contains("subscription_period_"))
+                    XCTAssertTrue(terms.localizedPricePerPeriod.contains("NT$990"))
+                    XCTAssertTrue(terms.localizedPricePerPeriod.contains(terms.localizedPeriod))
+                    XCTAssertFalse(terms.localizedPricePerPeriod.contains("%@"))
+                }
+            }
+        }
+    }
+
+    @MainActor
+    func testSubscriptionDisclosureUsesSingularAndPluralPeriods() throws {
+        let lang = LocalizationManager.shared
+        let oldLanguage = lang.effectiveLanguage
+        defer { lang.effectiveLanguage = oldLanguage }
+        lang.effectiveLanguage = .en
+        let expected: [(SubscriptionPurchaseTerms.Unit, String)] = [(.day, "day"), (.week, "week"), (.month, "month"), (.year, "year")]
+        for (unit, name) in expected {
+            let one = try XCTUnwrap(SubscriptionPurchaseTerms(title: "VIP", displayPrice: "$9.99", periodValue: 1, periodUnit: unit))
+            let many = try XCTUnwrap(SubscriptionPurchaseTerms(title: "VIP", displayPrice: "$9.99", periodValue: 2, periodUnit: unit))
+            XCTAssertEqual(one.localizedPeriod, "1 " + name)
+            XCTAssertEqual(many.localizedPeriod, "2 " + name + "s")
+        }
+    }
+
+    func testPurchaseEulaLinkTargetsTheLicenseDocumentInsteadOfTheSupportPage() {
+        XCTAssertEqual(LegalLinks.termsOfUse.scheme, "https")
+        XCTAssertEqual(LegalLinks.termsOfUse.host, "yulintao.github.io")
+        XCTAssertEqual(LegalLinks.termsOfUse.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "tiandiluopan-subscription")
+        XCTAssertEqual(LegalLinks.privacyPolicy.scheme, "https")
+        XCTAssertEqual(LegalLinks.privacyPolicy.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "tiandiluopan-privacy")
+    }
+
     func testReopeningJanuaryBirthdayNeverSubtractsAnotherYear() {
         let original = instant("1990-01-10T04:00:00Z")
         var savedDate = original

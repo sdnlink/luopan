@@ -5,11 +5,10 @@ import Foundation
 /// Keep these URLs stable so the links shown in Settings and the paywall
 /// always point at the currently published legal pages.
 public enum LegalLinks {
-    // Escape the slashes so the repository's lightweight Swift checker does
-    // not mistake the URL for a source comment.
-    public static let termsOfUse = URL(string: "https://yulintao.github.io/tiandiluopan-support/")!
+    /// This page contains the service terms, subscription terms and full EULA.
+    public static let termsOfUse = URL(string: "https://yulintao.github.io/tiandiluopan-subscription/")!
     public static let privacyPolicy = URL(string: "https://yulintao.github.io/tiandiluopan-privacy/")!
-    public static let subscriptionInfo = URL(string: "https://yulintao.github.io/tiandiluopan-subscription/")!
+    public static let subscriptionInfo = termsOfUse
     /// 正式上架后分配的 App Store 数字 ID（配置后点击评分直接直达 App Store 撰写长评页面）
     public static let appStoreID: String = ""
 }
@@ -557,7 +556,6 @@ public struct SettingsView: View {
 
 public struct MasterVIPPageView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.openURL) private var openURL
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject var lang = LocalizationManager.shared
     @Binding var selectedProductId: String
@@ -572,7 +570,7 @@ public struct MasterVIPPageView: View {
 
     private var selectedProductIsAvailable: Bool {
         guard let product = IAPProductID(rawValue: selectedProductId) else { return false }
-        return iap.hasProduct(for: product)
+        return iap.canPurchaseProduct(for: product)
     }
 
     public var body: some View {
@@ -607,9 +605,9 @@ public struct MasterVIPPageView: View {
 
                     if !iap.isLoadingProducts,
                        let selectedProduct = IAPProductID(rawValue: selectedProductId),
-                       !iap.hasProduct(for: selectedProduct) {
+                       !iap.canPurchaseProduct(for: selectedProduct) {
                         HStack(spacing: 8) {
-                            Text(lang.t("price_unavailable"))
+                            Text(lang.t(selectedProduct == .vipYearly ? "subscription_details_unavailable" : "price_unavailable"))
                                 .adaptiveFont(size: 10)
                                 .foregroundColor(.orange.opacity(0.9))
                             Spacer()
@@ -619,6 +617,11 @@ public struct MasterVIPPageView: View {
                             .adaptiveFont(size: 11, weight: .semibold)
                             .foregroundColor(.yanCyan)
                         }
+                    }
+
+                    if let selectedProduct = IAPProductID(rawValue: selectedProductId) {
+                        PurchaseDisclosureView(productID: selectedProduct)
+                            .padding(.vertical, 8)
                     }
 
                     // 购买与恢复按钮
@@ -644,6 +647,7 @@ public struct MasterVIPPageView: View {
                             .foregroundColor(.black)
                             .cornerRadius(8)
                         }
+                        .buttonStyle(.plain)
                         .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !selectedProductIsAvailable)
                     }
 
@@ -658,6 +662,7 @@ public struct MasterVIPPageView: View {
                             Spacer()
                         }
                     }
+                    .buttonStyle(.plain)
                     .disabled(iap.isProcessingPurchase)
                     .padding(.top, 2)
                 }
@@ -672,24 +677,6 @@ public struct MasterVIPPageView: View {
                 privilegeRow(icon: "scroll.fill", title: lang.t("privilege_tianji_title"))
                 privilegeRow(icon: "camera.viewfinder", title: lang.t("ar_title"))
             }
-
-            // 3. 自动续费服务声明链接
-            Section {
-                Button {
-                    openURL(LegalLinks.subscriptionInfo)
-                } label: {
-                    HStack {
-                        Label(lang.t("subscription_info_button"), systemImage: "safari")
-                            .foregroundColor(Color.yanCyan)
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .adaptiveFont(size: 11)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-                .adaptiveFont(size: 12, weight: .semibold)
-            }
         }
         .listStyle(InsetGroupedListStyle())
         .frame(maxWidth: horizontalSizeClass == .regular ? 900 : 700)
@@ -697,6 +684,7 @@ public struct MasterVIPPageView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationBarTitle(lang.t("settings_menu_vip"), displayMode: .inline)
         .preferredColorScheme(.dark)
+        .onAppear { iap.refreshProductsIfNeeded() }
     }
 
     private func productRow(id: IAPProductID, tag: String) -> some View {
@@ -705,14 +693,13 @@ public struct MasterVIPPageView: View {
         return Button(action: {
             selectedProductId = id.rawValue
         }) {
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(id.title)
                             .adaptiveFont(size: 13, weight: .bold)
                             .foregroundColor(isSelected ? Color(red: 0.95, green: 0.85, blue: 0.45) : .white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(tag)
                             .adaptiveFont(size: 9, weight: .bold)
                             .padding(.horizontal, 5)
@@ -726,16 +713,14 @@ public struct MasterVIPPageView: View {
                     Text(id.desc)
                         .adaptiveFont(size: 11)
                         .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
-                Text(iap.localizedPrice(for: id))
+                Text(iap.localizedBillingPrice(for: id))
                     .adaptiveFont(size: 15, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(isSelected ? Color(red: 0.22, green: 0.19, blue: 0.12) : Color(red: 0.12, green: 0.13, blue: 0.17))
             .cornerRadius(8)

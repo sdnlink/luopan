@@ -61,7 +61,7 @@ public struct VIPLockCardView: View {
                 Button(action: onUnlockTap) {
                     HStack(spacing: 6) {
                         Image(systemName: "crown.fill")
-                        Text("\(purchaseActionTitle) (\(iap.localizedPrice(for: targetProductId)))")
+                        Text("\(purchaseActionTitle) (\(iap.localizedBillingPrice(for: targetProductId)))")
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .adaptiveFont(size: 12, weight: .bold)
@@ -118,11 +118,71 @@ public struct VIPLockCardView: View {
     }
 }
 
+/// Shared by both direct purchase entry points. Keep the full billing details
+/// and legal links immediately above the purchase action on every screen size.
+struct PurchaseDisclosureView: View {
+    let productID: IAPProductID
+    @ObservedObject private var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
+
+    init(productID: IAPProductID) { self.productID = productID }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(iap.subscriptionPurchaseTerms(for: productID)?.title ?? productID.title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+            if productID == .vipYearly {
+                if let terms = iap.subscriptionPurchaseTerms(for: productID) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(lang.t("subscription_billing_price"))
+                            .font(.system(size: 12)).foregroundColor(.white.opacity(0.8))
+                        Text(terms.localizedPricePerPeriod)
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundColor(Color.yanGold)
+                        Text(lang.t("subscription_billing_period") + ": " + terms.localizedPeriod)
+                            .font(.system(size: 13)).foregroundColor(.white)
+                    }
+                    .accessibilityIdentifier("purchase.subscription.billing")
+                } else {
+                    Text(iap.isLoadingProducts ? lang.t("price_loading") : lang.t("subscription_details_unavailable"))
+                        .font(.system(size: 13)).foregroundColor(.orange)
+                }
+                Text(lang.t("vip_legal_agreement"))
+                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.8))
+            } else {
+                Text(iap.localizedPrice(for: productID))
+                    .font(.system(size: 19, weight: .bold)).foregroundColor(Color.yanGold)
+                Text(lang.t("purchase_one_time_notice"))
+                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.8))
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                Link(destination: LegalLinks.termsOfUse) {
+                    Label(lang.t("legal_terms_button"), systemImage: "doc.text")
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("purchase.terms")
+                Link(destination: LegalLinks.privacyPolicy) {
+                    Label(lang.t("legal_privacy_button"), systemImage: "hand.raised")
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("purchase.privacy")
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(Color.yanCyan)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 // MARK: - 全功能专业版 VIP 收银台弹窗 (VIP Paywall Sheet)
 
 public struct VIPPaywallSheet: View {
     private let annualOnly: Bool
-    @Environment(\.openURL) private var openURL
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
@@ -227,9 +287,9 @@ public struct VIPPaywallSheet: View {
                         }
                         .padding(.horizontal, 16)
 
-                        if !iap.isLoadingProducts && !iap.hasProduct(for: selectedIAPProduct) {
+                        if !iap.isLoadingProducts && !iap.canPurchaseProduct(for: selectedIAPProduct) {
                             HStack(spacing: 8) {
-                                Text(LocalizationManager.shared.t("price_unavailable"))
+                                Text(lang.t(selectedIAPProduct == .vipYearly ? "subscription_details_unavailable" : "price_unavailable"))
                                     .adaptiveFont(size: 10)
                                     .foregroundColor(.orange.opacity(0.9))
                                 Spacer()
@@ -242,6 +302,12 @@ public struct VIPPaywallSheet: View {
                             .padding(.horizontal, 16)
                         }
                         
+                        PurchaseDisclosureView(productID: selectedIAPProduct)
+                            .padding(12)
+                            .background(Color.white.opacity(0.04))
+                            .cornerRadius(10)
+                            .padding(.horizontal, 16)
+
                         // 4. 购买与恢复操作按键
                         VStack(spacing: 10) {
                             Button(action: {
@@ -254,9 +320,8 @@ public struct VIPPaywallSheet: View {
                                             .progressViewStyle(CircularProgressViewStyle(tint: .black))
                                             .padding(.trailing, 4)
                                     }
-                                    Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(selectedIsSingleProduct ? LocalizationManager.shared.t("pay_securely") : LocalizationManager.shared.t("unlock_vip_now")) (\(getSelectedProductTitle()))")
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.7)
+                                    Text(isPurchasing ? LocalizationManager.shared.t("vip_connecting_store") : "\(selectedIsSingleProduct ? LocalizationManager.shared.t("pay_securely") : LocalizationManager.shared.t("unlock_vip_now")) (\(iap.localizedBillingPrice(for: selectedIAPProduct)))")
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
                                 .adaptiveFont(size: 14, weight: .bold)
                                 .frame(maxWidth: .infinity)
@@ -271,7 +336,7 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(.black)
                                 .cornerRadius(10)
                             }
-                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !iap.hasProduct(for: selectedIAPProduct))
+                            .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !iap.canPurchaseProduct(for: selectedIAPProduct))
                             
                             Button(action: {
                                 iap.restorePurchases()
@@ -284,40 +349,12 @@ public struct VIPPaywallSheet: View {
                         }
                         .padding(.horizontal, 16)
                         
-                        // 5. 自动续期与苹果服务说明
+                        // 5. 使用范围说明
                         VStack(spacing: 4) {
-                            Text(LocalizationManager.shared.t("vip_legal_agreement"))
-                                .adaptiveFont(size: 10)
-                                .foregroundColor(.white.opacity(0.45))
-                                .multilineTextAlignment(.center)
                             Text(LocalizationManager.shared.t("settings_safety_disclaimer"))
                                 .adaptiveFont(size: 10)
                                 .foregroundColor(.orange.opacity(0.75))
                                 .multilineTextAlignment(.center)
-
-                            HStack(spacing: 18) {
-                                Button {
-                                    openURL(LegalLinks.termsOfUse)
-                                } label: {
-                                    Label(LocalizationManager.shared.t("legal_terms_button"), systemImage: "safari")
-                                }
-                                .buttonStyle(.plain)
-                                Button {
-                                    openURL(LegalLinks.privacyPolicy)
-                                } label: {
-                                    Label(LocalizationManager.shared.t("legal_privacy_button"), systemImage: "safari")
-                                }
-                                .buttonStyle(.plain)
-                                Button {
-                                    openURL(LegalLinks.subscriptionInfo)
-                                } label: {
-                                    Label(LocalizationManager.shared.t("subscription_info_button"), systemImage: "safari")
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .adaptiveFont(size: 10, weight: .semibold)
-                            .foregroundColor(.yanCyan)
-                            .multilineTextAlignment(.center)
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
@@ -396,13 +433,6 @@ public struct VIPPaywallSheet: View {
         )
     }
     
-    private func getSelectedProductTitle() -> String {
-        guard let id = IAPProductID(rawValue: selectedProductId) else {
-            return LocalizationManager.shared.t("vip_badge_title")
-        }
-        return "\(id.title) (\(iap.localizedPrice(for: id)))"
-    }
-
     private var selectedIAPProduct: IAPProductID {
         IAPProductID(rawValue: selectedProductId) ?? .vipYearly
     }
@@ -435,14 +465,13 @@ public struct VIPPaywallSheet: View {
         Button(action: {
             selectedProductId = id.rawValue
         }) {
-            HStack {
+            VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(id.title)
                             .adaptiveFont(size: 13, weight: .bold)
                             .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(tag)
                             .adaptiveFont(size: 9, weight: .bold)
                             .padding(.horizontal, 4)
@@ -456,18 +485,15 @@ public struct VIPPaywallSheet: View {
                     Text(id.desc)
                         .adaptiveFont(size: 10)
                         .foregroundColor(.white.opacity(0.6))
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
-                Spacer()
-                
-                Text(iap.localizedPrice(for: id))
+                Text(iap.localizedBillingPrice(for: id))
                     .adaptiveFont(size: 15, weight: .bold, design: .monospaced)
                     .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
             .background(isSelected ? Color(red: 0.83, green: 0.68, blue: 0.21).opacity(0.15) : Color.white.opacity(0.04))
             .cornerRadius(8)

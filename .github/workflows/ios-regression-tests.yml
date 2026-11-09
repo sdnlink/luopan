@@ -21,8 +21,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Check app and widget source dependencies
-        run: python3 tiandi_luopan/tools/check_swift_target_dependencies.py
+      - name: Check Xcode project structure and target dependencies
+        run: |
+          python3 -m unittest discover -s tiandi_luopan/tools -p 'test_check_swift_target_dependencies.py'
+          python3 tiandi_luopan/tools/check_swift_target_dependencies.py
       - name: Run tests on an available iPhone simulator
         id: regression_tests
         timeout-minutes: 30

@@ -62,8 +62,10 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Check app and widget source dependencies
-        run: python3 tools/check_swift_target_dependencies.py
+      - name: Check Xcode project structure and target dependencies
+        run: |
+          python3 -m unittest discover -s tools -p 'test_check_swift_target_dependencies.py'
+          python3 tools/check_swift_target_dependencies.py
 
       # --------------------------------------------------
       # 2. 选择 Xcode 并检查构建环境

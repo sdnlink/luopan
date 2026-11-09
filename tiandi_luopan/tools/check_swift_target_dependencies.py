@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Catch references to repository types omitted from an Xcode source phase.
+"""Validate Xcode object references and local type availability in source phases.
 
-This checks local type availability, not Swift semantics or framework imports.
+This checks project structure, not Swift semantics or framework imports.
 Run xcodebuild as well: lexical checks cannot replace compiling each target.
 """
 from pathlib import Path
@@ -16,7 +16,53 @@ PROJECT = IOS / "TiandiLuopan.xcodeproj" / "project.pbxproj"
 ROOTS = [IOS / "TiandiLuopan", IOS / "TiandiLuopanWidget"]
 
 
+def validate_project_structure(project):
+    # Check before constructing dictionaries: a duplicate object key otherwise
+    # silently replaces a localized resource with a newly registered Swift file.
+    definitions = list(re.finditer(
+        r'^\s*(\w+)\s*(?:/\*[^\n]*?\*/\s*)?=\s*\{\s*isa\s*=\s*(\w+);', project, re.M))
+    objects = {}
+    errors = []
+    for definition in definitions:
+        object_id, kind = definition.groups()
+        if object_id in objects:
+            errors.append("Duplicate Xcode object ID {} ({}, {})".format(object_id, objects[object_id], kind))
+        else:
+            objects[object_id] = kind
+
+    parents = {}
+    for index, definition in enumerate(definitions):
+        object_id, kind = definition.groups()
+        end = definitions[index + 1].start() if index + 1 < len(definitions) else len(project)
+        body = project[definition.end():end]
+        if kind in {"PBXGroup", "PBXVariantGroup"}:
+            children = re.search(r'\bchildren\s*=\s*\((.*?)\);', body, re.S)
+            if not children:
+                errors.append("{} {} has no children list".format(kind, object_id))
+                continue
+            entries = re.sub(r'/\*.*?\*/', '', children.group(1), flags=re.S)
+            for child in (entry.strip() for entry in entries.split(',')):
+                if not child:
+                    continue
+                if child not in objects:
+                    errors.append("Group {} references missing child {}".format(object_id, child))
+                if child in parents:
+                    errors.append("Xcode object {} is a child of multiple groups: {} and {}".format(
+                        child, parents[child], object_id))
+                else:
+                    parents[child] = object_id
+        elif kind == "PBXBuildFile":
+            file_ref = re.search(r'\bfileRef\s*=\s*(\w+)', body)
+            if file_ref and file_ref.group(1) not in objects:
+                errors.append("Build file {} references missing file {}".format(object_id, file_ref.group(1)))
+    if not definitions:
+        errors.append("No Xcode object definitions found")
+    if errors:
+        raise ValueError("\n".join(errors))
+
+
 def source_phases(project):
+    validate_project_structure(project)
     references = dict(re.findall(
         r'(\w+) /\* .*? \*/ = \{isa = PBXFileReference;[^\n]*?path = "?([^";]+)"?;', project))
     build_files = dict(re.findall(

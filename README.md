@@ -4,7 +4,7 @@
 
 | 目录 | 内容 |
 | --- | --- |
-| [website/](website/) | sdnlink.cn 官网、隐私政策、订阅协议及支持页面的唯一源码目录 |
+| [website/](website/) | sdnlink.cn 官网及八语言独立页面的唯一源码目录 |
 | [docs/](docs/) | 代码审查、功能设计和发布记录 |
 | [tools/](tools/) | 官网检查及发布打包工具 |
 | [tiandi_luopan/](tiandi_luopan/) | Android、iOS 应用及对应工具，详见其 README |
@@ -20,6 +20,7 @@ python3 -m http.server 8000 --directory website
 
 ```sh
 python3 tools/package_website.py --check
+python3 -m unittest discover -s tools -p 'test_package_website.py'
 python3 tools/package_website.py
 ```
 

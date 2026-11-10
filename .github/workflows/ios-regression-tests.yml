@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Xcode project structure and target dependencies
         run: |
+          python3 -m unittest discover -s tools -p 'test_package_website.py'
           python3 -m unittest discover -s tiandi_luopan/tools -p 'test_check_swift_target_dependencies.py'
           python3 tiandi_luopan/tools/check_swift_target_dependencies.py
       - name: Run tests on an available iPhone simulator

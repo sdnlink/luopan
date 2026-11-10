@@ -19,3 +19,6 @@ project.private.config.json
 
 # 临时脚本与导出文件（工作辅助，不应入库）
 .tmp_scripts/
+
+# 官网生成的发布包
+/dist/

@@ -105,7 +105,7 @@ class ProjectStructureTests(unittest.TestCase):
 
         root = Path(__file__).resolve().parents[2]
         for name in ["privacy.html", "subscription-terms.html", "support.html"]:
-            content = (root / "docs" / name).read_text()
+            content = (root / "website" / name).read_text()
             parser = Sections()
             parser.feed(content)
             self.assertEqual(set(parser.ids), {"zh-CN", "zh-TW", "en", "ja", "ko", "th", "vi", "id"})

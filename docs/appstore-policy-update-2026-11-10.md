@@ -13,9 +13,9 @@
 
 仓库内修改网页不会自动更新官网服务器，也不会修改 App Store Connect。以下内容需要随版本发布：
 
-1. 将 `docs/subscription-terms.html` 发布到应用 EULA 地址：
+1. 将 `website/subscription-terms.html` 发布到应用 EULA 地址：
    `https://sdnlink.cn/subscription-terms.html`。
-2. 将 `docs/privacy.html` 发布到应用隐私地址：
+2. 将 `website/privacy.html` 发布到应用隐私地址：
    `https://sdnlink.cn/privacy.html`。
 3. 应用购买入口按用户指定统一使用 sdnlink.cn。历史 GitHub Pages 协议网址不再作为新版本入口；旧版本仍可能访问这些地址，可在有对应仓库权限时另行同步。
 4. 在 App Store Connect 的所有已启用本地化描述中保留可用 EULA 链接，隐私政策字段使用更新后的公开地址。当前应用链接指向自定义 EULA，License Agreement 应与该协议内容一致。
@@ -63,6 +63,10 @@ App 备案名称为“天机演象”，备案号为“京ICP备2024080356号-2A
 
 ## 服务支持页面与手动发布
 
-用户确认手动发布官网。新增 `docs/support.html`，正式地址为 `https://sdnlink.cn/support.html`。页面提供八语言的联系入口、购买恢复、会员区别、单次额度、订阅取消与 Apple 退款入口、资料删除和测量复核说明。应用“关于”及官网导航均链接到该支持页。
+用户确认手动发布官网。新增 `website/support.html`，正式地址为 `https://sdnlink.cn/support.html`。页面提供八语言的联系入口、购买恢复、会员区别、单次额度、订阅取消与 Apple 退款入口、资料删除和测量复核说明。应用“关于”及官网导航均链接到该支持页。
 
 本次发布文件为 `index.html`、`appstore-marketing.html`、`privacy.html`、`subscription-terms.html`、`support.html` 及 `assets/` 图标。发布后，App Store Connect 的隐私政策字段使用 `https://sdnlink.cn/privacy.html`，所有本地化描述或自定义 EULA 使用 `https://sdnlink.cn/subscription-terms.html`，服务支持网址使用 `https://sdnlink.cn/support.html`。文件包中的发布说明与 SHA-256 清单可用于核对。
+
+## 官网文件归档
+
+官网源码统一到 `website/`：五个 HTML、`assets/` 中不同尺寸的 PNG 和根路径 `favicon.ico`。根目录首页改为兼容跳转，`docs/` 只保存开发记录；历史多份相同图标、重复首页及内嵌 favicon 已清理。统一打包入口为 `python3 tools/package_website.py`，产物位于 `dist/sdnlink-website.zip`。发布压缩包内容到服务器站点根目录，三个 App Store 链接路径保持不变。

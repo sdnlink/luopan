@@ -312,14 +312,15 @@ public struct VIPPaywallSheet: View {
                         }
                         .padding(.horizontal, 16)
 
-                        if !iap.isLoadingProducts && !iap.canPurchaseProduct(for: selectedIAPProduct) {
+                        if !iap.isLoadingProducts,
+                           let reason = iap.purchaseUnavailableMessageKey(for: selectedIAPProduct) {
                             HStack(spacing: 8) {
-                                Text(lang.t(selectedIAPProduct == .vipYearly ? "subscription_details_unavailable" : "price_unavailable"))
+                                Text(lang.t(reason))
                                     .adaptiveFont(size: 10)
                                     .foregroundColor(.orange.opacity(0.9))
                                 Spacer()
-                                Button(LocalizationManager.shared.t("reload_prices")) {
-                                    iap.refreshProductsIfNeeded(force: true)
+                                Button(lang.t(reason == "iap_storage_unavailable" ? "iap_retry_purchase" : "reload_prices")) {
+                                    iap.retryPurchaseAvailability()
                                 }
                                 .adaptiveFont(size: 11, weight: .semibold)
                                 .foregroundColor(.yanCyan)

@@ -915,17 +915,17 @@
                     <div class="preview-item">
                         <span class="preview-icon">🏛️</span>
                         <div class="preview-label">3D VR 仿真推演</div>
-                        <div class="preview-sub">户型图 2D 智能转化为 3D 半透明晶体空间，毫米级定向包围盒（OBB）推演。</div>
+                        <div class="preview-sub">依据已标注户型和输入尺寸生成 3D 模型，展示房间比例与方位；结果需现场复核。</div>
                     </div>
                     <div class="preview-item">
                         <span class="preview-icon">🧭</span>
-                        <div class="preview-label">专业双轴高精罗盘</div>
+                        <div class="preview-label">双轴姿态与方位罗盘</div>
                         <div class="preview-sub">沈氏玄空飞星、大游年八宅、时家奇门排盘，国际地磁 WMM 模型离线真北校正。</div>
                     </div>
                     <div class="preview-item">
                         <span class="preview-icon">📐</span>
-                        <div class="preview-label">工业级 CAD / 长卷导出</div>
-                        <div class="preview-sub">AutoCAD ASCII DXF 矢量工程图与朱丝栏古典宣纸超高清长卷一键生成。</div>
+                        <div class="preview-label">DXF 图纸 / 长卷导出</div>
+                        <div class="preview-sub">将当前测绘记录导出为 ASCII DXF 文件，或生成传统文化参考长卷。</div>
                     </div>
                 </div>
             </div>
@@ -936,7 +936,7 @@
             <div class="section-header">
                 <span class="section-tag">Core Capabilities</span>
                 <h2 class="section-title">全链路空间智能与数字化研判</h2>
-                <p class="section-desc">从现场硬件实测到虚拟户型推演，提供完整、精准、符合工程与传统双重标准的数字化工具体系。</p>
+                <p class="section-desc">支持现场空间记录、户型几何建模和传统文化参考分析。测量与识别结果可能受设备和环境影响，不能替代专业测绘或工程验收。</p>
             </div>
 
             <div class="feature-grid">
@@ -949,9 +949,9 @@
                         利用 iPhone / iPad Pro 的光学镜头与 LiDAR 深度传感器，实时构建室内 3D 墙体几何外壳与地坪网格，捕捉开间、进深与梁高，自动侦测穿堂煞、对门煞、横梁压顶等形煞。
                     </p>
                     <ul class="feature-points">
-                        <li>支持 Apple RoomPlan 官方高精室内语义提取</li>
+                        <li>使用 Apple RoomPlan 识别房间结构，结果可人工核对</li>
                         <li>多边形几何质心自动太极立极点解算</li>
-                        <li>端侧离线高精度计算，全景形煞诊断完全开放</li>
+                        <li>设备端处理，全景形煞候选标注免费开放</li>
                     </ul>
                 </div>
 
@@ -965,7 +965,7 @@
                     </p>
                     <ul class="feature-points">
                         <li>房屋主轴定向包围盒（OBB）自适应旋转</li>
-                        <li>中宫受污与火烧天门毫米级立体碰撞检测</li>
+                        <li>依据模型位置检查传统文化规则中的空间关系，供人工复核</li>
                         <li>年度/终身会员独享完整推演与 3D 查看器</li>
                     </ul>
                 </div>
@@ -992,13 +992,13 @@
             <div class="tech-box">
                 <div class="tech-content">
                     <h3>端侧原生安全与硬核工程实现</h3>
-                    <p>北京长线科技坚守“用户至上、隐私第一”的工程哲学。系统全链路采用苹果 iOS 原生底层架构开发，杜绝第三方插件与广告追踪，确保您的商业测绘与户型数据绝对私密安全。</p>
+                    <p>北京长线科技有限公司使用 iOS 原生框架在设备端处理测绘和分析，不接入广告或第三方统计 SDK。数据保存、Apple 同步与备份、主动导出和删除方式详见隐私政策。</p>
                     <ul class="tech-list">
                         <li class="tech-list-item">
                             <div class="tech-item-dot"></div>
                             <div class="tech-item-text">
                                 <strong>纯苹果原生底层开发 (Swift / SwiftUI / SceneKit)</strong>
-                                <span>零第三方统计与跨平台桥接损耗，极致流畅渲染与低功耗表现。</span>
+                                <span>界面与空间展示使用原生框架；性能和耗电情况取决于设备、场景及使用方式。</span>
                             </div>
                         </li>
                         <li class="tech-list-item">
@@ -1012,7 +1012,7 @@
                             <div class="tech-item-dot"></div>
                             <div class="tech-item-text">
                                 <strong>AutoCAD Release 12/2000 矢量兼容</strong>
-                                <span>测绘成果可直出标准 ASCII DXF 格式，完美导入 AutoCAD、Revit、SketchUp 协同作业。</span>
+                                <span>可导出 ASCII DXF 格式，便于在支持该格式的软件中复核和编辑；导入效果以目标软件支持情况为准。</span>
                             </div>
                         </li>
                     </ul>
@@ -1036,7 +1036,7 @@
                     </div>
                     <div class="spec-item">
                         <span class="spec-k">安全合规属性</span>
-                        <span class="spec-v">零三方 SDK · 本地沙盒加密持久化</span>
+                        <span class="spec-v">无广告或第三方统计 SDK · 本机保存与完整性校验</span>
                     </div>
                 </div>
             </div>
@@ -1072,7 +1072,7 @@
                 <a href="#architecture">技术架构</a>
                 <a href="privacy.html">隐私保护政策</a>
                 <a href="subscription-terms.html">用户服务协议</a> · <a href="subscription-terms.html">订阅说明</a>
-                <a href="mailto:support@sdnlink.cn">技术支持与合作</a>
+                <a href="support.html">服务支持与合作</a>
                 <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">工业和信息化部政务服务平台</a>
             </div>
 

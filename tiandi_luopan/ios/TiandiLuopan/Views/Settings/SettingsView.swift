@@ -6,8 +6,9 @@ import Foundation
 /// always point at the currently published legal pages.
 public enum LegalLinks {
     /// This page contains the service terms, subscription terms and full EULA.
-    public static let termsOfUse = URL(string: "https://yulintao.github.io/tiandiluopan-subscription/")!
-    public static let privacyPolicy = URL(string: "https://yulintao.github.io/tiandiluopan-privacy/")!
+    public static let termsOfUse = URL(string: "https://sdnlink.cn/subscription-terms.html")!
+    public static let privacyPolicy = URL(string: "https://sdnlink.cn/privacy.html")!
+    public static let support = URL(string: "https://sdnlink.cn/support.html")!
     public static let subscriptionInfo = termsOfUse
     public static let registeredAppName = "天机演象"
     public static let appFilingNumber = "京ICP备2024080356号-2A"
@@ -613,14 +614,14 @@ public struct MasterVIPPageView: View {
 
                     if !iap.isLoadingProducts,
                        let selectedProduct = IAPProductID(rawValue: selectedProductId),
-                       !iap.canPurchaseProduct(for: selectedProduct) {
+                       let reason = iap.purchaseUnavailableMessageKey(for: selectedProduct) {
                         HStack(spacing: 8) {
-                            Text(lang.t(selectedProduct == .vipYearly ? "subscription_details_unavailable" : "price_unavailable"))
+                            Text(lang.t(reason))
                                 .adaptiveFont(size: 10)
                                 .foregroundColor(.orange.opacity(0.9))
                             Spacer()
-                            Button(lang.t("reload_prices")) {
-                                iap.refreshProductsIfNeeded(force: true)
+                            Button(lang.t(reason == "iap_storage_unavailable" ? "iap_retry_purchase" : "reload_prices")) {
+                                iap.retryPurchaseAvailability()
                             }
                             .adaptiveFont(size: 11, weight: .semibold)
                             .foregroundColor(.yanCyan)
@@ -1276,6 +1277,11 @@ public struct AboutPageView: View {
 
             // 4. 法律条款与合规自律
             Section(header: Text(legalSectionTitle)) {
+                Link(destination: LegalLinks.support) {
+                    Label(lang.t("legal_support_button"), systemImage: "questionmark.circle")
+                }
+                .foregroundColor(Color.yanCyan)
+
                 HStack(spacing: 16) {
                     Button {
                         openURL(LegalLinks.termsOfUse)

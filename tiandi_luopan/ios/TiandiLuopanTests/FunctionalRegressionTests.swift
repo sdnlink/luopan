@@ -347,10 +347,14 @@ final class FunctionalRegressionTests: XCTestCase {
 
     func testPurchaseEulaLinkTargetsTheLicenseDocumentInsteadOfTheSupportPage() {
         XCTAssertEqual(LegalLinks.termsOfUse.scheme, "https")
-        XCTAssertEqual(LegalLinks.termsOfUse.host, "yulintao.github.io")
-        XCTAssertEqual(LegalLinks.termsOfUse.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "tiandiluopan-subscription")
+        XCTAssertEqual(LegalLinks.termsOfUse.host, "sdnlink.cn")
+        XCTAssertEqual(LegalLinks.termsOfUse.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "subscription-terms.html")
         XCTAssertEqual(LegalLinks.privacyPolicy.scheme, "https")
-        XCTAssertEqual(LegalLinks.privacyPolicy.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "tiandiluopan-privacy")
+        XCTAssertEqual(LegalLinks.privacyPolicy.host, "sdnlink.cn")
+        XCTAssertEqual(LegalLinks.privacyPolicy.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "privacy.html")
+        XCTAssertEqual(LegalLinks.support.scheme, "https")
+        XCTAssertEqual(LegalLinks.support.host, "sdnlink.cn")
+        XCTAssertEqual(LegalLinks.support.path, "/support.html")
     }
 
     func testReopeningJanuaryBirthdayNeverSubtractsAnotherYear() {
@@ -541,6 +545,49 @@ final class FunctionalRegressionTests: XCTestCase {
             return Data()
         })
         XCTAssertThrowsError(try store.key(createIfMissing: false))
+    }
+
+    func testConsumablePreflightRejectsUnreadableLedgerBeforePaymentCanStart() {
+        for product in [IAPProductID.floorplanSingle, .tianjiSingle] {
+            var paymentStarted = false
+            do {
+                try PurchasePreflight.verify(productID: product) {
+                    throw IAPLedgerStorageError.invalidMirror
+                }
+                paymentStarted = true
+            } catch {}
+            XCTAssertFalse(paymentStarted, product.rawValue)
+        }
+    }
+
+    func testConsumablePreflightCannotChargeBeforeItsNewKeyHasBeenStored() {
+        let keys = IAPSealKeyStore(read: { _ in nil }, write: { _, _ in
+            throw IAPLedgerStorageError.keychain(errSecNotAvailable)
+        }, makeMigratable: { _ in }, generate: { Data(repeating: 19, count: 32) })
+        for product in [IAPProductID.floorplanSingle, .tianjiSingle] {
+            XCTAssertThrowsError(try PurchasePreflight.verify(productID: product) { _ = try keys.key() })
+        }
+    }
+
+    func testConsumablePreflightAllowsRetryAfterTemporaryKeychainFailure() throws {
+        var locked = true
+        let original = Data(repeating: 23, count: 32)
+        let keys = IAPSealKeyStore(read: { _ in
+            if locked { throw IAPLedgerStorageError.keychain(errSecInteractionNotAllowed) }
+            return original
+        }, makeMigratable: { _ in })
+        XCTAssertThrowsError(try PurchasePreflight.verify(productID: .floorplanSingle) { _ = try keys.key() })
+        locked = false
+        XCTAssertNoThrow(try PurchasePreflight.verify(productID: .floorplanSingle) { _ = try keys.key() })
+    }
+
+    func testMembershipPreflightDoesNotDependOnTheConsumableLedger() throws {
+        for product in [IAPProductID.vipYearly, .proLifetime] {
+            XCTAssertNoThrow(try PurchasePreflight.verify(productID: product) {
+                XCTFail("Apple-backed membership access must not require a consumable ledger")
+                throw IAPLedgerStorageError.invalidMirror
+            })
+        }
     }
 
     func testRecoveredLedgerKeepsItsBalanceWhenVerifiedMembershipIsMerged() {

@@ -235,6 +235,20 @@ public enum IAPProductID: String, CaseIterable, Equatable {
     var includesAllFeatures: Bool { self == .vipYearly || self == .proLifetime }
 }
 
+/// Consumables must have a readable ledger and a durable signing key before
+/// opening Apple's payment sheet. Membership restoration does not depend on
+/// the consumable ledger and remains available when an old backup is damaged.
+enum PurchasePreflight {
+    static func verify(productID: IAPProductID, prepareStorage: () throws -> Void) throws {
+        switch productID {
+        case .floorplanSingle, .tianjiSingle:
+            try prepareStorage()
+        case .vipYearly, .proLifetime:
+            break
+        }
+    }
+}
+
 /// A purchase disclosure is usable only when the App Store supplies a complete
 /// title, storefront price and billing period. Product names never imply cadence.
 struct SubscriptionPurchaseTerms: Equatable {
@@ -1250,9 +1264,14 @@ public class StoreKitIAPManager: ObservableObject {
             return
         }
 
-        guard let productID = IAPProductID(rawValue: id), canPurchaseProduct(for: productID) else {
+        guard let productID = IAPProductID(rawValue: id) else {
             failPurchase(id: id, message: LocalizationManager.shared.t("iap_err_product_unavailable"))
             fetchProducts()
+            return
+        }
+        if let messageKey = purchaseUnavailableMessageKey(for: productID) {
+            failPurchase(id: id, message: LocalizationManager.shared.t(messageKey))
+            if messageKey != "iap_storage_unavailable" { fetchProducts() }
             return
         }
 
@@ -1554,9 +1573,44 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     func canPurchaseProduct(for productID: IAPProductID) -> Bool {
+        purchaseUnavailableMessageKey(for: productID) == nil
+    }
+
+    func purchaseUnavailableMessageKey(for productID: IAPProductID) -> String? {
         guard let product = availableProducts[productID.rawValue],
-              !product.displayPrice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        return productID != .vipYearly || subscriptionPurchaseTerms(for: productID) != nil
+              !product.displayPrice.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return productID == .vipYearly ? "subscription_details_unavailable" : "price_unavailable"
+        }
+        if productID == .vipYearly && subscriptionPurchaseTerms(for: productID) == nil {
+            return "subscription_details_unavailable"
+        }
+        do {
+            try PurchasePreflight.verify(productID: productID) { try prepareConsumablePurchaseStorage() }
+            return nil
+        } catch {
+            return "iap_storage_unavailable"
+        }
+    }
+
+    private func prepareConsumablePurchaseStorage() throws {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        _ = currentMirrorLocked()
+        guard !ledgerStorageUnavailable else { throw IAPLedgerStorageError.persistenceFailed }
+        // A first purchase also needs its key persisted before payment. A
+        // missing key for an existing ledger must never be replaced here.
+        _ = try sealKeyStore.key()
+    }
+
+    func retryPurchaseAvailability() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in self?.retryPurchaseAvailability() }
+            return
+        }
+        clearTransientMessages()
+        objectWillChange.send()
+        refreshProductsIfNeeded(force: true)
+        refreshEntitlements()
     }
 
     func localizedBillingPrice(for productID: IAPProductID) -> String {

@@ -3381,7 +3381,10 @@ public struct FloorplanView: View {
                         featureDesc: lang.t("privilege_floorplan_desc"),
                         badge: lang.t("vip_badge_title"),
                         targetProductId: .floorplanSingle,
-                        onUnlockTap: { showPaywall = true }
+                        onUnlockTap: {
+                            paywallDefaultProduct = .floorplanSingle
+                            showPaywall = true
+                        }
                     )
                     .frame(maxWidth: .infinity, alignment: .leading)
                     

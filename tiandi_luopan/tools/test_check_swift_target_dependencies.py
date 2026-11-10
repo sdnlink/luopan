@@ -104,7 +104,7 @@ class ProjectStructureTests(unittest.TestCase):
                     self.ids.append(dict(attrs).get("id"))
 
         root = Path(__file__).resolve().parents[2]
-        for name in ["privacy.html", "subscription-terms.html"]:
+        for name in ["privacy.html", "subscription-terms.html", "support.html"]:
             content = (root / "docs" / name).read_text()
             parser = Sections()
             parser.feed(content)
@@ -112,6 +112,21 @@ class ProjectStructureTests(unittest.TestCase):
             self.assertEqual(len(parser.ids), 8)
             for placeholder in ["请按实际情况确认", "confirm whether newly added", "【新規追加"]:
                 self.assertNotIn(placeholder, content)
+            self.assertNotRegex(content, r"【[^】]+】|\[(governing jurisdiction|court or arbitration body)\]")
+            if name == "subscription-terms.html":
+                # Every offered localization needs a complete license scope,
+                # and its privacy link must use the app's canonical website.
+                for marker in ["家人共享", "Family Sharing", "ファミリー共有", "가족 공유",
+                               "การแชร์กันในครอบครัว", "Chia sẻ trong gia đình", "Keluarga Berbagi"]:
+                    self.assertIn(marker, content)
+                for language in parser.ids:
+                    self.assertIn('href="https://sdnlink.cn/privacy.html#' + language + '"', content)
+            if name == "support.html":
+                self.assertIn('href="mailto:support@sdnlink.cn"', content)
+                self.assertIn('href="tel:+8613167574837"', content)
+                for language in parser.ids:
+                    self.assertIn('href="https://sdnlink.cn/privacy.html#' + language + '"', content)
+                    self.assertIn('href="https://sdnlink.cn/subscription-terms.html#' + language + '"', content)
 
 
 if __name__ == "__main__":

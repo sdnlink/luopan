@@ -11,13 +11,13 @@
 
 ## 待同步的公开页面与商店配置
 
-仓库内修改网页不会自动更新另一个 GitHub Pages 站点，也不会修改 App Store Connect。以下内容需要随版本发布：
+仓库内修改网页不会自动更新官网服务器，也不会修改 App Store Connect。以下内容需要随版本发布：
 
-1. 将 `docs/subscription-terms.html` 发布到应用使用的 EULA 页面：
-   `https://yulintao.github.io/tiandiluopan-subscription/`。
-2. 将 `docs/privacy.html` 发布到应用使用的隐私页面：
-   `https://yulintao.github.io/tiandiluopan-privacy/`。
-3. 同步更新 `https://sdnlink.cn/subscription-terms.html` 和 `https://sdnlink.cn/privacy.html`，确保跨页面链接内容一致。
+1. 将 `docs/subscription-terms.html` 发布到应用 EULA 地址：
+   `https://sdnlink.cn/subscription-terms.html`。
+2. 将 `docs/privacy.html` 发布到应用隐私地址：
+   `https://sdnlink.cn/privacy.html`。
+3. 应用购买入口按用户指定统一使用 sdnlink.cn。历史 GitHub Pages 协议网址不再作为新版本入口；旧版本仍可能访问这些地址，可在有对应仓库权限时另行同步。
 4. 在 App Store Connect 的所有已启用本地化描述中保留可用 EULA 链接，隐私政策字段使用更新后的公开地址。当前应用链接指向自定义 EULA，License Agreement 应与该协议内容一致。
 5. 商店内年度和终身商品说明同步上述权益；终身用户不应再收到家庭分房的年度收费提示。
 6. 审核备注说明两个购买入口、免费资料删除入口及全功能终身权益，并附 iPad 购买信息和协议链接的实际录屏。
@@ -50,3 +50,19 @@
 App 备案名称为“天机演象”，备案号为“京ICP备2024080356号-2A”。应用“设置 → 关于”新增备案信息和工信部查询入口；两份法律网页及官网、产品介绍页同步展示 App 备案。原网站备案号“京ICP备2024080356号”单独保留。更新后的公开网页仍需发布。
 
 链接验证：`https://www.sdnlink.cn` 在本次检查中 HTTPS 握手失败，`https://sdnlink.cn` 返回 HTTP 200。法律网页和应用内联系信息使用已验证可访问的根域名；www 子域名需在服务器侧补齐 HTTPS 配置。
+
+## 本轮合规修复
+
+- 单次购买在展示购买按钮和进入 Apple 付款前检查额度账本及密钥存储。账本不可读或密钥无法持久保存时禁用购买、显示存储原因并提供重试；会员恢复继续使用 Apple 验证。
+- 单次户型按钮每次打开收银台都重新选择单次商品，避免继承之前 3D 入口的年度订阅选择。
+- 八语言 EULA 补充 Apple 使用规则允许的家庭共享及批量购买许可；只移除尚未确定适用法律和法院的可选占位条款，不擅自指定法院。现有隐私、联系、备案和其他协议条款保留。
+- 官网和产品页移除缺乏验证依据的毫米级、工程标准、工程级、绝对安全及全部档案加密等表述，说明设备、环境、人工复核和软件导入的限制。
+- 按用户指定将应用协议入口统一为 sdnlink.cn，并同步八语言协议内链接及地址回归检查。官网公开内容需以发布后实际 HTTP 验证为准。
+
+官网上传检查：按用户指定尝试现有 `sdnlink.cn` SSH 连接，连接被服务器关闭，当前工作环境没有已配置的站点目录或可用上传通道。最新五个 HTML（含 support.html）和所需图标已整理为发布包并校验 SHA-256；不能将本地修改或链接切换表述为线上已发布。发布后需验证公开 URL 内容并同步 App Store Connect。
+
+## 服务支持页面与手动发布
+
+用户确认手动发布官网。新增 `docs/support.html`，正式地址为 `https://sdnlink.cn/support.html`。页面提供八语言的联系入口、购买恢复、会员区别、单次额度、订阅取消与 Apple 退款入口、资料删除和测量复核说明。应用“关于”及官网导航均链接到该支持页。
+
+本次发布文件为 `index.html`、`appstore-marketing.html`、`privacy.html`、`subscription-terms.html`、`support.html` 及 `assets/` 图标。发布后，App Store Connect 的隐私政策字段使用 `https://sdnlink.cn/privacy.html`，所有本地化描述或自定义 EULA 使用 `https://sdnlink.cn/subscription-terms.html`，服务支持网址使用 `https://sdnlink.cn/support.html`。文件包中的发布说明与 SHA-256 清单可用于核对。

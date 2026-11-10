@@ -615,10 +615,6 @@ public struct ARVisionView: View {
         return Mountain24Data.shared.mountain(for: targetCalculatedHeading)
     }
 
-    private var targetElevationDegrees: Double {
-        targetProjection.elevation(point: currentTargetSamplePoint, cameraElevation: currentCapturePose?.elevation ?? 0)
-    }
-
     private var targetSanHeWater: SanHeWaterItem? {
         let sitting = motion.headingState.sittingMountain
         let mTarget = targetMountain

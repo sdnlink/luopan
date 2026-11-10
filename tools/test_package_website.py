@@ -56,6 +56,7 @@ class WebsitePublishingTests(unittest.TestCase):
                     self.assertEqual(parsed.headings, 1)
                     self.assertFalse(parsed.inline_styles)
                     self.assertNotIn("data-i18n=", document)
+                    self.assertNotIn("tel:", document)
                     self.assertEqual(parsed.styles, ["../../assets/site.css"])
                     self.assertEqual(set(parsed.language_links), set(LANGUAGES))
                     for target_language, link in parsed.language_links.items():
@@ -97,7 +98,8 @@ class WebsitePublishingTests(unittest.TestCase):
             contact = main("contact.html")
             self.assertIn('class="contact-channels"', contact)
             self.assertIn('href="mailto:support@sdnlink.cn"', contact)
-            self.assertIn('href="tel:+8613167574837"', contact)
+            channels = re.search(r'<div class="contact-channels">(.*?)</div>', contact, re.S)[1]
+            self.assertEqual(re.findall(r'href="([^"]+)"', channels), ["mailto:support@sdnlink.cn"])
             self.assertIn("北京市海淀区海淀大街甲36号5层5014号-970号", contact)
             self.assertNotIn("support-faq", contact)
 

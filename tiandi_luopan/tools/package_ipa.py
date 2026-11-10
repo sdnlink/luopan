@@ -77,21 +77,15 @@ def package_ipa():
         with open(exec_path, "wb") as f:
             f.write(create_macho_arm64_stub())
 
-    # 4. Copy www web core assets
-    src_www = os.path.join(root_dir, "ios/TiandiLuopan/www")
-    dest_www = os.path.join(app_dir, "www")
-    shutil.copytree(src_www, dest_www)
-    # Also copy index.html to app root for fallback
-    shutil.copy2(os.path.join(src_www, "index.html"), os.path.join(app_dir, "index.html"))
-
-    # 4.5 Copy localized resources (*.lproj)
+    # 4. Copy localized permission descriptions (*.lproj).
+    # The standalone Safari/PWA resources are not used by the native app.
     src_tiandi = os.path.join(root_dir, "ios/TiandiLuopan")
     for item in os.listdir(src_tiandi):
         if item.endswith(".lproj"):
             src_lp = os.path.join(src_tiandi, item)
             dest_lp = os.path.join(app_dir, item)
             if os.path.isdir(src_lp):
-                shutil.copytree(src_lp, dest_lp, dirs_exist_ok=True)
+                shutil.copytree(src_lp, dest_lp)
 
     # 5. Copy icons from AppIcon.appiconset
     src_icons = os.path.join(root_dir, "ios/TiandiLuopan/Assets.xcassets/AppIcon.appiconset")

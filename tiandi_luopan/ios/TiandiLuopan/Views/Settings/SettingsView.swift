@@ -9,33 +9,23 @@ public enum LegalLinks {
     public static let termsOfUse = URL(string: "https://sdnlink.cn/i18n/zh-CN/subscription-terms.html")!
     public static let privacyPolicy = URL(string: "https://sdnlink.cn/i18n/zh-CN/privacy.html")!
     public static let support = URL(string: "https://sdnlink.cn/i18n/zh-CN/contact.html")!
-    public static let subscriptionInfo = termsOfUse
-    public static let registeredAppName = "天机演象"
-    public static let appFilingNumber = "京ICP备2024080356号-2A"
-    public static let appFilingLookup = URL(string: "https://beian.miit.gov.cn/")!
     /// 正式上架后分配的 App Store 数字 ID（配置后点击评分直接直达 App Store 撰写长评页面）
     public static let appStoreID: String = ""
 }
 
 private enum LegalDocument: String, Identifiable {
-    case terms
-    case privacy
     case compliance
 
     var id: String { rawValue }
 
     var titleKey: String {
         switch self {
-        case .terms: return "legal_terms_title"
-        case .privacy: return "legal_privacy_title"
         case .compliance: return "legal_compliance_title"
         }
     }
 
     var bodyKey: String {
         switch self {
-        case .terms: return "legal_terms_body"
-        case .privacy: return "legal_privacy_body"
         case .compliance: return "legal_compliance_body"
         }
     }
@@ -1222,21 +1212,6 @@ public struct AboutPageView: View {
             }
             .foregroundColor(Color.yanCyan)
 
-            Section(header: Text(lang.t("legal_app_filing_title"))) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(lang.t("legal_app_filing_name"))
-                        .font(.system(size: 12)).foregroundColor(.secondary)
-                    Text(LegalLinks.registeredAppName)
-                        .textSelection(.enabled)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(lang.t("legal_app_filing_number"))
-                        .font(.system(size: 12)).foregroundColor(.secondary)
-                    Link(LegalLinks.appFilingNumber, destination: LegalLinks.appFilingLookup)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
             // 2. 新手教程与评分反馈
             Section {
                 Button(action: {
@@ -1410,12 +1385,6 @@ struct PersonalProfileDataView: View {
             }
             Section(footer: Text(lang.t("profile_data_delete_note"))) {
                 Button(lang.t("profile_data_delete_all"), role: .destructive) { showDeleteConfirmation = true }
-            }
-            Section {
-                Text(lang.t("legal_privacy_body"))
-                    .font(.system(size: 13)).foregroundColor(.secondary)
-            } header: {
-                Text(lang.t("legal_privacy_title"))
             }
         }
         .listStyle(.insetGrouped)

@@ -315,15 +315,16 @@ export ANDROID_SDK_ROOT=/path/to/android-sdk
 
 * **iOS 安装包 (IPA)**：`dist-ios/YanXiangCompass-v1.3.3.ipa`
 * **Xcode 原生工程**：`ios/TiandiLuopan.xcodeproj`（Swift 5.x + **纯 SwiftUI** + CoreLocation + CoreMotion + ARKit + StoreKit）
-* **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（可选。原生 App 本身是纯 SwiftUI 壳，**不通过 WKWebView 渲染该目录**；`www` 仅由 `tools/serve_ios_web.py` 在局域网内作为免签 PWA 提供服务，详见 5.3 方式 4）
+* **Web / PWA 兜底资源**：`ios/TiandiLuopan/www/`（可选。该目录仅由 `tools/serve_ios_web.py` 在局域网内提供独立 Safari/PWA 演示，不再复制进原生 App 安装包，详见 5.3 方式 4）
 
 ### 5.2 资源生成与打包（重要：真实 IPA 仍需 macOS）
 
-`build_ios.ps1` 会调用 `tools/` 下的 Python 脚本完成三件事：
+`build_ios.ps1` 会调用 `tools/` 下的 Python 脚本完成以下步骤：
 
 1. 提取并生成全套高清 iOS AppIcon / PWA 图标资源；
-2. 重新生成 Web 适配核心（`prepare_ios_web.py`）；
-3. 调用 `package_ipa.py` **组装并压缩**出 `dist-ios/YanXiangCompass-v1.3.3.ipa`。
+2. 为独立 PWA 演示生成 Web 适配资源（`prepare_ios_web.py`），该资源不参与原生打包；
+3. 校验已维护的 Xcode 工程（`generate_pbxproj.py` 不会重新生成或覆盖工程）；
+4. 调用 `package_ipa.py` **组装并压缩**出资源结构验证包 `dist-ios/YanXiangCompass-v1.3.3.ipa`。
 
 > **⚠️ 关于“在 Windows 上打包 IPA”的说明**
 > 一个可被设备安装的、**经过 Apple 签名**的 IPA 必须依赖 macOS + Xcode（`xcodebuild` / `codesign`）或 Apple 的云构建链编译出真实的 Mach-O 可执行文件。**Windows 环境无法完成这一步。**
@@ -382,7 +383,7 @@ iOS 原生工程使用 **StoreKit 2** 完成 App Store 内购；原生 App 是�
 
 ### 5.6 VIP 付费功能醒目标注
 
-当前 iOS 原生工程只通过 `StoreKit 2` 使用 App Store 内购，未实现微信、支付宝、银联、信用卡或 Apple Pay 聚合收银台，也没有对应的 iOS Universal Links/支付 SDK。`tools/implement_multichannel_cashier.py` 等脚本属于 Web 资源实验/历史实现，不能作为原生 iOS 支付能力说明。
+当前 iOS 原生工程只通过 `StoreKit 2` 使用 App Store 内购，未实现微信、支付宝、银联、信用卡或 Apple Pay 聚合收银台，也没有对应的 iOS Universal Links/支付 SDK。Web 资源中的历史支付展示不能作为原生 iOS 支付能力说明；相关一次性迁移脚本已清理。
 
 当前原生 UI 的付费标识和门控包括：
 

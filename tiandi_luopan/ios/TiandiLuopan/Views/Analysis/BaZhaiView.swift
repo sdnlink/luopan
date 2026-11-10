@@ -2360,19 +2360,6 @@ public struct AddFamilyMemberDialog: View {
         }
     }
 
-    private var birthYearSectionTitle: String {
-        switch lang.effectiveLanguage {
-        case .en: return "Birth Year"
-        case .zhHant: return "出生年份"
-        case .ja: return "生年"
-        case .ko: return "출생연도"
-        case .vi: return "Năm sinh"
-        case .th: return "ปีเกิด"
-        case .id: return "Tahun Lahir"
-        case .auto, .zhHans: return "出生年份"
-        }
-    }
-
     private var genderSectionTitle: String {
         switch lang.effectiveLanguage {
         case .en: return "Gender"

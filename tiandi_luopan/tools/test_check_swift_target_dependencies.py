@@ -125,7 +125,7 @@ class ProjectStructureTests(unittest.TestCase):
                     self.assertIn('href="contact.html"', content)
                     contact = (root / "website" / "i18n" / language / "contact.html").read_text()
                     self.assertIn('href="mailto:support@sdnlink.cn"', contact)
-                    self.assertIn('href="tel:+8613167574837"', contact)
+                    self.assertNotIn('tel:', contact)
                     self.assertIn('href="privacy.html"', content)
                     self.assertIn('href="subscription-terms.html"', content)
 

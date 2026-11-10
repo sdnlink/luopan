@@ -1672,17 +1672,6 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         return distance
     }
 
-    private static func makeMarkerNode(position: SIMD3<Float>, color: UIColor) -> SCNNode {
-        let sphere = SCNSphere(radius: 0.016)
-        let mat = SCNMaterial()
-        mat.diffuse.contents = color
-        mat.lightingModel = .constant
-        sphere.materials = [mat]
-        let node = SCNNode(geometry: sphere)
-        node.position = SCNVector3(position.x, position.y, position.z)
-        return node
-    }
-
     private static func makeLineNode(from start: SIMD3<Float>, to end: SIMD3<Float>, color: UIColor) -> SCNNode {
         let indices: [Int32] = [0, 1]
         let vertices = [SCNVector3(start.x, start.y, start.z), SCNVector3(end.x, end.y, end.z)]

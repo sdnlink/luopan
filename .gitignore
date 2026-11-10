@@ -20,5 +20,12 @@ project.private.config.json
 # 临时脚本与导出文件（工作辅助，不应入库）
 .tmp_scripts/
 
+# Python 运行缓存
+__pycache__/
+*.py[cod]
+
+# HTML 功能审计的可再生成结果
+/tiandi_luopan/tools/html_features_summary.txt
+
 # 官网生成的发布包
 /dist/

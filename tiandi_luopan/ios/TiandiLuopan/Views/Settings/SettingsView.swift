@@ -6,9 +6,9 @@ import Foundation
 /// always point at the currently published legal pages.
 public enum LegalLinks {
     /// This page contains the service terms, subscription terms and full EULA.
-    public static let termsOfUse = URL(string: "https://sdnlink.cn/subscription-terms.html")!
-    public static let privacyPolicy = URL(string: "https://sdnlink.cn/privacy.html")!
-    public static let support = URL(string: "https://sdnlink.cn/support.html")!
+    public static let termsOfUse = URL(string: "https://sdnlink.cn/i18n/zh-CN/subscription-terms.html")!
+    public static let privacyPolicy = URL(string: "https://sdnlink.cn/i18n/zh-CN/privacy.html")!
+    public static let support = URL(string: "https://sdnlink.cn/i18n/zh-CN/contact.html")!
     public static let subscriptionInfo = termsOfUse
     public static let registeredAppName = "天机演象"
     public static let appFilingNumber = "京ICP备2024080356号-2A"
@@ -1182,7 +1182,6 @@ public struct LanguagePreferencesPageView: View {
 
 public struct AboutPageView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.openURL) private var openURL
     @ObservedObject var lang = LocalizationManager.shared
     @State private var showOnboardingGuide: Bool = false
     @State private var showTestFlightRateTip: Bool = false
@@ -1208,6 +1207,20 @@ public struct AboutPageView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             }
+
+            Section(header: Text(lang.t("about_documents_purchases"))) {
+                Link(destination: LegalLinks.privacyPolicy) {
+                    Label(lang.t("legal_privacy_button"), systemImage: "hand.raised.fill")
+                }
+                Link(destination: LegalLinks.termsOfUse) {
+                    Label(lang.t("about_terms"), systemImage: "doc.text")
+                }
+                Link(destination: LegalLinks.support) {
+                    Label(lang.t("about_contact"), systemImage: "envelope")
+                }
+                RestorePurchasesButton(style: .settingsRow)
+            }
+            .foregroundColor(Color.yanCyan)
 
             Section(header: Text(lang.t("legal_app_filing_title"))) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -1275,35 +1288,8 @@ public struct AboutPageView: View {
                 .padding(.vertical, 2)
             }
 
-            // 4. 法律条款与合规自律
+            // 4. 合规与安全说明
             Section(header: Text(legalSectionTitle)) {
-                Link(destination: LegalLinks.support) {
-                    Label(lang.t("legal_support_button"), systemImage: "questionmark.circle")
-                }
-                .foregroundColor(Color.yanCyan)
-
-                HStack(spacing: 16) {
-                    Button {
-                        openURL(LegalLinks.termsOfUse)
-                    } label: {
-                        Label(lang.t("legal_terms_button"), systemImage: "safari")
-                    }
-                    .buttonStyle(.plain)
-                    .adaptiveFont(size: 12, weight: .semibold)
-                    .foregroundColor(Color.yanCyan)
-
-                    Spacer()
-
-                    Button {
-                        openURL(LegalLinks.privacyPolicy)
-                    } label: {
-                        Label(lang.t("legal_privacy_button"), systemImage: "safari")
-                    }
-                    .buttonStyle(.plain)
-                    .adaptiveFont(size: 12, weight: .semibold)
-                    .foregroundColor(Color.yanCyan)
-                }
-
                 Button {
                     legalDocument = .compliance
                 } label: {

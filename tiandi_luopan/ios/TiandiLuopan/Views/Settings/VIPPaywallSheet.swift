@@ -108,7 +108,13 @@ public struct VIPLockCardView: View {
 }
 
 struct RestorePurchasesButton: View {
+    enum Style {
+        case compact
+        case settingsRow
+    }
+
     var presentsResult = true
+    var style: Style = .compact
     @ObservedObject private var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
     @State private var resultMessage = ""
@@ -126,11 +132,13 @@ struct RestorePurchasesButton: View {
             }
         } label: {
             HStack(spacing: 8) {
+                if style == .settingsRow { Image(systemName: "arrow.clockwise") }
                 if iap.isRestoringPurchases { ProgressView().tint(Color.yanCyan) }
                 Text(lang.t(iap.isRestoringPurchases ? "iap_restoring" : "restore_purchases"))
                     .fixedSize(horizontal: false, vertical: true)
+                if style == .settingsRow { Spacer() }
             }
-            .font(.system(size: 12, weight: .semibold))
+            .font(style == .settingsRow ? .body : .system(size: 12, weight: .semibold))
             .foregroundColor(Color.yanCyan)
             .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())

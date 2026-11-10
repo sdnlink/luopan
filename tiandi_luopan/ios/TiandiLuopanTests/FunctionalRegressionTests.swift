@@ -348,13 +348,13 @@ final class FunctionalRegressionTests: XCTestCase {
     func testPurchaseEulaLinkTargetsTheLicenseDocumentInsteadOfTheSupportPage() {
         XCTAssertEqual(LegalLinks.termsOfUse.scheme, "https")
         XCTAssertEqual(LegalLinks.termsOfUse.host, "sdnlink.cn")
-        XCTAssertEqual(LegalLinks.termsOfUse.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "subscription-terms.html")
+        XCTAssertEqual(LegalLinks.termsOfUse.path, "/i18n/zh-CN/subscription-terms.html")
         XCTAssertEqual(LegalLinks.privacyPolicy.scheme, "https")
         XCTAssertEqual(LegalLinks.privacyPolicy.host, "sdnlink.cn")
-        XCTAssertEqual(LegalLinks.privacyPolicy.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")), "privacy.html")
+        XCTAssertEqual(LegalLinks.privacyPolicy.path, "/i18n/zh-CN/privacy.html")
         XCTAssertEqual(LegalLinks.support.scheme, "https")
         XCTAssertEqual(LegalLinks.support.host, "sdnlink.cn")
-        XCTAssertEqual(LegalLinks.support.path, "/support.html")
+        XCTAssertEqual(LegalLinks.support.path, "/i18n/zh-CN/contact.html")
     }
 
     func testReopeningJanuaryBirthdayNeverSubtractsAnotherYear() {

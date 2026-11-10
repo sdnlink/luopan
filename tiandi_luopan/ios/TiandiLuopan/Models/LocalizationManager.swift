@@ -237,6 +237,9 @@ public class LocalizationManager: ObservableObject {
     
     private let localizedStrings: [AppLanguage: ValidatedTranslationTable] = [
         .zhHans: [
+            "about_documents_purchases": "协议与购买",
+            "about_terms": "使用条款",
+            "about_contact": "联系我们",
             "xkd_alignment_missing": "测绘位置未与此户型对齐，请重新同步模型。",
             "legacy_reminders_title": "未关联住宅的提醒",
             "legacy_reminders_hint": "这些已预约提醒保留原内容；无法确定属于哪套房，可在这里取消。",
@@ -1087,6 +1090,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "镜面朝外、微下倾3-5度；八卦镜、山海镇等避免直照邻家门窗，保持邻里和睦。",
 ],
         .zhHant: [
+            "about_documents_purchases": "條款與購買",
+            "about_terms": "使用條款",
+            "about_contact": "聯絡我們",
             "xkd_alignment_missing": "測繪位置未與此戶型對齊，請重新同步模型。",
             "legacy_reminders_title": "未關聯住宅的提醒",
             "legacy_reminders_hint": "這些已預約提醒保留原內容；無法確定屬於哪套房，可在這裡取消。",
@@ -1937,6 +1943,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "鏡面朝外、微下傾3-5度；八卦鏡、山海鎮等避免直照鄰家門窗，保持鄰里和睦。",
 ],
         .en: [
+            "about_documents_purchases": "Legal & Purchases",
+            "about_terms": "Terms of Use",
+            "about_contact": "Contact Us",
             "xkd_alignment_missing": "Survey positions are not aligned with this plan. Sync the model again.",
             "legacy_reminders_title": "Unassigned reminders",
             "legacy_reminders_hint": "These reminders retain their original content. Their home is unknown; cancel them here if needed.",
@@ -2783,6 +2792,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "Angle reflective surfaces outward and 3–5° downward; never point Bagua mirrors or plaques directly at neighbors' doors or windows.",
         ],
         .th: [
+            "about_documents_purchases": "ข้อกำหนดและการซื้อ",
+            "about_terms": "ข้อกำหนดการใช้งาน",
+            "about_contact": "ติดต่อเรา",
             "xkd_alignment_missing": "ตำแหน่งวัดยังไม่ตรงแปลนนี้ กรุณาซิงก์โมเดลอีกครั้ง",
             "legacy_reminders_title": "การเตือนที่ยังไม่ผูกบ้าน",
             "legacy_reminders_hint": "การเตือนเดิมยังคงเนื้อหาไว้ แต่ไม่ทราบว่าเป็นบ้านใด สามารถยกเลิกที่นี่",
@@ -3615,6 +3627,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "หันหน้ากระจกออกและกดลง 3–5 องศา หลีกเลี่ยงการหันกระจกปากั้วหรือป้ายซานไห่เจิ้นส่องตรงใส่ประตูหน้าต่างเพื่อนบ้าน",
         ],
         .vi: [
+            "about_documents_purchases": "Điều khoản và mua hàng",
+            "about_terms": "Điều khoản sử dụng",
+            "about_contact": "Liên hệ",
             "xkd_alignment_missing": "Vị trí đo chưa khớp mặt bằng này. Hãy đồng bộ lại mô hình.",
             "legacy_reminders_title": "Nhắc nhở chưa gắn nhà",
             "legacy_reminders_hint": "Những nhắc nhở này giữ nội dung cũ. Chưa rõ thuộc nhà nào; có thể hủy tại đây.",
@@ -4447,6 +4462,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "Mặt gương hướng ra ngoài, hơi chúc xuống 3–5°; tránh để gương Bát Quái hay Sơn Hải Trấn chiếu thẳng vào cửa nhà hàng xóm.",
         ],
         .id: [
+            "about_documents_purchases": "Ketentuan & Pembelian",
+            "about_terms": "Ketentuan Penggunaan",
+            "about_contact": "Hubungi Kami",
             "xkd_alignment_missing": "Posisi survei belum selaras dengan denah ini. Sinkronkan model lagi.",
             "legacy_reminders_title": "Pengingat tanpa rumah",
             "legacy_reminders_hint": "Pengingat ini mempertahankan isi aslinya. Rumahnya belum diketahui; batalkan di sini bila perlu.",
@@ -5279,6 +5297,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "Arahkan permukaan reflektif keluar dan miring 3–5° ke bawah; hindari mengarahkan cermin Bagua langsung ke pintu atau jendela tetangga.",
         ],
         .ja: [
+            "about_documents_purchases": "規約と購入",
+            "about_terms": "利用規約",
+            "about_contact": "お問い合わせ",
             "xkd_alignment_missing": "測定位置がこの間取りと未整合です。モデルを再同期してください。",
             "legacy_reminders_title": "住宅未設定の通知",
             "legacy_reminders_hint": "予約済み通知は元の内容を保持しています。住宅を特定できないため、必要ならここで取消できます。",
@@ -6111,6 +6132,9 @@ public class LocalizationManager: ObservableObject {
             "ar_sha_talisman_hang_desc": "鏡面は外向きで3〜5度下向きに傾け、八卦鏡や山海鎮が隣家の玄関・窓を直照しないよう近隣との調和を保ってください。",
         ],
         .ko: [
+            "about_documents_purchases": "약관 및 구매",
+            "about_terms": "이용약관",
+            "about_contact": "문의하기",
             "xkd_alignment_missing": "측정 위치가 도면과 맞지 않습니다. 모델을 다시 동기화하세요.",
             "legacy_reminders_title": "주택 미지정 알림",
             "legacy_reminders_hint": "기존 알림 내용은 유지됩니다. 어느 주택인지 알 수 없으며 여기서 취소할 수 있습니다.",

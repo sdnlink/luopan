@@ -9,6 +9,9 @@ public enum LegalLinks {
     public static let termsOfUse = URL(string: "https://yulintao.github.io/tiandiluopan-subscription/")!
     public static let privacyPolicy = URL(string: "https://yulintao.github.io/tiandiluopan-privacy/")!
     public static let subscriptionInfo = termsOfUse
+    public static let registeredAppName = "天机演象"
+    public static let appFilingNumber = "京ICP备2024080356号-2A"
+    public static let appFilingLookup = URL(string: "https://beian.miit.gov.cn/")!
     /// 正式上架后分配的 App Store 数字 ID（配置后点击评分直接直达 App Store 撰写长评页面）
     public static let appStoreID: String = ""
 }
@@ -1203,6 +1206,21 @@ public struct AboutPageView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
+            }
+
+            Section(header: Text(lang.t("legal_app_filing_title"))) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lang.t("legal_app_filing_name"))
+                        .font(.system(size: 12)).foregroundColor(.secondary)
+                    Text(LegalLinks.registeredAppName)
+                        .textSelection(.enabled)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lang.t("legal_app_filing_number"))
+                        .font(.system(size: 12)).foregroundColor(.secondary)
+                    Link(LegalLinks.appFilingNumber, destination: LegalLinks.appFilingLookup)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             // 2. 新手教程与评分反馈

@@ -7,20 +7,117 @@ import UIKit
 
 /// Live exports keep their slot until completion or cancellation. Wall-clock
 /// expiry would allow a long-running share to succeed without paying for it.
-struct TianjiCreditReservations {
+struct ConsumableCreditReservations {
     private var tokens: Set<String> = []
     var count: Int { tokens.count }
 
-    mutating func reserve(availableCredits: Int) -> String? {
-        guard availableCredits > tokens.count else { return nil }
-        let token = UUID().uuidString
+    mutating func reserve(availableCredits: Int, token: String = UUID().uuidString) -> String? {
+        guard availableCredits > tokens.count, !tokens.contains(token) else { return nil }
         tokens.insert(token)
         return token
     }
 
+    func contains(_ token: String) -> Bool { tokens.contains(token) }
+
     @discardableResult
     mutating func finish(_ token: String) -> Bool {
         tokens.remove(token) != nil
+    }
+}
+
+enum IAPLedgerStorageError: Error {
+    case keychain(OSStatus)
+    case invalidKey
+    case missingKey
+    case invalidMirror
+    case persistenceFailed
+}
+
+/// Preserve the existing seal bytes while making the key eligible for system
+/// backup migration. Never replace a temporarily inaccessible key or return a
+/// newly generated key before Keychain confirms it was stored successfully.
+final class IAPSealKeyStore {
+    static let account = "com.yanxiang.compass.iap.seal.key"
+    static let legacyAccount = "com.yanxiang.luopan.iap.seal.key"
+    private let lock = NSLock()
+    private var cachedKey: Data?
+    private let read: (String) throws -> Data?
+    private let write: (String, Data) throws -> Data
+    private let makeMigratable: (String) throws -> Void
+    private let generate: () throws -> Data
+
+    init(read: @escaping (String) throws -> Data? = IAPSealKeyStore.readKey,
+         write: @escaping (String, Data) throws -> Data = IAPSealKeyStore.writeKey,
+         makeMigratable: @escaping (String) throws -> Void = IAPSealKeyStore.upgradeAccessibility,
+         generate: @escaping () throws -> Data = IAPSealKeyStore.generateKey) {
+        self.read = read
+        self.write = write
+        self.makeMigratable = makeMigratable
+        self.generate = generate
+    }
+
+    func key(createIfMissing: Bool = true) throws -> SymmetricKey {
+        lock.lock()
+        defer { lock.unlock() }
+        if let cachedKey { return SymmetricKey(data: cachedKey) }
+        let key: Data
+        if let existing = try read(Self.account) {
+            guard existing.count >= 32 else { throw IAPLedgerStorageError.invalidKey }
+            try makeMigratable(Self.account)
+            key = existing
+        } else if let legacy = try read(Self.legacyAccount) {
+            guard legacy.count >= 32 else { throw IAPLedgerStorageError.invalidKey }
+            key = try write(Self.account, legacy)
+            try makeMigratable(Self.account)
+        } else {
+            guard createIfMissing else { throw IAPLedgerStorageError.missingKey }
+            key = try write(Self.account, generate())
+        }
+        guard key.count >= 32 else { throw IAPLedgerStorageError.invalidKey }
+        cachedKey = key
+        return SymmetricKey(data: key)
+    }
+
+    static func readKey(account: String) throws -> Data? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrAccount as String: account,
+                                   kSecReturnData as String: true,
+                                   kSecMatchLimit as String: kSecMatchLimitOne]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw IAPLedgerStorageError.keychain(status) }
+        guard let data = item as? Data else { throw IAPLedgerStorageError.invalidKey }
+        return data
+    }
+
+    static func writeKey(account: String, data: Data) throws -> Data {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrAccount as String: account,
+                                   kSecValueData as String: data,
+                                   kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status == errSecDuplicateItem, let existing = try readKey(account: account) {
+            try upgradeAccessibility(account: account)
+            return existing
+        }
+        guard status == errSecSuccess else { throw IAPLedgerStorageError.keychain(status) }
+        return data
+    }
+
+    static func upgradeAccessibility(account: String) throws {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecAttrAccount as String: account]
+        let attributes: [String: Any] = [kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock]
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        guard status == errSecSuccess else { throw IAPLedgerStorageError.keychain(status) }
+    }
+
+    static func generateKey() throws -> Data {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        guard status == errSecSuccess else { throw IAPLedgerStorageError.keychain(status) }
+        return Data(bytes)
     }
 }
 
@@ -70,16 +167,36 @@ public struct ReceiptValidationResult {
     }
 }
 
-/// A signed, device-bound grant for the currently active one-shot floorplan
-/// case. The grant is an integrity check for the local layout cache; production
-/// ownership and cross-device synchronization still belong to a server ledger.
+/// A signed grant for the active one-shot case. New grants also require a
+/// committed debit in the sealed ledger; an interrupted save cannot unlock one.
 public struct FloorplanAccessGrant: Codable, Equatable {
     public let id: String
     public let signature: String
+    var requiresCommittedDebit: Bool { id.hasPrefix("floorplan-v2-") }
 
     public init(id: String, signature: String) {
         self.id = id
         self.signature = signature
+    }
+}
+
+/// Keep saving and settlement in one path for both image import and report
+/// generation. Failed saves release the slot without ever spending a credit.
+enum FloorplanCreditPurchase {
+    enum Outcome {
+        case unavailable, saveFailed, commitFailed
+        case completed(FloorplanAccessGrant)
+    }
+
+    static func acquire(reserve: () -> FloorplanAccessGrant?,
+                        persist: (FloorplanAccessGrant) -> Bool,
+                        commit: (FloorplanAccessGrant) -> Bool,
+                        cancel: (FloorplanAccessGrant) -> Void) -> Outcome {
+        guard let grant = reserve() else { return .unavailable }
+        defer { cancel(grant) }
+        guard persist(grant) else { return .saveFailed }
+        guard commit(grant) else { return .commitFailed }
+        return .completed(grant)
     }
 }
 
@@ -114,6 +231,8 @@ public enum IAPProductID: String, CaseIterable, Equatable {
         case .tianjiSingle: return LocalizationManager.shared.t("product_tianji_single_desc")
         }
     }
+
+    var includesAllFeatures: Bool { self == .vipYearly || self == .proLifetime }
 }
 
 /// A purchase disclosure is usable only when the App Store supplies a complete
@@ -170,6 +289,46 @@ private enum IAPProductKind {
     case tianjiSingle
 }
 
+/// Access is protected by the manager's entitlement lock. A pre-sync scan must
+/// never overwrite the authoritative result of an explicit restore.
+struct EntitlementScanCoordinator {
+    private(set) var revision = 0
+    private(set) var isRestoring = false
+
+    mutating func beginRestore() {
+        isRestoring = true
+        revision += 1
+    }
+
+    mutating func beginScan(restoring: Bool) -> Int? {
+        guard restoring || !isRestoring else { return nil }
+        revision += 1
+        return revision
+    }
+
+    mutating func revoke() { revision += 1 }
+    mutating func endRestore() { isRestoring = false }
+    func canCommit(_ expectedRevision: Int) -> Bool { revision == expectedRevision }
+}
+
+enum PurchaseRestoreEnvironment {
+    case production, sandbox, xcode, unknown
+
+    var noPurchasesMessageKey: String {
+        switch self {
+        case .sandbox: return "iap_restore_none_sandbox"
+        case .xcode: return "iap_restore_none_xcode"
+        case .production, .unknown: return "iap_restore_none"
+        }
+    }
+}
+
+enum EntitlementVerificationOutcome {
+    case verified([String])
+    case unavailable
+    case superseded
+}
+
 // MARK: - IAP 代理协议
 
 public protocol StoreKitIAPManagerDelegate: AnyObject {
@@ -211,6 +370,7 @@ public class StoreKitIAPManager: ObservableObject {
     /// after a request has already completed.
     @Published public private(set) var productsRevision: Int = 0
     @Published public private(set) var isProcessingPurchase: Bool = false
+    @Published public private(set) var isRestoringPurchases: Bool = false
     @Published public private(set) var lastErrorMessage: String?
     @Published public private(set) var lastStatusMessage: String?
     @Published public private(set) var lastCompletedProductID: String?
@@ -251,9 +411,41 @@ public class StoreKitIAPManager: ObservableObject {
         /// in the sealed mirror makes credit minting and transaction claiming
         /// one persisted state transition.
         var processedTransactionIDs: [String]
+        var redeemedFloorplanGrantIDs: [String]
+
+        mutating func redeemFloorplanGrant(_ id: String) -> Bool {
+            guard isAuthoritative, floorplanCredits > 0,
+                  !redeemedFloorplanGrantIDs.contains(id) else { return false }
+            floorplanCredits -= 1
+            redeemedFloorplanGrantIDs.append(id)
+            return true
+        }
+
+        mutating func applyMembershipSnapshot(from verified: EntitlementMirror) {
+            verifiedAt = verified.verifiedAt
+            isAuthoritative = verified.isAuthoritative
+            isLifetime = verified.isLifetime
+            vipActive = verified.vipActive
+            vipExpireDate = verified.vipExpireDate
+            purchasedProductIDs = verified.purchasedProductIDs
+        }
 
         func allowsFamilyRoomAllocation(at date: Date) -> Bool {
-            isAuthoritative && (vipActive || vipExpireDate > date.timeIntervalSince1970)
+            isAuthoritative && (isLifetime || vipActive || vipExpireDate > date.timeIntervalSince1970)
+        }
+
+        func restoredProductIDs(confirmed: [String], at date: Date) -> [String] {
+            guard isAuthoritative else { return [] }
+            return Array(Set(confirmed)).filter { productID in
+                switch productID {
+                case IAPProductID.vipYearly.rawValue:
+                    return vipActive || vipExpireDate > date.timeIntervalSince1970
+                case IAPProductID.proLifetime.rawValue:
+                    return isLifetime
+                default:
+                    return false
+                }
+            }.sorted()
         }
 
         mutating func revokePaidProduct(_ productID: String) {
@@ -271,6 +463,7 @@ public class StoreKitIAPManager: ObservableObject {
             case floorplanCredits, tianjiCredits, purchasedProductIDs
             case consumableGrants
             case processedTransactionIDs
+            case redeemedFloorplanGrantIDs
         }
 
         init(verifiedAt: Date,
@@ -282,7 +475,8 @@ public class StoreKitIAPManager: ObservableObject {
              tianjiCredits: Int,
              purchasedProductIDs: [String],
              consumableGrants: [String: ConsumableGrant] = [:],
-             processedTransactionIDs: [String] = []) {
+             processedTransactionIDs: [String] = [],
+             redeemedFloorplanGrantIDs: [String] = []) {
             self.verifiedAt = verifiedAt
             self.isAuthoritative = isAuthoritative
             self.isLifetime = isLifetime
@@ -293,6 +487,7 @@ public class StoreKitIAPManager: ObservableObject {
             self.purchasedProductIDs = purchasedProductIDs
             self.consumableGrants = consumableGrants
             self.processedTransactionIDs = processedTransactionIDs
+            self.redeemedFloorplanGrantIDs = redeemedFloorplanGrantIDs
         }
 
         init(from decoder: Decoder) throws {
@@ -312,6 +507,7 @@ public class StoreKitIAPManager: ObservableObject {
             // decode as an empty ledger and are migrated from the legacy key
             // when the next verified transaction is handled.
             processedTransactionIDs = try container.decodeIfPresent([String].self, forKey: .processedTransactionIDs) ?? []
+            redeemedFloorplanGrantIDs = try container.decodeIfPresent([String].self, forKey: .redeemedFloorplanGrantIDs) ?? []
         }
 
         func encode(to encoder: Encoder) throws {
@@ -326,13 +522,25 @@ public class StoreKitIAPManager: ObservableObject {
             try container.encode(purchasedProductIDs, forKey: .purchasedProductIDs)
             try container.encode(consumableGrants, forKey: .consumableGrants)
             try container.encode(processedTransactionIDs, forKey: .processedTransactionIDs)
+            try container.encode(redeemedFloorplanGrantIDs, forKey: .redeemedFloorplanGrantIDs)
         }
     }
 
     private let kMirrorKey = "yx_iap_entitlement_mirror_v2"
     private let kMirrorSealKey = "yx_iap_entitlement_mirror_seal"
-    private let kKeychainSealAccount = "com.yanxiang.compass.iap.seal.key"
-    private let kLegacyKeychainSealAccount = "com.yanxiang.luopan.iap.seal.key"
+    private let kSealedMirrorKey = "yx_iap_sealed_ledger_v1"
+    private let sealKeyStore = IAPSealKeyStore()
+    private var ledgerStorageUnavailable = false
+    /// Apple can still restore memberships while an old consumable ledger is
+    /// unreadable. Keep those verified rights in memory without overwriting it.
+    private var verifiedMembershipFallback: EntitlementMirror?
+    private let storageFeedbackLock = NSLock()
+    private var didReportStorageFailure = false
+
+    private struct SealedMirrorEnvelope: Codable {
+        let data: Data
+        let seal: String
+    }
     // 旧版（v1）本地标志，仅供一次性迁移读取，不再作为权益真值
     private let kIsVIP = "yx_iap_is_vip"
     private let kIsLifetime = "yx_iap_is_lifetime"
@@ -345,14 +553,16 @@ public class StoreKitIAPManager: ObservableObject {
     private var lastProductsFetchDate: Date?
     private let productsRetryInterval: TimeInterval = 30
     private let entitlementLock = NSLock()
-    private var entitlementRevision = 0
+    private var entitlementScans = EntitlementScanCoordinator()
     private var revokedEntitlementTransactionIDs = Set<UInt64>()
     /// In-flight exports reserve a slot in memory and only debit the durable
     /// balance after the deliverable succeeds.  A process termination therefore
     /// cannot permanently destroy a paid credit. Active operations own their
     /// reservation until completion, cancellation, or controller teardown.
-    private var activeTianjiReservations = TianjiCreditReservations()
+    private var activeTianjiReservations = ConsumableCreditReservations()
+    private var activeFloorplanReservations = ConsumableCreditReservations()
     private var transactionListener: Task<Void, Never>?
+    private var unfinishedTransactionsTask: Task<Void, Never>?
     private var verificationTask: Task<Void, Never>?
     /// 内存镜像（主线程读写），避免 SwiftUI 每帧 JSON 解码 + HMAC
     private var cachedMirror: EntitlementMirror?
@@ -389,6 +599,7 @@ public class StoreKitIAPManager: ObservableObject {
         self.tianjiCreditsCount = mirror?.isAuthoritative == true ? (mirror?.tianjiCredits ?? 0) : 0
         // 3. 交易监听（续期/退款/跨设备恢复/Ask to Buy 结果）
         listenForTransactions()
+        retryUnfinishedTransactions()
         // 4. 权威对账（currentEntitlements 驱动，验证完成即覆写镜像）
         runVerification()
         fetchProducts()
@@ -396,6 +607,7 @@ public class StoreKitIAPManager: ObservableObject {
 
     deinit {
         transactionListener?.cancel()
+        unfinishedTransactionsTask?.cancel()
         verificationTask?.cancel()
     }
 
@@ -429,50 +641,101 @@ public class StoreKitIAPManager: ObservableObject {
     /// 假设调用方已持有 entitlementLock。
     private func currentMirrorLocked() -> EntitlementMirror? {
         if !cachedMirrorLoadedFromStorage {
-            cachedMirror = readMirrorFromStorage()
-            cachedMirrorLoadedFromStorage = true
+            do {
+                cachedMirror = try readMirrorFromStorage()
+                if let verified = verifiedMembershipFallback {
+                    if cachedMirror == nil { cachedMirror = verified }
+                    else { cachedMirror?.applyMembershipSnapshot(from: verified) }
+                    verifiedMembershipFallback = nil
+                }
+                cachedMirrorLoadedFromStorage = true
+                ledgerStorageUnavailable = false
+                resetStorageFailureFeedback()
+            } catch {
+                // Retry later and preserve every stored byte. An inaccessible
+                // key is not evidence that the customer has no paid balance.
+                ledgerStorageUnavailable = true
+                reportLedgerStorageFailure()
+                return verifiedMembershipFallback
+            }
         }
         return cachedMirror
     }
 
-    private func readMirrorFromStorage() -> EntitlementMirror? {
-        guard let data = UserDefaults.standard.data(forKey: kMirrorKey),
-              let seal = UserDefaults.standard.string(forKey: kMirrorSealKey),
-              let mirror = try? JSONDecoder().decode(EntitlementMirror.self, from: data) else {
-            return nil
+    private func readMirrorFromStorage() throws -> EntitlementMirror? {
+        let defaults = UserDefaults.standard
+        let data: Data
+        let seal: String
+        if let envelopeData = defaults.data(forKey: kSealedMirrorKey) {
+            let envelope = try JSONDecoder().decode(SealedMirrorEnvelope.self, from: envelopeData)
+            data = envelope.data
+            seal = envelope.seal
+        } else {
+            guard let legacyData = defaults.data(forKey: kMirrorKey) else { return nil }
+            guard let legacySeal = defaults.string(forKey: kMirrorSealKey) else {
+                throw IAPLedgerStorageError.invalidMirror
+            }
+            data = legacyData
+            seal = legacySeal
         }
+        let mirror = try JSONDecoder().decode(EntitlementMirror.self, from: data)
+        // Do not generate a replacement key for an existing paid ledger.
+        let key = try sealKeyStore.key(createIfMissing: false)
         // Mirrors written before per-transaction consumable grants were added
         // used the v2 payload. Accept that seal once and re-seal on the next
         // entitlement/transaction write so upgrades do not discard a valid
         // local cache.
-        guard computeMirrorSeal(mirror) == seal
-                || computeV3MirrorSeal(mirror) == seal
-                || computePreConsumableGrantSeal(mirror) == seal
-                || computeLegacyMirrorSeal(mirror) == seal else {
-            return nil
+        guard computeMirrorSeal(mirror, using: key) == seal
+                || (mirror.redeemedFloorplanGrantIDs.isEmpty && (
+                    computeV4MirrorSeal(mirror, using: key) == seal
+                    || computeV3MirrorSeal(mirror, using: key) == seal
+                    || computePreConsumableGrantSeal(mirror, using: key) == seal
+                    || computeLegacyMirrorSeal(mirror, using: key) == seal)) else {
+            throw IAPLedgerStorageError.invalidMirror
         }
         return mirror
     }
 
     /// 覆写镜像（带锁）。
-    private func updateMirror(_ mirror: EntitlementMirror) {
+    @discardableResult
+    private func updateMirror(_ mirror: EntitlementMirror) -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        updateMirrorLocked(mirror)
+        return updateMirrorLocked(mirror)
     }
 
     /// 假设调用方已持有 entitlementLock。
-    private func updateMirrorLocked(_ mirror: EntitlementMirror) {
-        cachedMirror = mirror
-        cachedMirrorLoadedFromStorage = true
-        let data = (try? JSONEncoder().encode(mirror)) ?? Data()
-        UserDefaults.standard.set(data, forKey: kMirrorKey)
-        UserDefaults.standard.set(computeMirrorSeal(mirror), forKey: kMirrorSealKey)
+    @discardableResult
+    private func updateMirrorLocked(_ mirror: EntitlementMirror) -> Bool {
+        guard !ledgerStorageUnavailable else { reportLedgerStorageFailure(); return false }
+        do {
+            let key = try sealKeyStore.key()
+            let data = try JSONEncoder().encode(mirror)
+            let envelope = SealedMirrorEnvelope(data: data, seal: computeMirrorSeal(mirror, using: key))
+            // The payload and seal must be a single defaults value. Separate
+            // writes can leave a valid paid ledger with a mismatched old seal.
+            UserDefaults.standard.set(try JSONEncoder().encode(envelope), forKey: kSealedMirrorKey)
+            cachedMirror = mirror
+            cachedMirrorLoadedFromStorage = true
+            resetStorageFailureFeedback()
+            UserDefaults.standard.removeObject(forKey: kMirrorKey)
+            UserDefaults.standard.removeObject(forKey: kMirrorSealKey)
+            return true
+        } catch {
+            reportLedgerStorageFailure()
+            return false
+        }
     }
 
-    private func computeMirrorSeal(_ mirror: EntitlementMirror) -> String {
+    private func computeMirrorSeal(_ mirror: EntitlementMirror, using key: SymmetricKey) -> String {
+        let legacySeal = computeV4MirrorSeal(mirror, using: key)
+        let payload = "v5|\(legacySeal)|\(mirror.redeemedFloorplanGrantIDs.sorted().joined(separator: ","))"
+        let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
+        return Data(mac).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func computeV4MirrorSeal(_ mirror: EntitlementMirror, using key: SymmetricKey) -> String {
         let payload = "v4|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(mirror.vipActive ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))|\(consumableGrantSealPayload(mirror.consumableGrants))"
-        let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
@@ -480,10 +743,9 @@ public class StoreKitIAPManager: ObservableObject {
     /// Seal format used by the immediately preceding mirror version (v3),
     /// which predates the vipActive Apple-grant flag. It remains readable so
     /// an upgrade does not discard a valid local cache; the next authoritative
-    /// verification re-seals with the v4 payload.
-    private func computeV3MirrorSeal(_ mirror: EntitlementMirror) -> String {
+    /// verification re-seals with the current payload.
+    private func computeV3MirrorSeal(_ mirror: EntitlementMirror, using key: SymmetricKey) -> String {
         let payload = "v3|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))|\(consumableGrantSealPayload(mirror.consumableGrants))"
-        let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
@@ -492,16 +754,14 @@ public class StoreKitIAPManager: ObservableObject {
     /// already included processed transaction IDs but did not track grant
     /// ownership. It remains readable so an upgrade does not discard a valid
     /// local balance.
-    private func computePreConsumableGrantSeal(_ mirror: EntitlementMirror) -> String {
+    private func computePreConsumableGrantSeal(_ mirror: EntitlementMirror, using key: SymmetricKey) -> String {
         let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))|\(mirror.processedTransactionIDs.sorted().joined(separator: ","))"
-        let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
 
-    private func computeLegacyMirrorSeal(_ mirror: EntitlementMirror) -> String {
+    private func computeLegacyMirrorSeal(_ mirror: EntitlementMirror, using key: SymmetricKey) -> String {
         let payload = "v2|\(Int64(mirror.verifiedAt.timeIntervalSince1970.rounded()))|\(mirror.isAuthoritative ? 1 : 0)|\(mirror.isLifetime ? 1 : 0)|\(Int64(mirror.vipExpireDate.rounded()))|\(mirror.floorplanCredits)|\(mirror.tianjiCredits)|\(mirror.purchasedProductIDs.sorted().joined(separator: ","))"
-        let key = deviceSealSymmetricKey()
         let mac = HMAC<SHA256>.authenticationCode(for: Data(payload.utf8), using: key)
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
@@ -511,6 +771,22 @@ public class StoreKitIAPManager: ObservableObject {
             guard let grant = grants[transactionID] else { return nil }
             return "\(transactionID):\(grant.productID):\(grant.consumed ? 1 : 0):\(grant.revoked ? 1 : 0)"
         }.joined(separator: ",")
+    }
+
+    private func reportLedgerStorageFailure() {
+        storageFeedbackLock.lock()
+        guard !didReportStorageFailure else { storageFeedbackLock.unlock(); return }
+        didReportStorageFailure = true
+        storageFeedbackLock.unlock()
+        DispatchQueue.main.async { [weak self] in
+            self?.lastErrorMessage = LocalizationManager.shared.t("iap_storage_unavailable")
+        }
+    }
+
+    private func resetStorageFailureFeedback() {
+        storageFeedbackLock.lock()
+        didReportStorageFailure = false
+        storageFeedbackLock.unlock()
     }
 
     /// 一次性迁移 v1 本地标志（仅当镜像不存在时执行）。
@@ -543,7 +819,7 @@ public class StoreKitIAPManager: ObservableObject {
         guard var mirror = currentMirrorLocked() else { return }
         let merged = Set(mirror.processedTransactionIDs).union(legacyIDs)
         mirror.processedTransactionIDs = merged.sorted()
-        updateMirrorLocked(mirror)
+        guard updateMirrorLocked(mirror) else { return }
         UserDefaults.standard.removeObject(forKey: kProcessedTransactionIDs)
     }
 
@@ -561,11 +837,13 @@ public class StoreKitIAPManager: ObservableObject {
     }
 
     public var canUseFloorplan: Bool {
-        guard let mirror = currentMirror(), mirror.isAuthoritative else { return false }
-        return hasUnlockedVIP || mirror.floorplanCredits > 0
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
+        return isVIPUnlocked() || mirror.floorplanCredits > activeFloorplanReservations.count
     }
 
-    /// Family room allocation is an annual subscription service, separate from case credits.
+    /// Both membership products include family room allocation; case credits do not.
     public var canUseFamilyRoomAllocation: Bool {
         currentMirror()?.allowsFamilyRoomAllocation(at: Date()) == true
     }
@@ -649,7 +927,7 @@ public class StoreKitIAPManager: ObservableObject {
     /// refund. A credit already spent cannot be reconstructed locally; the
     /// server ledger remains required for cross-device and post-consumption
     /// refund policy.
-    private func revokeConsumableGrant(productID: String, transactionID: String) {
+    private func revokeConsumableGrant(productID: String, transactionID: String) -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
         // A revocation can be delivered immediately after the purchase and
@@ -657,9 +935,11 @@ public class StoreKitIAPManager: ObservableObject {
         // authoritative.  The transaction itself is already StoreKit
         // verified, so revoke a matching grant regardless of that snapshot
         // flag; otherwise the credit could survive until a later sync.
-        guard var mirror = currentMirrorLocked(),
+        let stored = currentMirrorLocked()
+        guard !ledgerStorageUnavailable else { return false }
+        guard var mirror = stored,
               var grant = mirror.consumableGrants[transactionID],
-              !grant.revoked else { return }
+              !grant.revoked else { return true }
         grant.revoked = true
         mirror.consumableGrants[transactionID] = grant
         if !grant.consumed, let kind = productKind(for: productID) {
@@ -672,49 +952,88 @@ public class StoreKitIAPManager: ObservableObject {
                 break
             }
         }
-        updateMirrorLocked(mirror)
+        guard updateMirrorLocked(mirror) else { return false }
         let floorplan = mirror.floorplanCredits
         let tianji = mirror.tianjiCredits
         DispatchQueue.main.async { [weak self] in
             self?.floorplanCreditsCount = floorplan
             self?.tianjiCreditsCount = tianji
         }
+        return true
     }
 
     // MARK: - 消费型商品记账（仅苹果已验证交易背书下增减）
 
-    /// Issue a device-bound grant after a verified floorplan credit is
-    /// consumed. Saved layouts store this grant instead of trusting a mutable
-    /// boolean in UserDefaults.
-    public func issueFloorplanAccessGrant() -> FloorplanAccessGrant {
+    /// Compatibility migration for previously paid unsigned layouts only.
+    /// New purchases must use reserve/commit so a failed save never debits.
+    public func issueFloorplanAccessGrant() -> FloorplanAccessGrant? {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        _ = currentMirrorLocked()
+        guard !ledgerStorageUnavailable else { return nil }
         let id = UUID().uuidString
-        return FloorplanAccessGrant(id: id, signature: floorplanGrantSignature(for: id))
+        do {
+            return FloorplanAccessGrant(id: id, signature: try floorplanGrantSignature(for: id, createKey: true))
+        } catch {
+            reportLedgerStorageFailure()
+            return nil
+        }
     }
 
     public func validateFloorplanAccessGrant(_ grant: FloorplanAccessGrant) -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
         guard !grant.id.isEmpty, !grant.signature.isEmpty else { return false }
-        return floorplanGrantSignature(for: grant.id) == grant.signature
+        guard (try? floorplanGrantSignature(for: grant.id)) == grant.signature else { return false }
+        return !grant.requiresCommittedDebit
+            || currentMirrorLocked()?.redeemedFloorplanGrantIDs.contains(grant.id) == true
     }
 
-    private func floorplanGrantSignature(for id: String) -> String {
+    private func floorplanGrantSignature(for id: String, createKey: Bool = false) throws -> String {
         let payload = Data("floorplan-grant-v1|\(id)".utf8)
-        let mac = HMAC<SHA256>.authenticationCode(for: payload, using: deviceSealSymmetricKey())
+        let mac = HMAC<SHA256>.authenticationCode(for: payload,
+                                                 using: try sealKeyStore.key(createIfMissing: createKey))
         return Data(mac).map { String(format: "%02x", $0) }.joined()
     }
 
-    public func consumeFloorplanCredit() -> Bool {
+    public func reserveFloorplanCredit() -> FloorplanAccessGrant? {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative else { return false }
-        if isVIPUnlocked() { return true }
-        guard mirror.floorplanCredits > 0 else { return false }
-        var updated = mirror
-        updated.floorplanCredits -= 1
-        markConsumableGrantConsumedLocked(kind: .floorplanSingle, mirror: &updated)
-        updateMirrorLocked(updated)
-        let remain = updated.floorplanCredits
+        guard let mirror = currentMirrorLocked(), mirror.isAuthoritative, !isVIPUnlocked(),
+              mirror.floorplanCredits > activeFloorplanReservations.count else { return nil }
+        let id = "floorplan-v2-\(UUID().uuidString)"
+        do {
+            let signature = try floorplanGrantSignature(for: id)
+            guard activeFloorplanReservations.reserve(availableCredits: mirror.floorplanCredits, token: id) != nil else { return nil }
+            return FloorplanAccessGrant(id: id, signature: signature)
+        } catch {
+            reportLedgerStorageFailure()
+            return nil
+        }
+    }
+
+    /// The caller must first persist the layout containing this grant. The
+    /// debit and grant activation then become one sealed ledger transition.
+    public func commitFloorplanCreditReservation(_ grant: FloorplanAccessGrant) -> Bool {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard grant.requiresCommittedDebit,
+              (try? floorplanGrantSignature(for: grant.id)) == grant.signature,
+              var mirror = currentMirrorLocked() else { return false }
+        if mirror.redeemedFloorplanGrantIDs.contains(grant.id) { return true }
+        guard activeFloorplanReservations.contains(grant.id), mirror.redeemFloorplanGrant(grant.id) else { return false }
+        markConsumableGrantConsumedLocked(kind: .floorplanSingle, mirror: &mirror)
+        guard updateMirrorLocked(mirror) else { return false }
+        activeFloorplanReservations.finish(grant.id)
+        let remain = mirror.floorplanCredits
         DispatchQueue.main.async { [weak self] in self?.floorplanCreditsCount = remain }
         return true
+    }
+
+    public func cancelFloorplanCreditReservation(_ grant: FloorplanAccessGrant) {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        activeFloorplanReservations.finish(grant.id)
     }
 
     public func consumeTianjiCredit() -> Bool {
@@ -726,7 +1045,7 @@ public class StoreKitIAPManager: ObservableObject {
         var updated = mirror
         updated.tianjiCredits -= 1
         markConsumableGrantConsumedLocked(kind: .tianjiSingle, mirror: &updated)
-        updateMirrorLocked(updated)
+        guard updateMirrorLocked(updated) else { return false }
         let remain = updated.tianjiCredits
         DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
         return true
@@ -749,12 +1068,13 @@ public class StoreKitIAPManager: ObservableObject {
     public func commitTianjiCreditReservation(_ token: String) {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard activeTianjiReservations.finish(token) else { return }
+        guard activeTianjiReservations.contains(token) else { return }
         guard var mirror = currentMirrorLocked(), mirror.isAuthoritative,
               mirror.tianjiCredits > 0 else { return }
         mirror.tianjiCredits -= 1
         markConsumableGrantConsumedLocked(kind: .tianjiSingle, mirror: &mirror)
-        updateMirrorLocked(mirror)
+        guard updateMirrorLocked(mirror) else { return }
+        activeTianjiReservations.finish(token)
         let remain = mirror.tianjiCredits
         DispatchQueue.main.async { [weak self] in self?.tianjiCreditsCount = remain }
     }
@@ -772,11 +1092,12 @@ public class StoreKitIAPManager: ObservableObject {
     /// credit in the same sealed mirror write. Replayed transactions return
     /// false but are still finished by the caller, so a crash cannot either
     /// lose a credit or leave a transaction permanently pending.
-    private func applyVerifiedTransactionIfNeeded(productID: String, transactionID: String) -> Bool {
+    private func applyVerifiedTransactionIfNeeded(productID: String, transactionID: String) throws -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
         guard let kind = productKind(for: productID) else { return false }
         var mirror = currentMirrorLocked() ?? freshEmptyMirror()
+        guard !ledgerStorageUnavailable else { throw IAPLedgerStorageError.persistenceFailed }
         // Migrate the legacy unsealed ledger into the sealed mirror before
         // checking the transaction. This prevents an old build's processed ID
         // from minting a second credit after upgrade.
@@ -803,7 +1124,7 @@ public class StoreKitIAPManager: ObservableObject {
         case .vipYearly, .proLifetime:
             break
         }
-        updateMirrorLocked(mirror)
+        guard updateMirrorLocked(mirror) else { throw IAPLedgerStorageError.persistenceFailed }
         if !legacyIDs.isEmpty {
             UserDefaults.standard.removeObject(forKey: kProcessedTransactionIDs)
         }
@@ -993,16 +1314,18 @@ public class StoreKitIAPManager: ObservableObject {
     /// StoreKit 2 没有独立的 restore transaction API：用户主动恢复时先
     /// 调用 `AppStore.sync()`，再以 `Transaction.currentEntitlements` 对账。
     /// 消费型额度仍是本地账本，不由 Apple 的恢复流程重新发放。
-    public func restorePurchases() {
+    public func restorePurchases(onCompletion: ((String) -> Void)? = nil) {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
-                self?.restorePurchases()
+                self?.restorePurchases(onCompletion: onCompletion)
             }
             return
         }
+        guard !isProcessingPurchase else { return }
         lastErrorMessage = nil
         lastStatusMessage = nil
-        guard !isProcessingPurchase else { return }
+        beginRestoreReconciliation()
+        isRestoringPurchases = true
         isProcessingPurchase = true
         Task {
             do {
@@ -1010,30 +1333,54 @@ public class StoreKitIAPManager: ObservableObject {
                 // but an explicit user restore must ask the App Store to sync
                 // first (especially after an account/device change).
                 try await AppStore.sync()
-                await self.verifyEntitlementsAsync()
-                var unlockedList: [String] = []
-                if self.isVIP() { unlockedList.append(IAPProductID.vipYearly.rawValue) }
-                if self.isLifetime() { unlockedList.append(IAPProductID.proLifetime.rawValue) }
-                let unlocked = unlockedList
+                await self.reconcileUnfinishedTransactions()
+                var outcome = await self.verifyEntitlementsAsync(restoring: true)
+                // A verified refund can invalidate an in-flight restore scan.
+                // Re-read once with the latest revoked-transaction set.
+                if case .superseded = outcome { outcome = await self.verifyEntitlementsAsync(restoring: true) }
+                let environment = await self.currentRestoreEnvironment()
+                let finalOutcome = outcome
                 await MainActor.run {
-                    if unlocked.isEmpty {
-                        // Consumable credits are intentionally not restorable by
-                        // StoreKit; only report the absence of restorable
-                        // subscriptions/non-consumables.
-                        self.lastStatusMessage = LocalizationManager.shared.t("iap_restore_none")
-                    } else {
-                        self.lastStatusMessage = nil
-                    }
+                    self.endRestoreReconciliation()
+                    self.isRestoringPurchases = false
                     self.isProcessingPurchase = false
-                    self.delegate?.iapManagerDidRestorePurchases(unlockedProductIds: unlocked)
+                    switch finalOutcome {
+                    case .verified(let confirmed):
+                        // A refund can arrive while the environment lookup is
+                        // awaiting Apple. Report only rights still present now.
+                        let unlocked = self.currentMirror()?.restoredProductIDs(confirmed: confirmed, at: Date()) ?? []
+                        let message = LocalizationManager.shared.t(unlocked.isEmpty
+                            ? environment.noPurchasesMessageKey : "iap_restore_success")
+                        if let onCompletion { onCompletion(message) }
+                        else { self.lastStatusMessage = message }
+                        self.delegate?.iapManagerDidRestorePurchases(unlockedProductIds: unlocked)
+                    case .unavailable, .superseded:
+                        let message = LocalizationManager.shared.t("iap_restore_unavailable")
+                        if let onCompletion { onCompletion(message) }
+                        else { self.lastErrorMessage = message }
+                    }
                 }
             } catch {
                 await MainActor.run {
+                    self.endRestoreReconciliation()
+                    self.isRestoringPurchases = false
                     self.isProcessingPurchase = false
-                    self.lastErrorMessage = error.localizedDescription
+                    if let onCompletion { onCompletion(error.localizedDescription) }
+                    else { self.lastErrorMessage = error.localizedDescription }
                 }
             }
         }
+    }
+
+    private func currentRestoreEnvironment() async -> PurchaseRestoreEnvironment {
+        if let result = try? await AppTransaction.shared, case .verified(let transaction) = result {
+            if transaction.environment == .sandbox { return .sandbox }
+            if transaction.environment == .xcode { return .xcode }
+            if transaction.environment == .production { return .production }
+        }
+        // Older sandbox installations may not have an app transaction yet.
+        if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" { return .sandbox }
+        return .unknown
     }
 
     /// Clear one-shot UI feedback when a payment screen is presented again.
@@ -1070,6 +1417,23 @@ public class StoreKitIAPManager: ObservableObject {
         }
     }
 
+    private func reconcileUnfinishedTransactions() async {
+        for await result in Transaction.unfinished {
+            guard !Task.isCancelled else { return }
+            if case .verified(let transaction) = result {
+                await handleTransactionUpdate(transaction)
+            }
+        }
+    }
+
+    private func retryUnfinishedTransactions() {
+        guard unfinishedTransactionsTask == nil else { return }
+        unfinishedTransactionsTask = Task { [weak self] in
+            await self?.reconcileUnfinishedTransactions()
+            self?.unfinishedTransactionsTask = nil
+        }
+    }
+
     private func handleTransactionUpdate(_ transaction: Transaction) async {
         let pid = transaction.productID
         guard isSupportedProductID(pid) else {
@@ -1086,7 +1450,7 @@ public class StoreKitIAPManager: ObservableObject {
             if let kind = productKind(for: pid) {
                 switch kind {
                 case .floorplanSingle, .tianjiSingle:
-                    revokeConsumableGrant(productID: pid, transactionID: String(transaction.id))
+                    guard revokeConsumableGrant(productID: pid, transactionID: String(transaction.id)) else { return }
                 case .vipYearly, .proLifetime:
                     revokePaidEntitlement(productID: pid, transactionID: transaction.id)
                 }
@@ -1097,7 +1461,13 @@ public class StoreKitIAPManager: ObservableObject {
         }
 
         let txId = String(transaction.id)
-        let didProcess = applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        let didProcess: Bool
+        do {
+            didProcess = try applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        } catch {
+            await reportPurchasePersistenceFailure(productID: pid)
+            return // Keep the Apple transaction unfinished for a later retry.
+        }
         // Always finish a replay as well. A previous crash may have committed
         // the ledger but not reached finish(), and returning early would leave
         // StoreKit delivering the same transaction forever.
@@ -1112,7 +1482,7 @@ public class StoreKitIAPManager: ObservableObject {
         guard didProcess else { return }
 
         await MainActor.run {
-            self.isProcessingPurchase = false
+            if !self.isRestoringPurchases { self.isProcessingPurchase = false }
             self.lastCompletedProductID = pid
             self.delegate?.iapManagerDidCompletePurchase(productId: pid, transactionId: txId)
         }
@@ -1122,7 +1492,13 @@ public class StoreKitIAPManager: ObservableObject {
     private func handleVerified(_ transaction: Transaction) async {
         let pid = transaction.productID
         let txId = String(transaction.id)
-        let didProcess = applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        let didProcess: Bool
+        do {
+            didProcess = try applyVerifiedTransactionIfNeeded(productID: pid, transactionID: txId)
+        } catch {
+            await reportPurchasePersistenceFailure(productID: pid)
+            return
+        }
         await transaction.finish()
 
         // 订阅/非消耗品：即使交易 ID 已入账，也重新权威对账刷新到期日。
@@ -1139,6 +1515,15 @@ public class StoreKitIAPManager: ObservableObject {
             self.isProcessingPurchase = false
             self.lastCompletedProductID = pid
             self.delegate?.iapManagerDidCompletePurchase(productId: pid, transactionId: txId)
+        }
+    }
+
+    private func reportPurchasePersistenceFailure(productID: String) async {
+        await MainActor.run {
+            if !self.isRestoringPurchases { self.isProcessingPurchase = false }
+            let message = LocalizationManager.shared.t("iap_storage_unavailable")
+            self.lastErrorMessage = message
+            self.delegate?.iapManagerDidFailPurchase(productId: productID, errorMsg: message)
         }
     }
 
@@ -1271,19 +1656,33 @@ public class StoreKitIAPManager: ObservableObject {
     /// reconciliation. Older scans cannot commit over this state transition.
     private func revokePaidEntitlement(productID: String, transactionID: UInt64) {
         entitlementLock.lock()
-        entitlementRevision += 1
+        entitlementScans.revoke()
         revokedEntitlementTransactionIDs.insert(transactionID)
         var mirror = currentMirrorLocked() ?? freshEmptyMirror()
         mirror.revokePaidProduct(productID)
-        updateMirrorLocked(mirror)
+        if ledgerStorageUnavailable { verifiedMembershipFallback = mirror }
+        else { updateMirrorLocked(mirror) }
         entitlementLock.unlock()
         DispatchQueue.main.async { [weak self] in self?.publishCurrentEntitlements() }
     }
 
-    private func entitlementScanState() -> (revision: Int, revokedIDs: Set<UInt64>) {
+    private func beginRestoreReconciliation() {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        return (entitlementRevision, revokedEntitlementTransactionIDs)
+        entitlementScans.beginRestore()
+    }
+
+    private func endRestoreReconciliation() {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        entitlementScans.endRestore()
+    }
+
+    private func entitlementScanState(restoring: Bool) -> (revision: Int, revokedIDs: Set<UInt64>)? {
+        entitlementLock.lock()
+        defer { entitlementLock.unlock() }
+        guard let revision = entitlementScans.beginScan(restoring: restoring) else { return nil }
+        return (revision, revokedEntitlementTransactionIDs)
     }
 
     /// Call on the main thread and read the latest committed mirror, so a
@@ -1308,7 +1707,7 @@ public class StoreKitIAPManager: ObservableObject {
                                             expectedRevision: Int) -> Bool {
         entitlementLock.lock()
         defer { entitlementLock.unlock() }
-        guard entitlementRevision == expectedRevision else { return false }
+        guard entitlementScans.canCommit(expectedRevision) else { return false }
         var mirror = currentMirrorLocked() ?? freshEmptyMirror()
         mirror.verifiedAt = Date()
         mirror.isAuthoritative = true
@@ -1316,8 +1715,13 @@ public class StoreKitIAPManager: ObservableObject {
         mirror.vipActive = vipActive
         mirror.vipExpireDate = vipExpire
         mirror.purchasedProductIDs = purchasedProductIDs.sorted()
-        updateMirrorLocked(mirror)
-        return true
+        if ledgerStorageUnavailable {
+            // Only verified membership fields are available in this fallback;
+            // never trust or re-mint a balance whose seal cannot be checked.
+            verifiedMembershipFallback = mirror
+            return true
+        }
+        return updateMirrorLocked(mirror)
     }
 
     /// Re-evaluate time-based entitlements when the app returns to foreground.
@@ -1329,6 +1733,7 @@ public class StoreKitIAPManager: ObservableObject {
             }
             return
         }
+        retryUnfinishedTransactions()
         runVerification()
     }
 
@@ -1341,20 +1746,28 @@ public class StoreKitIAPManager: ObservableObject {
     /// 订阅有效性以「苹果当前是否仍授予」为准，而不是只看本地镜像里抄来
     /// 的到期日：
     /// - currentEntitlements 中未撤销的年度订阅即视为授予中（该序列只含
-    ///   subscribed / inGracePeriod），宽限期与账单重试期保持可用；
+    ///   subscribed / inGracePeriod），宽限期保持可用；
     /// - 本地缓存为空（对账瞬间 currentEntitlements 尚未同步）而镜像此前
     ///   有效时，先查 Product.SubscriptionInfo.status 二次确认：状态为
     ///   subscribed/inGracePeriod 保持订阅可用；明确 expired/revoked 则收回。
     ///   信息不足时仅保留旧订阅状态；终身权益独立按当前交易快照对账。
-    private func verifyEntitlementsAsync() async {
-        let scan = entitlementScanState()
+    /// - 用户主动恢复时始终复核订阅状态，不要求旧镜像中已经有订阅。
+    @discardableResult
+    private func verifyEntitlementsAsync(restoring: Bool = false) async -> EntitlementVerificationOutcome {
+        guard let scan = entitlementScanState(restoring: restoring) else { return .superseded }
         var isLifetime = false
         var vipActive = false
         var vipExpire: TimeInterval = 0
         var purchasedProductIDs: [String] = []
+        var confirmedProductIDs: [String] = []
+        var encounteredUnverifiedTransaction = false
+        var subscriptionStatusUnavailable = false
 
         for await entitlement in Transaction.currentEntitlements {
-            guard case .verified(let tx) = entitlement else { continue }
+            guard case .verified(let tx) = entitlement else {
+                encounteredUnverifiedTransaction = true
+                continue
+            }
             guard tx.revocationDate == nil, !scan.revokedIDs.contains(tx.id) else { continue }
             guard let product = productKind(for: tx.productID) else { continue }
             purchasedProductIDs.append(tx.productID)
@@ -1362,10 +1775,12 @@ public class StoreKitIAPManager: ObservableObject {
             case .proLifetime:
                 // 非消耗品：未撤销则永久有效（退款后自动移出 currentEntitlements）
                 isLifetime = true
+                confirmedProductIDs.append(IAPProductID.proLifetime.rawValue)
             case .vipYearly:
                 // 出现在 currentEntitlements 中 = 苹果当前授予（订阅中或宽限中），
                 // 不因 expirationDate 已过而锁；expirationDate 仅作展示与兜底。
                 vipActive = true
+                confirmedProductIDs.append(IAPProductID.vipYearly.rawValue)
                 if let exp = tx.expirationDate {
                     vipExpire = max(vipExpire, exp.timeIntervalSince1970)
                 }
@@ -1380,15 +1795,18 @@ public class StoreKitIAPManager: ObservableObject {
             let prev = currentMirror()
             let prevActive = prev?.isAuthoritative == true
                 && (prev?.vipActive == true || (prev?.vipExpireDate ?? 0) > Date().timeIntervalSince1970)
-            if prevActive {
-                switch await currentSubscriptionRenewalState() {
-                case .active:
+            if restoring || prevActive {
+                switch await currentSubscriptionRenewalState(loadIfNeeded: restoring, revokedIDs: scan.revokedIDs) {
+                case .active(let productID, let expiration):
                     vipActive = true
-                    vipExpire = prev?.vipExpireDate ?? 0
+                    vipExpire = expiration?.timeIntervalSince1970 ?? 0
+                    purchasedProductIDs.append(productID)
+                    confirmedProductIDs.append(IAPProductID.vipYearly.rawValue)
                 case .inactive:
                     // 明确 expired/revoked → 允许覆写收回
                     break
                 case .unknown:
+                    subscriptionStatusUnavailable = true
                     // Preserve only the prior subscription while offline.
                     // Never skip reconciliation of the lifetime entitlement.
                     vipActive = prev?.vipActive ?? false
@@ -1400,6 +1818,12 @@ public class StoreKitIAPManager: ObservableObject {
             }
         }
 
+        // An unverified transaction or failed lookup is not proof that the
+        // customer never bought anything. Preserve the cache and report retry.
+        if restoring && confirmedProductIDs.isEmpty && (encounteredUnverifiedTransaction || subscriptionStatusUnavailable) {
+            return .unavailable
+        }
+
         // 覆写镜像验证段（保留账本段；消费型商品不因验证清零/恢复）
         guard persistEntitlementSnapshot(
             isLifetime: isLifetime,
@@ -1407,95 +1831,51 @@ public class StoreKitIAPManager: ObservableObject {
             vipExpire: vipExpire,
             purchasedProductIDs: purchasedProductIDs,
             expectedRevision: scan.revision
-        ) else { return }
+        ) else { return .superseded }
 
         // 发布 UI（主线程）
         await MainActor.run {
             self.publishCurrentEntitlements()
         }
+        return .verified(Array(Set(confirmedProductIDs)).sorted())
     }
 
     /// 用 Product.SubscriptionInfo.status 确认苹果侧订阅续期状态。
-    /// 纯读属性，不触发任何登录弹窗；商品尚未加载时返回 unknown。
-    private func currentSubscriptionRenewalState() async -> SubscriptionRenewalStateSummary {
-        guard let product = availableProducts[IAPProductID.vipYearly.rawValue],
-              let subscription = product.subscription else {
-            return .unknown
+    /// Restore must work before the paywall has loaded any product metadata.
+    private func currentSubscriptionRenewalState(loadIfNeeded: Bool, revokedIDs: Set<UInt64>) async -> SubscriptionRenewalStateSummary {
+        var product = await MainActor.run { self.availableProducts[IAPProductID.vipYearly.rawValue] }
+        if product == nil && loadIfNeeded {
+            do {
+                let products = try await Product.products(for: [IAPProductID.vipYearly.rawValue])
+                product = products.first { $0.id == IAPProductID.vipYearly.rawValue && $0.type == .autoRenewable }
+            } catch {
+                return .unknown
+            }
         }
+        guard let subscription = product?.subscription else { return .unknown }
         guard let statuses = try? await subscription.status else {
             return .unknown
         }
-        let states = statuses.map { $0.state }
-        if states.isEmpty { return .inactive }
-        if states.contains(where: { $0 == .subscribed || $0 == .inGracePeriod }) {
-            return .active
+        var hasUnverifiedStatus = false
+        for status in statuses {
+            guard case .verified(let transaction) = status.transaction,
+                  case .verified = status.renewalInfo else {
+                hasUnverifiedStatus = true
+                continue
+            }
+            guard productKind(for: transaction.productID) == .vipYearly,
+                  transaction.revocationDate == nil, !revokedIDs.contains(transaction.id) else { continue }
+            if status.state == .subscribed || status.state == .inGracePeriod {
+                return .active(productID: transaction.productID, expiration: transaction.expirationDate)
+            }
         }
-        if states.contains(where: { $0 == .expired || $0 == .revoked }) {
-            return .inactive
-        }
-        return .unknown
+        return hasUnverifiedStatus ? .unknown : .inactive
     }
 
     private enum SubscriptionRenewalStateSummary {
-        case active
+        case active(productID: String, expiration: Date?)
         case inactive
         case unknown
     }
 
-    // MARK: - Keychain HMAC 防篡改保护（镜像封印）
-
-    /// 获取或生成保存在 Keychain 中的设备级 256-bit HMAC 密钥（向下兼容旧版 Keychain 账户迁移）
-    private func deviceSealSymmetricKey() -> SymmetricKey {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: kKeychainSealAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecSuccess, let keyData = item as? Data, keyData.count >= 32 {
-            return SymmetricKey(data: keyData)
-        }
-
-        // 向下兼容旧版 Keychain 账户 "com.yanxiang.luopan.iap.seal.key"，平滑迁移至 "com.yanxiang.compass.iap.seal.key"
-        let legacyQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: kLegacyKeychainSealAccount,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var legacyItem: CFTypeRef?
-        if SecItemCopyMatching(legacyQuery as CFDictionary, &legacyItem) == errSecSuccess,
-           let legacyKeyData = legacyItem as? Data, legacyKeyData.count >= 32 {
-            let migrateQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrAccount as String: kKeychainSealAccount,
-                kSecValueData as String: legacyKeyData,
-                kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-            ]
-            SecItemDelete(migrateQuery as CFDictionary)
-            SecItemAdd(migrateQuery as CFDictionary, nil)
-            return SymmetricKey(data: legacyKeyData)
-        }
-
-        var randomBytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
-        let vendorSalt = UIDevice.current.identifierForVendor?.uuidString ?? "com.yanxiang.compass.device"
-        var combined = Data(randomBytes)
-        if let vendorData = vendorSalt.data(using: .utf8) {
-            combined.append(vendorData)
-        }
-        let derivedKeyData = Data(SHA256.hash(data: combined))
-
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrAccount as String: kKeychainSealAccount,
-            kSecValueData as String: derivedKeyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
-        SecItemDelete(addQuery as CFDictionary)
-        SecItemAdd(addQuery as CFDictionary, nil)
-        return SymmetricKey(data: derivedKeyData)
-    }
 }

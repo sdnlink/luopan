@@ -1,5 +1,6 @@
 """Regression coverage for project errors that prevent xcodebuild from opening it."""
 import unittest
+import plistlib
 
 from check_swift_target_dependencies import PROJECT, source_phases, validate_project_structure
 
@@ -72,6 +73,45 @@ class ProjectStructureTests(unittest.TestCase):
     def test_empty_project_cannot_pass(self):
         with self.assertRaisesRegex(ValueError, "No Xcode object definitions found"):
             validate_project_structure('{}')
+
+    def test_app_manifest_covers_ar_interval_timing(self):
+        app = PROJECT.parent.parent / "TiandiLuopan"
+        self.assertIn("systemUptime", (app / "Views/ARVision/ARSpatialSurveyView.swift").read_text())
+        manifest = plistlib.loads((app / "PrivacyInfo.xcprivacy").read_bytes())
+        reasons = {entry["NSPrivacyAccessedAPIType"]: entry["NSPrivacyAccessedAPITypeReasons"]
+                   for entry in manifest["NSPrivacyAccessedAPITypes"]}
+        self.assertIn("35F9.1", reasons.get("NSPrivacyAccessedAPICategorySystemBootTime", []))
+
+    def test_both_manifests_declare_app_group_defaults(self):
+        ios = PROJECT.parent.parent
+        for target in ["TiandiLuopan", "TiandiLuopanWidget"]:
+            manifest = plistlib.loads((ios / target / "PrivacyInfo.xcprivacy").read_bytes())
+            reasons = {entry["NSPrivacyAccessedAPIType"]: entry["NSPrivacyAccessedAPITypeReasons"]
+                       for entry in manifest["NSPrivacyAccessedAPITypes"]}
+            self.assertIn("1C8F.1", reasons.get("NSPrivacyAccessedAPICategoryUserDefaults", []), target)
+
+    def test_public_terms_are_complete_in_all_supported_languages(self):
+        from html.parser import HTMLParser
+        from pathlib import Path
+
+        class Sections(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids = []
+
+            def handle_starttag(self, tag, attrs):
+                if tag == "section":
+                    self.ids.append(dict(attrs).get("id"))
+
+        root = Path(__file__).resolve().parents[2]
+        for name in ["privacy.html", "subscription-terms.html"]:
+            content = (root / "docs" / name).read_text()
+            parser = Sections()
+            parser.feed(content)
+            self.assertEqual(set(parser.ids), {"zh-CN", "zh-TW", "en", "ja", "ko", "th", "vi", "id"})
+            self.assertEqual(len(parser.ids), 8)
+            for placeholder in ["请按实际情况确认", "confirm whether newly added", "【新規追加"]:
+                self.assertNotIn(placeholder, content)
 
 
 if __name__ == "__main__":

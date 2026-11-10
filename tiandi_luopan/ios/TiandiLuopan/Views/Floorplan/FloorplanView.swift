@@ -411,7 +411,7 @@ public struct FloorplanView: View {
         guard iap.canUseFamilyRoomAllocation, familyProfile.isProfileEnabled else { return [] }
         let people = FamilyRoomAllocationEngine.people(profile: familyProfile)
         return FamilyRoomAllocationEngine.resolve(manual: familyRoomAssignments, rooms: rooms, people: people, centroid: centroid,
-            heading: effectiveHeading, aspectRatio: floorplanAspectRatio, hasAnnualAccess: true)
+            heading: effectiveHeading, aspectRatio: floorplanAspectRatio, hasMembershipAccess: true)
     }
 
     private var familyRoomLabels: [String: String] {
@@ -589,8 +589,8 @@ public struct FloorplanView: View {
                 // A paid case grant follows the active layout. Replacing the
                 // image therefore starts a new editable case without charging
                 // a second credit for the same active one-shot entitlement.
-                if !iap.hasUnlockedVIP && !didConsumeFloorplanCredit {
-                    guard iap.consumeFloorplanCredit() else {
+                if !hasFloorplanAccess {
+                    guard iap.canUseFloorplan else {
                         // UIImagePickerController updates the binding before
                         // this callback. Restore the previous plan when the
                         // user tries to switch without another entitlement.
@@ -598,10 +598,6 @@ public struct FloorplanView: View {
                         showPaywall = true
                         return
                     }
-                    didConsumeFloorplanCredit = true
-                    let grant = iap.issueFloorplanAccessGrant()
-                    floorplanAccessGrantID = grant.id
-                    floorplanAccessGrantSignature = grant.signature
                 }
                 if replacingExistingPlan {
                     // A new plan has a different coordinate system. Do not
@@ -621,9 +617,16 @@ public struct FloorplanView: View {
                 surveyMapping = nil
                 houseFacingWasExplicit = nil
                 restoredAspectRatio = 1
-                replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
+                let saved = hasFloorplanAccess ? persistLayout() : acquireFloorplanAccess()
+                if saved {
+                    replaceSpatialArchives(measured: nil, virtual: nil, exterior: [])
+                    // Publish the same saved plan under its new property ID
+                    // so other windows do not keep the previous property's ID.
+                    persistLayout()
+                } else {
+                    applyWorkspaceSnapshot(workspaceStore.snapshot)
+                }
                 floorplanImageBeforePicker = nil
-                persistLayout()
                 refreshAudit(force: true)
             }
         }
@@ -731,6 +734,19 @@ public struct FloorplanView: View {
             FloorplanAuditStore.shared.clear()
             refreshAudit(force: true)
         }
+        .onChange(of: iap.floorplanCreditsCount) { _ in
+            // Another scene can observe the saved layout before its credit
+            // commit. Activate that grant when the ledger publication arrives.
+            guard !didConsumeFloorplanCredit,
+                  let saved = workspaceStore.snapshot.layout,
+                  saved.hasFloorplanAccess,
+                  let id = saved.floorplanAccessGrantID,
+                  let signature = saved.floorplanAccessGrantSignature,
+                  iap.validateFloorplanAccessGrant(FloorplanAccessGrant(id: id, signature: signature)) else { return }
+            floorplanAccessGrantID = id
+            floorplanAccessGrantSignature = signature
+            didConsumeFloorplanCredit = true
+        }
         .onChange(of: iap.canUseFamilyRoomAllocation) { _ in
             reportExportGeneration &+= 1
             exportedReportImage = nil
@@ -791,7 +807,7 @@ public struct FloorplanView: View {
         guard ShaSurveyStore.shared.isCurrentProperty(propertyID) else { return false }
         let sanitizedRooms = rooms.map { sanitizedRoom($0) }
         let resolvedHeading = compassHeading.map { normalizedHeading($0) } ?? CompassMotionManager.shared.headingState.facingAngle
-        let previousGrant: (Bool, String?, String?) = {
+        let previousGrant: (Bool, String?, String?)? = {
             guard let data = UserDefaults.standard.data(forKey: savedLayoutKey),
                   let previous = try? JSONDecoder().decode(SavedFloorplanLayout.self, from: data),
                   previous.hasFloorplanAccess,
@@ -809,9 +825,10 @@ public struct FloorplanView: View {
             // One-time migration for layouts written before grants were
             // signed. The old grant was already created only after a local
             // credit debit; re-seal it immediately for subsequent writes.
-            let migrated = StoreKitIAPManager.shared.issueFloorplanAccessGrant()
+            guard let migrated = StoreKitIAPManager.shared.issueFloorplanAccessGrant() else { return nil }
             return (true, migrated.id, migrated.signature)
         }()
+        guard let previousGrant else { return false }
         let saved = SavedFloorplanLayout(
             rooms: sanitizedRooms,
             centroidX: Double(clampedUnit(Double(centroid.x), fallback: 0.5)),
@@ -866,6 +883,10 @@ public struct FloorplanView: View {
         exportedReportImage = nil
         reloadSpatialSurveyArchives()
         familyRoomAssignments = nil
+        userFloorplanImage = snapshot.image
+        didConsumeFloorplanCredit = false
+        floorplanAccessGrantID = nil
+        floorplanAccessGrantSignature = nil
         guard let saved = snapshot.layout else { return }
         var restoredIDs = Set<String>()
         let restoredRooms = saved.rooms.map { room -> FloorplanRoom in
@@ -910,7 +931,7 @@ public struct FloorplanView: View {
             } else if saved.floorplanAccessGrantSignature == nil {
                 // Migrate one legacy unsigned grant and persist the signed
                 // replacement below. Invalid signed data remains locked.
-                let migrated = iap.issueFloorplanAccessGrant()
+                guard let migrated = iap.issueFloorplanAccessGrant() else { return }
                 floorplanAccessGrantID = migrated.id
                 floorplanAccessGrantSignature = migrated.signature
                 didConsumeFloorplanCredit = true
@@ -984,18 +1005,19 @@ public struct FloorplanView: View {
     /// Keep the image outside UserDefaults and store only the small editable
     /// layout model there. This avoids a large synchronous defaults write when
     /// a user imports a camera photo or a high-resolution floor plan.
-    private func persistLayout() {
+    @discardableResult
+    private func persistLayout(accessGrant: FloorplanAccessGrant? = nil) -> Bool {
         let saved = SavedFloorplanLayout(
             rooms: rooms,
             centroidX: Double(centroid.x),
             centroidY: Double(centroid.y),
             compassRotation: Self.normalizedHeading(effectiveHeading),
             isSyncWithCompass: isSyncWithCompass,
-            hasFloorplanAccess: didConsumeFloorplanCredit
+            hasFloorplanAccess: accessGrant != nil || (didConsumeFloorplanCredit
                 && floorplanAccessGrantID != nil
-                && floorplanAccessGrantSignature != nil,
-            floorplanAccessGrantID: floorplanAccessGrantID,
-            floorplanAccessGrantSignature: floorplanAccessGrantSignature,
+                && floorplanAccessGrantSignature != nil),
+            floorplanAccessGrantID: accessGrant?.id ?? floorplanAccessGrantID,
+            floorplanAccessGrantSignature: accessGrant?.signature ?? floorplanAccessGrantSignature,
             aspectRatio: Double(floorplanAspectRatio),
             widthMeters: calibratedWidthMeters.map { Double($0) },
             depthMeters: calibratedDepthMeters.map { Double($0) },
@@ -1004,15 +1026,20 @@ public struct FloorplanView: View {
             surveyMapping: surveyMapping,
             familyRoomAssignments: familyRoomAssignments
         )
-        guard didRestorePersistedLayout else { return }
+        guard didRestorePersistedLayout else { return false }
         do {
             let accepted = try workspaceStore.save(layout: saved, image: userFloorplanImage,
                                                     writerID: workspaceWriterID, expectedRevision: workspaceRevision,
                                                     expectedPropertyID: workspacePropertyID)
             if accepted { workspaceRevision = workspaceStore.snapshot.revision }
-            else { applyWorkspaceSnapshot(workspaceStore.snapshot) }
+            else {
+                applyWorkspaceSnapshot(workspaceStore.snapshot)
+                caseBackupToastMessage = lang.t("save_failed")
+            }
+            return accepted
         } catch {
             caseBackupToastMessage = lang.t("save_failed")
+            return false
         }
     }
 
@@ -1702,17 +1729,35 @@ public struct FloorplanView: View {
 
     private func acquireFloorplanAccess() -> Bool {
         if iap.hasUnlockedVIP || didConsumeFloorplanCredit { return true }
-        guard iap.consumeFloorplanCredit() else {
+        let outcome = FloorplanCreditPurchase.acquire(
+            reserve: { iap.reserveFloorplanCredit() },
+            persist: { persistLayout(accessGrant: $0) },
+            commit: { iap.commitFloorplanCreditReservation($0) },
+            cancel: { iap.cancelFloorplanCreditReservation($0) }
+        )
+        switch outcome {
+        case .unavailable:
+            if iap.floorplanCreditsCount > 0 {
+                caseBackupToastMessage = lang.t("iap_storage_unavailable")
+                return false
+            }
             paywallDefaultProduct = .floorplanSingle
             showPaywall = true
             return false
+        case .saveFailed:
+            return false
+        case .commitFailed:
+            // The uncommitted grant is invalid even if this cleanup write
+            // fails. The paid balance remains available for another attempt.
+            persistLayout()
+            caseBackupToastMessage = lang.t("iap_storage_unavailable")
+            return false
+        case .completed(let grant):
+            didConsumeFloorplanCredit = true
+            floorplanAccessGrantID = grant.id
+            floorplanAccessGrantSignature = grant.signature
+            return true
         }
-        didConsumeFloorplanCredit = true
-        let grant = iap.issueFloorplanAccessGrant()
-        floorplanAccessGrantID = grant.id
-        floorplanAccessGrantSignature = grant.signature
-        persistLayout()
-        return true
     }
     
     // MARK: - 顶栏控制
@@ -3415,7 +3460,7 @@ public struct FloorplanView: View {
         let familySnapshot = FamilyRoomExportSnapshot(manual: familyRoomAssignments, rooms: roomsToDraw,
             people: FamilyRoomAllocationEngine.people(profile: familyProfile), centroid: snapshot.centroid,
             heading: snapshot.heading, aspectRatio: snapshot.aspectRatio,
-            hasAnnualAccess: iap.canUseFamilyRoomAllocation, includePeople: showFamilyRoomLabels)
+            hasMembershipAccess: iap.canUseFamilyRoomAllocation, includePeople: showFamilyRoomLabels)
         let personLabels = familySnapshot.labels
         let report = snapshot.report + familySnapshot.report
         let heading = snapshot.heading
@@ -3619,7 +3664,14 @@ private struct FloorplanReportShareSheet: UIViewControllerRepresentable {
     let items: [Any]
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = controller.popoverPresentationController {
+            popover.sourceView = controller.view
+            popover.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY,
+                                        width: 1, height: 1)
+            popover.permittedArrowDirections = []
+        }
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

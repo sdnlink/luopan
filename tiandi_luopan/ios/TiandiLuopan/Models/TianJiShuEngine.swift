@@ -249,8 +249,8 @@ public class TianJiShuEngine {
             let sSize = subTitle.size(withAttributes: subAttr)
             subTitle.draw(at: CGPoint(x: (size.width - sSize.width) / 2, y: 165), withAttributes: subAttr)
             
-            // 防伪编号与福主尊称署名
-            let snLabel = tr8("防伪鉴真号", "防偽鑒真號", "Verification No.", "識別真贋番号", "감정 진위 번호", "Mã xác thực", "หมายเลขตรวจสอบ", "No. Verifikasi")
+            // 报告编号与福主尊称署名（编号仅用于识别报告）
+            let snLabel = tr8("报告编号", "報告編號", "Report No.", "レポート番号", "보고서 번호", "Mã báo cáo", "หมายเลขรายงาน", "No. Laporan")
             let sn = "\(snLabel): YX-\(Int(reportDate.timeIntervalSince1970))-\(Int.random(in: 1000...9999))"
             sn.draw(at: CGPoint(x: 100, y: 220), withAttributes: [
                 .font: UIFont.monospacedSystemFont(ofSize: 18, weight: .regular),

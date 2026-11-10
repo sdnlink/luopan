@@ -682,6 +682,7 @@ public struct OwnerLifeGuaView: View {
     @ObservedObject private var kua = UserKuaProfileManager.shared
     @Environment(\.presentationMode) private var presentationMode
     @State private var showFamilySection = true
+    @State private var showProfileData = false
     @State private var activeSheet: Sheet?
     private enum Sheet: String, Identifiable {
         case editOwnerKua, addFamilyMember
@@ -693,39 +694,44 @@ public struct OwnerLifeGuaView: View {
     public var body: some View {
         NavigationView {
             ScrollView {
-                OwnerGuaVIPGate {
-                VStack(alignment: .leading, spacing: 14) {
-                    DisclosureGroup(lang.t("analysis_usage")) {
-                        Text(lang.t("bz_owner_intro"))
-                    }
-                        .adaptiveFont(size: 12)
-                        .foregroundColor(.white.opacity(0.75))
-                        .padding(.horizontal, 16)
-                    Toggle(lang.t("bz_owner_enable"), isOn: $kua.isProfileEnabled)
-                        .adaptiveFont(size: 13)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                    if kua.isProfileEnabled {
-                        Text(lang.t("bz_tool_context") + " · " + context.sittingMountain.localizedName + lang.t("mountain_suffix"))
-                            .adaptiveFont(size: 11)
-                            .foregroundColor(Color.yanCyan)
-                            .padding(.horizontal, 16)
-                        ownerKuaCard(sittingPalace: context.sittingMountain.palace)
-                        Button {
-                            presentationMode.wrappedValue.dismiss()
-                            AppNavigationRouter.shared.requestRoute(tab: 2)
-                        } label: {
-                            Label(lang.t("fra_open_plan") + " · " + lang.t("fra_annual"), systemImage: "person.2.fill")
-                                .font(.system(size: 13, weight: .semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(12)
-                                .background(Color.yanCyan.opacity(0.12))
-                                .cornerRadius(10)
+                VStack {
+                    Button(lang.t("profile_data_title")) { showProfileData = true }
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.top, 12)
+                    OwnerGuaVIPGate {
+                        VStack(alignment: .leading, spacing: 14) {
+                            DisclosureGroup(lang.t("analysis_usage")) {
+                                Text(lang.t("bz_owner_intro"))
+                            }
+                                .adaptiveFont(size: 12)
+                                .foregroundColor(.white.opacity(0.75))
+                                .padding(.horizontal, 16)
+                            Toggle(lang.t("bz_owner_enable"), isOn: $kua.isProfileEnabled)
+                                .adaptiveFont(size: 13)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                            if kua.isProfileEnabled {
+                                Text(lang.t("bz_tool_context") + " · " + context.sittingMountain.localizedName + lang.t("mountain_suffix"))
+                                    .adaptiveFont(size: 11)
+                                    .foregroundColor(Color.yanCyan)
+                                    .padding(.horizontal, 16)
+                                ownerKuaCard(sittingPalace: context.sittingMountain.palace)
+                                Button {
+                                    presentationMode.wrappedValue.dismiss()
+                                    AppNavigationRouter.shared.requestRoute(tab: 2)
+                                } label: {
+                                    Label(lang.t("fra_open_plan") + " · " + lang.t("fra_membership"), systemImage: "person.2.fill")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .frame(maxWidth: .infinity)
+                                        .padding(12)
+                                        .background(Color.yanCyan.opacity(0.12))
+                                        .cornerRadius(10)
+                                }
+                                .padding(.horizontal, 16)
+                            }
                         }
-                        .padding(.horizontal, 16)
                     }
-                }
-                .padding(.vertical, 16)
+                    .padding(.vertical, 16)
                 }
             }
             .background(Color(red: 0.07, green: 0.07, blue: 0.09).ignoresSafeArea())
@@ -753,6 +759,14 @@ public struct OwnerLifeGuaView: View {
                     })
                 }
                 }
+            }
+            .sheet(isPresented: $showProfileData) {
+                NavigationView {
+                    PersonalProfileDataView()
+                        .toolbar { ToolbarItem(placement: .navigationBarTrailing) {
+                            Button(lang.t("done")) { showProfileData = false }
+                        } }
+                }.navigationViewStyle(StackNavigationViewStyle())
             }
         }
         .navigationViewStyle(.stack)

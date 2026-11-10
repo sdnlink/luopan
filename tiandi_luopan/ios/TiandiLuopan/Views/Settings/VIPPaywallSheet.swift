@@ -78,18 +78,7 @@ public struct VIPLockCardView: View {
                     .cornerRadius(8)
                 }
                 
-                Button(action: {
-                    StoreKitIAPManager.shared.restorePurchases()
-                }) {
-                    Text(LocalizationManager.shared.t("restore_purchases_btn"))
-                        .adaptiveFont(size: 11)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.08))
-                        .foregroundColor(Color.yanCyan)
-                        .cornerRadius(8)
-                }
+                RestorePurchasesButton()
             }
         }
         .padding(14)
@@ -118,6 +107,44 @@ public struct VIPLockCardView: View {
     }
 }
 
+struct RestorePurchasesButton: View {
+    var presentsResult = true
+    @ObservedObject private var iap = StoreKitIAPManager.shared
+    @ObservedObject private var lang = LocalizationManager.shared
+    @State private var resultMessage = ""
+    @State private var showResult = false
+
+    var body: some View {
+        Button {
+            if presentsResult {
+                iap.restorePurchases { message in
+                    resultMessage = message
+                    showResult = true
+                }
+            } else {
+                iap.restorePurchases()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if iap.isRestoringPurchases { ProgressView().tint(Color.yanCyan) }
+                Text(lang.t(iap.isRestoringPurchases ? "iap_restoring" : "restore_purchases"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundColor(Color.yanCyan)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(iap.isProcessingPurchase)
+        .alert(lang.t("restore_purchases"), isPresented: $showResult) {
+            Button(lang.t("done"), role: .cancel) {}
+        } message: {
+            Text(resultMessage)
+        }
+    }
+}
+
 /// Shared by both direct purchase entry points. Keep the full billing details
 /// and legal links immediately above the purchase action on every screen size.
 struct PurchaseDisclosureView: View {
@@ -132,6 +159,10 @@ struct PurchaseDisclosureView: View {
             Text(iap.subscriptionPurchaseTerms(for: productID)?.title ?? productID.title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
+            if productID.includesAllFeatures {
+                Text(lang.t("membership_benefits_notice"))
+                    .font(.system(size: 12)).foregroundColor(.white.opacity(0.8))
+            }
             if productID == .vipYearly {
                 if let terms = iap.subscriptionPurchaseTerms(for: productID) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -182,7 +213,6 @@ struct PurchaseDisclosureView: View {
 // MARK: - 全功能专业版 VIP 收银台弹窗 (VIP Paywall Sheet)
 
 public struct VIPPaywallSheet: View {
-    private let annualOnly: Bool
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var iap = StoreKitIAPManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
@@ -193,9 +223,8 @@ public struct VIPPaywallSheet: View {
     @State private var alertIsError: Bool = false
     @State private var showAlert: Bool = false
     
-    public init(defaultProductId: IAPProductID = .vipYearly, annualOnly: Bool = false) {
-        self.annualOnly = annualOnly
-        _selectedProductId = State(initialValue: annualOnly ? IAPProductID.vipYearly.rawValue : defaultProductId.rawValue)
+    public init(defaultProductId: IAPProductID = .vipYearly) {
+        _selectedProductId = State(initialValue: defaultProductId.rawValue)
     }
     
     public var body: some View {
@@ -215,13 +244,13 @@ public struct VIPPaywallSheet: View {
                                 .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
                                 .padding(.top, 12)
                             
-                            Text(annualOnly ? lang.t("fra_title") : selectedIsSingleProduct
+                            Text(selectedIsSingleProduct
                                  ? selectedIAPProduct.title
                                  : LocalizationManager.shared.t("vip_sheet_title"))
                                 .adaptiveFont(size: 18, weight: .bold)
                                 .foregroundColor(.white)
                             
-                            Text(annualOnly ? lang.t("fra_paywall") : selectedIsSingleProduct
+                            Text(selectedIsSingleProduct
                                  ? selectedIAPProduct.desc
                                  : LocalizationManager.shared.t("vip_sheet_subtitle"))
                                 .adaptiveFont(size: 11)
@@ -231,18 +260,14 @@ public struct VIPPaywallSheet: View {
                         // 2. 核心特权清单。单次商品只展示它实际解锁的
                         // 一项服务，避免把一次导出误解成全量 VIP。
                         VStack(spacing: 8) {
-                            if annualOnly {
-                                privilegeItem(icon: "person.2.fill", title: lang.t("fra_title"), desc: lang.t("fra_paywall"))
-                            } else if selectedIsSingleProduct {
+                            if selectedIsSingleProduct {
                                 privilegeItem(
                                     icon: selectedProductId == IAPProductID.floorplanSingle.rawValue ? "house.fill" : "scroll.fill",
                                     title: selectedIAPProduct.title,
                                     desc: selectedIAPProduct.desc
                                 )
                             } else {
-                                if selectedIAPProduct == .vipYearly {
-                                    privilegeItem(icon: "person.2.fill", title: lang.t("fra_title"), desc: lang.t("fra_paywall"))
-                                }
+                                privilegeItem(icon: "person.2.fill", title: lang.t("fra_title"), desc: lang.t("fra_paywall"))
                                 privilegeItem(icon: "person.2.fill", title: LocalizationManager.shared.t("bz_tool_owner"), desc: LocalizationManager.shared.t("bz_owner_vip_desc"))
                                 privilegeItem(icon: "sparkles", title: LocalizationManager.shared.t("privilege_qimen_title"), desc: LocalizationManager.shared.t("privilege_qimen_desc"))
                                 privilegeItem(icon: "calendar.badge.clock", title: LocalizationManager.shared.t("privilege_purplewhite_title"), desc: LocalizationManager.shared.t("privilege_purplewhite_desc"))
@@ -265,7 +290,7 @@ public struct VIPPaywallSheet: View {
                                 isSelected: selectedProductId == IAPProductID.vipYearly.rawValue
                             )
                             
-                            if !annualOnly {
+                            Group {
                                 productChoiceCard(
                                     id: .proLifetime,
                                     tag: LocalizationManager.shared.t("product_pro_lifetime_tag"),
@@ -338,13 +363,7 @@ public struct VIPPaywallSheet: View {
                             }
                             .disabled(iap.isProcessingPurchase || iap.isLoadingProducts || !iap.canPurchaseProduct(for: selectedIAPProduct))
                             
-                            Button(action: {
-                                iap.restorePurchases()
-                            }) {
-                                Text(LocalizationManager.shared.t("restore_purchases"))
-                                    .adaptiveFont(size: 11)
-                                    .foregroundColor(Color.yanCyan)
-                            }
+                            RestorePurchasesButton(presentsResult: false)
                             .padding(.top, 2)
                         }
                         .padding(.horizontal, 16)
@@ -374,13 +393,13 @@ public struct VIPPaywallSheet: View {
             iap.refreshProductsIfNeeded()
         }
         .onReceive(iap.$isVIPUser) { isVip in
-            if isVip && (!annualOnly || iap.canUseFamilyRoomAllocation) {
+            if isVip {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }
         }
         .onReceive(iap.$isLifetimeUser) { isLifetime in
-            if isLifetime && !annualOnly {
+            if isLifetime {
                 isPurchasing = false
                 presentationMode.wrappedValue.dismiss()
             }
@@ -398,7 +417,7 @@ public struct VIPPaywallSheet: View {
             }
         }
         .onReceive(iap.$isProcessingPurchase) { processing in
-            isPurchasing = processing
+            isPurchasing = processing && !iap.isRestoringPurchases
         }
         .onReceive(iap.$lastErrorMessage.compactMap { $0 }) { message in
             isPurchasing = false

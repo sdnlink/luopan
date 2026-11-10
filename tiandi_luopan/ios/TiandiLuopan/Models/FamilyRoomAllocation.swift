@@ -50,11 +50,11 @@ enum FamilyRoomAllocationEngine {
 
     static func resolve(manual: [FamilyRoomAssignment]?, rooms: [FloorplanRoom], people: [FamilyRoomPerson],
                         centroid: CGPoint, heading: Double, aspectRatio: CGFloat,
-                        hasAnnualAccess: Bool) -> [FamilyRoomAssignment] {
-        guard hasAnnualAccess else { return [] }
+                        hasMembershipAccess: Bool) -> [FamilyRoomAssignment] {
+        guard hasMembershipAccess else { return [] }
         if let manual { return cleaned(manual, rooms: rooms, people: people) }
         return recommend(rooms: rooms, people: people, centroid: centroid, heading: heading,
-                         aspectRatio: aspectRatio, hasAnnualAccess: true)
+                         aspectRatio: aspectRatio, hasMembershipAccess: true)
     }
 
     static func labels(assignments: [FamilyRoomAssignment], people: [FamilyRoomPerson]) -> [String: String] {
@@ -122,8 +122,8 @@ enum FamilyRoomAllocationEngine {
     /// Each person gets at most one bedroom and one shared study. Never propose sleeping
     /// in a kitchen/bathroom, or force an unfavorable bedroom when there is no match.
     static func recommend(rooms: [FloorplanRoom], people: [FamilyRoomPerson], centroid: CGPoint,
-                          heading: Double, aspectRatio: CGFloat, hasAnnualAccess: Bool) -> [FamilyRoomAssignment] {
-        guard hasAnnualAccess else { return [] }
+                          heading: Double, aspectRatio: CGFloat, hasMembershipAccess: Bool) -> [FamilyRoomAssignment] {
+        guard hasMembershipAccess else { return [] }
         var result: [FamilyRoomAssignment] = []
         for person in people {
             for study in [false, true] {
@@ -170,14 +170,14 @@ struct FamilyRoomExportSnapshot {
     let report: [FloorplanAuditItem]
 
     init(manual: [FamilyRoomAssignment]?, rooms: [FloorplanRoom], people: [FamilyRoomPerson],
-         centroid: CGPoint, heading: Double, aspectRatio: CGFloat, hasAnnualAccess: Bool, includePeople: Bool) {
-        guard hasAnnualAccess, includePeople, !people.isEmpty else {
+         centroid: CGPoint, heading: Double, aspectRatio: CGFloat, hasMembershipAccess: Bool, includePeople: Bool) {
+        guard hasMembershipAccess, includePeople, !people.isEmpty else {
             labels = [:]
             report = []
             return
         }
         let assignments = FamilyRoomAllocationEngine.resolve(manual: manual, rooms: rooms, people: people,
-            centroid: centroid, heading: heading, aspectRatio: aspectRatio, hasAnnualAccess: true)
+            centroid: centroid, heading: heading, aspectRatio: aspectRatio, hasMembershipAccess: true)
         var capturedLabels = FamilyRoomAllocationEngine.labels(assignments: assignments, people: people)
         var items: [FloorplanAuditItem] = []
         let lang = LocalizationManager.shared

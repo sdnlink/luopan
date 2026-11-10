@@ -886,64 +886,70 @@ public final class UserKuaProfileManager: ObservableObject {
     private let kEnabledKey = "tiandi_owner_profile_enabled"
     private let kFamilyMembersKey = "tiandi_family_members_v1"
 
+    private let profileDefaults: UserDefaults
+    private let profileSharedDefaults: UserDefaults?
+    private let legacyProfileCloud: NSUbiquitousKeyValueStore?
+    private var isErasingPersonalData = false
+
     @Published public var birthYear: Int {
         didSet {
+            guard !isErasingPersonalData else { return }
             let clamped = max(1919, min(2035, birthYear))
             if birthYear != clamped {
                 birthYear = clamped
                 return
             }
-            UserDefaults.standard.set(birthYear, forKey: kBirthYearKey)
-            LocalizationManager.sharedDefaults?.set(birthYear, forKey: kBirthYearKey)
-            NSUbiquitousKeyValueStore.default.set(Int64(birthYear), forKey: kBirthYearKey)
+            profileDefaults.set(birthYear, forKey: kBirthYearKey)
+            profileSharedDefaults?.set(birthYear, forKey: kBirthYearKey)
         }
     }
 
     @Published public var birthDate: Date {
         didSet {
-            UserDefaults.standard.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
-            LocalizationManager.sharedDefaults?.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
-            NSUbiquitousKeyValueStore.default.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
+            guard !isErasingPersonalData else { return }
+            profileDefaults.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
+            profileSharedDefaults?.set(birthDate.timeIntervalSince1970, forKey: kBirthDateKey)
         }
     }
 
     @Published public var isMale: Bool {
         didSet {
-            UserDefaults.standard.set(isMale, forKey: kIsMaleKey)
-            LocalizationManager.sharedDefaults?.set(isMale, forKey: kIsMaleKey)
-            NSUbiquitousKeyValueStore.default.set(isMale, forKey: kIsMaleKey)
+            guard !isErasingPersonalData else { return }
+            profileDefaults.set(isMale, forKey: kIsMaleKey)
+            profileSharedDefaults?.set(isMale, forKey: kIsMaleKey)
         }
     }
 
     @Published public var isProfileEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(isProfileEnabled, forKey: kEnabledKey)
-            LocalizationManager.sharedDefaults?.set(isProfileEnabled, forKey: kEnabledKey)
-            NSUbiquitousKeyValueStore.default.set(isProfileEnabled, forKey: kEnabledKey)
+            guard !isErasingPersonalData else { return }
+            profileDefaults.set(isProfileEnabled, forKey: kEnabledKey)
+            profileSharedDefaults?.set(isProfileEnabled, forKey: kEnabledKey)
         }
     }
 
     @Published public var familyMembers: [FamilyMemberProfile] = [] {
         didSet {
+            guard !isErasingPersonalData else { return }
             if let data = try? JSONEncoder().encode(familyMembers) {
-                UserDefaults.standard.set(data, forKey: kFamilyMembersKey)
-                LocalizationManager.sharedDefaults?.set(data, forKey: kFamilyMembersKey)
-                NSUbiquitousKeyValueStore.default.set(data, forKey: kFamilyMembersKey)
+                profileDefaults.set(data, forKey: kFamilyMembersKey)
+                profileSharedDefaults?.set(data, forKey: kFamilyMembersKey)
             }
         }
     }
 
-    private init() {
-        let shared = LocalizationManager.sharedDefaults
-        let cloud = NSUbiquitousKeyValueStore.default
-        let cloudYear = cloud.longLong(forKey: kBirthYearKey)
+    init(defaults: UserDefaults = .standard, sharedDefaults: UserDefaults? = LocalizationManager.sharedDefaults,
+         legacyCloud: NSUbiquitousKeyValueStore? = .default) {
+        self.profileDefaults = defaults
+        self.profileSharedDefaults = sharedDefaults
+        self.legacyProfileCloud = legacyCloud
+        let shared = sharedDefaults
         let savedYear = (shared?.object(forKey: kBirthYearKey) as? Int)
-            ?? (UserDefaults.standard.object(forKey: kBirthYearKey) as? Int)
-            ?? (cloudYear > 0 ? Int(cloudYear) : nil)
+            ?? (profileDefaults.object(forKey: kBirthYearKey) as? Int)
             ?? 1990
         let clampedYear = max(1920, min(2035, savedYear))
         let savedTimestamp = (shared?.object(forKey: kBirthDateKey) as? Double)
-            ?? (UserDefaults.standard.object(forKey: kBirthDateKey) as? Double)
+            ?? (profileDefaults.object(forKey: kBirthDateKey) as? Double)
             ?? {
                 var comp = DateComponents()
                 comp.year = clampedYear
@@ -953,26 +959,24 @@ public final class UserKuaProfileManager: ObservableObject {
             }()
             ?? Date().timeIntervalSince1970
         let savedMale = (shared?.object(forKey: kIsMaleKey) as? Bool)
-            ?? (UserDefaults.standard.object(forKey: kIsMaleKey) as? Bool)
+            ?? (profileDefaults.object(forKey: kIsMaleKey) as? Bool)
             ?? true
         let savedEnabled = (shared?.object(forKey: kEnabledKey) as? Bool)
-            ?? (UserDefaults.standard.object(forKey: kEnabledKey) as? Bool)
+            ?? (profileDefaults.object(forKey: kEnabledKey) as? Bool)
             ?? true
         self.birthDate = Date(timeIntervalSince1970: savedTimestamp)
         self.birthYear = Self.fengShuiYear(for: Date(timeIntervalSince1970: savedTimestamp))
         self.isMale = savedMale
         self.isProfileEnabled = savedEnabled
         if let fData = (shared?.data(forKey: kFamilyMembersKey))
-            ?? UserDefaults.standard.data(forKey: kFamilyMembersKey)
-            ?? cloud.data(forKey: kFamilyMembersKey),
+            ?? profileDefaults.data(forKey: kFamilyMembersKey),
            let restored = try? Self.restoringFamilyMembers(from: fData) {
             self.familyMembers = restored.profiles
             // Property observers do not run during initialization. Persist repaired IDs now,
             // before a floorplan can refer to an ID that would change on the next launch.
             if let migratedData = restored.migratedData {
-                UserDefaults.standard.set(migratedData, forKey: kFamilyMembersKey)
+                profileDefaults.set(migratedData, forKey: kFamilyMembersKey)
                 shared?.set(migratedData, forKey: kFamilyMembersKey)
-                cloud.set(migratedData, forKey: kFamilyMembersKey)
             }
         }
     }
@@ -1094,8 +1098,31 @@ public final class UserKuaProfileManager: ObservableObject {
         familyMembers[idx] = m
     }
 
+    /// Always available, including after membership expires. Remove profile copies
+    /// from local defaults, the App Group and the legacy iCloud store together.
+    public func deleteAllPersonalProfiles() {
+        isErasingPersonalData = true
+        familyMembers = []
+        isProfileEnabled = false
+        birthYear = 1990
+        birthDate = Self.gregorianCalendar().date(from: DateComponents(year: 1990, month: 6, day: 15)) ?? Date()
+        isMale = true
+        isErasingPersonalData = false
+        for key in [kBirthYearKey, kBirthDateKey, kIsMaleKey, kEnabledKey, kFamilyMembersKey] {
+            profileDefaults.removeObject(forKey: key)
+            profileSharedDefaults?.removeObject(forKey: key)
+            legacyProfileCloud?.removeObject(forKey: key)
+        }
+        // Keep only a disabled marker; reopening must not recreate an enabled profile.
+        profileDefaults.set(false, forKey: kEnabledKey)
+        profileSharedDefaults?.set(false, forKey: kEnabledKey)
+        legacyProfileCloud?.synchronize()
+    }
+
     public func removeFamilyMember(id: String) {
         familyMembers.removeAll { $0.id == id }
+        legacyProfileCloud?.removeObject(forKey: kFamilyMembersKey)
+        legacyProfileCloud?.synchronize()
     }
 
     public func addOrUpdateFamilyMember(role: FamilyRole, birthYear: Int, isMale: Bool) {
@@ -1109,6 +1136,8 @@ public final class UserKuaProfileManager: ObservableObject {
 
     public func removeFamilyMember(role: FamilyRole) {
         familyMembers.removeAll { $0.role == role }
+        legacyProfileCloud?.removeObject(forKey: kFamilyMembersKey)
+        legacyProfileCloud?.synchronize()
     }
 
     /// 根据后天洛书命卦公式计算本命卦洛书数 (1..9，5男寄坤2、女寄艮8)

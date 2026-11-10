@@ -2,6 +2,8 @@ import XCTest
 import UIKit
 import Combine
 import simd
+import CryptoKit
+import Security
 @testable import TiandiLuopan
 
 final class FunctionalRegressionTests: XCTestCase {
@@ -205,6 +207,84 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertTrue(mirror.purchasedProductIDs.isEmpty)
     }
 
+    func testManualRestoreInvalidatesPreSyncScansAndBlocksBackgroundRefreshes() throws {
+        var coordinator = EntitlementScanCoordinator()
+        let beforeSync = try XCTUnwrap(coordinator.beginScan(restoring: false))
+        coordinator.beginRestore()
+        XCTAssertFalse(coordinator.canCommit(beforeSync))
+        XCTAssertNil(coordinator.beginScan(restoring: false))
+        let restore = try XCTUnwrap(coordinator.beginScan(restoring: true))
+        XCTAssertNil(coordinator.beginScan(restoring: false))
+        XCTAssertTrue(coordinator.canCommit(restore))
+        coordinator.endRestore()
+        XCTAssertNotNil(coordinator.beginScan(restoring: false))
+    }
+
+    func testLaterEntitlementScanCannotBeOverwrittenByAnOlderScan() throws {
+        var coordinator = EntitlementScanCoordinator()
+        let old = try XCTUnwrap(coordinator.beginScan(restoring: false))
+        let latest = try XCTUnwrap(coordinator.beginScan(restoring: false))
+        XCTAssertFalse(coordinator.canCommit(old))
+        XCTAssertTrue(coordinator.canCommit(latest))
+    }
+
+    func testRefundDuringRestoreRejectsTheScanAndPermitsReconciliation() throws {
+        var coordinator = EntitlementScanCoordinator()
+        coordinator.beginRestore()
+        let scan = try XCTUnwrap(coordinator.beginScan(restoring: true))
+        coordinator.revoke()
+        XCTAssertFalse(coordinator.canCommit(scan))
+        let retry = try XCTUnwrap(coordinator.beginScan(restoring: true))
+        XCTAssertTrue(coordinator.canCommit(retry))
+        XCTAssertNil(coordinator.beginScan(restoring: false))
+    }
+
+    func testFailedRestoreReleasesTheBackgroundReconciliationGate() throws {
+        var coordinator = EntitlementScanCoordinator()
+        coordinator.beginRestore()
+        coordinator.endRestore()
+        XCTAssertFalse(coordinator.isRestoring)
+        XCTAssertNotNil(coordinator.beginScan(restoring: false))
+    }
+
+    func testRestoreReportsOnlyFreshlyVerifiedCurrentPaidProducts() {
+        let now = instant("2026-11-09T00:00:00Z")
+        var mirror = StoreKitIAPManager.EntitlementMirror(verifiedAt: now, isAuthoritative: true,
+            isLifetime: true, vipActive: false, vipExpireDate: 0, floorplanCredits: 3, tianjiCredits: 4,
+            purchasedProductIDs: [IAPProductID.proLifetime.rawValue])
+        let all = IAPProductID.allCases.map(\.rawValue)
+        XCTAssertEqual(mirror.restoredProductIDs(confirmed: all, at: now), [IAPProductID.proLifetime.rawValue])
+        XCTAssertEqual(mirror.restoredProductIDs(confirmed: [], at: now), [])
+        mirror.vipActive = true
+        XCTAssertEqual(Set(mirror.restoredProductIDs(confirmed: all, at: now)),
+                       Set([IAPProductID.vipYearly.rawValue, IAPProductID.proLifetime.rawValue]))
+        mirror.revokePaidProduct(IAPProductID.vipYearly.rawValue)
+        XCTAssertEqual(mirror.restoredProductIDs(confirmed: [IAPProductID.vipYearly.rawValue], at: now), [])
+        mirror.isAuthoritative = false
+        XCTAssertEqual(mirror.restoredProductIDs(confirmed: all, at: now), [])
+    }
+
+    @MainActor
+    func testRestoreFailureMessagesIdentifySandboxAndXcodeInAllLanguages() {
+        XCTAssertEqual(PurchaseRestoreEnvironment.sandbox.noPurchasesMessageKey, "iap_restore_none_sandbox")
+        XCTAssertEqual(PurchaseRestoreEnvironment.xcode.noPurchasesMessageKey, "iap_restore_none_xcode")
+        XCTAssertEqual(PurchaseRestoreEnvironment.production.noPurchasesMessageKey, "iap_restore_none")
+        XCTAssertEqual(PurchaseRestoreEnvironment.unknown.noPurchasesMessageKey, "iap_restore_none")
+        let lang = LocalizationManager.shared
+        let oldLanguage = lang.effectiveLanguage
+        defer { lang.effectiveLanguage = oldLanguage }
+        for language in AppLanguage.allCases where language != .auto {
+            lang.effectiveLanguage = language
+            for environment in [PurchaseRestoreEnvironment.production, .sandbox, .xcode, .unknown] {
+                let key = environment.noPurchasesMessageKey
+                XCTAssertNotEqual(lang.t(key), key)
+                XCTAssertFalse(lang.t(key).isEmpty)
+            }
+            XCTAssertNotEqual(lang.t("iap_restore_unavailable"), lang.t("iap_restore_none"))
+            XCTAssertNotEqual(lang.t("iap_restore_success"), "iap_restore_success")
+        }
+    }
+
     func testIncompleteSubscriptionDisclosuresCannotBeUsedForPurchasing() {
         XCTAssertNil(SubscriptionPurchaseTerms(title: " ", displayPrice: "$19.99", periodValue: 1, periodUnit: .year))
         XCTAssertNil(SubscriptionPurchaseTerms(title: "Annual VIP", displayPrice: "\n", periodValue: 1, periodUnit: .year))
@@ -378,7 +458,7 @@ final class FunctionalRegressionTests: XCTestCase {
     }
 
     func testExportReservationStaysActiveUntilExplicitCompletionAndCommitsOnce() throws {
-        var reservations = TianjiCreditReservations()
+        var reservations = ConsumableCreditReservations()
         let token = try XCTUnwrap(reservations.reserve(availableCredits: 1))
         // Repeated availability checks must not evict a still-presented share.
         for _ in 0..<100 { XCTAssertNil(reservations.reserve(availableCredits: 1)) }
@@ -389,7 +469,7 @@ final class FunctionalRegressionTests: XCTestCase {
     }
 
     func testCancellingOneExportDoesNotReleaseAnotherExportsCredit() throws {
-        var reservations = TianjiCreditReservations()
+        var reservations = ConsumableCreditReservations()
         let first = try XCTUnwrap(reservations.reserve(availableCredits: 2))
         let second = try XCTUnwrap(reservations.reserve(availableCredits: 2))
         XCTAssertTrue(reservations.finish(first))
@@ -397,6 +477,181 @@ final class FunctionalRegressionTests: XCTestCase {
         XCTAssertEqual(reservations.count, 1)
         XCTAssertNil(reservations.reserve(availableCredits: 1))
         XCTAssertTrue(reservations.finish(second))
+    }
+
+    func testSealKeyMigrationPreservesTheKeyAndCanBeReadFromABackup() throws {
+        let original = Data(repeating: 41, count: 32)
+        var keychain = [IAPSealKeyStore.legacyAccount: original]
+        var migratedAccounts: [String] = []
+        let store = IAPSealKeyStore(read: { keychain[$0] }, write: { account, bytes in
+            keychain[account] = bytes
+            return bytes
+        }, makeMigratable: { migratedAccounts.append($0) }, generate: {
+            XCTFail("An upgrade must not replace the existing seal key")
+            return Data(repeating: 0, count: 32)
+        })
+        XCTAssertEqual(try store.key().withUnsafeBytes { Data($0) }, original)
+        XCTAssertEqual(keychain[IAPSealKeyStore.account], original)
+        XCTAssertEqual(migratedAccounts, [IAPSealKeyStore.account])
+        let backup = keychain
+        let restored = IAPSealKeyStore(read: { backup[$0] }, write: { _, bytes in
+            XCTFail("A restored key must not be replaced")
+            return bytes
+        }, makeMigratable: { _ in })
+        XCTAssertEqual(try restored.key(createIfMissing: false).withUnsafeBytes { Data($0) }, original)
+    }
+
+    func testTemporarilyLockedKeychainDoesNotGenerateOrOverwriteAPaidLedgersKey() {
+        let store = IAPSealKeyStore(read: { _ in
+            throw IAPLedgerStorageError.keychain(errSecInteractionNotAllowed)
+        }, write: { _, bytes in
+            XCTFail("Read failures must never be treated as an absent key")
+            return bytes
+        }, makeMigratable: { _ in XCTFail("The key was not read") }, generate: {
+            XCTFail("A temporary Keychain error must not rotate the key")
+            return Data()
+        })
+        XCTAssertThrowsError(try store.key())
+    }
+
+    func testFailedKeyWriteIsNotCachedAndTheNextAttemptCanRecover() throws {
+        var persistedKey: Data?
+        var attempts = 0
+        let bytes = Data(repeating: 17, count: 32)
+        let store = IAPSealKeyStore(read: { _ in persistedKey }, write: { _, data in
+            attempts += 1
+            if attempts == 1 { throw IAPLedgerStorageError.keychain(errSecNotAvailable) }
+            persistedKey = data
+            return data
+        }, makeMigratable: { _ in }, generate: { bytes })
+        XCTAssertThrowsError(try store.key())
+        XCTAssertNil(persistedKey)
+        XCTAssertEqual(try store.key().withUnsafeBytes { Data($0) }, bytes)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(try store.key().withUnsafeBytes { Data($0) }, bytes)
+        XCTAssertEqual(attempts, 2)
+    }
+
+    func testMissingBackupKeyIsReportedWithoutGeneratingAReplacement() {
+        let store = IAPSealKeyStore(read: { _ in nil }, write: { _, bytes in
+            XCTFail("An existing ledger cannot be resealed with a new key")
+            return bytes
+        }, makeMigratable: { _ in }, generate: {
+            XCTFail("An existing ledger requires its original key")
+            return Data()
+        })
+        XCTAssertThrowsError(try store.key(createIfMissing: false))
+    }
+
+    func testRecoveredLedgerKeepsItsBalanceWhenVerifiedMembershipIsMerged() {
+        let now = Date()
+        var recovered = StoreKitIAPManager.EntitlementMirror(verifiedAt: .distantPast, isAuthoritative: false,
+            isLifetime: false, vipActive: false, vipExpireDate: 0, floorplanCredits: 3,
+            tianjiCredits: 2, purchasedProductIDs: [], processedTransactionIDs: ["paid-transaction"],
+            redeemedFloorplanGrantIDs: ["floorplan-v2-already-paid"])
+        let verified = StoreKitIAPManager.EntitlementMirror(verifiedAt: now, isAuthoritative: true,
+            isLifetime: true, vipActive: false, vipExpireDate: 0, floorplanCredits: 0,
+            tianjiCredits: 0, purchasedProductIDs: [IAPProductID.proLifetime.rawValue])
+        recovered.applyMembershipSnapshot(from: verified)
+        XCTAssertTrue(recovered.isLifetime)
+        XCTAssertTrue(recovered.isAuthoritative)
+        XCTAssertEqual(recovered.verifiedAt, now)
+        XCTAssertEqual(recovered.floorplanCredits, 3)
+        XCTAssertEqual(recovered.tianjiCredits, 2)
+        XCTAssertEqual(recovered.processedTransactionIDs, ["paid-transaction"])
+        XCTAssertEqual(recovered.redeemedFloorplanGrantIDs, ["floorplan-v2-already-paid"])
+    }
+
+    func testFailedAccessibilityMigrationRetainsTheOriginalKeyForRetry() throws {
+        let original = Data(repeating: 29, count: 32)
+        var canMigrate = false
+        let store = IAPSealKeyStore(read: { account in
+            account == IAPSealKeyStore.account ? original : nil
+        }, write: { _, bytes in
+            XCTFail("Accessibility changes must not delete or replace a key")
+            return bytes
+        }, makeMigratable: { _ in
+            if !canMigrate { throw IAPLedgerStorageError.keychain(errSecNotAvailable) }
+        })
+        XCTAssertThrowsError(try store.key())
+        canMigrate = true
+        XCTAssertEqual(try store.key().withUnsafeBytes { Data($0) }, original)
+    }
+
+    @MainActor
+    func testFailedFloorplanImageSaveReleasesItsReservationWithoutSpending() throws {
+        let suite = "failed-case-save-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let blocker = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try Data([1]).write(to: blocker) // A file cannot be the image directory.
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: blocker)
+        }
+        let workspace = FloorplanWorkspaceStore(defaults: defaults, directory: blocker)
+        var reservations = ConsumableCreditReservations()
+        let grant = FloorplanAccessGrant(id: "floorplan-v2-save-failure", signature: "test")
+        var didCommit = false
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 2, height: 2)).image { _ in }
+        let layout = SavedFloorplanLayout(rooms: [], centroidX: 0.5, centroidY: 0.5,
+                                         compassRotation: 0, isSyncWithCompass: false,
+                                         hasFloorplanAccess: true, floorplanAccessGrantID: grant.id,
+                                         floorplanAccessGrantSignature: grant.signature)
+        let outcome = FloorplanCreditPurchase.acquire(reserve: {
+            reservations.reserve(availableCredits: 1, token: grant.id).map { _ in grant }
+        }, persist: { _ in
+            do { return try workspace.save(layout: layout, image: image, writerID: UUID()) }
+            catch { return false }
+        }, commit: { _ in didCommit = true; return true }, cancel: {
+            reservations.finish($0.id)
+        })
+        guard case .saveFailed = outcome else { return XCTFail("Saving must fail before any debit") }
+        XCTAssertFalse(didCommit)
+        XCTAssertEqual(reservations.count, 0)
+        XCTAssertNil(defaults.data(forKey: FloorplanWorkspaceStore.layoutKey))
+        XCTAssertEqual(workspace.snapshot.revision, 0)
+    }
+
+    func testFloorplanCommitFailureReleasesItsSlotAndDoesNotActivateTheGrant() throws {
+        var reservations = ConsumableCreditReservations()
+        let grant = FloorplanAccessGrant(id: "floorplan-v2-write-failure", signature: "test")
+        var saveSucceeded = false
+        let outcome = FloorplanCreditPurchase.acquire(reserve: {
+            reservations.reserve(availableCredits: 1, token: grant.id).map { _ in grant }
+        }, persist: { _ in saveSucceeded = true; return true }, commit: { _ in false }, cancel: {
+            reservations.finish($0.id)
+        })
+        guard case .commitFailed = outcome else { return XCTFail("A failed ledger write must not activate the case") }
+        XCTAssertTrue(saveSucceeded)
+        XCTAssertEqual(reservations.count, 0)
+        XCTAssertNotNil(reservations.reserve(availableCredits: 1))
+        XCTAssertTrue(grant.requiresCommittedDebit)
+    }
+
+    func testFloorplanGrantDebitsOnceOnlyAfterItsSaveSucceeds() throws {
+        var mirror = StoreKitIAPManager.EntitlementMirror(verifiedAt: Date(), isAuthoritative: true,
+            isLifetime: false, vipActive: false, vipExpireDate: 0, floorplanCredits: 1,
+            tianjiCredits: 0, purchasedProductIDs: [])
+        let grant = FloorplanAccessGrant(id: "floorplan-v2-success", signature: "test")
+        var saved = false
+        let outcome = FloorplanCreditPurchase.acquire(reserve: { grant }, persist: { _ in
+            XCTAssertEqual(mirror.floorplanCredits, 1)
+            XCTAssertTrue(mirror.redeemedFloorplanGrantIDs.isEmpty)
+            saved = true
+            return true
+        }, commit: {
+            XCTAssertTrue(saved)
+            return mirror.redeemFloorplanGrant($0.id)
+        }, cancel: { _ in })
+        guard case .completed(let redeemed) = outcome else { return XCTFail("Expected a saved and paid case") }
+        XCTAssertEqual(redeemed, grant)
+        XCTAssertEqual(mirror.floorplanCredits, 0)
+        XCTAssertEqual(mirror.redeemedFloorplanGrantIDs, [grant.id])
+        XCTAssertFalse(mirror.redeemFloorplanGrant(grant.id))
+        XCTAssertEqual(mirror.floorplanCredits, 0)
+        let restored = try JSONDecoder().decode(StoreKitIAPManager.EntitlementMirror.self,
+                                               from: JSONEncoder().encode(mirror))
+        XCTAssertEqual(restored.redeemedFloorplanGrantIDs, [grant.id])
     }
 
     private func entrance(position: SIMD3<Float>, normal: SIMD3<Float>) -> SpatialOpening3D {
@@ -2127,11 +2382,13 @@ final class FunctionalRegressionTests: XCTestCase {
         FloorplanRoom(id: id, name: id, type: type, rect: CGRect(x: x, y: y, width: 0.1, height: 0.1))
     }
 
-    func testFamilyRoomServiceRequiresVerifiedAnnualSubscription() {
+    func testFamilyRoomServiceIncludesVerifiedLifetimeAndAnnualMembership() {
         let now = instant("2026-11-09T00:00:00Z")
         var mirror = StoreKitIAPManager.EntitlementMirror(verifiedAt: now, isAuthoritative: true,
             isLifetime: true, vipActive: false, vipExpireDate: 0, floorplanCredits: 5, tianjiCredits: 5,
             purchasedProductIDs: [IAPProductID.proLifetime.rawValue, IAPProductID.vipYearly.rawValue])
+        XCTAssertTrue(mirror.allowsFamilyRoomAllocation(at: now))
+        mirror.isLifetime = false
         XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now)) // Product history and credits are insufficient.
         mirror.vipExpireDate = now.addingTimeInterval(10).timeIntervalSince1970
         XCTAssertTrue(mirror.allowsFamilyRoomAllocation(at: now))
@@ -2143,6 +2400,66 @@ final class FunctionalRegressionTests: XCTestCase {
         mirror.isAuthoritative = true
         mirror.revokePaidProduct(IAPProductID.vipYearly.rawValue)
         XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now))
+    }
+
+    func testPurchaseBenefitsExcludeSingleUseProducts() {
+        XCTAssertTrue(IAPProductID.vipYearly.includesAllFeatures)
+        XCTAssertTrue(IAPProductID.proLifetime.includesAllFeatures)
+        XCTAssertFalse(IAPProductID.floorplanSingle.includesAllFeatures)
+        XCTAssertFalse(IAPProductID.tianjiSingle.includesAllFeatures)
+    }
+
+    func testUnverifiedLifetimeDoesNotUnlockFeaturesAndRevokedLifetimeLosesAccess() {
+        let now = instant("2026-11-10T00:00:00Z")
+        var mirror = StoreKitIAPManager.EntitlementMirror(verifiedAt: now, isAuthoritative: false,
+            isLifetime: true, vipActive: false, vipExpireDate: 0, floorplanCredits: 1, tianjiCredits: 1,
+            purchasedProductIDs: [IAPProductID.proLifetime.rawValue])
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now))
+        mirror.isAuthoritative = true
+        XCTAssertTrue(mirror.allowsFamilyRoomAllocation(at: now.addingTimeInterval(86400 * 365 * 10)))
+        mirror.revokePaidProduct(IAPProductID.proLifetime.rawValue)
+        XCTAssertFalse(mirror.allowsFamilyRoomAllocation(at: now))
+    }
+
+    @MainActor
+    func testUnpaidProfileDeletionErasesBothStoresAndStaysDeletedAfterReload() throws {
+        let localID = "profile-local-" + UUID().uuidString
+        let groupID = "profile-group-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: localID))
+        let shared = try XCTUnwrap(UserDefaults(suiteName: groupID))
+        defer { defaults.removePersistentDomain(forName: localID); shared.removePersistentDomain(forName: groupID) }
+        let profile = UserKuaProfileManager(defaults: defaults, sharedDefaults: shared, legacyCloud: nil)
+        profile.updateOwnerBirthYear(1985, isMale: false)
+        profile.addFamilyMember(role: .son, customName: "Child", birthYear: 2010, isMale: true)
+        XCTAssertNotNil(defaults.data(forKey: "tiandi_family_members_v1"))
+        XCTAssertNotNil(shared.data(forKey: "tiandi_family_members_v1"))
+        profile.deleteAllPersonalProfiles()
+        XCTAssertTrue(profile.familyMembers.isEmpty)
+        XCTAssertFalse(profile.isProfileEnabled)
+        for key in ["tiandi_owner_birth_year", "tiandi_owner_birth_date", "tiandi_owner_is_male", "tiandi_family_members_v1"] {
+            XCTAssertNil(defaults.object(forKey: key), key)
+            XCTAssertNil(shared.object(forKey: key), key)
+        }
+        let reloaded = UserKuaProfileManager(defaults: defaults, sharedDefaults: shared, legacyCloud: nil)
+        XCTAssertTrue(reloaded.familyMembers.isEmpty)
+        XCTAssertFalse(reloaded.isProfileEnabled)
+        XCTAssertTrue(FamilyRoomAllocationEngine.people(profile: reloaded).isEmpty)
+    }
+
+    @MainActor
+    func testIndividualProfileDeletionPreservesOtherMembersAcrossReload() throws {
+        let suite = "profile-delete-one-" + UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let profile = UserKuaProfileManager(defaults: defaults, sharedDefaults: nil, legacyCloud: nil)
+        profile.addFamilyMember(role: .son, customName: "First", birthYear: 2010, isMale: true)
+        profile.addFamilyMember(role: .daughter, customName: "Second", birthYear: 2012, isMale: false)
+        let removed = profile.familyMembers[0].id
+        let survivor = profile.familyMembers[1].id
+        profile.removeFamilyMember(id: removed)
+        let reloaded = UserKuaProfileManager(defaults: defaults, sharedDefaults: nil, legacyCloud: nil)
+        XCTAssertEqual(reloaded.familyMembers.map(\.id), [survivor])
+        XCTAssertEqual(reloaded.familyMembers[0].displayName, "Second")
     }
 
     @MainActor
@@ -2173,7 +2490,7 @@ final class FunctionalRegressionTests: XCTestCase {
             for visible in [false, true] where !access || !visible {
                 let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
                     centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
-                    hasAnnualAccess: access, includePeople: visible)
+                    hasMembershipAccess: access, includePeople: visible)
                 XCTAssertTrue(snapshot.labels.isEmpty)
                 XCTAssertTrue(snapshot.report.isEmpty)
             }
@@ -2187,7 +2504,7 @@ final class FunctionalRegressionTests: XCTestCase {
                       FamilyRoomPerson(id: "elder", name: "Elder", guaKey: "乾")]
         let snapshot = FamilyRoomExportSnapshot(manual: nil, rooms: rooms, people: people,
             centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
-            hasAnnualAccess: true, includePeople: true)
+            hasMembershipAccess: true, includePeople: true)
         let roomItem = try XCTUnwrap(snapshot.report.first { $0.id == "family-room-south-bed" })
         XCTAssertTrue(roomItem.title.contains(LocalizationManager.shared.t("fra_suggested")))
         XCTAssertTrue(roomItem.isGood)
@@ -2203,7 +2520,7 @@ final class FunctionalRegressionTests: XCTestCase {
         let manual = [FamilyRoomAssignment(personID: "elder", roomID: "south-bed")]
         let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
             centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
-            hasAnnualAccess: true, includePeople: true)
+            hasMembershipAccess: true, includePeople: true)
         XCTAssertTrue(try XCTUnwrap(snapshot.labels["south-bed"]).hasPrefix("⚠︎"))
         let item = try XCTUnwrap(snapshot.report.first)
         XCTAssertTrue(item.title.contains(LocalizationManager.shared.t("fra_assigned")))
@@ -2249,7 +2566,7 @@ final class FunctionalRegressionTests: XCTestCase {
         var manual = [FamilyRoomAssignment(personID: "owner", roomID: "bed")]
         let snapshot = FamilyRoomExportSnapshot(manual: manual, rooms: rooms, people: people,
             centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1,
-            hasAnnualAccess: true, includePeople: true)
+            hasMembershipAccess: true, includePeople: true)
         people[0] = FamilyRoomPerson(id: "owner", name: "New name", guaKey: "乾")
         manual.removeAll()
         XCTAssertEqual(snapshot.labels["bed"], "Original name")
@@ -2266,11 +2583,11 @@ final class FunctionalRegressionTests: XCTestCase {
                      allocationRoom("kitchen", .kitchen, x: 0.75, y: 0.45)]
         let person = FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎")
         let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: [person],
-            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasMembershipAccess: true)
         XCTAssertEqual(plan, [FamilyRoomAssignment(personID: "owner", roomID: "south-bed"),
                               FamilyRoomAssignment(personID: "owner", roomID: "north-study")])
         XCTAssertEqual(plan, FamilyRoomAllocationEngine.recommend(rooms: Array(rooms.reversed()), people: [person],
-            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true))
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasMembershipAccess: true))
     }
 
     @MainActor
@@ -2283,7 +2600,7 @@ final class FunctionalRegressionTests: XCTestCase {
                       FamilyRoomPerson(id: "elder", name: "Elder", guaKey: "乾"),
                       FamilyRoomPerson(id: "child", name: "Child", guaKey: "坎")]
         let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: people,
-            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasMembershipAccess: true)
         XCTAssertEqual(plan.count, 6)
         XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "owner", roomID: "south-bed")))
         XCTAssertTrue(plan.contains(FamilyRoomAssignment(personID: "elder", roomID: "southwest-bed")))
@@ -2299,7 +2616,7 @@ final class FunctionalRegressionTests: XCTestCase {
                      allocationRoom("center-bed", .masterBedroom, x: 0.45, y: 0.45)]
         let person = FamilyRoomPerson(id: "child", name: "Child", guaKey: "坎")
         let plan = FamilyRoomAllocationEngine.recommend(rooms: rooms, people: [person],
-            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasAnnualAccess: true)
+            centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1, hasMembershipAccess: true)
         XCTAssertTrue(plan.isEmpty)
         let fit = FamilyRoomAllocationEngine.fits(room: rooms[1], rooms: rooms, people: [person],
             centroid: CGPoint(x: 0.5, y: 0.5), heading: 0, aspectRatio: 1).first
@@ -2360,14 +2677,14 @@ final class FunctionalRegressionTests: XCTestCase {
         let people = [FamilyRoomPerson(id: "owner", name: "Owner", guaKey: "坎")]
         let center = CGPoint(x: 0.5, y: 0.5)
         XCTAssertFalse(FamilyRoomAllocationEngine.resolve(manual: nil, rooms: rooms, people: people,
-            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: true).isEmpty)
+            centroid: center, heading: 0, aspectRatio: 1, hasMembershipAccess: true).isEmpty)
         XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: [], rooms: rooms, people: people,
-            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: true).isEmpty)
+            centroid: center, heading: 0, aspectRatio: 1, hasMembershipAccess: true).isEmpty)
         let manual = [FamilyRoomAssignment(personID: "owner", roomID: "bed")]
         XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: manual, rooms: rooms, people: people,
-            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: false).isEmpty)
+            centroid: center, heading: 0, aspectRatio: 1, hasMembershipAccess: false).isEmpty)
         XCTAssertTrue(FamilyRoomAllocationEngine.resolve(manual: nil, rooms: rooms, people: people,
-            centroid: center, heading: 0, aspectRatio: 1, hasAnnualAccess: false).isEmpty)
+            centroid: center, heading: 0, aspectRatio: 1, hasMembershipAccess: false).isEmpty)
     }
 
     func testFamilyAssignmentsRoundTripWithCaseAndDecodeLegacyPlans() throws {

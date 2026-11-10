@@ -32,7 +32,7 @@ struct FamilyRoomAllocationSection: View {
     private var people: [FamilyRoomPerson] { FamilyRoomAllocationEngine.people(profile: profile) }
     private var assignments: [FamilyRoomAssignment] {
         FamilyRoomAllocationEngine.resolve(manual: manualAssignments, rooms: rooms, people: people,
-            centroid: centroid, heading: heading, aspectRatio: aspectRatio, hasAnnualAccess: iap.canUseFamilyRoomAllocation)
+            centroid: centroid, heading: heading, aspectRatio: aspectRatio, hasMembershipAccess: iap.canUseFamilyRoomAllocation)
     }
 
     private var unassignedPeople: [FamilyRoomPerson] {
@@ -50,7 +50,7 @@ struct FamilyRoomAllocationSection: View {
                 Label(lang.t("fra_title"), systemImage: "person.2.fill")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
-                Text(lang.t("fra_annual"))
+                Text(lang.t("fra_membership"))
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.yellow)
             }
@@ -84,7 +84,7 @@ struct FamilyRoomAllocationSection: View {
         .background(Color.white.opacity(0.05))
         .cornerRadius(12)
         .padding(.horizontal, 16)
-        .sheet(isPresented: $showPaywall) { VIPPaywallSheet(annualOnly: true) }
+        .sheet(isPresented: $showPaywall) { VIPPaywallSheet(defaultProductId: .vipYearly) }
         .sheet(isPresented: $showProfiles) {
             OwnerLifeGuaView(context: houseContext)
         }

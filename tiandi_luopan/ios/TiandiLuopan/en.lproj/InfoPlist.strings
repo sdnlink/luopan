@@ -1,11 +1,6 @@
-/* App Display Name */
 "CFBundleDisplayName" = "TianJi YanXiang";
 "CFBundleName" = "TianJi YanXiang";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "TianJi YanXiang uses your location to calculate precise coordinates, elevation, magnetic declination, and true solar time.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi YanXiang uses your location to calculate precise coordinates, elevation, magnetic declination, and true solar time.";
-"NSMotionUsageDescription" = "TianJi YanXiang uses motion sensors to drive the dual-axis digital level and precision compass.";
-"NSCameraUsageDescription" = "TianJi YanXiang uses the camera for AR orientation, spatial surveying, and on-site Sha analysis.";
-"NSPhotoLibraryAddUsageDescription" = "TianJi YanXiang needs permission to save survey snapshots and cultural reference scrolls to your photo library.";
-"NSPhotoLibraryUsageDescription" = "TianJi YanXiang needs photo library access to import floor plans and save survey scrolls and snapshots.";
+"NSCameraUsageDescription" = "Scan indoor walls, openings and dimensions.";
+"NSMotionUsageDescription" = "Track AR space and stabilize the measurement view.";
+"NSPhotoLibraryUsageDescription" = "Import floorplan images or save space records you choose to export.";
+"NSPhotoLibraryAddUsageDescription" = "Import floorplan images or save space records you choose to export.";

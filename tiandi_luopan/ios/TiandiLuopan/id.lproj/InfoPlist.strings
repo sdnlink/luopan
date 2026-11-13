@@ -1,11 +1,6 @@
-/* App Display Name */
-"CFBundleDisplayName" = "TianJi";
-"CFBundleName" = "TianJi";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "TianJi YanXiang memerlukan akses lokasi untuk menghitung koordinat, ketinggian, deklinasi magnetik, dan waktu surya sejati.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "TianJi YanXiang memerlukan akses lokasi untuk menghitung koordinat, ketinggian, deklinasi magnetik, dan waktu surya sejati.";
-"NSMotionUsageDescription" = "TianJi YanXiang menggunakan sensor gerak presisi tinggi untuk menggerakkan waterpas dua sumbu dan kompas.";
-"NSCameraUsageDescription" = "TianJi YanXiang memerlukan akses kamera untuk orientasi AR, survei spasial, dan analisis bentuk Sha di lokasi.";
-"NSPhotoLibraryAddUsageDescription" = "TianJi YanXiang memerlukan izin untuk menyimpan foto bukti survei dan gulungan referensi ke galeri Anda.";
-"NSPhotoLibraryUsageDescription" = "TianJi YanXiang memerlukan akses galeri foto untuk mengimpor denah rumah dan menyimpan hasil survei.";
+"CFBundleDisplayName" = "TianJi YanXiang";
+"CFBundleName" = "TianJi YanXiang";
+"NSCameraUsageDescription" = "Pindai dinding, bukaan dan dimensi ruangan.";
+"NSMotionUsageDescription" = "Lacak ruang AR dan stabilkan tampilan pengukuran.";
+"NSPhotoLibraryUsageDescription" = "Impor gambar denah atau simpan catatan ruang pilihan Anda.";
+"NSPhotoLibraryAddUsageDescription" = "Impor gambar denah atau simpan catatan ruang pilihan Anda.";

@@ -1,11 +1,6 @@
-/* App Display Name */
-"CFBundleDisplayName" = "Thiên Cơ";
-"CFBundleName" = "Thiên Cơ";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "Thiên Cơ Diễn Tượng cần quyền vị trí để tính tọa độ chính xác, độ cao, độ lệch từ và giờ mặt trời thật tại địa phương.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Thiên Cơ Diễn Tượng cần quyền vị trí để tính tọa độ chính xác, độ cao, độ lệch từ và giờ mặt trời thật tại địa phương.";
-"NSMotionUsageDescription" = "Thiên Cơ Diễn Tượng sử dụng cảm biến chuyển động độ chính xác cao cho thước thủy hai trục và la bàn.";
-"NSCameraUsageDescription" = "Thiên Cơ Diễn Tượng cần quyền camera để định hướng thực cảnh AR, khảo sát không gian và phân tích hình sát.";
-"NSPhotoLibraryAddUsageDescription" = "Thiên Cơ Diễn Tượng cần quyền lưu ảnh chụp khảo sát thực địa và trường quyển vào thư viện ảnh của bạn.";
-"NSPhotoLibraryUsageDescription" = "Thiên Cơ Diễn Tượng cần quyền truy cập thư viện ảnh để nhập sơ đồ mặt bằng và lưu trường quyển khảo sát.";
+"CFBundleDisplayName" = "Thiên Cơ Diễn Tượng";
+"CFBundleName" = "Thiên Cơ Diễn Tượng";
+"NSCameraUsageDescription" = "Quét tường, cửa và kích thước trong nhà.";
+"NSMotionUsageDescription" = "Theo dõi không gian AR và ổn định hình đo.";
+"NSPhotoLibraryUsageDescription" = "Nhập ảnh mặt bằng hoặc lưu hồ sơ không gian đã chọn.";
+"NSPhotoLibraryAddUsageDescription" = "Nhập ảnh mặt bằng hoặc lưu hồ sơ không gian đã chọn.";

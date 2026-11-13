@@ -7,6 +7,227 @@ import Security
 @testable import TiandiLuopan
 
 final class FunctionalRegressionTests: XCTestCase {
+    func testEstimateSettingsPersistPerProjectAndRejectStaleWrites() throws {
+        let suite = "estimate-regression-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FloorplanCaseStore(defaults: defaults)
+        let room = FloorplanRoom(name: "Room", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6))
+        let layout = residentialLayout([room])
+        try store.insert(FloorplanCaseRecord(id: "a", title: "A", createdAt: Date(), sittingSummary: "", layout: layout))
+        try store.insert(FloorplanCaseRecord(id: "b", title: "B", createdAt: Date(), sittingSummary: "", layout: layout))
+        var settings = ResidentialEstimateSettings(selectedRoomIDs: [room.id])
+        settings.wallHeight = "3.1"
+        XCTAssertTrue(try store.saveEstimateSettings(id: "a", settings: settings, expectedLayout: layout, expectedSettings: nil))
+        XCTAssertFalse(try store.saveEstimateSettings(id: "a", settings: settings, expectedLayout: layout, expectedSettings: nil))
+        XCTAssertNil(store.records.first { $0.id == "b" }?.layout.estimateSettings)
+        let reopened = FloorplanCaseStore(defaults: defaults)
+        XCTAssertEqual(reopened.records.first { $0.id == "a" }?.layout.estimateSettings, settings)
+        var next = settings; next.wallHeight = "2.9"
+        XCTAssertTrue(try store.saveEstimateSettings(id: "a", settings: next, expectedLayout: layout, expectedSettings: settings))
+        var changedGeometry = layout; changedGeometry.widthMeters = 11
+        XCTAssertFalse(try store.saveEstimateSettings(id: "a", settings: settings, expectedLayout: changedGeometry, expectedSettings: next))
+    }
+
+    func testEstimateSettingsSurvivePortableBackupAndLegacyLayoutsHaveNone() throws {
+        let room = FloorplanRoom(name: "Room", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6))
+        var layout = residentialLayout([room])
+        let previous = try JSONDecoder().decode(SavedFloorplanLayout.self, from: JSONEncoder().encode(layout))
+        XCTAssertNil(previous.estimateSettings)
+        var settings = ResidentialEstimateSettings(selectedRoomIDs: [room.id]); settings.packCoverage = "2,5"
+        layout.estimateSettings = settings
+        let record = FloorplanCaseRecord(id: "a", title: "A", createdAt: Date(), sittingSummary: "", layout: layout)
+        let directory = FileManager.default.temporaryDirectory
+        let data = try FloorplanCaseAssets.backup(record, directory: directory)
+        let restored = try FloorplanCaseAssets.importBackup(data, existingIDs: [], directory: directory)
+        XCTAssertEqual(restored.layout.estimateSettings, settings)
+        XCTAssertEqual(ResidentialGeometry.clean(record).layout.estimateSettings, settings)
+    }
+
+    func testEstimateSettingsParseBothDecimalKeyboardsAndRejectInvalidValues() {
+        XCTAssertEqual(ResidentialEstimateSettings.number("1,44"), 1.44)
+        XCTAssertEqual(ResidentialEstimateSettings.number(" 1.44 "), 1.44)
+        XCTAssertNil(ResidentialEstimateSettings.number("nan"))
+        XCTAssertNil(ResidentialEstimateSettings.number("inf"))
+        var settings = ResidentialEstimateSettings(selectedRoomIDs: [])
+        settings.packCoverage = "0"
+        XCTAssertFalse(settings.isValid)
+        settings.packCoverage = "1.44"; settings.waste = .infinity
+        XCTAssertFalse(settings.isValid)
+    }
+
+    func testMaterialsCSVPreservesQuotesAndDoesNotCreateSpreadsheetFormulas() throws {
+        let data = ResidentialCSVReport.encode([
+            [.text("Studio,\n\"North\""), .number(12.5)],
+            [.text(" =SUM(1,2)"), .text("@command"), .text("-label")]
+        ])
+        XCTAssertEqual(Array(data.prefix(3)), [0xEF, 0xBB, 0xBF])
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(text.contains("\"Studio,\n\"\"North\"\"\""))
+        XCTAssertTrue(text.contains("\"12.5000\""))
+        XCTAssertTrue(text.contains("\"' =SUM(1,2)\""))
+        XCTAssertTrue(text.contains("\"'@command\""))
+        XCTAssertTrue(text.contains("\"'-label\""))
+        XCTAssertTrue(text.hasSuffix("\r\n"))
+    }
+
+    @MainActor
+    func testProjectSnapshotKeepsMeasuredAndManualModelsUntilPropertySwitch() throws {
+        let suite = "model-sources-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = ShaSurveyStore(defaults: defaults)
+        let measured = survey("LiDAR"), manual = survey("Manual")
+        store.replaceProperty(measured: measured, virtual: nil, exterior: [])
+        XCTAssertTrue(store.saveSurvey(manual, key: SpatialSurveyArchiveKeys.virtual, propertyID: store.propertyID))
+        XCTAssertEqual(store.projectModels().measured?.id, measured.id)
+        XCTAssertEqual(store.projectModels().manual?.id, manual.id)
+        store.replaceProperty(measured: nil, virtual: nil, exterior: [])
+        XCTAssertNil(store.projectModels().measured)
+        XCTAssertNil(store.projectModels().manual)
+    }
+
+    private func residentialLayout(_ rooms: [FloorplanRoom], width: Double = 10, depth: Double = 5) -> SavedFloorplanLayout {
+        SavedFloorplanLayout(rooms: rooms, centroidX: 0.5, centroidY: 0.5, compassRotation: 0,
+            isSyncWithCompass: false, hasFloorplanAccess: false, floorplanAccessGrantID: nil,
+            floorplanAccessGrantSignature: nil, widthMeters: width, depthMeters: depth)
+    }
+
+    func testResidentialMetricsRespectPhysicalScaleAndExcludeDoors() {
+        let room = FloorplanRoom(name: "Room", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6))
+        let door = FloorplanRoom(name: "Door", type: .door, rect: room.rect)
+        let metrics = ResidentialPlanMetrics(layout: residentialLayout([room, door]))
+        XCTAssertEqual(metrics.rooms.count, 1)
+        XCTAssertEqual(metrics.totalArea, 6, accuracy: 0.000001)
+        XCTAssertEqual(metrics.totalPerimeter, 10, accuracy: 0.000001)
+        XCTAssertTrue(metrics.canEstimate)
+    }
+
+    func testResidentialConcaveOutlineUsesPolygonInsteadOfBoundingBox() throws {
+        let points = [CGPoint(x: 0, y: 0), CGPoint(x: 4, y: 0), CGPoint(x: 4, y: 1),
+            CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 4), CGPoint(x: 0, y: 4)]
+        let triangles = try XCTUnwrap(ResidentialPolygon.triangulate(points))
+        XCTAssertEqual(triangles.reduce(0) { $0 + abs(ResidentialPolygon.signedArea($1)) }, 7, accuracy: 0.000001)
+        let room = FloorplanRoom(name: "L", type: .livingRoom, rect: CGRect(x: 0, y: 0, width: 0.4, height: 0.8),
+            polygonPoints: points.map { CGPoint(x: $0.x / 10, y: $0.y / 5) })
+        let metrics = ResidentialPlanMetrics(layout: residentialLayout([room]))
+        XCTAssertEqual(metrics.totalArea, 7, accuracy: 0.000001)
+        XCTAssertEqual(metrics.totalPerimeter, 16, accuracy: 0.000001)
+        let hole = try XCTUnwrap(ResidentialPolygon.triangulate([CGPoint(x: 2, y: 2), CGPoint(x: 3, y: 2),
+            CGPoint(x: 3, y: 3), CGPoint(x: 2, y: 3)]))
+        XCTAssertEqual(ResidentialPolygon.overlapArea(triangles, hole), 0, accuracy: 0.000001)
+        XCTAssertEqual(ResidentialPolygon.overlapArea(triangles, triangles), 7, accuracy: 0.000001)
+        XCTAssertNotNil(ResidentialPolygon.triangulate(Array(points.reversed())))
+    }
+
+    func testResidentialOverlapDistinguishesSharedWallFromSharedFloor() {
+        let a = FloorplanRoom(name: "A", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6))
+        var b = FloorplanRoom(name: "B", type: .kitchen, rect: CGRect(x: 0.2, y: 0, width: 0.2, height: 0.6))
+        XCTAssertTrue(ResidentialPlanMetrics(layout: residentialLayout([a, b])).canEstimate)
+        b.rect.origin.x = 0.1
+        let overlapping = ResidentialPlanMetrics(layout: residentialLayout([a, b]))
+        XCTAssertEqual(overlapping.overlappingRoomIDs, Set([a.id, b.id]))
+        XCTAssertFalse(overlapping.canEstimate)
+    }
+
+    func testResidentialInvalidAndOutsideGeometryBlocksEstimates() {
+        let outside = FloorplanRoom(name: "Outside", type: .study, rect: CGRect(x: 0.9, y: 0, width: 0.2, height: 0.5))
+        let metrics = ResidentialPlanMetrics(layout: residentialLayout([outside]))
+        XCTAssertEqual(metrics.outsideRoomCount, 1)
+        XCTAssertFalse(metrics.canEstimate)
+        let crossing = [CGPoint(x: 0, y: 0), CGPoint(x: 3, y: 3), CGPoint(x: 0, y: 2), CGPoint(x: 2, y: 0)]
+        XCTAssertNil(ResidentialPolygon.triangulate(crossing))
+        let bad = FloorplanRoom(name: "Bad", type: .study, rect: .zero, polygonPoints: [CGPoint(x: CGFloat.nan, y: 0)])
+        XCTAssertEqual(ResidentialPlanMetrics(layout: residentialLayout([bad])).invalidRoomCount, 1)
+        XCTAssertFalse(ResidentialPlanMetrics(layout: residentialLayout([outside], width: .infinity)).canEstimate)
+    }
+
+    func testMaterialEstimateDeductsOpeningsAndRoundsPacksUp() throws {
+        let a = FloorplanRoom(name: "A", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6))
+        let b = FloorplanRoom(name: "B", type: .study, rect: CGRect(x: 0.2, y: 0, width: 0.2, height: 0.6))
+        let rooms = ResidentialPlanMetrics(layout: residentialLayout([a, b])).rooms
+        let estimate = try XCTUnwrap(ResidentialMaterialEstimate(rooms: rooms, wallHeight: 2.8,
+            wastePercent: 10, packCoverage: 1.44, openingArea: 6, coats: 2, paintCoverage: 10))
+        XCTAssertEqual(estimate.flooringArea, 13.2, accuracy: 0.000001)
+        XCTAssertEqual(estimate.flooringPacks, 10)
+        XCTAssertEqual(estimate.paintArea, 50, accuracy: 0.000001)
+        XCTAssertEqual(estimate.paintLitres, 11, accuracy: 0.000001)
+        XCTAssertNil(ResidentialMaterialEstimate(rooms: rooms, wallHeight: 2.8,
+            wastePercent: 10, packCoverage: 0, openingArea: 0, coats: 2, paintCoverage: 10))
+        XCTAssertNil(ResidentialMaterialEstimate(rooms: rooms, wallHeight: 2.8,
+            wastePercent: 10, packCoverage: 1.44, openingArea: 1000, coats: 2, paintCoverage: 10))
+        XCTAssertNil(ResidentialMaterialEstimate(rooms: [], wallHeight: 2.8,
+            wastePercent: 10, packCoverage: 1.44, openingArea: 0, coats: 2, paintCoverage: 10))
+    }
+
+    func testResidentialBackupOmitsLegacyAnalysisAndPreservesPolygon() throws {
+        let room = FloorplanRoom(name: "Studio", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.6),
+            polygonPoints: [CGPoint(x: 0, y: 0), CGPoint(x: 0.2, y: 0), CGPoint(x: 0.2, y: 0.6)],
+            inspectionTitle: "Old advice", inspectionLevel: "凶", inspectionAdvice: "Old remedy")
+        let original = FloorplanCaseRecord(id: "sample", title: "Plan", createdAt: Date(), sittingSummary: "Old heading",
+            layout: residentialLayout([room]))
+        let data = try FloorplanCaseAssets.backup(original, directory: FileManager.default.temporaryDirectory)
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        for field in ["inspectionAdvice", "palaceName", "familyRoomAssignments", "floorplanAccessGrant", "fengshuiScore", "sittingSummary"] {
+            XCTAssertFalse(text.contains(field), field)
+        }
+        let imported = try FloorplanCaseAssets.importBackup(data, existingIDs: [], directory: FileManager.default.temporaryDirectory)
+        XCTAssertEqual(imported.layout.rooms.first?.polygonPoints, room.polygonPoints)
+        XCTAssertEqual(imported.layout.widthMeters, 10)
+        XCTAssertEqual(imported.layout.rooms.first?.inspectionLevel, "")
+    }
+
+    func testResidentialBackupRejectsDuplicateRoomIdentifiers() {
+        let room = FloorplanRoom(id: "duplicate", name: "Room", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.2))
+        let original = FloorplanCaseRecord(id: "sample", title: "Plan", createdAt: Date(), sittingSummary: "", layout: residentialLayout([room, room]))
+        XCTAssertThrowsError(try FloorplanCaseAssets.backup(original, directory: FileManager.default.temporaryDirectory))
+    }
+
+    func testResidentialSurveyExportPreservesGeometryWithoutLegacyKeys() throws {
+        let opening = SpatialOpening3D(type: .entranceDoor, position: SIMD3(1, 1, 0),
+            normal: SIMD3(0, 0, -1), width: 0.9, height: 2.1)
+        let room = SpatialRoom3D(name: "Studio", type: .study, center: SIMD3(1, 1.4, 1.5), size: SIMD3(2, 2.8, 3))
+        let survey = HouseSpatialSurveyEngine.analyzeSpatialHouse(scanMethod: "Measured", walls: [],
+            openings: [opening], beams: [], rooms: [room], objects: [], compassHeading: 12)
+        let data = try JSONEncoder().encode(ResidentialSurveyGeometry(survey))
+        let text = try XCTUnwrap(String(data: data, encoding: .utf8))
+        for key in ["fengshuiScore", "shaItems", "yangGateName", "yangIsAuspicious"] {
+            XCTAssertFalse(text.contains(key), key)
+        }
+        let restored = try JSONDecoder().decode(ResidentialSurveyGeometry.self, from: data).restored
+        XCTAssertEqual(restored.id, survey.id)
+        XCTAssertEqual(restored.rooms.first?.sizeX, 2)
+        XCTAssertEqual(restored.openings.first?.id, opening.id)
+        XCTAssertEqual(restored.compassHeading, 12)
+        XCTAssertTrue(restored.shaItems.isEmpty)
+    }
+
+    func testResidentialBackupRejectsUnsupportedFormatVersion() throws {
+        let room = FloorplanRoom(name: "Room", type: .study, rect: CGRect(x: 0, y: 0, width: 0.2, height: 0.2))
+        let original = FloorplanCaseRecord(id: "sample", title: "Plan", createdAt: Date(), sittingSummary: "", layout: residentialLayout([room]))
+        let data = try FloorplanCaseAssets.backup(original, directory: FileManager.default.temporaryDirectory)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        payload["version"] = 999
+        let future = try JSONSerialization.data(withJSONObject: payload)
+        XCTAssertThrowsError(try FloorplanCaseAssets.importBackup(future, existingIDs: [], directory: FileManager.default.temporaryDirectory))
+    }
+
+    @MainActor
+    func testResidentialReportIsAPaginatedReadablePDF() throws {
+        let rooms = (0..<45).map { i in
+            FloorplanRoom(name: "Room \(i + 1)", type: .study,
+                rect: CGRect(x: Double(i % 9) / 10, y: Double(i / 9) / 6, width: 0.08, height: 0.12))
+        }
+        let layout = residentialLayout(rooms)
+        let metrics = ResidentialPlanMetrics(layout: layout)
+        let url = try ResidentialPDFReport.write(layout: layout, title: "Test", metrics: metrics,
+            selectedIDs: Set(rooms.map(\.id)), estimate: nil, parameters: [])
+        defer { try? FileManager.default.removeItem(at: url) }
+        let document = try XCTUnwrap(CGPDFDocument(url as CFURL))
+        XCTAssertGreaterThan(document.numberOfPages, 1)
+        XCTAssertEqual(document.page(at: 1)?.getBoxRect(.mediaBox).width, 595)
+    }
+
     private func instant(_ text: String) -> Date {
         ISO8601DateFormatter().date(from: text)!
     }
@@ -753,7 +974,9 @@ final class FunctionalRegressionTests: XCTestCase {
             survey.shaItems.filter { $0.detail.contains("八宅") || $0.detail.contains("玄空") || $0.title.contains("玄空") }
                 .map { $0.title + "|" + $0.locationName + "|" + $0.detail }.sorted()
         }
-        XCTAssertFalse(findings(first).isEmpty)
+        XCTAssertTrue(first.shaItems.isEmpty)
+        XCTAssertEqual(first.fengshuiScore, 0)
+        XCTAssertEqual(first.dimensions.totalWidth, second.dimensions.totalWidth, accuracy: 0.0001)
         XCTAssertEqual(findings(first), findings(second))
     }
 
@@ -1556,16 +1779,7 @@ final class FunctionalRegressionTests: XCTestCase {
     }
 
     @MainActor
-    func testIndependentToolsAndDatePosterKeepTheOpeningHouseOrientation() {
-        var live = Mountain24Data.shared.resolveHeadingState(heading: 94)
-        let request = AnalysisToolRequest(tool: .dates, context: live)
-        live = Mountain24Data.shared.resolveHeadingState(heading: 184)
-        let card = DailyAuspiciousCardSheet(targetDate: instant("2026-11-09T04:00:00Z"), headingState: request.context)
-        XCTAssertEqual(request.context.facingAngle, 94, accuracy: 0.000001)
-        XCTAssertEqual(card.headingState.facingAngle, request.context.facingAngle)
-        XCTAssertEqual(card.headingState.sittingMountain.id, request.context.sittingMountain.id)
-        XCTAssertNotEqual(card.headingState.sittingMountain.id, live.sittingMountain.id)
-    }
+
 
     private func deepLayout(rooms: [FloorplanRoom], heading: Double = 0, facing: Double = 180,
                             aspectRatio: Double = 1) -> SavedFloorplanLayout {

@@ -545,288 +545,46 @@ struct ProportionalTwoPaneLayout: Layout {
 // MARK: - 天机演象 纯原生 SwiftUI 根视图 (Root Content View - PRD 5.0 标准五大场景)
 
 public struct RootContentView: View {
-    private let motion = CompassMotionManager.shared
     @ObservedObject private var lang = LocalizationManager.shared
-    @State private var selectedTab: Int
-    /// 保留旧子页索引用于链接兼容；菜单导航使用独立功能请求。
-    @State private var analysisSubTab: Int = 0
-    @State private var analysisFeatureRequest: AnalysisFeatureRequest?
-    @State private var showOnboarding: Bool = false
-    @State private var showShortcutDailyCard: Bool = false
-    // 读取 size class 建立环境依赖：折叠/展开（或 iPad 分屏拖动）切换时本视图
-    // 重渲染并级联子视图 body 重算，使 Font.adaptive 的静态查询同步刷新
-    //（配合 body 尾部 onChange 一起生效）。
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /// 垂直尺寸类：Duo 合上外屏 / 普通 iPhone 横屏为 compact，展开内屏为 regular。
-    /// 与水平尺寸类一起作为「空间是否足以并排两栏」的唯一布局依据。
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    // 读取 Dynamic Type 环境值建立依赖：系统「文字大小」变化时根视图重算 body，
-    // 级联刷新 Font.adaptive（它按窗口 trait 计算，不读环境值，需要这里触发）。
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    /// 注入给所有子视图的布局环境值（窗口尺寸 / 界面方向 / 设备族 / 垂直尺寸类）。
+    @State private var selectedTab = 0
     @State private var layoutForm = AdaptiveLayoutForm.current()
-    
-    public init() {
-        var initialTab = 0
-        if let tabArgIndex = CommandLine.arguments.firstIndex(of: "-selectedTab"),
-           tabArgIndex + 1 < CommandLine.arguments.count,
-           let tabValue = Int(CommandLine.arguments[tabArgIndex + 1]) {
-            initialTab = tabValue
-        }
-        _selectedTab = State(initialValue: initialTab)
-        
-        // 自定义原生 TabBar 深色黑金质感外观（折叠/展开切换时 onChange 会重调以刷新字号）
-        Self.applyTabBarAppearance(isLargeLayout: UITraitCollection.current.horizontalSizeClass == .regular)
-    }
-
-    /// 同步刷新布局环境值：只在值真正变化时写 @State，避免无谓重绘。
-    /// 开合、旋转、Split View、Safe Area 变化时几何会连续变化，这里每次都重算，
-    /// 不缓存首次出现时的窗口尺寸 / 尺寸类。
-    private func refreshLayoutForm(size: CGSize) {
-        guard size.width > 1, size.height > 1 else { return }
-        let next = AdaptiveLayoutForm.current(size: size,
-                                              verticalSizeClass: verticalSizeClass)
-        if next != layoutForm { layoutForm = next }
-    }
-
-    /// 尺寸类变化但窗口尺寸不变时（开合 / 分屏）也要重算快照。
-    private func refreshLayoutFormKeepingSize() {
-        let next = AdaptiveLayoutForm.current(size: layoutForm.size,
-                                              verticalSizeClass: verticalSizeClass)
-        if next != layoutForm { layoutForm = next }
-    }
-
-    /// 构建黑金深色 TabBar 外观：应用到 appearance proxy，并同步刷新
-    /// 已挂载的 UITabBar 实例与条目字号（appearance proxy 不影响已创建的 bar）。
-    private static func applyTabBarAppearance(isLargeLayout: Bool) {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 14/255.0, green: 14/255.0, blue: 17/255.0, alpha: 1.0)
-
-        let itemAppearance = UITabBarItemAppearance()
-        // Tab 标签是 UIKit 固定字号，不会自动跟随 Dynamic Type：用 UIFontMetrics 补齐，
-        // 并给 maximumPointSize = 1.3x 上限，避免放大后撑出 49pt 的 TabBar 高度。
-        let baseTabFontSize: CGFloat = isLargeLayout ? 13 : 10
-        let tabFont = UIFontMetrics(forTextStyle: .caption1)
-            .scaledFont(for: UIFont.systemFont(ofSize: baseTabFontSize, weight: .medium),
-                        maximumPointSize: baseTabFontSize * 1.3)
-        itemAppearance.normal.iconColor = UIColor.systemGray2
-        itemAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor.systemGray2,
-            .font: tabFont
-        ]
-
-        itemAppearance.selected.iconColor = UIColor(red: 242/255.0, green: 217/255.0, blue: 115/255.0, alpha: 1.0)
-        itemAppearance.selected.titleTextAttributes = [
-            .foregroundColor: UIColor(red: 242/255.0, green: 217/255.0, blue: 115/255.0, alpha: 1.0),
-            .font: tabFont
-        ]
-
-        appearance.stackedLayoutAppearance = itemAppearance
-        UITabBar.appearance().standardAppearance = appearance
-        if #available(iOS 15.0, *) {
-            UITabBar.appearance().scrollEdgeAppearance = appearance
-        }
-
-        // 实时刷新已挂载的 TabBar（SwiftUI TabView 的宿主 UITabBarController 已创建）
-        let selectedColor = UIColor(red: 242/255.0, green: 217/255.0, blue: 115/255.0, alpha: 1.0)
-        for scene in UIApplication.shared.connectedScenes {
-            guard let windowScene = scene as? UIWindowScene else { continue }
-            for window in windowScene.windows {
-                Self.refreshTabBars(in: window, appearance: appearance, normalFont: tabFont, selectedColor: selectedColor)
-            }
-        }
-    }
-
-    private static func refreshTabBars(in view: UIView,
-                                       appearance: UITabBarAppearance,
-                                       normalFont: UIFont,
-                                       selectedColor: UIColor) {
-        if let tabBar = view as? UITabBar {
-            tabBar.standardAppearance = appearance
-            if #available(iOS 15.0, *) {
-                tabBar.scrollEdgeAppearance = appearance
-            }
-            tabBar.items?.forEach { item in
-                item.setTitleTextAttributes(
-                    [.foregroundColor: UIColor.systemGray2, .font: normalFont],
-                    for: .normal
-                )
-                item.setTitleTextAttributes(
-                    [.foregroundColor: selectedColor, .font: normalFont],
-                    for: .selected
-                )
-            }
-        }
-        view.subviews.forEach {
-            Self.refreshTabBars(in: $0, appearance: appearance, normalFont: normalFont, selectedColor: selectedColor)
-        }
-    }
-    
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    public init() {}
     public var body: some View {
         TabView(selection: $selectedTab) {
-            // Tab 1: 主罗盘与天心十道 (含120分金、64卦、24山、双轴水准仪、空亡详勘)
-            CompassMainView(isActive: selectedTab == 0)
-                .tabItem {
-                    Image(systemName: "safari.fill")
-                    Text(lang.t("tab_compass"))
-                }
-                .tag(0)
-            
-            // Tab 2: AR 实景天心透视与形煞智能标注 (前后镜头翻转、靶心动态测角、水印快照存证)
-            ARVisionView(isActive: selectedTab == 1)
-                .tabItem {
-                    Image(systemName: "camera.viewfinder")
-                    Text(lang.t("tab_ar"))
-                }
-                .tag(1)
-            
-            // Tab 3: 户型空间立极与全屋风水体检 (中宫重心立极、罗盘半透明叠透、火烧天门/鬼门体检)
+            ResidentialProjectsView(selectedTab: $selectedTab)
+                .tabItem { Label(lang.t("res_projects"), systemImage: "folder") }.tag(0)
+            ResidentialMeasurementView()
+                .tabItem { Label(lang.t("res_measure"), systemImage: "viewfinder") }.tag(1)
             FloorplanView(isActive: selectedTab == 2)
-                .tabItem {
-                    Image(systemName: "house.fill")
-                    Text(lang.t("tab_floorplan"))
-                }
-                .tag(2)
-            
-            // Tab 4: 玄空理气与三式绝学 (玄空飞星、八宅三合、流年紫白、时家奇门、天机长卷)
-            XuanKongGridView(isActive: selectedTab == 3,
-                             selectedSubTab: $analysisSubTab, featureRequest: $analysisFeatureRequest)
-                .tabItem {
-                    Image(systemName: "square.grid.3x3.fill")
-                    Text(lang.t("tab_analysis"))
-                }
-                .tag(3)
-            
-            // Tab 5: 系统设置与会员中心 (四档 StoreKit 内购、特权矩阵、8字传感器校准)
-            SettingsView(isActive: selectedTab == 4)
-                .tabItem {
-                    Image(systemName: "gearshape.fill")
-                    Text(lang.t("tab_settings"))
-                }
-                .tag(4)
+                .tabItem { Label(lang.t("res_edit"), systemImage: "square.and.pencil") }.tag(2)
+            SettingsView(isActive: selectedTab == 3)
+                .tabItem { Label(lang.t("settings"), systemImage: "gearshape") }.tag(3)
         }
-        .accentColor(Color(red: 0.95, green: 0.85, blue: 0.45))
+        .tint(.cyan)
         .preferredColorScheme(.dark)
-        // 采集真实窗口尺寸并同步注入 Environment：iPad 旋转不改变 size class，
-        // 各页靠 interfaceOrientation + 尺寸切换「横屏双栏 / 竖屏单列」。
-        .background(
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { refreshLayoutForm(size: geo.size) }
-                    .onChange(of: geo.size) { newSize in
-                        refreshLayoutForm(size: newSize)
-                    }
-            }
-        )
         .environment(\.adaptiveLayoutForm, layoutForm)
-        .onChange(of: verticalSizeClass) { _ in
-            // 开合/分屏可能只改尺寸类不改窗口尺寸：此时几何探针的 onChange 不会触发，
-            // 必须单独刷新快照，否则分栏判据会滞后一帧甚至停在旧形态。
-            refreshLayoutFormKeepingSize()
-        }
-        .onChange(of: horizontalSizeClass) { newValue in
-            refreshLayoutFormKeepingSize()
-            // 折叠/展开（或 iPad 分屏拖动）切换：重建 TabBar 外观刷新 Tab 字号；
-            // 本视图因依赖 size class 而重渲染，级联子视图 body 重算，
-            // 使 Font.adaptive 的静态查询同步更新 1.0x ↔ 1.35x 字号比例。
-            Self.applyTabBarAppearance(isLargeLayout: newValue == .regular)
-        }
-        .onChange(of: dynamicTypeSize) { _ in
-            // 系统「文字大小」变化：本视图已因读取该环境值而重渲染，
-            // 这里再把 UIKit 侧已挂载的 TabBar 字号刷新一遍（UITabBar 不跟随 Dynamic Type）。
-            Self.applyTabBarAppearance(isLargeLayout: horizontalSizeClass == .regular)
-        }
+        .background(GeometryReader { geo in
+            Color.clear.onAppear { refreshLayout(geo.size) }
+                .onChange(of: geo.size) { refreshLayout($0) }
+        })
         .onAppear {
-            // init 阶段 UITraitCollection.current 尚未进入真实窗口环境，
-            // 取不到 regular 宽度 → iPad 首帧 Tab 字号会停在 10pt；而
-            // onChange(of:) 只在尺寸类“变化”时触发，不会补首帧。此处用
-            // 已建立的 environment 值重新应用一次，保证 iPad 启动即为 13pt。
-            Self.applyTabBarAppearance(isLargeLayout: horizontalSizeClass == .regular)
-            motion.start()
-            updateResourceUsage()
-            RetentionServiceManager.shared.registerSystemShortcutsAndSpotlight()
-            if OnboardingGuideSheet.shouldPresentOnLaunch() {
-                showOnboarding = true
-            }
+            UIApplication.shared.shortcutItems = []
+            // Delete donated legacy fortune-telling entries on upgrade.
+            ResidentialUpgrade.removeLegacyDiscovery()
+            consumeRoute()
         }
-        .sheet(isPresented: $showOnboarding) {
-            OnboardingGuideSheet()
-        }
-        .sheet(isPresented: $showShortcutDailyCard) {
-            DailyAuspiciousCardSheet()
-        }
-        .onChange(of: selectedTab) { _ in
-            updateResourceUsage()
-        }
-        // 冷启动：URL 在 SceneDelegate 同步到达时视图树尚未挂载，
-        // 通知会丢；改为挂载后主动消费单例里暂存的路由意图。
-        .onAppear {
-            consumePendingAlmanacRoute()
-        }
-        // 热启动：SceneDelegate 收到 URL 后立即投递，同时刷新路由状态。
-        .onReceive(NotificationCenter.default.publisher(for: .didTapAlmanacWidget)) { _ in
-            consumePendingAlmanacRoute()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .didRequestAppNavigation).receive(on: DispatchQueue.main)) { _ in
-            consumePendingAlmanacRoute()
-        }
-        .onOpenURL { url in
-            // SwiftUI 原生兜底：若系统把 URL 交给视图层，也能定位到目标页。
-            SceneDelegate.routeWidgetURL(url)
-            consumePendingAlmanacRoute()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Re-enable sensors only after the app is visible again. Keeping
-            // Core Location/Core Motion streams alive while the app is
-            // backgrounded wastes battery and can keep the device warm.
-            updateResourceUsage()
-            motion.resumeIfSensorsEnabled()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            motion.stop()
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
+        .onReceive(NotificationCenter.default.publisher(for: .didRequestAppNavigation)) { _ in consumeRoute() }
+        .onOpenURL { SceneDelegate.routeWidgetURL($0); consumeRoute() }
     }
-
-    /// 消费小组件深链与主屏快捷入口的待处理意图（幂等）。
-    /// Tab 3 = 理气菜单；旧黄历请求直接打开独立天星择日工具。
-    private func consumePendingAlmanacRoute() {
-        if AppNavigationRouter.shared.consumeAlmanac() {
-            selectedTab = 3
-            analysisSubTab = 1
-            analysisFeatureRequest = AnalysisFeatureRequest(feature: .dates)
-        }
-        if let route = AppNavigationRouter.shared.consumeTabRoute() {
-            selectedTab = route.tab
-            if let sub = route.subTab {
-                analysisSubTab = sub
-            }
-            if route.tab == 3, let feature = route.feature ?? route.subTab.flatMap(AnalysisFeature.fromLegacySubTab) {
-                analysisFeatureRequest = AnalysisFeatureRequest(feature: feature)
-            }
-            if route.openDailyCard {
-                showOnboarding = false
-                showShortcutDailyCard = true
-            }
-        }
+    private func refreshLayout(_ size: CGSize) {
+        layoutForm = AdaptiveLayoutForm.current(size: size, verticalSizeClass: verticalSizeClass)
     }
-
-    /// The live compass and camera survey need an awake screen while they are
-    /// in use.  Reports, settings and the paywall should follow the user's
-    /// normal Auto-Lock preference to avoid draining the battery while idle.
-    private func updateResourceUsage() {
-        // 多窗口：传感器开关是全局单例，两个窗口各按自己的 Tab 置位会互相覆盖
-        // （窗口 A 停在罗盘、窗口 B 停在设置时，B 会把 A 的 device motion 关掉）。
-        // 只要同时存在多个前台场景，就统一保持开启，宁可多耗一点电，也不让另一个窗口的罗盘停摆。
-        let activeSceneCount = UIApplication.shared.connectedScenes
-            .filter { $0.activationState == .foregroundActive }
-            .count
-        let multipleActiveScenes = activeSceneCount > 1
-        UIApplication.shared.isIdleTimerDisabled = multipleActiveScenes || selectedTab == 0 || selectedTab == 1
-        motion.setDeviceMotionEnabled(multipleActiveScenes || selectedTab == 0 || selectedTab == 1)
-        motion.setHeadingUpdatesEnabled(multipleActiveScenes || selectedTab != 4)
-        motion.resumeIfSensorsEnabled()
+    private func consumeRoute() {
+        _ = AppNavigationRouter.shared.consumeAlmanac()
+        if let route = AppNavigationRouter.shared.consumeTabRoute(), route.feature == nil, !route.openDailyCard {
+            selectedTab = (0...3).contains(route.tab) ? route.tab : 0
+        }
     }
 }
 

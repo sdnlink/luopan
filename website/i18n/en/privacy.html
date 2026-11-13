@@ -38,40 +38,35 @@
   <h2>1. Information and Permissions</h2>
   <p>The App asks for the following permissions only when you use the relevant feature.</p>
   <h3>Personal and family profiles; report customization</h3>
-  <p>Names or labels, relationships, birth dates or years, and gender that you voluntarily enter are used for life-gua and room-allocation references. Obtain the person’s or guardian’s permission before entering another person’s or a child’s information. Profiles are stored on the device and in the App Group shared by this app and its widget. Family profiles are no longer automatically uploaded to or restored from iCloud.</p>
-  <p>Custom client names, report signatures and seal text personalize reports. The most recently applied values are kept locally. Clear the fields in the scroll editor and apply to remove them; delete previously generated or shared reports separately.</p>
-  <h3>Motion and Direction Sensors</h3>
-  <p><strong>Use:</strong> Accelerometer, gyroscope, and magnetometer data drive the compass dial, level, and bearing readings. <strong>Storage:</strong> Raw sensor readings are processed in device memory in real time and are not sent to developer servers. Field records and reports you save may include calculated results such as bearings.</p>
-  <h3>Location (While Using the App)</h3>
-  <p><strong>Use:</strong> Latitude, longitude, and elevation are used on-device with the World Magnetic Model (WMM) to calculate magnetic declination, local true solar time, and seasonal terms. <strong>Storage:</strong> Calculated on-device without background location-history tracking. Reports and survey images you choose to save or share may include the current location or coordinates; review them before sharing.</p>
-  <h3>Camera</h3>
+<p>The new iOS app does not collect birth, gender or life-gua profiles or provide personal predictions or related room allocation. Previous profiles are retained for users and can be deleted free in Settings → Privacy and data; deletion also requests cleanup of accessible old iCloud profile copies.</p>
+<p>Projects may contain room names, dimensions, plans, openings, scanned models and exports. Data is primarily stored on device. You initiate sharing and backups; check home and personal details before sharing.</p>
+<h3>Motion and Direction Sensors</h3>
+<p>Motion sensors support AR tracking and view stabilization on device. The new app has no compass feature and does not request location permission.</p>
+<h3>Camera</h3>
   <p><strong>Use:</strong> Only for live preview and spatial alignment in the AR survey feature. <strong>Storage:</strong> Frames are processed locally in real time, without automatic recording or upload to developer servers. Survey snapshots you choose to capture, save or share may include camera images and are written to local archives, Photos or your selected sharing destination.</p>
   <h3>LiDAR / RoomPlan Room Scanning</h3>
   <p><strong>Use:</strong> On supported devices, the App uses Apple’s ARKit and RoomPlan frameworks to scan rooms and produce spatial geometry. <strong>Storage:</strong> Scan data is processed on-device. If you export or share spatial files, they may contain building structure, orientation, or location information; whether to share them is your decision.</p>
   <p>Saved surveys may also contain room geometry, doors and windows, directions, annotation points and ARWorldMap data used to restore spatial positioning. These archives are stored locally; manage exported, backed-up or shared copies where they are stored.</p>
   <h3>Photos</h3>
-  <p><strong>Read:</strong> Lets you pick a blueprint or floor-plan photo for analysis. <strong>Write:</strong> Lets you save generated reports, culture scrolls, daily auspicious sign cards, or watermarked survey images to your photo library. We access only the images you explicitly select.</p>
-  <h3>Local Notifications (Optional)</h3>
-  <p><strong>Use:</strong> Only when you actively enable “24 Solar Terms Reminders” or “Auspicious Day Reminders”, the App schedules local alerts via iOS <code>UNUserNotificationCenter</code>. <strong>Storage:</strong> Computed and triggered entirely on-device without remote push servers or push token uploads.</p>
-  <h3>In-App Purchases (StoreKit)</h3>
-  <p><strong>Use:</strong> Purchase and restoration of the TianJi YanXiang Annual Membership (auto-renewable subscription), TianJi YanXiang Pro (Lifetime), Floor-Plan Reference Report (single), and Watermark-Free Culture Scroll (single). <strong>Storage:</strong> Apple StoreKit handles payments and transaction verification. An integrity-checked entitlement mirror and consumable balances are stored in local UserDefaults; verification keys are kept in Keychain. We do not receive card details. Verification keys are eligible for migration through Apple-supported system backups; balances and keys must be restored together. If an older backup lacks the original key, records are kept and support is offered; unverified records do not generate new credits. We do not track advertising.</p>
-  <p>Restore Purchases uses Apple verification for active annual subscriptions and lifetime access. Single-use consumable credits are not reissued through Apple restoration; backup migration requires both the balance records and their original verification key.</p>
-
-  <h2>2. Third-Party SDKs and Data Sharing</h2>
+<p>Projects may contain room names, dimensions, plans, openings, scanned models and exports. Data is primarily stored on device. You initiate sharing and backups; check home and personal details before sharing.</p>
+<h3>Local Notifications (Optional)</h3>
+<p>The new app does not schedule solar-term or auspicious-date reminders. On upgrade it removes this app’s old pending and delivered local notifications.</p>
+<h3>In-App Purchases (StoreKit)</h3>
+<p>Apple StoreKit verifies purchases and restorations. Entitlements and legacy credits are stored on device with integrity checks; verification keys are in Keychain. We do not receive card details. The new interface sells annual and lifetime access only. Legacy-credit migration requires original records and keys; contact support if verification fails.</p>
+<h2>2. Third-Party SDKs and Data Sharing</h2>
   <p>The app has no third-party advertising or analytics SDKs, does not collect IDFA, does not track across apps or websites, and does not sell or rent your data. Payments, iCloud and system backups handled by Apple, and recipients you choose when sharing, process data within the scope described here and under the applicable service rules.</p>
 
   <h2>3. Data Retention and Security</h2>
   <p>Floor-plan drafts, survey archives, reports and settings are stored in the iOS app sandbox or the App Group shared with the widget, depending on the feature. Purchase rights and credits are stored in integrity-checked local UserDefaults; the verification key is stored in Keychain. Not all archives are stored in Keychain. Data remains until deleted. After app removal, treatment of the sandbox, shared container and Keychain follows iOS behavior; removal does not automatically delete Apple cloud copies, system backups, Photos or copies held by others.</p>
 
-  <h3>Apple iCloud, system backups and migration</h3>
-  <p>Compass-lock preferences and action lists may sync through Apple’s iCloud key-value store when supported by the distributed app and system settings. This update stops automatic cloud sync of personal family profiles. Deleting a profile also requests removal of accessible legacy iCloud profile copies; offline deletion may finish syncing after reconnection.</p>
+  <h3>Apple iCloud, system backups and migration</h3><p>The new app does not sync compass preferences, reminders or personal prediction data. Apple may retain older cloud copies. Deleting previous profiles requests removal of accessible corresponding copies, which may sync after reconnecting. Manage system backups and exported files separately.</p>
   <h3>Privacy API purposes</h3>
   <p>UserDefaults stores settings for this app and its App Group; file timestamps manage local survey files; system uptime measures AR refresh intervals. There are no advertising or third-party analytics SDKs, no cross-app tracking and no upload of profiles, plans or camera frames to developer servers.</p>
 
   <h2>4. Your Rights and Choices</h2>
   <ul>
-    <li><strong>Withdraw permissions:</strong> You can turn off camera, location, or photo access at any time in iOS Settings → Privacy &amp; Security. The related feature will stop working; other features are unaffected.</li>
-    <li><strong>Deletion:</strong> Data remains until you delete it. With or without a paid membership, open Settings → Family data management to delete individual members or clear all owner and family profiles and disable personal analysis. This removes local, shared-container and accessible legacy iCloud profile copies. Previously exported, shared or separately archived copies must be deleted where they are stored.</li>
+    <li>Revoke camera or photo access in system settings. Delete previous profiles free in app settings and projects in the project list. A new floorplan replaces the current draft. Delete backups, exports and shared copies separately. Deleting the app does not cancel Apple subscriptions.</li>
+    <li>Revoke camera or photo access in system settings. Delete previous profiles free in app settings and projects in the project list. A new floorplan replaces the current draft. Delete backups, exports and shared copies separately. Deleting the app does not cancel Apple subscriptions.</li>
     <li><strong>Questions and requests:</strong> For questions about data handling or to exercise rights available under applicable law, email <a href="mailto:support@sdnlink.cn">support@sdnlink.cn</a>.</li>
     <li><strong>Subscriptions:</strong> Subscriptions, refunds, and billing are handled by Apple; manage them in Settings → Apple ID → Subscriptions.</li>
   </ul>

@@ -114,7 +114,7 @@ public struct VRSpatialSurveyView: View {
             self._ceilingMetersText = State(initialValue: String(format: "%.2f", initialSurvey.dimensions.ceilingHeight))
         } else {
             self._surveyReference = State(initialValue: VRSurveyReference(
-                coordinateHeading: initialCoordinateHeading ?? CompassMotionManager.shared.headingState.facingAngle,
+                coordinateHeading: initialCoordinateHeading ?? 0,
                 houseFacingDegrees: initialHouseFacingDegrees,
                 normalizedCentroid: initialCentroid,
                 yaw: 0

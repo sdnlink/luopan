@@ -1,11 +1,6 @@
-/* App Display Name */
 "CFBundleDisplayName" = "천기연상";
 "CFBundleName" = "천기연상";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "천기연상은 현지 정밀 경위도, 해발고도, 자기 편각 및 진태양시를 계산하기 위해 위치 정보를 사용합니다.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "천기연상은 현지 정밀 경위도, 해발고도, 자기 편각 및 진태양시를 계산하기 위해 위치 정보를 사용합니다.";
-"NSMotionUsageDescription" = "천기연상은 2축 수평계와 고정밀 나침반을 구동하기 위해 모션 센서를 사용합니다.";
-"NSCameraUsageDescription" = "천기연상은 AR 실경 방위 측정, 공간 측량 및 형살 분석 기능을 제공하기 위해 카메라를 사용합니다.";
-"NSPhotoLibraryAddUsageDescription" = "천기연상은 현장 측량 스냅샷과 선지 장권 이미지를 사진 보관함에 저장하기 위해 권한이 필요합니다.";
-"NSPhotoLibraryUsageDescription" = "천기연상은 평면도를 불러오고 현장 측량 장권 및 스냅샷을 저장하기 위해 사진 보관함 접근 권한이 필요합니다.";
+"NSCameraUsageDescription" = "실내 벽, 개구부와 치수를 스캔합니다.";
+"NSMotionUsageDescription" = "AR 공간 추적 및 측정 화면 안정화에 사용합니다.";
+"NSPhotoLibraryUsageDescription" = "평면도 이미지 가져오기 또는 선택한 공간 기록 저장에 사용합니다.";
+"NSPhotoLibraryAddUsageDescription" = "평면도 이미지 가져오기 또는 선택한 공간 기록 저장에 사용합니다.";

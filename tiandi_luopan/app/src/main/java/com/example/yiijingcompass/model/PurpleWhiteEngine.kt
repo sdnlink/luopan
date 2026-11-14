@@ -211,7 +211,7 @@ class PurpleWhiteEngine private constructor() {
     }
 
     fun calculateChart(date: Date = Date(), heading: Double = 0.0): PurpleWhiteChart {
-        val calendar = Calendar.getInstance()
+        val calendar = java.util.GregorianCalendar()
         calendar.time = date
         val rawYear = calendar.get(Calendar.YEAR)
         val rawMonth = calendar.get(Calendar.MONTH) + 1

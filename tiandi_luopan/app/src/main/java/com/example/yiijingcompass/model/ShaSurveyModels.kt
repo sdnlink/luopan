@@ -145,6 +145,14 @@ class ShaSurveyStore private constructor() {
     }
 
     private var prefs: SharedPreferences? = null
+    var propertyID: String = UUID.randomUUID().toString()
+        private set
+    var propertyKey: String = UUID.randomUUID().toString()
+        private set
+    var interiorSource: InteriorSurveySource? = null
+        private set
+    var siteFacts: List<XuanKongSiteFact> = emptyList()
+        private set
     val records: MutableList<ExteriorShaRecord> = mutableListOf()
     var latestInterior: HouseSpatialSurvey? = null
 
@@ -152,7 +160,7 @@ class ShaSurveyStore private constructor() {
         get() {
             if (records.isEmpty() && latestInterior == null) return null
             return PanoramaFengShuiArchive(
-                compassHeading = 0.0,
+                compassHeading = records.firstNotNullOfOrNull { it.capturedHeadingDegrees } ?: latestInterior?.compassHeading ?: 0.0,
                 interior = latestInterior,
                 exterior = ArrayList(records)
             )
@@ -161,9 +169,15 @@ class ShaSurveyStore private constructor() {
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         loadFromPrefs()
+        propertyKey = prefs?.getString("propertyKey",null) ?: propertyKey
+        prefs?.edit()?.putString("propertyKey",propertyKey)?.commit()
+        latestInterior = ProjectCodec.decode(prefs?.getString("interior",null),HouseSpatialSurvey::class.java)
+        interiorSource = prefs?.getString("source",null)?.let { runCatching { InteriorSurveySource.valueOf(it) }.getOrNull() }
+        siteFacts = prefs?.getString("facts",null)?.let { runCatching { ProjectCodec.gson.fromJson(it,Array<XuanKongSiteFact>::class.java).toList() }.getOrNull() } ?: emptyList()
     }
 
     private fun loadFromPrefs() {
+        records.clear()
         val json = prefs?.getString(KEY_RECORDS, null) ?: return
         try {
             val array = JSONArray(json)
@@ -183,7 +197,9 @@ class ShaSurveyStore private constructor() {
             for (r in records) {
                 array.put(r.toJsonObject())
             }
-            prefs?.edit()?.putString(KEY_RECORDS, array.toString())?.apply()
+            prefs?.edit()?.putString(KEY_RECORDS, array.toString())?.putString("propertyKey",propertyKey)
+                ?.putString("interior",latestInterior?.let { ProjectCodec.gson.toJson(it) })
+                ?.putString("source",interiorSource?.name)?.putString("facts",ProjectCodec.gson.toJson(siteFacts))?.apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -196,6 +212,38 @@ class ShaSurveyStore private constructor() {
 
     fun updateInterior(survey: HouseSpatialSurvey?) {
         latestInterior = survey
+        interiorSource = survey?.let { InteriorSurveySource.PROJECTION }
+        persist()
+    }
+
+    @Synchronized fun isCurrentProperty(id: String) = propertyID == id
+    @Synchronized fun replaceProperty(measured: HouseSpatialSurvey?, virtual: HouseSpatialSurvey?, exterior: List<ExteriorShaRecord>,
+        siteFacts: List<XuanKongSiteFact> = emptyList(), propertyKey: String? = null, expectedPropertyID: String? = null): Boolean {
+        if(expectedPropertyID != null && !isCurrentProperty(expectedPropertyID)) return false
+        if(expectedPropertyID == null) { propertyID=UUID.randomUUID().toString(); this.propertyKey=propertyKey ?: UUID.randomUUID().toString() }
+        prefs?.edit()?.putString(SpatialSurveyArchiveKeys.MEASURED,measured?.let { ProjectCodec.gson.toJson(it) })
+            ?.putString(SpatialSurveyArchiveKeys.VIRTUAL,virtual?.let { ProjectCodec.gson.toJson(it) })?.apply()
+        records.clear(); records.addAll(exterior); this.siteFacts=siteFacts.filter { it.palaceID in 0..8 }
+        latestInterior=measured ?: virtual
+        interiorSource=if(measured != null) InteriorSurveySource.MEASURED else if(virtual != null) InteriorSurveySource.VIRTUAL else null
+        persist(); return true
+    }
+    @Synchronized fun saveSurvey(survey: HouseSpatialSurvey,key: String,propertyID: String): Boolean {
+        if(!isCurrentProperty(propertyID) || key !in setOf(SpatialSurveyArchiveKeys.MEASURED,SpatialSurveyArchiveKeys.VIRTUAL)) return false
+        prefs?.edit()?.putString(key,ProjectCodec.gson.toJson(survey))?.apply()
+        if(key == SpatialSurveyArchiveKeys.MEASURED || prefs?.contains(SpatialSurveyArchiveKeys.MEASURED) != true&&interiorSource!=InteriorSurveySource.PROJECTION) {
+            latestInterior=survey; interiorSource=if(key == SpatialSurveyArchiveKeys.MEASURED) InteriorSurveySource.MEASURED else InteriorSurveySource.VIRTUAL; persist()
+        }
+        return true
+    }
+    fun projectModels(): Pair<HouseSpatialSurvey?,HouseSpatialSurvey?> =
+        ProjectCodec.decode(prefs?.getString(SpatialSurveyArchiveKeys.MEASURED,null),HouseSpatialSurvey::class.java) to
+            ProjectCodec.decode(prefs?.getString(SpatialSurveyArchiveKeys.VIRTUAL,null),HouseSpatialSurvey::class.java)
+    fun refreshMeasuredSurvey(survey: HouseSpatialSurvey,propertyID: String) = replaceProperty(survey,null,records.toList(),siteFacts,expectedPropertyID=propertyID)
+    fun setSiteFact(kind: XuanKongSiteFactKind,palaceID: Int,present: Boolean,propertyID: String) {
+        if(!isCurrentProperty(propertyID) || palaceID !in 0..8) return
+        siteFacts=siteFacts.filterNot { it.kind == kind && it.palaceID == palaceID } + if(present) listOf(XuanKongSiteFact(kind,palaceID)) else emptyList()
+        persist()
     }
 
     fun clearRecords() {
@@ -221,5 +269,11 @@ class ShaSurveyStore private constructor() {
             records = ArrayList(records)
         )
     }
+}
+
+enum class InteriorSurveySource { MEASURED, VIRTUAL, PROJECTION }
+object SpatialSurveyArchiveKeys {
+    const val MEASURED="latest_house_spatial_survey"
+    const val VIRTUAL="latest_vr_house_spatial_survey"
 }
 

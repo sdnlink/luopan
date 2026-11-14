@@ -2,6 +2,8 @@ package com.example.yiijingcompass.model
 
 import java.util.Calendar
 import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 // MARK: - 动土择日吉凶分析引擎 (ZeRi Engine - PRD 择日分析)
 
@@ -15,8 +17,9 @@ data class ZeRiAnalysis(
     val sittingClashWarning: String?,
     val detailsText: String,
     val yiActivities: List<String>,
-    val jiActivities: List<String>
-)
+    val jiActivities: List<String>,
+    val dayPillar: String = ""
+) { val localizedDayPillar get() = SolarTimeCalculator.localizedDayPillar(dayPillar) }
 
 class ZeRiEngine private constructor() {
     companion object {
@@ -40,8 +43,8 @@ class ZeRiEngine private constructor() {
         return analyze(date, sitting)
     }
 
-    fun analyze(date: Date, sitting: Mountain24Item): ZeRiAnalysis {
-        val calendar = Calendar.getInstance()
+    fun analyze(date: Date, sitting: Mountain24Item?): ZeRiAnalysis {
+        val calendar = java.util.GregorianCalendar()
         calendar.time = date
         val year = calendar.get(Calendar.YEAR)
         val month = calendar.get(Calendar.MONTH) + 1
@@ -49,7 +52,7 @@ class ZeRiEngine private constructor() {
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
 
         // 子初 (23:00) 换日
-        val dayCalendar = Calendar.getInstance()
+        val dayCalendar = java.util.GregorianCalendar()
         dayCalendar.time = date
         if (hour >= 23) {
             dayCalendar.add(Calendar.DAY_OF_MONTH, 1)
@@ -196,9 +199,9 @@ class ZeRiEngine private constructor() {
             "庚" to "酉", "酉" to "酉", "辛" to "酉",
             "戌" to "戌", "乾" to "戌", "亥" to "亥"
         )
-        val sittingBranch = mountainBranch[sitting.name] ?: sitting.name
-        val sClash = clashMap[sittingBranch]
-        if (sClash == dayBranch) {
+        val sittingBranch = sitting?.let { mountainBranch[it.name] ?: it.name }
+        val sClash = sittingBranch?.let { clashMap[it] }
+        if (sitting != null && sClash == dayBranch) {
             sittingClash = when (lang) {
                 AppLanguage.EN -> "Day branch clashes with House Sitting Mountain (${sitting.localizedName}); Sitting Clash Taboo."
                 AppLanguage.ZH_HANT -> "今日日支【${dayBranch}】直衝本宅坐山【${sitting.localizedName}山】，犯【衝山大忌】，切勿動土安門！"
@@ -286,7 +289,71 @@ class ZeRiEngine private constructor() {
             sittingClashWarning = sittingClash,
             detailsText = details,
             yiActivities = yi,
-            jiActivities = ji
+            jiActivities = ji,
+            dayPillar = dayStem + dayBranch
         )
     }
+
+    fun analyzeGeneralDay(date: Date = Date()) = analyze(date, null)
+    fun resolveDayOfficerIndex(date: Date, dayPillar: String): Int {
+        val term = SolarTimeCalculator.instance.solarTermIndex(date)
+        val monthBranch = if (term < 2) 1 else (2 + (term - 2) / 2) % 12
+        val dayBranch = branches.indexOf(dayPillar.takeLast(1))
+        return if (dayBranch < 0) 0 else (dayBranch - monthBranch + 12) % 12
+    }
+    fun localizedDayOfficerName(index: Int) = LocalizationManager.instance.t("native_day_officer_${index.coerceIn(0, 11)}")
+    fun officerSpecificYiSummary(index: Int) = LocalizationManager.instance.t("native_day_yi_${if(index in listOf(0,1,2,4,5,8,9,10)) index else 99}")
+    fun findUpcomingAuspiciousDays(sitting: Mountain24Item?, from: Date = Date(), days: Int = 30,
+        ownerBirthYear: Int? = null, category: ZeRiActivityCategory = ZeRiActivityCategory.ALL, limit: Int = 8): List<UpcomingAuspiciousDay> {
+        if (limit <= 0) return emptyList()
+        val base = java.util.GregorianCalendar().apply { time = from; set(Calendar.HOUR_OF_DAY,12); set(Calendar.MINUTE,0); set(Calendar.SECOND,0); set(Calendar.MILLISECOND,0) }
+        val ownerBranch = ownerBirthYear?.let { branches[Math.floorMod(it - 4, 12)] }
+        val result = mutableListOf<UpcomingAuspiciousDay>()
+        val count = if (category == ZeRiActivityCategory.ALL) maxOf(1,days) else maxOf(45,days)
+        for (offset in 0 until count.coerceAtMost(3660)) {
+            val date = (base.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR,offset) }.time
+            val analysis = analyze(date,sitting)
+            if (!analysis.isAuspicious || (ownerBranch != null && clashMap[analysis.dayPillar.takeLast(1)] == ownerBranch)) continue
+            val officer = resolveDayOfficerIndex(date,analysis.dayPillar)
+            if (officer !in category.allowedOfficers) continue
+            val id = SimpleDateFormat("yyyy-MM-dd",Locale.US).format(date) + "-" + analysis.dayPillar
+            result.add(UpcomingAuspiciousDay(id,date,SimpleDateFormat("MM-dd",Locale.getDefault()).format(date),
+                analysis.localizedDayPillar,analysis.fourPillarsText,localizedDayOfficerName(officer),officerSpecificYiSummary(officer),ownerBranch != null))
+            if(result.size >= limit) break
+        }
+        return result
+    }
+    fun calculateTwelveShichen(date: Date = Date(), ownerBirthYear: Int? = null): List<ShichenHourItem> {
+        val day = analyzeGeneralDay(date).dayPillar
+        val stem = stems.indexOf(day.take(1)).coerceAtLeast(0)
+        val branch = branches.indexOf(day.takeLast(1)).coerceAtLeast(0)
+        val ownerBranch = ownerBirthYear?.let { branches[Math.floorMod(it - 4,12)] }
+        val dragon = ((branch % 6) * 2 + 8) % 12
+        return (0 until 12).map { index ->
+            val god = (index - dragon + 12) % 12
+            val clashes = ownerBranch != null && clashMap[branches[index]] == ownerBranch
+            val range = if(index == 0) "23:00-01:00" else String.format(Locale.US,"%02d:00-%02d:00",index * 2 - 1,index * 2 + 1)
+            ShichenHourItem(index,index,SolarTimeCalculator.localizedDayPillar(stems[((stem % 5) * 2 + index) % 10] + branches[index]),range,
+                LocalizationManager.instance.t("native_hour_god_$god"), god in setOf(0,1,4,5,7,10) && !clashes,clashes)
+        }
+    }
+    fun dailyCompassDirections(date: Date = Date()): DailyCompassGodDirections {
+        val stem = analyzeGeneralDay(date).dayPillar.take(1)
+        val wealth = when(stem) { "甲","乙" -> 8; "丙","丁" -> 7; "戊","己" -> 1; "庚","辛" -> 3; "壬" -> 9; "癸" -> 4; else -> 8 }
+        val joy = when(stem) { "甲","己" -> 8; "乙","庚" -> 6; "丙","辛" -> 2; "丁","壬" -> 9; "戊","癸" -> 4; else -> 9 }
+        val angles = mapOf(1 to 0.0,8 to 45.0,3 to 90.0,4 to 135.0,9 to 180.0,2 to 225.0,7 to 270.0,6 to 315.0)
+        return DailyCompassGodDirections(stem,wealth,angles.getValue(wealth),PurpleWhiteEngine.instance.palaceDirection(wealth),joy,angles.getValue(joy),PurpleWhiteEngine.instance.palaceDirection(joy))
+    }
 }
+
+enum class ZeRiActivityCategory(val rawValue: String, val allowedOfficers: Set<Int>) {
+    ALL("all",setOf(0,1,2,3,4,5,7,8,9,10)), MOVE_IN("move_in",setOf(2,4,5,8,10)), RENOVATION("renovation",setOf(0,4,5,8,10)),
+    OPENING("opening",setOf(2,4,8,9,10)), MARRIAGE_BED("marriage_bed",setOf(1,4,7,8,10));
+    val localizedTitle get() = LocalizationManager.instance.t("native_day_category_$rawValue")
+}
+data class UpcomingAuspiciousDay(val id: String,val date: Date,val dateLabel: String,val localizedDayPillar: String,
+    val fourPillarsText: String,val dayOfficerBadge: String,val yiSummary: String,val isOwnerHarmony: Boolean)
+data class ShichenHourItem(val id: Int,val branchIndex: Int,val localizedPillar: String,val timeRange: String,
+    val localizedGodName: String,val isAuspicious: Boolean,val clashesOwner: Boolean)
+data class DailyCompassGodDirections(val dayStem: String,val wealthPalaceId: Int,val wealthAngle: Double,val wealthDirection: String,
+    val joyPalaceId: Int,val joyAngle: Double,val joyDirection: String)

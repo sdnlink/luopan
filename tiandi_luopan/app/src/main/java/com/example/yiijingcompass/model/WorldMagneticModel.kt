@@ -99,7 +99,7 @@ class WorldMagneticModel private constructor() {
     private val semiMinorAxis = 6356.7523142
     private val referenceRadius = 6371.2
     private val baseEpochMillis: Long = run {
-        val cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"))
+        val cal = java.util.GregorianCalendar(TimeZone.getTimeZone("GMT"))
         cal.set(2025, Calendar.JANUARY, 1, 0, 0, 0)
         cal.set(Calendar.MILLISECOND, 0)
         cal.timeInMillis

@@ -129,14 +129,13 @@ data class PalaceCell(
     }
 
     val localizedEvaluation: String
-        get() = baseLocalizedEvaluation + "\n\n" + flyingStarsTraditionalSourceNote(
-            LocalizationManager.shared.effectiveLanguage
-        )
+        get() = baseLocalizedEvaluation+"\n\n"+TraditionalEvidenceCatalog.text(TraditionalEvidenceCatalog.pair(mountainStar,facingStar,localizedPalaceName+" · "+LocalizationManager.instance.t("xkd_pair_natal")))
 
     val baseLocalizedEvaluation: String
         get() {
             val lang = LocalizationManager.shared.effectiveLanguage
             if (hasEarthSha) return localizedEarthShaEvaluation(lang)
+            if(setOf(mountainStar,facingStar)==setOf(1,6))return LocalizationManager.instance.t("ref_pair_one_six")
             return when (lang) {
                 AppLanguage.EN -> {
                     if (mountainStar == activePeriod && facingStar == activePeriod) "Double Current Stars · Wealth and people prosper"
@@ -308,7 +307,8 @@ data class XuanKongChart(
     val chartModeTitle: String,
     val palaces: List<PalaceCell>,
     val summaryAnalysis: String,
-    val periodMeta: PeriodMeta
+    val periodMeta: PeriodMeta,
+    val patternKind:Int?=null
 ) {
     val patternDesc: String get() = summaryAnalysis
 
@@ -630,7 +630,7 @@ class FlyingStarsEngine private constructor() {
     }
 
     private fun effectiveSolarYear(date: Date): Int {
-        val cal = Calendar.getInstance()
+        val cal = java.util.GregorianCalendar()
         cal.time = date
         val year = cal.get(Calendar.YEAR)
         val month = cal.get(Calendar.MONTH) + 1
@@ -813,7 +813,8 @@ class FlyingStarsEngine private constructor() {
             chartModeTitle = modeTitle,
             palaces = cells,
             summaryAnalysis = summary,
-            periodMeta = meta
+            periodMeta = meta,
+            patternKind=patternKind
         )
     }
 

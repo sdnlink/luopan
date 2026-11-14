@@ -30,7 +30,20 @@ class TianJiShuEngine private constructor() {
      * 生成天机演象·福宅堪测全案长卷
      * 完全对齐 iOS TianJiShuEngine.generateScrollImage，具备 8 语种原生排版与全套数理勘测研判
      */
-    fun generateScrollImage(
+    private data class ScrollRender(val bitmap:Bitmap,val requiredHeight:Int)
+    fun generateScrollImage(context:Context,heading:Double,coordsDesc:String,solarTimeDesc:String,
+        language:AppLanguage?=null,isPro:Boolean=true,floorplanReport:List<FloorplanAuditItem> = emptyList(),
+        panoramaArchive:PanoramaFengShuiArchive?=null,reportDate:Date=Date(),analysis:TianJiAnalysisSnapshot?=null):Bitmap = LocalizationManager.instance.withLanguage(language ?: LocalizationManager.instance.effectiveLanguage) {
+        val snapshot=analysis ?: TianJiAnalysisSnapshot(heading,reportDate)
+        val floor=if(snapshot.hasSpatialSnapshot)snapshot.capturedFloorplanReport else floorplanReport
+        val panorama=if(snapshot.hasSpatialSnapshot)snapshot.capturedPanoramaArchive else panoramaArchive
+        val probe=renderScrollImage(context,snapshot.heading,coordsDesc,solarTimeDesc,language,isPro,floor,panorama,snapshot.reportDate,snapshot,1)
+        val height=maxOf(15000,probe.requiredHeight)
+        probe.bitmap.recycle()
+        renderScrollImage(context,snapshot.heading,coordsDesc,solarTimeDesc,language,isPro,floor,panorama,snapshot.reportDate,snapshot,height).bitmap
+    }
+
+    private fun renderScrollImage(
         @Suppress("UNUSED_PARAMETER") context: Context,
         heading: Double,
         coordsDesc: String,
@@ -39,8 +52,10 @@ class TianJiShuEngine private constructor() {
         isPro: Boolean = true,
         floorplanReport: List<FloorplanAuditItem> = emptyList(),
         panoramaArchive: PanoramaFengShuiArchive? = null,
-        reportDate: Date = Date()
-    ): Bitmap {
+        reportDate: Date = Date(),
+        analysis: TianJiAnalysisSnapshot,
+        canvasHeight: Int
+    ): ScrollRender {
         val renderLanguage = language ?: LocalizationManager.instance.effectiveLanguage
 
         fun tr8(
@@ -66,10 +81,7 @@ class TianJiShuEngine private constructor() {
         }
 
         val width = 1080
-        val archiveItemCount = (panoramaArchive?.exterior?.size ?: 0) + (panoramaArchive?.interior?.shaItems?.size ?: 0)
-        val extraArchiveHeight = maxOf(0, archiveItemCount - 12) * 150
-        val extraFloorplanHeight = maxOf(0, floorplanReport.size - 12) * 180
-        val estimatedHeight = 15000 + extraArchiveHeight + extraFloorplanHeight
+        val estimatedHeight = canvasHeight
 
         val bitmap = Bitmap.createBitmap(width, estimatedHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -183,13 +195,14 @@ class TianJiShuEngine private constructor() {
         drawSectionHeader(sec1Title, curY)
         curY += 65f
 
+        if(analysis.signature.client.isNotBlank())curY+=drawMeasuredText(LocalizationManager.instance.t("native_client_name")+" · "+analysis.signature.client.take(120),curY)+20f
         val mFacing = Mountain24Data.instance.mountain(heading)
         val sitAngle = (heading + 180.0) % 360.0
         val mSitting = Mountain24Data.instance.mountain(sitAngle)
         val fenjin = Fenjin120Data.instance.resolveFenjin(heading)
         val hex = Hexagram64Data.instance.hexagram(heading)
         val facingDelta = ((heading - mFacing.centerAngle) % 360.0 + 540.0) % 360.0 - 180.0
-        val useTiGua = kotlin.math.abs(facingDelta.toDouble()) > 3.0
+        val useTiGua = analysis.useTiGua
 
         val p1Text = when (renderLanguage) {
             AppLanguage.EN -> """
@@ -261,11 +274,13 @@ class TianJiShuEngine private constructor() {
 
         // 3. 第二卷 · 玄空飞星气运方阵
         val xkChart = FlyingStarsEngine.instance.calculateChart(
+            period = analysis.period,
             sitting = mSitting,
             facing = mFacing,
             useTiGua = useTiGua,
             date = reportDate
         )
+        curY += drawMeasuredText(analysis.guidanceText(xkChart),curY) + 20f
         val meta = xkChart.periodMeta
         val sec2Title = tr8(
             "第二卷 · ${meta.yuan}${meta.period}运玄空飞星气运方阵",
@@ -510,7 +525,7 @@ class TianJiShuEngine private constructor() {
             textSize = 28f
             typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         }
-        val sealText = tr8(
+        val defaultSealText = tr8(
             "天机演象\n罗盘\n御印",
             "天機演象\n羅盤\n御印",
             "TIANJI\nYANXIANG\nCELESTIAL\nSEAL",
@@ -520,10 +535,13 @@ class TianJiShuEngine private constructor() {
             "สวรรค์ลิขิต\nเข็มทิศ\nตราประทับ",
             "TIANJI\nKOMPAS\nSEGEL RESMI"
         )
+        val rawSeal=analysis.signature.seal.trim().take(60)
+        val sealText=if(rawSeal.isBlank())defaultSealText else if(rawSeal.length==4&&!rawSeal.contains(" "))rawSeal.take(2)+"\n"+rawSeal.drop(2) else rawSeal.replace(" ","\n")
+        sealTextPaint.textSize=if(rawSeal.length>8)18f else if(rawSeal.length>4)22f else 28f
         drawMeasuredText(sealText, curY + 36f, sealTextPaint, 795f, 150)
 
         // 干支纪年推导
-        val calendar = Calendar.getInstance()
+        val calendar = java.util.GregorianCalendar()
         calendar.time = reportDate
         val y = calendar.get(Calendar.YEAR)
         val isBeforeLichun = SolarTimeCalculator.instance.isBeforeLiChun(reportDate)
@@ -548,7 +566,7 @@ class TianJiShuEngine private constructor() {
             textSize = 22f
             typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
         }
-        drawMeasuredText(signText, curY + 45f, signPaint, 480f, 280)
+        drawMeasuredText(analysis.signature.master.trim().take(120).ifBlank {signText}, curY + 45f, signPaint, 480f, 280)
 
         // 15. 卷尾免责合规声明
         val disclaimerTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -569,7 +587,7 @@ class TianJiShuEngine private constructor() {
         curY += 260f
         curY += drawMeasuredText(disclaimer, curY, disclaimerTextPaint, 100f, 880) + 60f
 
-        val finalHeight = minOf(curY.toInt() + 60, estimatedHeight)
+        val finalHeight = curY.toInt() + 60
 
         // 绘制朱丝栏边框与回纹
         val borderPaint = Paint().apply {
@@ -616,14 +634,7 @@ class TianJiShuEngine private constructor() {
             canvas.restore()
         }
 
-        // 最终精准裁切至实际高度，杜绝空白余纸
-        return if (finalHeight < estimatedHeight) {
-            val cropped = Bitmap.createBitmap(bitmap, 0, 0, width, finalHeight)
-            bitmap.recycle()
-            cropped
-        } else {
-            bitmap
-        }
+        return ScrollRender(bitmap,finalHeight)
     }
 
     private fun drawSectionHeader(canvas: Canvas, title: String, atY: Float, vermilion: Int) {

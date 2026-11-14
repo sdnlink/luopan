@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Keystore keys are device-bound. Restore paid membership through Play;
+         a restored unsigned/foreign balance must never become an entitlement. -->
+    <exclude domain="sharedpref" path="tianji_entitlements.xml" />
+</full-backup-content>

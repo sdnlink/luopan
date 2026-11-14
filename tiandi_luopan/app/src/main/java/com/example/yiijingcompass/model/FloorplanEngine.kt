@@ -178,6 +178,10 @@ data class FloorplanRoom(
 ) {
     val area: Float get() = FloorplanEngine.roomArea(this)
     val center: PointF get() = FloorplanEngine.roomCentroid(this)
+    fun transformed(target: RectF): FloorplanRoom = copy(rect = RectF(target), polygonPoints = polygonPoints?.map { point ->
+        if (rect.width() > 0 && rect.height() > 0) PointF(target.left + (point.x - rect.left) * target.width() / rect.width(),
+            target.top + (point.y - rect.top) * target.height() / rect.height()) else PointF(point.x, point.y)
+    })
 }
 
 data class FloorplanAuditItem(
@@ -231,6 +235,9 @@ data class Quad<A, B, C, D>(
 class FloorplanEngine private constructor() {
     companion object {
         val instance: FloorplanEngine by lazy { FloorplanEngine() }
+        fun roomContains(room: FloorplanRoom, point: PointF): Boolean = room.polygonPoints?.takeIf { it.size >= 3 }
+            ?.let { GeometryUtils.polygonContains(point, it) }
+            ?: (point.x >= room.rect.left && point.x <= room.rect.right && point.y >= room.rect.top && point.y <= room.rect.bottom)
 
         fun roomArea(room: FloorplanRoom): Float {
             val pts = room.polygonPoints
@@ -310,20 +317,23 @@ class FloorplanEngine private constructor() {
     fun auditFloorplan(
         rooms: List<FloorplanRoom>,
         centroid: PointF,
-        heading: Double
+        heading: Double,
+        aspectRatio: Float = 1f,
+        date: java.util.Date = java.util.Date()
     ): Pair<List<FloorplanRoom>, List<FloorplanAuditItem>> {
         val updatedRooms = mutableListOf<FloorplanRoom>()
         val auditReport = mutableListOf<FloorplanAuditItem>()
         val language = LocalizationManager.instance.effectiveLanguage
+        val annual=PurpleWhiteEngine.instance.calculateChart(date,heading)
 
         val centralRoom = rooms
-            .filter { it.type != FloorplanRoomType.MISSING_CORNER && it.rect.contains(centroid.x, centroid.y) }
-            .minByOrNull { it.rect.width() * it.rect.height() }
+            .filter { it.type != FloorplanRoomType.MISSING_CORNER && roomContains(it,centroid) }
+            .minByOrNull { roomArea(it) }
         val centralRoomID = centralRoom?.id
 
         val manualMissingGua = rooms
             .filter { it.type == FloorplanRoomType.MISSING_CORNER }
-            .map { palaceForPoint(PointF(it.rect.centerX(), it.rect.centerY()), centroid, heading).second }
+            .map { palaceForPoint(PointF(it.rect.centerX(), it.rect.centerY()), centroid, heading, aspectRatio).second }
             .toSet()
 
         for (room in rooms) {
@@ -339,7 +349,7 @@ class FloorplanEngine private constructor() {
                     else -> Pair("中央", "中")
                 }
             } else {
-                palace = palaceForPoint(PointF(room.rect.centerX(), room.rect.centerY()), centroid, heading)
+                palace = palaceForPoint(roomCentroid(room), centroid, heading, aspectRatio)
             }
 
             r.palaceName = when (language) {
@@ -376,7 +386,7 @@ class FloorplanEngine private constructor() {
             val audit = evaluateRoom(r.type, palace.second, palace.first)
             r.inspectionTitle = audit.title
             r.inspectionLevel = audit.level
-            r.inspectionLore = audit.lore
+            r.inspectionLore = audit.lore+crossModuleLore(palace.second,annual)
             r.inspectionAdvice = audit.advice
 
             updatedRooms.add(r)
@@ -386,7 +396,7 @@ class FloorplanEngine private constructor() {
                     title = "${r.type.localizedName} · ${audit.title}",
                     palace = r.palaceName,
                     severity = audit.level,
-                    lore = audit.lore,
+                    lore = r.inspectionLore,
                     solution = audit.advice
                 )
             )
@@ -397,7 +407,7 @@ class FloorplanEngine private constructor() {
                 rooms = rooms,
                 centroid = centroid,
                 heading = heading,
-                excludingGua = manualMissingGua
+                excludingGua = manualMissingGua, aspectRatio = aspectRatio
             )
         )
 
@@ -455,8 +465,8 @@ class FloorplanEngine private constructor() {
         return Pair(updatedRooms, auditReport)
     }
 
-    fun palaceForPoint(point: PointF, centroid: PointF, heading: Double): Pair<String, String> {
-        val dx = (point.x - centroid.x).toDouble()
+    fun palaceForPoint(point: PointF, centroid: PointF, heading: Double, aspectRatio: Float = 1f): Pair<String, String> {
+        val dx = ((point.x - centroid.x) * aspectRatio.takeIf { it.isFinite() && it > 0 } .let { it ?: 1f }).toDouble()
         val dy = -(point.y - centroid.y).toDouble()
         var angleRad = atan2(dx, dy)
         var angleDeg = Math.toDegrees(angleRad)
@@ -467,32 +477,32 @@ class FloorplanEngine private constructor() {
     }
 
     fun resolvePalace(geoAngle: Double): Pair<String, String> {
-        return when (geoAngle) {
-            in 22.5..67.5 -> Pair(
+        return when (((((geoAngle % 360) + 360) % 360 + 22.5) % 360 / 45).toInt()) {
+            1 -> Pair(
                 tr8("东北", "東北", "Northeast", "北東", "동북", "Đông Bắc", "ตะวันออกเฉียงเหนือ", "Timur Laut"),
                 tr8("艮", "艮", "Gen", "艮", "간", "Cấn", "เกิ่น", "Gen")
             )
-            in 67.5..112.5 -> Pair(
+            2 -> Pair(
                 tr8("正东", "正東", "East", "東", "정동", "Chính Đông", "ตะวันออก", "Timur"),
                 tr8("震", "震", "Zhen", "震", "진", "Chấn", "เจิ้น", "Zhen")
             )
-            in 112.5..157.5 -> Pair(
+            3 -> Pair(
                 tr8("东南", "東南", "Southeast", "南東", "동남", "Đông Nam", "ตะวันออกเฉียงใต้", "Tenggara"),
                 tr8("巽", "巽", "Xun", "巽", "손", "Tốn", "ซวิ่น", "Xun")
             )
-            in 157.5..202.5 -> Pair(
+            4 -> Pair(
                 tr8("正南", "正南", "South", "南", "정남", "Chính Nam", "ใต้", "Selatan"),
                 tr8("离", "離", "Li", "離", "이", "Ly", "หลี", "Li")
             )
-            in 202.5..247.5 -> Pair(
+            5 -> Pair(
                 tr8("西南", "西南", "Southwest", "南西", "서남", "Tây Nam", "ตะวันตกเฉียงใต้", "Barat Daya"),
                 tr8("坤", "坤", "Kun", "坤", "곤", "Khôn", "คุน", "Kun")
             )
-            in 247.5..292.5 -> Pair(
+            6 -> Pair(
                 tr8("正西", "正西", "West", "西", "정서", "Chính Tây", "ตะวันตก", "Barat"),
                 tr8("兑", "兌", "Dui", "兌", "태", "Đoài", "ตุ้ย", "Dui")
             )
-            in 292.5..337.5 -> Pair(
+            7 -> Pair(
                 tr8("西北", "西北", "Northwest", "北西", "서북", "Tây Bắc", "ตะวันตกเฉียงเหนือ", "Barat Laut"),
                 tr8("乾", "乾", "Qian", "乾", "건", "Càn", "เฉียน", "Qian")
             )
@@ -507,7 +517,8 @@ class FloorplanEngine private constructor() {
         rooms: List<FloorplanRoom>,
         centroid: PointF,
         heading: Double,
-        excludingGua: Set<String>
+        excludingGua: Set<String>,
+        aspectRatio: Float = 1f
     ): List<FloorplanAuditItem> {
         val footprintRooms = rooms.filter {
             it.type != FloorplanRoomType.MISSING_CORNER && it.rect.width() > 0 && it.rect.height() > 0
@@ -525,7 +536,7 @@ class FloorplanEngine private constructor() {
             maxY = max(maxY, room.rect.bottom)
         }
         val bounds = RectF(minX, minY, maxX, maxY)
-        if (bounds.width() <= 10f || bounds.height() <= 10f) return emptyList()
+        if (bounds.width() <= 1e-6f || bounds.height() <= 1e-6f) return emptyList()
 
         val sectorWidth = bounds.width() / 3f
         val sectorHeight = bounds.height() / 3f
@@ -556,7 +567,7 @@ class FloorplanEngine private constructor() {
             if (occupied) continue
 
             val center = PointF(sector.centerX(), sector.centerY())
-            val palace = palaceForPoint(center, centroid, heading)
+            val palace = palaceForPoint(center, centroid, heading, aspectRatio)
             if (emittedGua.contains(palace.second)) continue
             emittedGua.add(palace.second)
 
@@ -649,6 +660,17 @@ class FloorplanEngine private constructor() {
             AppLanguage.ID -> id
             AppLanguage.AUTO, AppLanguage.ZH_HANS -> hans
         }
+    }
+
+    private fun crossModuleLore(gua:String,chart:PurpleWhiteChart):String {
+        val aliases=listOf(listOf("坎","Kan","감","Khảm","ข่าน"),listOf("坤","Kun","곤","Khôn","คุน"),listOf("震","Zhen","진","Chấn","เจิ้น"),listOf("巽","Xun","손","Tốn","ซวิ่น"),listOf("乾","Qian","건","Càn","เฉียน"),listOf("兑","兌","Dui","태","Đoài","ตุ้ย"),listOf("艮","Gen","간","Cấn","เกิ่น"),listOf("离","離","Li","이","Ly","หลี"))
+        val index=aliases.indexOfFirst {gua in it};val palace=listOf(1,2,3,4,6,7,8,9).getOrNull(index) ?: 5
+        val parts=mutableListOf<String>();val lang=LocalizationManager.instance
+        chart.palaceItems.firstOrNull {it.palaceId==palace}?.let {parts.add(lang.t("purple_white")+" · "+it.starName+" · "+it.advice)}
+        if(index>=0&&UserKuaProfileManager.instance.isProfileEnabled&&UserEntitlementsManager.instance.isVip){
+            BaZhaiEngine.instance.analyze(UserKuaProfileManager.instance.ownerGuaKey,"离").items.firstOrNull {it.guaName==aliases[index][0]}?.let {parts.add(lang.t("bz_tool_owner")+" · "+it.star.localizedName)}
+        }
+        return if(parts.isEmpty())"" else "\n"+parts.joinToString("\n")
     }
 
     private fun missingCornerLoreWithSource(gua: String, lore: String): String {
@@ -1193,6 +1215,19 @@ class FloorplanEngine private constructor() {
             )
     }
 
+    fun exportMetricDXF(rooms:List<FloorplanRoom>,centroid:PointF,widthMeters:Double,depthMeters:Double):String {
+        require(widthMeters.isFinite()&&depthMeters.isFinite()&&widthMeters>0&&depthMeters>0)
+        val result=StringBuilder("0\nSECTION\n2\nHEADER\n9\n\$INSUNITS\n70\n6\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n")
+        fun number(value:Double)=String.format(java.util.Locale.US,"%.6f",value)
+        rooms.forEach {room->
+            val points=room.polygonPoints ?: listOf(PointF(room.rect.left,room.rect.top),PointF(room.rect.right,room.rect.top),PointF(room.rect.right,room.rect.bottom),PointF(room.rect.left,room.rect.bottom))
+            points.indices.forEach {i->val a=points[i];val b=points[(i+1)%points.size]
+                result.append("0\nLINE\n8\nROOMS\n10\n${number(a.x*widthMeters)}\n20\n${number(-a.y*depthMeters)}\n30\n0\n11\n${number(b.x*widthMeters)}\n21\n${number(-b.y*depthMeters)}\n31\n0\n")}
+            result.append("0\nTEXT\n8\nROOMS\n10\n${number(room.center.x*widthMeters)}\n20\n${number(-room.center.y*depthMeters)}\n40\n0.2\n1\n${room.name.replace("\n"," ").replace("\r"," ")}\n")
+        }
+        result.append("0\nCIRCLE\n8\nTAIJI\n10\n${number(centroid.x*widthMeters)}\n20\n${number(-centroid.y*depthMeters)}\n40\n0.1\n0\nENDSEC\n0\nEOF\n")
+        return result.toString()
+    }
     fun exportDXF(rooms: List<FloorplanRoom>, centroid: PointF): String {
         val sb = StringBuilder()
         sb.append("0\nSECTION\n2\nHEADER\n9\n\$INSUNITS\n70\n6\n0\nENDSEC\n")

@@ -674,27 +674,10 @@ class AppWebBridge(
     fun isUserVip(): Boolean = UserEntitlementsManager.instance.isVip
 
     @JavascriptInterface
-    fun upgradeVipLevel(level: String): Boolean {
-        return try {
-            val lvl = EntitlementLevel.valueOf(level)
-            UserEntitlementsManager.instance.upgradeTo(lvl)
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
+    fun upgradeVipLevel(level: String): Boolean = false
 
     @JavascriptInterface
-    fun applyInAppPurchase(productId: String): Boolean {
-        val success = UserEntitlementsManager.instance.applyPurchase(productId)
-        if (success) {
-            activity.runOnUiThread {
-                Toast.makeText(activity, LocalizationManager.instance.t("iap_purchase_success"), Toast.LENGTH_SHORT).show()
-                webView.evaluateJavascript("if(window.onNativePaymentResult){window.onNativePaymentResult('iap', true, '$productId');}", null)
-            }
-        }
-        return success
-    }
+    fun applyInAppPurchase(productId: String): Boolean = false
 
     @JavascriptInterface
     fun launchGooglePlayPurchase(productId: String) {
@@ -800,7 +783,7 @@ class AppWebBridge(
     @JavascriptInterface
     fun refreshLocation() {
         activity.runOnUiThread {
-            (activity as? com.example.yiijingcompass.MainActivity)?.checkAndRequestLocation()
+            (activity as? com.example.yiijingcompass.LegacyWebActivity)?.checkAndRequestLocation()
                 ?: motion.start(activity)
         }
     }
@@ -816,7 +799,7 @@ class AppWebBridge(
     @JavascriptInterface
     fun requestCameraPermission() {
         activity.runOnUiThread {
-            (activity as? com.example.yiijingcompass.MainActivity)?.checkAndRequestCamera()
+            (activity as? com.example.yiijingcompass.LegacyWebActivity)?.checkAndRequestCamera()
         }
     }
 

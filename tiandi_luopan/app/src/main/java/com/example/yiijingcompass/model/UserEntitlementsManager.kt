@@ -74,11 +74,15 @@ class UserEntitlementsManager private constructor() {
     }
 
     private var prefs: SharedPreferences? = null
+    private val activeReservations=mutableSetOf<String>()
 
     var level: EntitlementLevel = EntitlementLevel.FREE
         private set
 
-    var exportCredits: Int = 3
+    var exportCredits: Int = 0
+        private set
+
+    var floorplanCredits: Int = 0
         private set
 
     var isFloorplanUnlocked: Boolean = false
@@ -87,17 +91,60 @@ class UserEntitlementsManager private constructor() {
     val isVip: Boolean
         get() = level != EntitlementLevel.FREE
 
-    fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    @Synchronized fun init(context: Context,recoverReservations:Boolean=true) {
+        prefs=runCatching {com.example.yiijingcompass.billing.SignedEntitlementPreferences.open(context)}.getOrNull()
+        if(prefs==null){level=EntitlementLevel.FREE;exportCredits=0;floorplanCredits=0;isFloorplanUnlocked=false;return}
         prefs?.let {
             val levelStr = it.getString(KEY_LEVEL, EntitlementLevel.FREE.name) ?: EntitlementLevel.FREE.name
             level = try { EntitlementLevel.valueOf(levelStr) } catch (_: Exception) { EntitlementLevel.FREE }
-            exportCredits = it.getInt(KEY_CREDITS, 3)
-            isFloorplanUnlocked = it.getBoolean(KEY_FLOORPLAN_UNLOCKED, false)
+            exportCredits = it.getInt(KEY_CREDITS, 0)
+            floorplanCredits=it.getInt("floorplan_credits",0)
+            isFloorplanUnlocked = floorplanCredits>0
+            if(recoverReservations){
+                val pending=reservations();val abandoned=pending.filterNot {it in activeReservations}
+                if(abandoned.isNotEmpty()&&it.edit().putInt(KEY_CREDITS,exportCredits+abandoned.size).putStringSet("export_reservations",pending.minus(abandoned.toSet())).commit())exportCredits+=abandoned.size
+            }
         }
     }
 
-    fun applyPurchase(productId: String): Boolean {
+    fun storageReady():Boolean=runCatching {prefs?.edit()?.putBoolean("ledger_ready",true)?.commit()==true}.getOrDefault(false)
+    @Synchronized internal fun applyVerifiedPurchase(productId: String,token: String): Boolean {
+        if(token.isBlank())return false
+        val key="token-"+java.security.MessageDigest.getInstance("SHA-256").digest((token+productId).toByteArray()).joinToString(""){"%02x".format(it)}
+        if(prefs?.getBoolean(key,false)==true && productId in setOf(InAppProductId.TIANJI_SINGLE.productId,InAppProductId.FLOORPLAN_SINGLE.productId))return true
+        if(productId==InAppProductId.TIANJI_SINGLE.productId){
+            val next=exportCredits+1
+            if(prefs?.edit()?.putInt(KEY_CREDITS,next)?.putBoolean(key,true)?.commit()!=true)return false
+            exportCredits=next;return true
+        }
+        if(productId==InAppProductId.FLOORPLAN_SINGLE.productId){
+            val next=floorplanCredits+1
+            if(prefs?.edit()?.putInt("floorplan_credits",next)?.putBoolean(key,true)?.commit()!=true)return false
+            floorplanCredits=next;isFloorplanUnlocked=true;return true
+        }
+        val result=applyPurchase(productId)
+        if(result&&prefs?.edit()?.putBoolean(key,true)?.commit()!=true)return false
+        return result
+    }
+
+    @Synchronized internal fun reconcileMembership(productIDs:Set<String>) {
+        level=when {InAppProductId.PRO_LIFETIME.productId in productIDs->EntitlementLevel.LIFETIME
+            InAppProductId.VIP_YEARLY.productId in productIDs->EntitlementLevel.PRO_YEARLY;else->EntitlementLevel.FREE}
+        isFloorplanUnlocked=floorplanCredits>0
+        prefs?.edit()?.putString(KEY_LEVEL,level.name)?.putBoolean(KEY_FLOORPLAN_UNLOCKED,isFloorplanUnlocked)?.apply()
+    }
+
+    fun hasFloorplanAccess(propertyKey:String):Boolean = isVip||prefs?.getBoolean("floorplan-grant-$propertyKey",false)==true
+    /** Balance and project grant commit together; imported JSON cannot create a grant. */
+    @Synchronized fun acquireFloorplanAccess(propertyKey:String,persist:()->Boolean={true}):Boolean {
+        if(hasFloorplanAccess(propertyKey))return true
+        if(propertyKey.isBlank()||floorplanCredits<=0)return false
+        if(!persist())return false
+        if(prefs?.edit()?.putInt("floorplan_credits",floorplanCredits-1)?.putBoolean("floorplan-grant-$propertyKey",true)?.commit()!=true)return false
+        floorplanCredits--;isFloorplanUnlocked=floorplanCredits>0;return true
+    }
+
+    private fun applyPurchase(productId: String): Boolean {
         return when (productId) {
             InAppProductId.VIP_YEARLY.productId -> {
                 upgradeTo(EntitlementLevel.PRO_YEARLY)
@@ -120,22 +167,42 @@ class UserEntitlementsManager private constructor() {
         }
     }
 
-    fun upgradeTo(newLevel: EntitlementLevel) {
+    private fun upgradeTo(newLevel: EntitlementLevel) {
+        if(level==EntitlementLevel.LIFETIME&&newLevel!=EntitlementLevel.LIFETIME)return
         level = newLevel
         prefs?.edit()?.putString(KEY_LEVEL, newLevel.name)?.apply()
     }
 
-    fun consumeCredit(): Boolean {
+    @Synchronized fun consumeCredit(): Boolean {
         if (isVip) return true
         if (exportCredits > 0) {
+            if(prefs?.edit()?.putInt(KEY_CREDITS, exportCredits-1)?.commit()!=true)return false
             exportCredits--
-            prefs?.edit()?.putInt(KEY_CREDITS, exportCredits)?.apply()
             return true
         }
         return false
     }
 
-    fun addCredits(amount: Int) {
+    private fun reservations():Set<String> = prefs?.getStringSet("export_reservations",emptySet())?.toSet() ?: emptySet()
+    @Synchronized fun reserveTianjiCredit():String? {
+        if(exportCredits<=0)return null
+        val token=java.util.UUID.randomUUID().toString()
+        if(prefs?.edit()?.putInt(KEY_CREDITS,exportCredits-1)?.putStringSet("export_reservations",reservations()+token)?.commit()!=true)return null
+        exportCredits--;activeReservations.add(token);return token
+    }
+    @Synchronized fun commitTianjiCreditReservation(token:String){
+        if(token !in reservations()){activeReservations.remove(token);return}
+        if(prefs?.edit()?.putStringSet("export_reservations",reservations()-token)?.commit()==true)activeReservations.remove(token)
+    }
+    @Synchronized fun refundTianjiCreditReservation(token:String){
+        if(token !in reservations()){activeReservations.remove(token);return}
+        if(prefs?.edit()?.putInt(KEY_CREDITS,exportCredits+1)?.putStringSet("export_reservations",reservations()-token)?.commit()==true){exportCredits++;activeReservations.remove(token)}
+    }
+    @Synchronized internal fun refundExportCredit() {
+        val next=exportCredits+1
+        if(prefs?.edit()?.putInt(KEY_CREDITS,next)?.commit()==true)exportCredits=next
+    }
+    private fun addCredits(amount: Int) {
         exportCredits += amount
         prefs?.edit()?.putInt(KEY_CREDITS, exportCredits)?.apply()
     }
@@ -146,6 +213,7 @@ class UserEntitlementsManager private constructor() {
             put("level", level.name)
             put("exportCredits", exportCredits)
             put("isFloorplanUnlocked", isFloorplanUnlocked)
+            put("floorplanCredits",floorplanCredits)
             val purchasedArr = org.json.JSONArray()
             if (level == EntitlementLevel.PRO_YEARLY) purchasedArr.put(InAppProductId.VIP_YEARLY.productId)
             if (level == EntitlementLevel.LIFETIME) purchasedArr.put(InAppProductId.PRO_LIFETIME.productId)

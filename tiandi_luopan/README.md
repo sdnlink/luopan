@@ -1,5 +1,7 @@
 # 天机演象 (TianJi YanXiang)
 
+Android 主界面现为原生 Kotlin。main iOS 的逐文件对应、功能范围、平台差异与构建方法见 [Android 移植说明](docs/ANDROID_IOS_PORT.md)；验证结果见 [验证记录](docs/ANDROID_VALIDATION.md)。
+
 > **天地人合一 · 时空一体化数字易学罗盘**  
 > 一款深度融合**传统风水勘测规范**、**现代高精度天体力学**与**移动传感器融合算法**的专业级 Android 综合时空罗盘应用。
 

@@ -26,6 +26,7 @@ class CompassLayerManager private constructor() {
 
     private var prefs: SharedPreferences? = null
 
+    var showDailyGodMarkers=false
     var showDegreeTicks: Boolean = true
     var showSolarTerms: Boolean = true
     var showHexagrams64: Boolean = true
@@ -38,6 +39,7 @@ class CompassLayerManager private constructor() {
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs?.let {
+            showDailyGodMarkers=it.getBoolean("compass_layer_daily_gods",false)
             showDegreeTicks = it.getBoolean("compass_layer_degree_ticks", true)
             showSolarTerms = it.getBoolean("compass_layer_solar_terms", true)
             showHexagrams64 = it.getBoolean("compass_layer_hexagrams64", true)
@@ -95,8 +97,18 @@ class CompassLayerManager private constructor() {
         persist()
     }
 
+    val activePreset:CompassPreset? get()=when {
+        !showDegreeTicks||!showMountain24||!showEightGua||!showTrueNorthNeedle||!showLevelBubble->null
+        showSolarTerms&&showHexagrams64&&showFenjin120->CompassPreset.COMPREHENSIVE
+        !showSolarTerms&&showHexagrams64&&showFenjin120->CompassPreset.SAN_YUAN
+        showSolarTerms&&!showHexagrams64&&showFenjin120->CompassPreset.SAN_HE
+        !showSolarTerms&&!showHexagrams64&&!showFenjin120->CompassPreset.MINIMALIST
+        else->null
+    }
+    fun save() = persist()
     private fun persist() {
         prefs?.edit()?.apply {
+            putBoolean("compass_layer_daily_gods",showDailyGodMarkers)
             putBoolean("compass_layer_degree_ticks", showDegreeTicks)
             putBoolean("compass_layer_solar_terms", showSolarTerms)
             putBoolean("compass_layer_hexagrams64", showHexagrams64)

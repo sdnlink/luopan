@@ -31,8 +31,13 @@ class LocalizationManager private constructor() {
             updateEffectiveLanguage()
         }
 
-    var effectiveLanguage: AppLanguage = AppLanguage.ZH_HANS
-        private set
+    private var resolvedLanguage=AppLanguage.ZH_HANS
+    private val renderLanguage=ThreadLocal<AppLanguage>()
+    val effectiveLanguage:AppLanguage get()=renderLanguage.get() ?: resolvedLanguage
+    fun <T> withLanguage(language:AppLanguage,body:()->T):T {
+        val previous=renderLanguage.get();renderLanguage.set(resolveLanguage(language))
+        try{return body()}finally {if(previous==null)renderLanguage.remove() else renderLanguage.set(previous)}
+    }
 
     private val translations = mutableMapOf<String, Map<String, String>>()
 
@@ -67,7 +72,7 @@ class LocalizationManager private constructor() {
     }
 
     private fun updateEffectiveLanguage() {
-        effectiveLanguage = resolveLanguage(currentSetting)
+        resolvedLanguage = resolveLanguage(currentSetting)
     }
 
     fun setLanguage(context: Context, lang: AppLanguage) {

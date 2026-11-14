@@ -2,6 +2,7 @@ package com.example.yiijingcompass.model
 
 import java.util.Calendar
 import java.util.Date
+import java.util.TimeZone
 
 data class QimenDoor(
     val name: String,
@@ -94,17 +95,8 @@ data class QimenDoor(
             )[name] ?: lore
         }
 
-    val classicalSourceNote: String
-        get() = when (LocalizationManager.shared.effectiveLanguage) {
-            AppLanguage.EN -> "Classical source: the traditional Eight-Gates mnemonic in Qimen Dunjia texts, ‘Rest, Life and Open are the three auspicious gates; Death, Shock and Harm are the three inauspicious gates; Block and View are intermediate.’ Interpretation: the gate language above is a historical symbolic reading. It does not determine travel safety, health, construction, legal or financial outcomes; verify real-world conditions and consult qualified professionals."
-            AppLanguage.ZH_HANT -> "古籍出處：奇門遁甲八門傳統訣：「休、生、開三吉；死、驚、傷三凶；杜、景二門中。」解釋：上文門象為古籍術數的象徵解讀，不決定出行安全、健康、施工、法律或財務結果；請以現場條件及專業意見為準。"
-            AppLanguage.JA -> "出典：奇門遁甲の八門訣「休・生・開は三吉、死・驚・傷は三凶、杜・景は中門」。解釈：門の吉凶は古典術数の象徴的な読みであり、旅行の安全、健康、工事、法律・金融の結果を決めるものではありません。"
-            AppLanguage.KO -> "출처: 기문둔갑 팔문 전통결 ‘휴·생·개는 삼길, 사·경·상은 삼흉, 두·경은 중문’. 해석: 위 문상은 고전 술수의 상징적 해석이며 여행 안전·건강·공사·법률·재무 결과를 결정하지 않습니다."
-            AppLanguage.VI -> "Nguồn cổ: khẩu quyết Bát Môn trong Kỳ Môn Độn Giáp: ‘Hưu, Sinh, Khai là ba cửa cát; Tử, Kinh, Thương là ba cửa hung; Đỗ, Cảnh là cửa trung.’ Giải thích: ngôn ngữ cửa là biểu tượng thuật số cổ, không quyết định an toàn đi lại, sức khỏe, xây dựng, pháp lý hay tài chính."
-            AppLanguage.TH -> "ที่มาโบราณ: สูตรแปดประตูในฉีเหมินตุ้นเจี่ย ‘ประตูพัก เกิด เปิด เป็นสามประตูมงคล; ตาย ตกใจ บาดเจ็บ เป็นสามประตูอัปมงคล; ซ่อนและทัศน์เป็นประตูกลาง’ คำอธิบาย: ถ้อยคำเรื่องประตูเป็นสัญลักษณ์ของศาสตร์โบราณ ไม่ได้กำหนดความปลอดภัย สุขภาพ งานก่อสร้าง กฎหมาย หรือการเงิน"
-            AppLanguage.ID -> "Sumber klasik: mnemonik Delapan Gerbang Qimen Dunjia, ‘Istirahat, Kehidupan, dan Pembuka adalah tiga gerbang baik; Kematian, Kejutan, dan Luka adalah tiga gerbang buruk; Blokir dan Pandang adalah gerbang menengah.’ Penjelasan: simbol gerbang ini adalah tafsir sejarah, bukan penentu keselamatan perjalanan, kesehatan, konstruksi, hukum, atau keuangan."
-            AppLanguage.AUTO, AppLanguage.ZH_HANS -> "古籍出处：奇门遁甲八门传统诀：“休、生、开三吉；死、惊、伤三凶；杜、景二门中。”解释：上文门象为古籍术数的象征解读，不决定出行安全、健康、施工、法律或财务结果；请以现场条件及专业意见为准。"
-        }
+    val classicalSourceNote:String get()=sourceReference.localizedText+"\n"+LocalizationManager.instance.t("ref_scope_note")
+
 }
 
 data class QimenPalaceCell(
@@ -316,7 +308,7 @@ class QimenEngine private constructor() {
     }
 
     private fun flightSkip(from: Int, forward: Boolean): List<Int> {
-        val startIdx = luoShuSkip.indexOf(from).let { if (it >= 0) it else 0 }
+        val startIdx = luoShuSkip.indexOf(from).let { if (it >= 0) it else if(forward)0 else luoShuSkip.lastIndex }
         val result = mutableListOf<Int>()
         for (i in 0 until 8) {
             val idx = if (forward) (startIdx + i) % 8 else (startIdx - i + 8) % 8
@@ -326,13 +318,13 @@ class QimenEngine private constructor() {
     }
 
     private fun flySkip(start: Int, steps: Int, forward: Boolean): Int {
-        val idx = luoShuSkip.indexOf(start).let { if (it >= 0) it else 0 }
+        val idx = luoShuSkip.indexOf(start).let { if (it >= 0) it else if(forward)0 else luoShuSkip.lastIndex }
         val targetIdx = if (forward) (idx + steps) % 8 else (idx - steps % 8 + 8) % 8
         return luoShuSkip[targetIdx]
     }
 
-    private fun dayGanZhiIndex(date: Date): Int {
-        val cal = Calendar.getInstance()
+    private fun dayGanZhiIndex(date: Date, timeZone: TimeZone = TimeZone.getDefault()): Int {
+        val cal = java.util.GregorianCalendar(timeZone)
         cal.time = date
         val y = cal.get(Calendar.YEAR)
         val m = cal.get(Calendar.MONTH) + 1
@@ -344,8 +336,8 @@ class QimenEngine private constructor() {
         return ((jdn + 49) % 60 + 60) % 60
     }
 
-    fun calculateChart(date: Date = Date(), heading: Double = 0.0): QimenChart {
-        val cal = Calendar.getInstance()
+    fun calculateChart(date: Date = Date(), heading: Double = 0.0, timeZone: TimeZone = TimeZone.getDefault()): QimenChart {
+        val cal = java.util.GregorianCalendar(timeZone)
         cal.time = date
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         val solarTermIndex = SolarTimeCalculator.instance.solarTermIndex(date)
@@ -362,7 +354,8 @@ class QimenEngine private constructor() {
             AppLanguage.ZH_HANS, AppLanguage.AUTO -> if (isYangDun) "阳遁" else "阴遁"
         }
 
-        val dayGz = dayGanZhiIndex(date)
+        val dayRef = (cal.clone() as Calendar).apply { if(hour >= 23) add(Calendar.DAY_OF_YEAR,1) }.time
+        val dayGz = dayGanZhiIndex(dayRef,timeZone)
         val fuHead = dayGz - (dayGz % 5)
         val yuanIndex = when (fuHead % 15) {
             0 -> 0
@@ -403,8 +396,7 @@ class QimenEngine private constructor() {
             AppLanguage.ZH_HANS, AppLanguage.AUTO -> "【${dunType}${juNumber}局 · 拆补${yuanName}】"
         }
 
-        val dayRef = Date(date.time + 3600000L)
-        val effDayGz = dayGanZhiIndex(dayRef)
+        val effDayGz = dayGz
         val dayStem = effDayGz % 10
         val hourBranch = ((hour + 1) / 2) % 12
         val hourStem = ((dayStem % 5) * 2 + hourBranch) % 10

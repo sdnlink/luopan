@@ -17,11 +17,29 @@ data class SolarTimeResult(
     val solarTermName: String,
     val baziGanzhi: String,
     val dayPillar: String
-)
+) { val localizedDayPillar: String get() = SolarTimeCalculator.localizedDayPillar(dayPillar) }
+
+data class SolarTermTransition(val date: Date, val name: String)
 
 class SolarTimeCalculator private constructor() {
     companion object {
         val instance: SolarTimeCalculator by lazy { SolarTimeCalculator() }
+        fun localizedDayPillar(pillar: String): String {
+            val stems = "甲乙丙丁戊己庚辛壬癸"
+            val branches = "子丑寅卯辰巳午未申酉戌亥"
+            val language = LocalizationManager.instance.effectiveLanguage
+            val values = when(language) {
+                AppLanguage.EN, AppLanguage.ID -> "Jia,Yi,Bing,Ding,Wu,Ji,Geng,Xin,Ren,Gui" to "Zi,Chou,Yin,Mao,Chen,Si,Wu,Wei,Shen,You,Xu,Hai"
+                AppLanguage.KO -> "갑,을,병,정,무,기,경,신,임,계" to "자,축,인,묘,진,사,오,미,신,유,술,해"
+                AppLanguage.VI -> "Giáp,Ất,Bính,Đinh,Mậu,Kỷ,Canh,Tân,Nhâm,Quý" to "Tý,Sửu,Dần,Mão,Thìn,Tỵ,Ngọ,Mùi,Thân,Dậu,Tuất,Hợi"
+                AppLanguage.TH -> "เจี่ย,อี้,ปิ่ง,ติง,อู่,จี่,เกิง,ซิน,เหริน,กุ่ย" to "จื่อ,โฉ่ว,หยิน,เหมา,เฉิน,ซื่อ,อู่,เว่ย,เซิน,โหย่ว,ซวี,ฮ่าย"
+                else -> return pillar
+            }
+            val a = pillar.firstOrNull()?.let { stems.indexOf(it) } ?: -1
+            val b = pillar.lastOrNull()?.let { branches.indexOf(it) } ?: -1
+            return if (a >= 0 && b >= 0) values.first.split(',')[a] + values.second.split(',')[b] else pillar
+        }
+
     }
 
     private val solarTerms = listOf(
@@ -38,20 +56,15 @@ class SolarTimeCalculator private constructor() {
         return calculate(Date(), longitude)
     }
 
-    fun calculate(date: Date = Date(), longitude: Double = 0.0): SolarTimeResult {
-        val calendar = Calendar.getInstance()
+    fun calculate(date: Date = Date(), longitude: Double = 0.0, timeZone: TimeZone = TimeZone.getDefault()): SolarTimeResult {
+        val civilCalendar = java.util.GregorianCalendar(timeZone).apply { time = date }
+        val calendar = java.util.GregorianCalendar(TimeZone.getTimeZone("UTC"))
         calendar.time = date
 
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
         val minute = calendar.get(Calendar.MINUTE)
         val second = calendar.get(Calendar.SECOND)
         val dayOfYear = calendar.get(Calendar.DAY_OF_YEAR)
-
-        val tz = calendar.timeZone
-        val daylightSavingOffset = if (tz.inDaylightTime(date)) tz.dstSavings else 0
-        val standardSecondsFromGMT = (tz.getOffset(date.time) - daylightSavingOffset) / 1000
-        val timezoneMeridian = standardSecondsFromGMT.toDouble() / 3600.0 * 15.0
-        val longitudeOffset = (longitude - timezoneMeridian) * 4.0
 
         val daysInYear = calendar.getActualMaximum(Calendar.DAY_OF_YEAR).toDouble()
         val fractionalDay = (dayOfYear - 1).toDouble() +
@@ -66,31 +79,37 @@ class SolarTimeCalculator private constructor() {
                 0.014615 * cos(2.0 * gamma) -
                 0.040849 * sin(2.0 * gamma)
         )
-        val totalOffsetMinutes = longitudeOffset + equationOfTime
-        val trueSolarMillis = date.time + (totalOffsetMinutes * 60.0 * 1000.0).toLong()
-        val trueSolarDate = Date(trueSolarMillis)
-
-        val formatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        formatter.timeZone = tz
-
+        val solarOffsetMinutes = longitude * 4.0 + equationOfTime
+        val totalOffsetMinutes = solarOffsetMinutes - timeZone.getOffset(date.time) / 60000.0
+        val trueSolarDate = Date(date.time + (solarOffsetMinutes * 60000.0).toLong())
+        val formatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).apply { this.timeZone = timeZone }
+        val solarFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).apply { this.timeZone = TimeZone.getTimeZone("UTC") }
         val termIndex = solarTermIndex(date)
-        val baziTermIndex = solarTermIndex(trueSolarDate)
-        val bazi = calculateBazi(
-            trueSolarDate,
-            baziTermIndex,
-            calendar,
-            isBeforeLiChun(trueSolarDate)
-        )
+        val bazi = calculateBazi(trueSolarDate, termIndex, calendar, civilCalendar.get(Calendar.YEAR), isBeforeLiChun(date, timeZone))
 
         return SolarTimeResult(
             standardTimeString = formatter.format(date),
-            trueSolarTimeString = formatter.format(trueSolarDate),
+            trueSolarTimeString = solarFormatter.format(trueSolarDate),
             timeOffsetMinutes = totalOffsetMinutes,
             equationOfTimeMinutes = equationOfTime,
             solarTermName = solarTerms[termIndex],
             baziGanzhi = bazi.first,
             dayPillar = bazi.second
         )
+    }
+
+    fun upcomingSolarTerms(after: Date, count: Int = 24): List<SolarTermTransition> {
+        var cursor = after.time
+        return (0 until count.coerceIn(0, 48)).map {
+            val index = solarTermIndex(Date(cursor))
+            var low = cursor; var high = cursor + 20 * 86400000L
+            while (high - low > 100) {
+                val middle = low + (high - low) / 2
+                if (solarTermIndex(Date(middle)) == index) low = middle else high = middle
+            }
+            cursor = high + 1000
+            SolarTermTransition(Date(high), solarTermName(Date(high)))
+        }
     }
 
     private fun normalizedDegrees(value: Double): Double {
@@ -106,8 +125,8 @@ class SolarTimeCalculator private constructor() {
         return solarTerms[solarTermIndex(date)]
     }
 
-    fun isBeforeLiChun(date: Date): Boolean {
-        val cal = Calendar.getInstance()
+    fun isBeforeLiChun(date: Date, timeZone: TimeZone = TimeZone.getDefault()): Boolean {
+        val cal = java.util.GregorianCalendar(timeZone)
         cal.time = date
         val month = cal.get(Calendar.MONTH) + 1 // 1-based
         val termIndex = solarTermIndex(date)
@@ -146,10 +165,10 @@ class SolarTimeCalculator private constructor() {
         date: Date,
         termIndex: Int,
         calendar: Calendar,
+        civilYear: Int,
         beforeLiChun: Boolean
     ): Pair<String, String> {
         calendar.time = date
-        val civilYear = calendar.get(Calendar.YEAR)
         val hour = calendar.get(Calendar.HOUR_OF_DAY)
 
         val dayPillarDate = if (hour >= 23) {
@@ -157,7 +176,7 @@ class SolarTimeCalculator private constructor() {
         } else {
             date
         }
-        val dayCal = Calendar.getInstance().apply { time = dayPillarDate }
+        val dayCal = java.util.GregorianCalendar(calendar.timeZone).apply { time = dayPillarDate }
         val dayYear = dayCal.get(Calendar.YEAR)
         val dayMonth = dayCal.get(Calendar.MONTH) + 1
         val dayDay = dayCal.get(Calendar.DAY_OF_MONTH)

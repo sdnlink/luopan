@@ -12,6 +12,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 演象·天机排盘 Google Play 官方计费核心管理器 (BillingClient 6.2+)
@@ -35,6 +36,8 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
             InAppProductId.TIANJI_SINGLE.productId
         )
 
+        val CONSUMABLE_PRODUCTS=setOf(InAppProductId.TIANJI_SINGLE.productId,InAppProductId.FLOORPLAN_SINGLE.productId)
+
         // 周期性订阅商品
         val SUBS_PRODUCTS = listOf(
             InAppProductId.VIP_YEARLY.productId
@@ -49,6 +52,7 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
         fun onPurchasesRestored(restoredProductIds: List<String>)
     }
 
+    private val purchaseGeneration=AtomicLong()
     private var billingClient: BillingClient? = null
     private var appContext: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -197,6 +201,9 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
      * 发起 Google Play 安全支付
      */
     fun launchPurchaseFlow(activity: Activity, productId: String, onLaunched: ((Boolean, String?) -> Unit)? = null) {
+        if(appContext!=null&&!UserEntitlementsManager.instance.storageReady())UserEntitlementsManager.instance.init(appContext!!)
+        if(!UserEntitlementsManager.instance.storageReady()){onLaunched?.invoke(false,com.example.yiijingcompass.model.LocalizationManager.instance.t("iap_storage_unavailable"));return}
+        if(!PurchaseVerifier.configured){onLaunched?.invoke(false,com.example.yiijingcompass.model.LocalizationManager.instance.t("native_billing_configuration"));return}
         val lang = com.example.yiijingcompass.model.LocalizationManager.instance.effectiveLanguage
         val client = billingClient
         if (client == null || !client.isReady) {
@@ -226,6 +233,7 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
         val productDetailsParamsList = mutableListOf<BillingFlowParams.ProductDetailsParams>()
 
         if (details.productType == BillingClient.ProductType.SUBS) {
+            if(!SubscriptionDisclosure.complete(details)){onLaunched?.invoke(false,com.example.yiijingcompass.model.LocalizationManager.instance.t("subscription_details_unavailable"));return}
             val offerDetails = details.subscriptionOfferDetails?.firstOrNull()
             if (offerDetails == null) {
                 val msg = when (lang) {
@@ -273,6 +281,7 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
      * 支付结果接收监听 (PurchasesUpdatedListener)
      */
     override fun onPurchasesUpdated(billingResult: BillingResult, purchases: MutableList<Purchase>?) {
+        purchaseGeneration.incrementAndGet()
         when (billingResult.responseCode) {
             BillingClient.BillingResponseCode.OK -> {
                 if (purchases != null) {
@@ -301,49 +310,20 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
      * 处理单笔交易：确认 (Acknowledge) 或消耗 (Consume)
      */
     private fun handlePurchase(purchase: Purchase) {
-        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
-            Log.w(TAG, "Purchase ${purchase.orderId} is not in PURCHASED state (${purchase.purchaseState})")
-            return
-        }
-
-        for (productId in purchase.products) {
-            // 1. 若为单次消耗品（如长卷单次导出）-> 执行消耗并补足点数
-            if (productId == InAppProductId.TIANJI_SINGLE.productId) {
-                val consumeParams = ConsumeParams.newBuilder()
-                    .setPurchaseToken(purchase.purchaseToken)
-                    .build()
-
-                billingClient?.consumeAsync(consumeParams) { result, _ ->
-                    if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                        Log.i(TAG, "Successfully consumed $productId")
-                        UserEntitlementsManager.instance.applyPurchase(productId)
-                        notifyListeners { it.onPurchaseSuccess(productId, purchase.orderId ?: purchase.purchaseToken) }
-                    } else {
-                        Log.e(TAG, "Failed to consume $productId: ${result.debugMessage}")
-                    }
-                }
-            } else {
-                // 2. 若为非消耗品或连续订阅 -> 确保已完成确认 Acknowledge
-                if (!purchase.isAcknowledged) {
-                    val ackParams = AcknowledgePurchaseParams.newBuilder()
-                        .setPurchaseToken(purchase.purchaseToken)
-                        .build()
-
-                    billingClient?.acknowledgePurchase(ackParams) { result ->
-                        if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                            Log.i(TAG, "Successfully acknowledged $productId")
-                            UserEntitlementsManager.instance.applyPurchase(productId)
-                            notifyListeners { it.onPurchaseSuccess(productId, purchase.orderId ?: purchase.purchaseToken) }
-                        } else {
-                            Log.e(TAG, "Failed to acknowledge $productId: ${result.debugMessage}")
-                        }
-                    }
-                } else {
-                    // 已确认过，同步本地特权状态
-                    UserEntitlementsManager.instance.applyPurchase(productId)
-                    notifyListeners { it.onPurchaseSuccess(productId, purchase.orderId ?: purchase.purchaseToken) }
-                }
+        if(!PurchaseVerifier.verify(purchase))return
+        for(productId in purchase.products.filter {it in INAPP_PRODUCTS||it in SUBS_PRODUCTS}){
+            if(!UserEntitlementsManager.instance.applyVerifiedPurchase(productId,purchase.purchaseToken)){
+                notifyListeners {it.onPurchaseFailed(productId,BillingClient.BillingResponseCode.ERROR,com.example.yiijingcompass.model.LocalizationManager.instance.t("iap_storage_unavailable"))};continue
             }
+            if(productId in CONSUMABLE_PRODUCTS){
+                billingClient?.consumeAsync(ConsumeParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()){result,_->
+                    if(result.responseCode==BillingClient.BillingResponseCode.OK)notifyListeners {it.onPurchaseSuccess(productId,purchase.orderId ?: purchase.purchaseToken)}
+                }
+            }else if(!purchase.isAcknowledged){
+                billingClient?.acknowledgePurchase(AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken).build()){result->
+                    if(result.responseCode==BillingClient.BillingResponseCode.OK)notifyListeners {it.onPurchaseSuccess(productId,purchase.orderId ?: purchase.purchaseToken)}
+                }
+            }else notifyListeners {it.onPurchaseSuccess(productId,purchase.orderId ?: purchase.purchaseToken)}
         }
     }
 
@@ -358,6 +338,7 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
             return
         }
 
+        val generation=purchaseGeneration.incrementAndGet()
         val restoredIds = mutableListOf<String>()
 
         // 查询 INAPP 已购
@@ -366,14 +347,16 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
             .build()
 
         client.queryPurchasesAsync(inAppParams) { result, purchases ->
+            if(purchaseGeneration.get()!=generation)return@queryPurchasesAsync
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 for (p in purchases) {
-                    if (p.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                        for (pid in p.products) {
-                            UserEntitlementsManager.instance.applyPurchase(pid)
+                    if (PurchaseVerifier.verify(p)) {
+                        if(p.products.any {it in CONSUMABLE_PRODUCTS})handlePurchase(p)
+                        for (pid in p.products.filter {it !in CONSUMABLE_PRODUCTS}) {
+                            UserEntitlementsManager.instance.applyVerifiedPurchase(pid,p.purchaseToken)
                             restoredIds.add(pid)
                         }
-                        if (!p.isAcknowledged && !p.products.contains(InAppProductId.TIANJI_SINGLE.productId)) {
+                        if (!p.isAcknowledged && p.products.none {it in CONSUMABLE_PRODUCTS}) {
                             client.acknowledgePurchase(
                                 AcknowledgePurchaseParams.newBuilder().setPurchaseToken(p.purchaseToken).build()
                             ) {}
@@ -387,12 +370,13 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
                 .setProductType(BillingClient.ProductType.SUBS)
                 .build()
 
-            client.queryPurchasesAsync(subsParams) { subResult, subPurchases ->
+            client.queryPurchasesAsync(subsParams) subscriptionQuery@{ subResult, subPurchases ->
+                if(purchaseGeneration.get()!=generation)return@subscriptionQuery
                 if (subResult.responseCode == BillingClient.BillingResponseCode.OK) {
                     for (p in subPurchases) {
-                        if (p.purchaseState == Purchase.PurchaseState.PURCHASED) {
-                            for (pid in p.products) {
-                                UserEntitlementsManager.instance.applyPurchase(pid)
+                        if (PurchaseVerifier.verify(p)) {
+                            for (pid in p.products.filter {it !in CONSUMABLE_PRODUCTS}) {
+                                UserEntitlementsManager.instance.applyVerifiedPurchase(pid,p.purchaseToken)
                                 restoredIds.add(pid)
                             }
                             if (!p.isAcknowledged) {
@@ -404,7 +388,13 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
                     }
                 }
 
-                Log.i(TAG, "Restored active purchases: $restoredIds")
+                if(result.responseCode==BillingClient.BillingResponseCode.OK&&subResult.responseCode==BillingClient.BillingResponseCode.OK&&PurchaseVerifier.configured)
+                    UserEntitlementsManager.instance.reconcileMembership(restoredIds.toSet())
+                if(result.responseCode!=BillingClient.BillingResponseCode.OK||subResult.responseCode!=BillingClient.BillingResponseCode.OK){
+                    val failure=if(result.responseCode!=BillingClient.BillingResponseCode.OK)result else subResult
+                    notifyListeners {it.onPurchaseFailed(null,failure.responseCode,failure.debugMessage)}
+                }else if(!PurchaseVerifier.configured)notifyListeners {it.onPurchaseFailed(null,BillingClient.BillingResponseCode.ERROR,com.example.yiijingcompass.model.LocalizationManager.instance.t("native_billing_configuration"))}
+                Log.i(TAG, "Active purchase restoration complete")
                 notifyListeners { it.onPurchasesRestored(restoredIds) }
                 onComplete?.invoke(restoredIds)
             }
@@ -426,6 +416,8 @@ class GooglePlayBillingManager private constructor() : PurchasesUpdatedListener,
     /**
      * 将所有 Google Play 商品本地化详情转为 JSON
      */
+    fun subscriptionDisclosure(productId:String):String?=productDetailsCache[productId]?.takeIf {it.productType==BillingClient.ProductType.SUBS}?.let(SubscriptionDisclosure::text)
+    fun canPurchase(productId:String):Boolean=PurchaseVerifier.configured&&productDetailsCache[productId]?.let {it.productType!=BillingClient.ProductType.SUBS||SubscriptionDisclosure.complete(it)}==true
     fun getProductDetailsJson(): String {
         val arr = JSONArray()
         for ((pid, details) in productDetailsCache) {

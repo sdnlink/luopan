@@ -325,6 +325,8 @@ data class SpatialWall3D(
     val thickness: Float = 0.20f,
     val isLoadBearing: Boolean = false
 ) {
+    constructor(id:String=UUID.randomUUID().toString(),start:Vec3f,end:Vec3f,height:Float=2.8f,
+        thickness:Float=.2f,isLoadBearing:Boolean=false):this(id,start.x,start.y,start.z,end.x,end.y,end.z,height,thickness,isLoadBearing)
     val start: Vec3f get() = Vec3f(startX, startY, startZ)
     val end: Vec3f get() = Vec3f(endX, endY, endZ)
     val length: Float
@@ -410,6 +412,8 @@ data class SpatialRoom3D(
     val areaSqMeters: Float = max(1.0f, sizeX * sizeZ),
     val rotationY: Float? = null
 ) {
+    constructor(id:String=UUID.randomUUID().toString(),name:String,type:FloorplanRoomType,center:Vec3f,size:Vec3f,
+        areaSqMeters:Float=max(1f,size.x*size.z),rotationY:Float?=null):this(id,name,type,center.x,center.y,center.z,size.x,size.y,size.z,areaSqMeters,rotationY)
     val center: Vec3f get() = Vec3f(centerX, centerY, centerZ)
     val size: Vec3f get() = Vec3f(sizeX, sizeY, sizeZ)
     val localizedName: String get() = type.localizedName
@@ -429,6 +433,10 @@ data class SpatialObject3D(
     val sizeZ: Float,
     val rotationY: Float? = null
 ) {
+    val localizedCategoryName: String get() {
+        val key="native_object_"+category.lowercase(Locale.ROOT)
+        return LocalizationManager.instance.t(key).let {if(it==key)category else it}
+    }
     val position: Vec3f get() = Vec3f(posX, posY, posZ)
     val size: Vec3f get() = Vec3f(sizeX, sizeY, sizeZ)
 }
@@ -525,10 +533,21 @@ data class HouseSpatialSurvey(
     val compassHeading: Double,
     val shaItems: List<HouseSpatialShaItem>,
     val fengshuiScore: Int,
-    val isCentroidIndirect: Boolean? = null
+    val isCentroidIndirect: Boolean? = null,
+    val houseFacingDegrees: Double? = null,
+    val houseFacingWasExplicit: Boolean? = null,
+    val centroidWasExplicit: Boolean? = null
 ) {
     val centroid: Vec3f get() = Vec3f(centroidX, centroidY, centroidZ)
     val centroidIndirect: Boolean get() = isCentroidIndirect ?: false
+    val resolvedHouseFacing get() = HouseSpatialSurveyEngine.resolveHouseFacing(openings,centroid,compassHeading,houseFacingDegrees)
+    val fixedHouseFacing: Double? get() {
+        if(houseFacingWasExplicit != null) return if(houseFacingWasExplicit) houseFacingDegrees else null
+        val saved = houseFacingDegrees ?: return null
+        val derived = HouseSpatialSurveyEngine.resolveHouseFacing(openings,centroid,compassHeading)
+        if(derived != null) { val delta=abs(saved-derived)%360; if(min(delta,360-delta)<0.01) return null }
+        return saved
+    }
 
     // MARK: - AutoCAD DXF 工程级矢量测绘图生成器 (PRD 专业测绘工具要求)
     fun generateCAD_DXF(): String {
@@ -730,6 +749,15 @@ data class HouseSpatialSurvey(
 // MARK: - 全屋形煞与 3D 测绘分析引擎 (HouseSpatialSurveyEngine)
 
 object HouseSpatialSurveyEngine {
+    fun resolveHouseFacing(openings: List<SpatialOpening3D>,centroid: Vec3f,coordinateHeading: Double,explicitFacing: Double? = null): Double? {
+        if(explicitFacing?.isFinite() == true) return (explicitFacing % 360 + 360) % 360
+        if(!coordinateHeading.isFinite()) return null
+        val door = openings.firstOrNull { it.type == SpatialOpeningType.ENTRANCE_DOOR } ?: return null
+        var normal = Vec2f(door.normalX,door.normalZ)
+        if(!normal.x.isFinite() || !normal.y.isFinite() || normal.length() <= 0.001) return null
+        if(normal.dot(Vec2f(door.posX-centroid.x,door.posZ-centroid.z))<0) normal=normal * -1f
+        return (atan2(normal.x.toDouble(),-normal.y.toDouble())*180/PI+coordinateHeading+720)%360
+    }
 
     fun analyzeSpatialHouse(
         scanMethod: String,
@@ -739,7 +767,11 @@ object HouseSpatialSurveyEngine {
         rooms: List<SpatialRoom3D>,
         objects: List<SpatialObject3D>,
         compassHeading: Double,
-        centroidOverride: Vec3f? = null
+        centroidOverride: Vec3f? = null,
+        houseFacingDegrees: Double? = null,
+        houseFacingWasExplicit: Boolean? = null,
+        analysisDate: Date = Date(),
+        surveyID: String = UUID.randomUUID().toString()
     ): HouseSpatialSurvey {
         // 1. 计算全屋物理边界包围盒
         var minX = Float.MAX_VALUE
@@ -1864,8 +1896,10 @@ object HouseSpatialSurveyEngine {
         }
 
         // N. 八宅吉凶宫位体检 (基于罗盘实测朝向)
-        val facingGua = guaForAngle(compassHeading)
-        val sittingAngle = (compassHeading + 180.0) % 360.0
+        val resolvedFacing = resolveHouseFacing(openings,centroid,compassHeading,houseFacingDegrees)
+        if(resolvedFacing != null) {
+        val facingGua = guaForAngle(resolvedFacing)
+        val sittingAngle = (resolvedFacing + 180.0) % 360.0
         val sittingGua = guaForAngle(sittingAngle)
         val bazhai = BaZhaiEngine.instance.analyze(sittingGua, facingGua)
 
@@ -1988,11 +2022,12 @@ object HouseSpatialSurveyEngine {
         }
 
         // O. 三元九运玄空飞星理气体检 (形理兼备)
-        val facingMountainItem = Mountain24Data.find(compassHeading)
+        val facingMountainItem = Mountain24Data.find(resolvedFacing)
         val sittingMountainItem = Mountain24Data.find(sittingAngle)
         val xkChart = FlyingStarsEngine.instance.calculateChart(
             sitting = sittingMountainItem,
-            facing = facingMountainItem
+            facing = facingMountainItem,
+            date = analysisDate
         )
         val curPeriod = xkChart.period
 
@@ -2232,16 +2267,16 @@ object HouseSpatialSurveyEngine {
         // O.1 玄空出卦 · 空亡破局煞
         if (firstMainDoor != null) {
             val probe = CompassHeadingState(
-                heading = compassHeading,
-                facingAngle = compassHeading,
-                facingMountain = Mountain24Data.find(compassHeading),
+                heading = resolvedFacing,
+                facingAngle = resolvedFacing,
+                facingMountain = Mountain24Data.find(resolvedFacing),
                 sittingMountain = Mountain24Data.find(sittingAngle)
             )
             val kwLevel = probe.kongWangLevel
             if (kwLevel != KongWangLevel.PURE) {
                 val isMajor = kwLevel == KongWangLevel.LARGE_VOID
                 val isSmall = kwLevel == KongWangLevel.SMALL_VOID
-                val degStr = String.format(Locale.US, "%.1f°", compassHeading)
+                val degStr = String.format(Locale.US, "%.1f°", resolvedFacing)
                 val kwTitle = kwLevel.localizedTitle
                 shaItems.add(HouseSpatialShaItem(
                     title = tr8(
@@ -2342,7 +2377,10 @@ object HouseSpatialSurveyEngine {
             }
         }
 
+        }
         return HouseSpatialSurvey(
+            id = surveyID,
+            timestamp = analysisDate,
             scanMethod = scanMethod,
             dimensions = dimensions,
             walls = walls,
@@ -2356,7 +2394,10 @@ object HouseSpatialSurveyEngine {
             compassHeading = compassHeading,
             shaItems = shaItems,
             fengshuiScore = max(0, min(100, score)),
-            isCentroidIndirect = isCentroidIndirect
+            isCentroidIndirect = isCentroidIndirect,
+            houseFacingDegrees = resolvedFacing,
+            houseFacingWasExplicit = houseFacingWasExplicit ?: (houseFacingDegrees?.isFinite() == true),
+            centroidWasExplicit = centroidOverride != null
         )
     }
 

@@ -84,6 +84,7 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
     var isLevel: Boolean = true
         private set
 
+    var hasLocationFix=false;private set
     var latitude: Double = 0.0
         private set
     var longitude: Double = 0.0
@@ -105,11 +106,33 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
     var isLocked: Boolean = false
         set(value) {
             field = value
+            appContext?.getSharedPreferences("compass_prefs",Context.MODE_PRIVATE)?.edit()?.putBoolean("locked",value)?.putFloat("locked_heading",heading.toFloat())?.apply()
+            appContext?.getSharedPreferences("almanac_widget",Context.MODE_PRIVATE)?.edit()?.putBoolean("locked",value)?.putFloat("heading",heading.toFloat())?.apply()
+            if(!value)physicalHeading()?.let {heading=it;headingState=Mountain24Data.instance.resolveHeadingState(it)}
             if (isHapticEnabled) {
                 triggerClick()
             }
         }
     var manualOffset: Double = 0.0
+        set(value){if(value.isFinite()){field=value;appContext?.getSharedPreferences("compass_prefs",Context.MODE_PRIVATE)?.edit()?.putFloat("manual_offset",value.toFloat())?.apply()}}
+    private var running=false
+    private var initialized=false
+    private var liveHeadingDate=0L
+    private var cameraBearing:Double?=null
+    private var cameraElevation:Double?=null
+    private var cameraRoll:Double?=null
+    var liveSensorHeading=0.0;private set
+    var hasLiveSensorHeading=false;private set
+    fun physicalHeading(now:Long=System.currentTimeMillis()):Double?=liveSensorHeading.takeIf {hasLiveSensorHeading&&now-liveHeadingDate in 0..3000}
+    fun physicalCameraHeading(now:Long=System.currentTimeMillis()):Double?=cameraBearing?.takeIf {now-liveHeadingDate in 0..3000}
+    fun physicalCameraElevation(now:Long=System.currentTimeMillis()):Double?=cameraElevation?.takeIf {now-liveHeadingDate in 0..3000}
+    fun physicalCameraRoll(now:Long=System.currentTimeMillis()):Double?=cameraRoll?.takeIf {now-liveHeadingDate in 0..3000}
+    fun lockAtFacingAngle(angle:Double){
+        if(!angle.isFinite())return
+        heading=(angle%360+360)%360;headingState=Mountain24Data.instance.resolveHeadingState(heading);isLocked=true
+        for(l in listeners)l.onHeadingUpdate(heading,trueHeading,magneticHeading,headingState)
+    }
+    fun toggleLock(){isLocked=!isLocked}
 
     var northReference: CompassNorthReference = CompassNorthReference.TRUE_NORTH
         set(value) {
@@ -196,10 +219,15 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
     }
 
     fun start(context: Context) {
+        if(running)return
+        running=true
         appContext = context.applicationContext
         val prefs = context.getSharedPreferences("compass_prefs", Context.MODE_PRIVATE)
         northReference = CompassNorthReference.from(prefs.getString("compass_north_reference", "true_north") ?: "true_north")
         isHapticEnabled = prefs.getBoolean("compass_haptic_enabled", true)
+        if(!initialized){initialized=true;manualOffset=prefs.getFloat("manual_offset",0f).toDouble()
+            if(prefs.getBoolean("locked",false))lockAtFacingAngle(prefs.getFloat("locked_heading",0f).toDouble())
+        }
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
             @Suppress("DEPRECATION")
@@ -219,6 +247,7 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
 
             if (rotationSensor != null) {
                 sm.registerListener(this, rotationSensor, SENSOR_RATE)
+                magnetometer?.let {sm.registerListener(this,it,SENSOR_RATE)}
             } else {
                 accelerometer?.let { sm.registerListener(this, it, SENSOR_RATE) }
                 magnetometer?.let { sm.registerListener(this, it, SENSOR_RATE) }
@@ -241,6 +270,7 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
     }
 
     fun stop() {
+        running=false
         sensorManager?.unregisterListener(this)
         try {
             locationManager?.removeUpdates(this)
@@ -294,10 +324,20 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         }
     }
 
-    private fun processRotationMatrix(rMatrix: FloatArray) {
-        if (isLocked) return
-
-        SensorManager.getOrientation(rMatrix, orientationAngles)
+    internal fun processRotationMatrix(rMatrix: FloatArray) {
+        if(rMatrix.size<9||rMatrix.any {!it.isFinite()})return
+        val rotation=(appContext?.getSystemService(Context.WINDOW_SERVICE) as? android.view.WindowManager)?.defaultDisplay?.rotation ?: android.view.Surface.ROTATION_0
+        val remapped=FloatArray(9)
+        val axes=when(rotation){android.view.Surface.ROTATION_90->SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
+            android.view.Surface.ROTATION_180->SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
+            android.view.Surface.ROTATION_270->SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
+            else->SensorManager.AXIS_X to SensorManager.AXIS_Y}
+        SensorManager.remapCoordinateSystem(rMatrix,axes.first,axes.second,remapped)
+        SensorManager.getOrientation(remapped, orientationAngles)
+        val east=-rMatrix[2].toDouble();val north=-rMatrix[5].toDouble();val up=-rMatrix[8].toDouble()
+        cameraBearing=if(kotlin.math.hypot(east,north)>.01)(Math.toDegrees(atan2(east,north))+currentDeclination+manualOffset+720)%360 else null
+        cameraElevation=Math.toDegrees(kotlin.math.asin(up.coerceIn(-1.0,1.0)))
+        cameraRoll=Math.toDegrees(atan2(-remapped[6].toDouble(),remapped[7].toDouble()))
         var azimuthDeg = Math.toDegrees(orientationAngles[0].toDouble())
         if (azimuthDeg < 0) azimuthDeg += 360.0
 
@@ -321,6 +361,13 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
         val decl = currentDeclination.toDouble()
         val trueH = (magneticHeading + decl + 360.0) % 360.0
         trueHeading = trueH
+        liveSensorHeading=if(hasDeclination)trueHeading else magneticHeading
+        hasLiveSensorHeading=true;liveHeadingDate=System.currentTimeMillis()
+        if(isLocked){
+            for(l in listeners)l.onHeadingUpdate(heading,trueHeading,magneticHeading,headingState)
+            if(System.currentTimeMillis()-lastSolarTimeUpdate>=1000){lastSolarTimeUpdate=System.currentTimeMillis();updateSolarTime()}
+            return
+        }
 
         val targetAngle = if (northReference == CompassNorthReference.TRUE_NORTH && hasDeclination) {
             trueHeading
@@ -366,13 +413,15 @@ class CompassMotionManager private constructor() : SensorEventListener, Location
     }
 
     private fun updateSolarTime() {
-        val solarResult = SolarTimeCalculator.instance.calculate(Date(), if (longitude != 0.0) longitude else 120.0)
+        val solarResult = SolarTimeCalculator.instance.calculate(Date(), longitude)
         for (l in listeners) {
-            l.onSolarTimeUpdate(solarResult.trueSolarTimeString, solarResult.solarTermName)
+            l.onSolarTimeUpdate(if(hasLocationFix)solarResult.trueSolarTimeString else "--:--:--", solarResult.solarTermName)
         }
     }
 
     override fun onLocationChanged(loc: Location) {
+        if(!loc.latitude.isFinite()||!loc.longitude.isFinite()||loc.latitude !in -90.0..90.0||loc.longitude !in -180.0..180.0)return
+        hasLocationFix=true
         latitude = loc.latitude
         longitude = loc.longitude
         altitude = if (loc.hasAltitude()) loc.altitude else 0.0

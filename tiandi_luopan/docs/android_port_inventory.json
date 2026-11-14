@@ -1,0 +1,527 @@
+{
+  "iosCommit": "b8428b46384e1eed9c17eb1135e176c30e471905",
+  "sources": [
+    {
+      "ios": "ios/TiandiLuopan/AppDelegate.swift",
+      "sha256": "89bf7a97dc80b6554a3442bf6155797c5e388e0a6cb5d2a9c0ce42f1679b261c",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeReminders.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/CompassMotionManager.swift",
+      "sha256": "906ea2107d08133b9b8df9c10f8eb8303b18d36fd9087b20856294630bde82b6",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/sensor/CompassMotionManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/BaZhaiEngine.swift",
+      "sha256": "8c4c1d8b54d08c3f407b4a260cf9596ee27ef211dc38de87223a7e0de98b330d",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/BaZhaiEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/UserKuaProfileManager.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/RemedyTaskStore.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/AuspiciousReminderContext.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeReminders.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeDiscovery.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeRetention.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/DailyCardRenderer.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/CompassLayerManager.swift",
+      "sha256": "94090bac16489708d50939dca7afe0758195713c09d2ab32075b6708e7bbe1a7",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/CompassLayerManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/ExteriorShaEngine.swift",
+      "sha256": "281899b45d5a4a4dc1f8a2e92c93b13e553c8706f70e73e5c266c51dfe723d06",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/ExteriorShaEngine.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/FamilyRoomAllocation.swift",
+      "sha256": "c661fc18f7e52614982effdb522bc6c2f9d0392e1e12219e4eee3abca18ab00e",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/FamilyRoomAllocation.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/Fenjin120Data.swift",
+      "sha256": "6d3c4ad182ade07990689d10aa381bcb5cf1bffd72fbac2b19cbf8f093c1a8c2",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/Fenjin120Data.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/FloorplanEngine.swift",
+      "sha256": "8da8382982e473f5582f5278f02ef5a41004a23effa9f25e74772a07d70a7dff",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/XuanKongHomeContextBuilder.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanWorkspace.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/PortableCaseCodec.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanImageDetector.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/FlyingStarsEngine.swift",
+      "sha256": "b56d49ac371743a24077904933faa731fd57497c647f4af3a8213246ee027fc2",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/FlyingStarsEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/XuanKongDeepAnalysis.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/AnalysisGuidance.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/GeometryUtils.swift",
+      "sha256": "f04ab165e989efd3e9e8a5e137c1346dc55f5c062a044b2379d15a295ec0eac8",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/GeometryUtils.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/ARCaptureModels.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/SpatialMapArchive.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/Hexagram64.swift",
+      "sha256": "5a0bbd12b6ba122db2a0045081304fbca05670cd20649f35ceccf2c3272304f1",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/Hexagram64.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/HouseSpatialSurveyModel.swift",
+      "sha256": "885a4b08660642b790d935a233139dd50f3708f205c621af14986f4be94bff1d",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/HouseSpatialSurveyModel.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeSharing.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/LocalizationManager.swift",
+      "sha256": "150d3ec4265d1e576214590b217d051fdaa2f0a31e4ab8b8b29abee3b0133f10",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/LocalizationManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/Mountain24.swift",
+      "sha256": "31ac0007614ef95b67ea5271cd7ca8dfb153b23417e2989e652792872a7442a1",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/Mountain24.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/OnDeviceShaAnalyzer.swift",
+      "sha256": "4210488b07eb939025eb06fa931ebf91bd65878f3c25682e458b606a4ef14a63",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/OnDeviceShaAnalyzer.kt"
+      ],
+      "platformNotes": "Android 本地图像几何检测替代 Vision，双阈值/多帧一致性、可选 ARCore 深度规则；识别精度需真机实景验收。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/PurpleWhiteEngine.swift",
+      "sha256": "49edaec38748c25462dd6723d74592f2dfdcb5cdb2243c287d8aed28833ed209",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/PurpleWhiteEngine.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/QimenEngine.swift",
+      "sha256": "f2db03221ddfa43533511a99e1aacef0ba62cc8f6780dd14a5d0604788614f1c",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/QimenEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/QimenScenario.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/SanHeWaterEngine.swift",
+      "sha256": "211a87ee43404493c909e4628ae67029345548edb214f2daf9ff7be0ee0a9aad",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/SanHeWaterEngine.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/ShaSurveyModels.swift",
+      "sha256": "c49ac73233d6d4d48f95d322d37d9fe40dc06824f1399c5334bc092c6fc7cadd",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/ShaSurveyModels.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/SolarTermsData.swift",
+      "sha256": "59a514e17c717aec08302b12f089ffb38c3b735b8c55910446d73c38e848ae12",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/SolarTermsData.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/SolarTimeCalculator.swift",
+      "sha256": "972b2649ffbb6cbbb1da85aaf16e57bbbdb767265ce4a43d0b005ba4d3fa8a75",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/SolarTimeCalculator.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/TianJiShuEngine.swift",
+      "sha256": "a250edfcd3f7d3b82dac69b9e1832740e698dbf625e2821fb27081916250070c",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/TianJiShuEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/TianJiAnalysisSnapshot.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/TraditionalEvidence.swift",
+      "sha256": "ab0e7b62779557ca1642e1a9758192eece5b0f9a9590297b35d849bb3c5ae268",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/TraditionalEvidence.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/WidgetAlmanacSnapshot.swift",
+      "sha256": "152d9db2e1d9c0d61de75f54eb53d05fa8347056a6ec01b3b9e34e8abca80dc9",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/WidgetAlmanacSnapshot.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/WorldMagneticModel.swift",
+      "sha256": "6f7be6ca344ae111bed9a3b34932541187f6522936d7e52399e286a3be20dd53",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/WorldMagneticModel.kt"
+      ],
+      "platformNotes": "保留 WMM2025 系数与离线计算，模型有效期 2025–2030。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/Models/ZeRiEngine.swift",
+      "sha256": "c7b138871f4a560524728e8c08a5fbc7dd68a5843139fa226b0ebe514df89482",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/model/ZeRiEngine.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/SceneDelegate.swift",
+      "sha256": "52d951ceab2ad7178e2c5c342312cbd3d6709acb3a8d95ce2c1447c589f5d469",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/AppNavigationRoute.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/CameraLease.kt"
+      ],
+      "platformNotes": "Android Activity 生命周期、深链接和相机互斥；iCloud KV / Spotlight 改用本地持久化、系统备份、Android 快捷方式。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/StoreKitIAPManager.swift",
+      "sha256": "8d6e768e06751e2b1833b7ba4a76594b85b1cb8660b10ac686fb1f5bd5693700",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/billing/GooglePlayBillingManager.kt",
+        "app/src/main/java/com/example/yiijingcompass/billing/PurchaseVerifier.kt",
+        "app/src/main/java/com/example/yiijingcompass/billing/SignedEntitlementPreferences.kt",
+        "app/src/main/java/com/example/yiijingcompass/billing/SubscriptionDisclosure.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/UserEntitlementsManager.kt"
+      ],
+      "platformNotes": "Google Play 替代 StoreKit；需配置 Play 公钥与商品，真机测试购买/退款/恢复。Keystore 密钥不参加备份，消耗余额不跨设备迁移。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/ViewController.swift",
+      "sha256": "beb99dd8370b322267468e34ddec5a256cb79c85ed798df0c16045a270d05f7b",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/ARVision/ARRoomPlanCaptureView.swift",
+      "sha256": "c62470d4bec82a2bc99e67215beb0259c843057ffe49d528031e0bdbd3600e0c",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ARSurveyActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/SpatialMapArchive.kt",
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt"
+      ],
+      "platformNotes": "Android 平台替代：实测平面/深度与多房间角点、手动门窗家具校正。Apple RoomPlan 的自动建筑语义和 USDZ 导出不能由 ARCore 原样提供。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/ARVision/ARSpatialSurveyView.swift",
+      "sha256": "2b4bae0ba57013a137d561fc5be3348c56619283fe1b5df5792089b593c849e7",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ARSurveyActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/ARCaptureSupport.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/CameraLease.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/ARCaptureModels.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/SpatialMapArchive.kt"
+      ],
+      "platformNotes": "ARCore 实测、尺量、层高、地面方位、采样图像/深度；地图采用三点人工重定位，不能直接读取 ARWorldMap。"
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/ARVision/ARVisionView.swift",
+      "sha256": "b9fffb51eeda98bfd46c6002110182844fd73af73058e792f3abb5668b622156",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ARSurveyActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ExteriorCaptureActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/PhotoProofActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/CaptureReviewView.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/OnDeviceShaAnalyzer.kt",
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/ARVision/House3DSpaceViewer.swift",
+      "sha256": "bd8f1be84774b451c6ef3ac4e322dc305a583a46eee662622ae45dfb6dbb9d9e",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeSharing.kt",
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/ARVision/VRSpatialSurveyView.swift",
+      "sha256": "f0c2d6aada014864c62150c9ced24606dde9f7970846b71aaa3c35023f880729",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanWorkspace.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Analysis/BaZhaiView.swift",
+      "sha256": "7f9e129da46fca822913c194ba7124aff840a72924c43e164c62790e34d70baa",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/BaZhaiEngine.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/UserKuaProfileManager.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/RemedyTaskStore.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Analysis/PurpleWhiteView.swift",
+      "sha256": "2cf57375b5ecaa5ef0e5b8904b9bf4b20e0c4b501c00192a86bcfde1814e5e95",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/PurpleWhiteEngine.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Analysis/QimenDunjiaView.swift",
+      "sha256": "88f3c8ac7d2c3a412deef5d641d87ed01f995f04af2ac9209fe365ce4dc1e10b",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/QimenScenario.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Analysis/TianJiShuView.swift",
+      "sha256": "2cfda79857465bb138bf9d15912c4bf51c219e8662f3186ebd2e4e3fedce0357",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ReportPreviewActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/PhotoProofActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeSharing.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Analysis/XuanKongGridView.swift",
+      "sha256": "98756ffcf3a482c9450dbfecdf8aac1805a06ccdd1d115afc817961536331b99",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/XuanKongDeepAnalysis.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/TianJiAnalysisSnapshot.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/CalibrationSheet.swift",
+      "sha256": "8be63b71ec869394361d1cb5ecb763bfb5e1dc02f51f54dd5a4591b0f9ac896d",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/sensor/CompassMotionManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/CompassDialView.swift",
+      "sha256": "7f36be64e414f724f75fcf52e9b1988335c099ff9e022887266ac6dde0aa3900",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/CompassHeaderView.swift",
+      "sha256": "cddadc0d2141f8c058813dfe1e8b2aafafb2f4dc590dbaa3e3fcda76f54c707b",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/sensor/CompassMotionManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/CompassMainView.swift",
+      "sha256": "34af53a6e3e44070a03ae98cf71aa3ce208ee29fdb24238cd13829d6770a2e0c",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/FengshuiPalaceDetailSheet.swift",
+      "sha256": "71803a1b8e9933b9446ffd17e5ebf3282d3c00e324f11e151780446239bcd914",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/AnalysisGuidance.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/FenjinDetailSheet.swift",
+      "sha256": "0380827460c3430ba1cf5e4b7591704286c985db6fb57e02a1b423f5703ad4af",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/Fenjin120Data.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/KongWangDetailSheet.swift",
+      "sha256": "79e092994f2b63b5a375b4b7d976f1486d3a15d352d508de5dff6c59f1312add",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/Mountain24.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Compass/LayerSettingsSheet.swift",
+      "sha256": "f6b813cd088e96480d866c1168c6f61322529fc2e3cfe6e39509b5ce9ad6c70d",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/CompassLayerManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Floorplan/FamilyRoomAllocationView.swift",
+      "sha256": "a62ece80f417ddbd92a0b00da5d0b31e4bc27d21f7602b92a86464f0e36b8ae3",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FamilyRoomAllocation.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Floorplan/FloorplanImagePicker.swift",
+      "sha256": "d0e286a7a303271955a8dc75ed38a4dda359fb1b4eaac25081897efdda4a358a",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanImageDetector.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Floorplan/FloorplanView.swift",
+      "sha256": "0710d14e45cc3340482da02d203d10446b668754457c820b036ca63f7b1c94a5",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeViews.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/FloorplanWorkspace.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/PortableCaseCodec.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/FloorplanReportRenderer.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/RootContentView.swift",
+      "sha256": "eb9eecb5f41f553620b66d800efeb8daff975df4992c20593dac1650f4663cae",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/AppNavigationRoute.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Settings/SettingsView.swift",
+      "sha256": "d4afca84fa17df0f55e9ad666e87654d71f83a3b53a61b62cd4df22401b2f5cb",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeReminders.kt",
+        "app/src/main/java/com/example/yiijingcompass/ui/NativeRetention.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopan/Views/Settings/VIPPaywallSheet.swift",
+      "sha256": "e9ee8713e07222bd00c4492ad7d8fa31ff96402d3491bca9f2dc6769db1c055f",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/MainActivity.kt",
+        "app/src/main/java/com/example/yiijingcompass/billing/SubscriptionDisclosure.kt",
+        "app/src/main/java/com/example/yiijingcompass/billing/GooglePlayBillingManager.kt"
+      ],
+      "platformNotes": ""
+    },
+    {
+      "ios": "ios/TiandiLuopanTests/FunctionalRegressionTests.swift",
+      "sha256": "3ad7964c5de892bcb96212d45fb25035c75c879b5e584f089bc8d9f591e1b546",
+      "android": [
+        "app/src/test/java/com/example/yiijingcompass/DeepAnalysisParityTests.kt",
+        "app/src/test/java/com/example/yiijingcompass/IOSParityTests.kt",
+        "app/src/test/java/com/example/yiijingcompass/NativeRenderingTests.kt",
+        "app/src/test/java/com/example/yiijingcompass/NativeWorkflowTests.kt",
+        "app/src/test/java/com/example/yiijingcompass/SpatialAndStateParityTests.kt"
+      ],
+      "platformNotes": "移植行为回归按 Android 可运行场景组织；不声称直接执行或逐条复制全部 Swift XCTest。"
+    },
+    {
+      "ios": "ios/TiandiLuopanWidget/AlmanacWidgetViews.swift",
+      "sha256": "c44f756b050bf12db57f483299e648c864e08d261ded78782a02153f9ef6e85b",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ui/AlmanacWidget.kt"
+      ],
+      "platformNotes": "Android RemoteViews 自适应桌面小组件；WidgetKit/锁屏 Live Activity 无同格式互通。"
+    },
+    {
+      "ios": "ios/TiandiLuopanWidget/TiandiLuopanAlmanacWidget.swift",
+      "sha256": "f642f36a35d2c570b0a28d75580430144cbf2bc15307c7704e40f1798f24d20a",
+      "android": [
+        "app/src/main/java/com/example/yiijingcompass/ui/AlmanacWidget.kt",
+        "app/src/main/java/com/example/yiijingcompass/model/WidgetAlmanacSnapshot.kt"
+      ],
+      "platformNotes": ""
+    }
+  ]
+}

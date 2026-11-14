@@ -1,6 +1,8 @@
 # 天机演象 (TianJi YanXiang)
 
-Android 主界面现为原生 Kotlin。main iOS 的逐文件对应、功能范围、平台差异与构建方法见 [Android 移植说明](docs/ANDROID_IOS_PORT.md)；验证结果见 [验证记录](docs/ANDROID_VALIDATION.md)。
+> **当前 iOS 产品：住宅空间测绘与规划工具。** 主流程为住宅项目、AR / LiDAR 测量、户型编辑、三维查看及几何成果导出；新增房间面积与周长统计、装修材料估算、已保存户型对比和 PDF 空间报告。iOS 的发布范围、操作路径与验证清单见 [住宅测绘版发布说明](docs/RESIDENTIAL_RELEASE.md)。下方的旧风水设计及 Android 功能文档属于历史资料，不代表当前 iOS 版本的功能或上架文案。
+
+Android 主界面现为原生 Kotlin，移植基线为本次 AR 分支合并前的 iOS 版本。逐文件对应、功能范围、平台差异与构建方法见 [Android 移植说明](docs/ANDROID_IOS_PORT.md)；验证结果见 [验证记录](docs/ANDROID_VALIDATION.md)。本次合并未将 iOS 新增的住宅规划流程移植到 Android。
 
 GitHub Actions 同时编译 Android 和 iOS，并保留安装包、归档、日志和测试报告 30 天，下载方式见 [双端自动编译说明](docs/MOBILE_CI.md)。
 

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1085 /* ResidentialProjectBackup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2085 /* ResidentialProjectBackup.swift */; };
+		1084 /* ResidentialPlanningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2084 /* ResidentialPlanningView.swift */; };
+		1083 /* ResidentialPlanning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2083 /* ResidentialPlanning.swift */; };
+		1082 /* ResidentialWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2082 /* ResidentialWorkspace.swift */; };
 		1001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2001 /* AppDelegate.swift */; };
 		1002 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2002 /* SceneDelegate.swift */; };
 		1003 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2003 /* ViewController.swift */; };
@@ -23,12 +27,7 @@
 		1024 /* SanHeWaterEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2024 /* SanHeWaterEngine.swift */; };
 		1025 /* SolarTimeCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2025 /* SolarTimeCalculator.swift */; };
 		1026 /* ExteriorShaEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2026 /* ExteriorShaEngine.swift */; };
-		1030 /* CompassDialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2030 /* CompassDialView.swift */; };
-		1031 /* CompassHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2031 /* CompassHeaderView.swift */; };
-		1032 /* CompassMainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2032 /* CompassMainView.swift */; };
 		1033 /* ARVisionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2033 /* ARVisionView.swift */; };
-		1034 /* XuanKongGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2034 /* XuanKongGridView.swift */; };
-		1035 /* BaZhaiView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2035 /* BaZhaiView.swift */; };
 		1036 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2036 /* SettingsView.swift */; };
 		1037 /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2037 /* RootContentView.swift */; };
 		1040 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2040 /* AVFoundation.framework */; };
@@ -42,19 +41,11 @@
 		1053 /* QimenEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2053 /* QimenEngine.swift */; };
 		1054 /* TianJiShuEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2054 /* TianJiShuEngine.swift */; };
 		1055 /* FloorplanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2055 /* FloorplanView.swift */; };
-		1056 /* QimenDunjiaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2056 /* QimenDunjiaView.swift */; };
-		1057 /* PurpleWhiteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2057 /* PurpleWhiteView.swift */; };
-		1058 /* TianJiShuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2058 /* TianJiShuView.swift */; };
-		1059 /* FenjinDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2059 /* FenjinDetailSheet.swift */; };
-		1060 /* KongWangDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2060 /* KongWangDetailSheet.swift */; };
-		1061 /* FengshuiPalaceDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2061 /* FengshuiPalaceDetailSheet.swift */; };
 		1062 /* CompassLayerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2062 /* CompassLayerManager.swift */; };
 		1063 /* SolarTermsData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2063 /* SolarTermsData.swift */; };
 		1014 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 2087 /* PrivacyInfo.xcprivacy */; };
-		1064 /* LayerSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2064 /* LayerSettingsSheet.swift */; };
 		1065 /* FloorplanImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2065 /* FloorplanImagePicker.swift */; };
 		1066 /* ZeRiEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2066 /* ZeRiEngine.swift */; };
-		1067 /* CalibrationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2067 /* CalibrationSheet.swift */; };
 		1068 /* VIPPaywallSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2068 /* VIPPaywallSheet.swift */; };
 		1069 /* LocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2069 /* LocalizationManager.swift */; };
 		1070 /* WorldMagneticModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2070 /* WorldMagneticModel.swift */; };
@@ -68,7 +59,6 @@
 		1077 /* GeometryUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2077 /* GeometryUtils.swift */; };
 		1078 /* VRSpatialSurveyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2078 /* VRSpatialSurveyView.swift */; };
 		1079 /* TraditionalEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2079 /* TraditionalEvidence.swift */; };
-		1081 /* FamilyRoomAllocationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2093 /* FamilyRoomAllocationView.swift */; };
 		1080 /* FamilyRoomAllocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2092 /* FamilyRoomAllocation.swift */; };
 		9100 /* WidgetAlmanacSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9200 /* WidgetAlmanacSnapshot.swift */; };
 		9101 /* TiandiLuopanAlmanacWidget.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = 9201 /* TiandiLuopanAlmanacWidget.swift */; };
@@ -89,6 +79,10 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2085 /* ResidentialProjectBackup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ResidentialProjectBackup.swift"; sourceTree = "<group>"; };
+		2084 /* ResidentialPlanningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ResidentialPlanningView.swift"; sourceTree = "<group>"; };
+		2083 /* ResidentialPlanning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ResidentialPlanning.swift"; sourceTree = "<group>"; };
+		2082 /* ResidentialWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ResidentialWorkspace.swift"; sourceTree = "<group>"; };
 		2000 /* TiandiLuopan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TiandiLuopan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		2002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -107,12 +101,7 @@
 		2024 /* SanHeWaterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/SanHeWaterEngine.swift"; sourceTree = "<group>"; };
 		2025 /* SolarTimeCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/SolarTimeCalculator.swift"; sourceTree = "<group>"; };
 		2026 /* ExteriorShaEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ExteriorShaEngine.swift"; sourceTree = "<group>"; };
-		2030 /* CompassDialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CompassDialView.swift"; sourceTree = "<group>"; };
-		2031 /* CompassHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CompassHeaderView.swift"; sourceTree = "<group>"; };
-		2032 /* CompassMainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CompassMainView.swift"; sourceTree = "<group>"; };
 		2033 /* ARVisionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/ARVisionView.swift"; sourceTree = "<group>"; };
-		2034 /* XuanKongGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Analysis/XuanKongGridView.swift"; sourceTree = "<group>"; };
-		2035 /* BaZhaiView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Analysis/BaZhaiView.swift"; sourceTree = "<group>"; };
 		2036 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/SettingsView.swift"; sourceTree = "<group>"; };
 		2037 /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/RootContentView.swift"; sourceTree = "<group>"; };
 		2040 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
@@ -126,18 +115,10 @@
 		2053 /* QimenEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/QimenEngine.swift"; sourceTree = "<group>"; };
 		2054 /* TianJiShuEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/TianJiShuEngine.swift"; sourceTree = "<group>"; };
 		2055 /* FloorplanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Floorplan/FloorplanView.swift"; sourceTree = "<group>"; };
-		2056 /* QimenDunjiaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Analysis/QimenDunjiaView.swift"; sourceTree = "<group>"; };
-		2057 /* PurpleWhiteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Analysis/PurpleWhiteView.swift"; sourceTree = "<group>"; };
-		2058 /* TianJiShuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Analysis/TianJiShuView.swift"; sourceTree = "<group>"; };
-		2059 /* FenjinDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/FenjinDetailSheet.swift"; sourceTree = "<group>"; };
-		2060 /* KongWangDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/KongWangDetailSheet.swift"; sourceTree = "<group>"; };
-		2061 /* FengshuiPalaceDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/FengshuiPalaceDetailSheet.swift"; sourceTree = "<group>"; };
 		2062 /* CompassLayerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/CompassLayerManager.swift"; sourceTree = "<group>"; };
 		2063 /* SolarTermsData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/SolarTermsData.swift"; sourceTree = "<group>"; };
-		2064 /* LayerSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/LayerSettingsSheet.swift"; sourceTree = "<group>"; };
 		2065 /* FloorplanImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Floorplan/FloorplanImagePicker.swift"; sourceTree = "<group>"; };
 		2066 /* ZeRiEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/ZeRiEngine.swift"; sourceTree = "<group>"; };
-		2067 /* CalibrationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Compass/CalibrationSheet.swift"; sourceTree = "<group>"; };
 		2068 /* VIPPaywallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Settings/VIPPaywallSheet.swift"; sourceTree = "<group>"; };
 		2069 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/LocalizationManager.swift"; sourceTree = "<group>"; };
 		2070 /* WorldMagneticModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WorldMagneticModel.swift"; sourceTree = "<group>"; };
@@ -159,7 +140,6 @@
 		2077 /* GeometryUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/GeometryUtils.swift"; sourceTree = "<group>"; };
 		2078 /* VRSpatialSurveyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ARVision/VRSpatialSurveyView.swift"; sourceTree = "<group>"; };
 		2079 /* TraditionalEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/TraditionalEvidence.swift"; sourceTree = "<group>"; };
-		2093 /* FamilyRoomAllocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Floorplan/FamilyRoomAllocationView.swift"; sourceTree = "<group>"; };
 		2092 /* FamilyRoomAllocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/FamilyRoomAllocation.swift"; sourceTree = "<group>"; };
 		9200 /* WidgetAlmanacSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/WidgetAlmanacSnapshot.swift"; sourceTree = "<group>"; };
 		9201 /* TiandiLuopanAlmanacWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TiandiLuopanAlmanacWidget.swift; sourceTree = "<group>"; };
@@ -196,7 +176,6 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				9111 /* TiandiLuopanWidget.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -251,6 +230,10 @@
 		4001 /* TiandiLuopan */ = {
 			isa = PBXGroup;
 			children = (
+				2083 /* ResidentialPlanning.swift */,
+				2084 /* ResidentialPlanningView.swift */,
+				2085 /* ResidentialProjectBackup.swift */,
+				2082 /* ResidentialWorkspace.swift */,
 				2001 /* AppDelegate.swift */,
 				2002 /* SceneDelegate.swift */,
 				2003 /* ViewController.swift */,
@@ -262,18 +245,12 @@
 				2021 /* Hexagram64.swift */,
 				2022 /* FlyingStarsEngine.swift */,
 				2079 /* TraditionalEvidence.swift */,
-				2093 /* FamilyRoomAllocationView.swift */,
 				2092 /* FamilyRoomAllocation.swift */,
 				2023 /* BaZhaiEngine.swift */,
 				2024 /* SanHeWaterEngine.swift */,
 				2025 /* SolarTimeCalculator.swift */,
 				2026 /* ExteriorShaEngine.swift */,
-				2030 /* CompassDialView.swift */,
-				2031 /* CompassHeaderView.swift */,
-				2032 /* CompassMainView.swift */,
 				2033 /* ARVisionView.swift */,
-				2034 /* XuanKongGridView.swift */,
-				2035 /* BaZhaiView.swift */,
 				2036 /* SettingsView.swift */,
 				2037 /* RootContentView.swift */,
 				2050 /* Fenjin120Data.swift */,
@@ -282,18 +259,10 @@
 				2053 /* QimenEngine.swift */,
 				2054 /* TianJiShuEngine.swift */,
 				2055 /* FloorplanView.swift */,
-				2056 /* QimenDunjiaView.swift */,
-				2057 /* PurpleWhiteView.swift */,
-				2058 /* TianJiShuView.swift */,
-				2059 /* FenjinDetailSheet.swift */,
-				2060 /* KongWangDetailSheet.swift */,
-				2061 /* FengshuiPalaceDetailSheet.swift */,
 				2062 /* CompassLayerManager.swift */,
 				2063 /* SolarTermsData.swift */,
-				2064 /* LayerSettingsSheet.swift */,
 				2065 /* FloorplanImagePicker.swift */,
 				2066 /* ZeRiEngine.swift */,
-				2067 /* CalibrationSheet.swift */,
 				2068 /* VIPPaywallSheet.swift */,
 				2069 /* LocalizationManager.swift */,
 				2070 /* WorldMagneticModel.swift */,
@@ -387,7 +356,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				9002 /* PBXTargetDependency */,
 			);
 			name = TiandiLuopan;
 			productName = TiandiLuopan;
@@ -513,6 +481,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1083 /* ResidentialPlanning.swift in Sources */,
+				1084 /* ResidentialPlanningView.swift in Sources */,
+				1085 /* ResidentialProjectBackup.swift in Sources */,
+				1082 /* ResidentialWorkspace.swift in Sources */,
 				1001 /* AppDelegate.swift in Sources */,
 				1002 /* SceneDelegate.swift in Sources */,
 				1003 /* ViewController.swift in Sources */,
@@ -525,12 +497,7 @@
 				1024 /* SanHeWaterEngine.swift in Sources */,
 				1025 /* SolarTimeCalculator.swift in Sources */,
 				1026 /* ExteriorShaEngine.swift in Sources */,
-				1030 /* CompassDialView.swift in Sources */,
-				1031 /* CompassHeaderView.swift in Sources */,
-				1032 /* CompassMainView.swift in Sources */,
 				1033 /* ARVisionView.swift in Sources */,
-				1034 /* XuanKongGridView.swift in Sources */,
-				1035 /* BaZhaiView.swift in Sources */,
 				1036 /* SettingsView.swift in Sources */,
 				1037 /* RootContentView.swift in Sources */,
 				1050 /* Fenjin120Data.swift in Sources */,
@@ -539,18 +506,10 @@
 				1053 /* QimenEngine.swift in Sources */,
 				1054 /* TianJiShuEngine.swift in Sources */,
 				1055 /* FloorplanView.swift in Sources */,
-				1056 /* QimenDunjiaView.swift in Sources */,
-				1057 /* PurpleWhiteView.swift in Sources */,
-				1058 /* TianJiShuView.swift in Sources */,
-				1059 /* FenjinDetailSheet.swift in Sources */,
-				1060 /* KongWangDetailSheet.swift in Sources */,
-				1061 /* FengshuiPalaceDetailSheet.swift in Sources */,
 				1062 /* CompassLayerManager.swift in Sources */,
 				1063 /* SolarTermsData.swift in Sources */,
-				1064 /* LayerSettingsSheet.swift in Sources */,
 				1065 /* FloorplanImagePicker.swift in Sources */,
 				1066 /* ZeRiEngine.swift in Sources */,
-				1067 /* CalibrationSheet.swift in Sources */,
 				1068 /* VIPPaywallSheet.swift in Sources */,
 				1069 /* LocalizationManager.swift in Sources */,
 				1070 /* WorldMagneticModel.swift in Sources */,
@@ -563,7 +522,6 @@
 				1077 /* GeometryUtils.swift in Sources */,
 				1078 /* VRSpatialSurveyView.swift in Sources */,
 				1079 /* TraditionalEvidence.swift in Sources */,
-				1081 /* FamilyRoomAllocationView.swift in Sources */,
 				1080 /* FamilyRoomAllocation.swift in Sources */,
 				9100 /* WidgetAlmanacSnapshot.swift in Sources */,
 

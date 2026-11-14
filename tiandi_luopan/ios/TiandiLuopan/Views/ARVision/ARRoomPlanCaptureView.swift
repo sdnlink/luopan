@@ -40,11 +40,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     @Published public private(set) var isCapturing = false
     @Published public private(set) var didFinish = false
     @Published public private(set) var errorMessage: String?
-    /// 结算页罗盘校准旋钮产生的朝向微调量（度），叠加到 initialCompassHeading 上
+    /// 模型坐标朝向修正产生的朝向微调量（度），叠加到 initialCoordinateHeading 上
     @Published public var headingOffsetDegrees: Double = 0.0
     /// Coordinate baseline, used by the top-down blueprint.
     private var coordinateHeading: Double? {
-        initialCompassHeading.map { ($0 + headingOffsetDegrees + 360).truncatingRemainder(dividingBy: 360) }
+        initialCoordinateHeading.map { ($0 + headingOffsetDegrees + 360).truncatingRemainder(dividingBy: 360) }
     }
 
     public var effectiveHeadingForDisplay: Double? {
@@ -55,7 +55,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     private weak var captureView: RoomCaptureView?
     private var latestRoom: CapturedRoom?
     private var capturedRoomsHistory: [CapturedRoom] = []
-    private var initialCompassHeading: Double?
+    private var initialCoordinateHeading: Double?
     @Published public private(set) var confirmedEntranceID: UUID?
 
     public var entranceOptions: [SpatialOpening3D] {
@@ -221,7 +221,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         latestRoom = nil
         capturedRoomsHistory.removeAll()
         scannedRoomCount = 0
-        initialCompassHeading = nil
+        initialCoordinateHeading = nil
         confirmedEntranceID = nil
         hasHeadingReference = false
         headingOffsetDegrees = 0
@@ -235,15 +235,12 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     }
 
     private func resolveCoordinateReference() {
-        guard initialCompassHeading == nil,
+        guard initialCoordinateHeading == nil,
               let frame = captureView?.captureSession.arSession.currentFrame,
               case .normal = frame.camera.trackingState else { return }
-        let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x,
-                                   frame.camera.transform.columns.2.y,
-                                   frame.camera.transform.columns.2.z)
-        initialCompassHeading = SurveyCoordinateReference.heading(
-            cameraHeading: CompassMotionManager.shared.physicalHeading(), cameraForward: forward)
-        hasHeadingReference = initialCompassHeading != nil
+        // RoomPlan coordinates are relative to the scan session, not north.
+        initialCoordinateHeading = 0
+        hasHeadingReference = initialCoordinateHeading != nil
     }
 
     public func startNextRoomSegment() {
@@ -341,18 +338,13 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
                 "doorSurfaces": allDoors.map(surfaceToDict),
                 "windowSurfaces": allWindows.map(surfaceToDict),
                 "openingSurfaces": allOpenings.map(surfaceToDict),
-                "detectedObjects": allObjects.map(objectToDict),
-                "spatialFengshuiFindings": spatialFindings
+                "detectedObjects": allObjects.map(objectToDict)
             ]
-            // Keep the complete shared analysis next to the raw RoomPlan
-            // surfaces. This includes every detected sha item, its detail and
-            // solution, the score, centroid and measured dimensions; the
-            // short `spatialFengshuiFindings` list above remains a quick UI
-            // summary for older consumers of this export.
+            // Share neutral geometry alongside the native RoomPlan surfaces.
             if let survey = currentSpatialSurvey,
-               let surveyData = try? JSONEncoder().encode(survey),
+               let surveyData = try? JSONEncoder().encode(ResidentialSurveyGeometry(survey)),
                let surveyObject = try? JSONSerialization.jsonObject(with: surveyData) {
-                payload["spatialSurvey"] = surveyObject
+                payload["spatialGeometry"] = surveyObject
             }
 
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
@@ -755,133 +747,11 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
-    private static func computeSpatialFengshuiFindings(for rooms: [CapturedRoom], entranceID: UUID? = nil) -> [String] {
-        var findings: [String] = []
-        let allDoors = deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
-        let allWindows = deduplicated(rooms.flatMap { $0.windows }, id: { $0.identifier })
-        let allObjects = deduplicated(rooms.flatMap { $0.objects }, id: { $0.identifier })
-
-        // 1. 入户门宽鲁班尺吉凶判定 (42.9cm 门光尺)。与空间模型使用
-        // 相同的外边界距离规则，避免把室内门当作入户门。
-        let mainDoor = resolveEntrance(from: rooms, preferredID: entranceID)
-        let lang = LocalizationManager.shared.effectiveLanguage
-        if let mainDoor, Float(mainDoor.dimensions.x) > 0.45 {
-            let doorWidth = Float(mainDoor.dimensions.x)
-            let eval = LubanRulerEvaluation.evaluate(meters: doorWidth)
-            let seg = eval.localizedYangSegmentName
-            let wStr = String(format: "%.2f", Double(doorWidth))
-            switch lang {
-            case .zhHans, .auto:
-                findings.append("门宽 \(wStr)m · 鲁班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉门" : "失度"))")
-            case .zhHant:
-                findings.append("門寬 \(wStr)m · 魯班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉門" : "失度"))")
-            case .en:
-                findings.append("Door \(wStr)m · Lu Ban [\(seg)] (\(eval.yangIsAuspicious ? "Auspicious" : "Check"))")
-            case .ja:
-                findings.append("門幅 \(wStr)m・魯班尺【\(seg)】(\(eval.yangIsAuspicious ? "吉門" : "要注意"))")
-            case .ko:
-                findings.append("문폭 \(wStr)m · 노반척【\(seg)】(\(eval.yangIsAuspicious ? "길문" : "주의"))")
-            case .vi:
-                findings.append("Rộng cửa \(wStr)m · Lỗ Ban [\(seg)] (\(eval.yangIsAuspicious ? "Cát" : "Lưu ý"))")
-            case .th:
-                findings.append("ประตู \(wStr)m · หลู่ปาน [\(seg)] (\(eval.yangIsAuspicious ? "มงคล" : "ควรตรวจ"))")
-            case .id:
-                findings.append("Pintu \(wStr)m · Lu Ban [\(seg)] (\(eval.yangIsAuspicious ? "Baik" : "Periksa"))")
-            }
-        }
-
-        // 2. 穿堂风煞检测 (门对窗 / 门对门一箭穿心)
-        for door in allDoors {
-            let dPos = SIMD2<Float>(door.transform.columns.3.x, door.transform.columns.3.z)
-            let dNormRaw = SIMD2<Float>(door.transform.columns.2.x, door.transform.columns.2.z)
-            let normLen = simd_length(dNormRaw)
-            guard normLen > 1e-4 else { continue }
-            let dNorm = dNormRaw / normLen
-
-            for win in allWindows {
-                let wPos = SIMD2<Float>(win.transform.columns.3.x, win.transform.columns.3.z)
-                let delta = wPos - dPos
-                let dist = simd_length(delta)
-                guard dist >= 1.8 && dist <= 12.0 else { continue }
-                let dir = delta / dist
-                let alignment = abs(simd_dot(dNorm, dir))
-                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
-                if alignment >= 0.88 && lateral <= 0.65 {
-                    let dStr = String(format: "%.1f", dist)
-                    switch lang {
-                    case .zhHans, .auto: findings.append("⚠️ 穿堂煞：门窗对冲直通 (间距 \(dStr)m)")
-                    case .zhHant: findings.append("⚠️ 穿堂煞：門窗對衝直通 (間距 \(dStr)m)")
-                    case .en:     findings.append("⚠️ Through-Draft: Door aligns with window (\(dStr)m)")
-                    case .ja:     findings.append("⚠️ 穿堂風殺：扉と窓が一直線（距離 \(dStr)m）")
-                    case .ko:     findings.append("⚠️ 천당풍살: 문·창문 직통 맞바람 (\(dStr)m)")
-                    case .vi:     findings.append("⚠️ Xuyên Đường Sát: Cửa-cửa sổ thông thẳng (\(dStr)m)")
-                    case .th:     findings.append("⚠️ ลมทะลุกลางบ้าน: ประตูตรงหน้าต่าง (\(dStr)m)")
-                    case .id:     findings.append("⚠️ Angin Tembus: Pintu segaris jendela (\(dStr)m)")
-                    }
-                    break
-                }
-            }
-            if findings.count >= 2 { break }
-        }
-
-        // 3. 房门冲床检测 (Door normal ray hitting Bed)
-        let beds = allObjects.filter { $0.category == .bed }
-        for door in allDoors {
-            let dPos = SIMD2<Float>(door.transform.columns.3.x, door.transform.columns.3.z)
-            let dNormRaw = SIMD2<Float>(door.transform.columns.2.x, door.transform.columns.2.z)
-            let normLen = simd_length(dNormRaw)
-            guard normLen > 1e-4 else { continue }
-            let dNorm = dNormRaw / normLen
-            for bed in beds {
-                let bPos = SIMD2<Float>(bed.transform.columns.3.x, bed.transform.columns.3.z)
-                let delta = bPos - dPos
-                let dist = simd_length(delta)
-                guard dist >= 0.8 && dist <= 4.8 else { continue }
-                let alignment = abs(simd_dot(dNorm, delta / dist))
-                let lateral = dist * sqrt(max(0, 1.0 - alignment * alignment))
-                if alignment >= 0.85 && lateral <= 0.70 {
-                    let dStr = String(format: "%.1f", dist)
-                    switch lang {
-                    case .zhHans, .auto: findings.append("⚠️ 门冲床：房门直对卧床 (\(dStr)m)")
-                    case .zhHant: findings.append("⚠️ 門衝床：房門直對臥床 (\(dStr)m)")
-                    case .en:     findings.append("⚠️ Door-to-Bed: Door faces bed (\(dStr)m)")
-                    case .ja:     findings.append("⚠️ 門衝床：室内扉がベッドに正対（\(dStr)m）")
-                    case .ko:     findings.append("⚠️ 문충침: 방문이 침대와 직대 (\(dStr)m)")
-                    case .vi:     findings.append("⚠️ Môn Xung Sàng: Cửa chiếu thẳng giường (\(dStr)m)")
-                    case .th:     findings.append("⚠️ ประตูชนเตียง: ประตูตรงกับเตียงนอน (\(dStr)m)")
-                    case .id:     findings.append("⚠️ Pintu-ke-Ranjang: Pintu menghadap ranjang (\(dStr)m)")
-                    }
-                    break
-                }
-            }
-        }
-
-        // 4. 水火相冲检测 (厨灶与马桶卫浴过近)
-        let stoves = allObjects.filter { $0.category == .stove || $0.category == .oven }
-        let toilets = allObjects.filter { $0.category == .toilet || $0.category == .bathtub }
-        for stove in stoves {
-            let sPos = SIMD2<Float>(stove.transform.columns.3.x, stove.transform.columns.3.z)
-            for toilet in toilets {
-                let tPos = SIMD2<Float>(toilet.transform.columns.3.x, toilet.transform.columns.3.z)
-                let dist = simd_distance(sPos, tPos)
-                if dist <= 2.1 {
-                    let dStr = String(format: "%.1f", dist)
-                    switch lang {
-                    case .zhHans, .auto: findings.append("⚠️ 水火冲：厨灶与卫浴紧邻 (\(dStr)m)")
-                    case .zhHant: findings.append("⚠️ 水火衝：廚灶與衛浴緊鄰 (\(dStr)m)")
-                    case .en:     findings.append("⚠️ Water-Fire Clash: Stove near bath (\(dStr)m)")
-                    case .ja:     findings.append("⚠️ 水火衝：コンロと水回りが近接（\(dStr)m）")
-                    case .ko:     findings.append("⚠️ 수화상충: 조리대와 욕실 인접 (\(dStr)m)")
-                    case .vi:     findings.append("⚠️ Thủy Hỏa Xung: Bếp gần phòng tắm (\(dStr)m)")
-                    case .th:     findings.append("⚠️ น้ำไฟปะทะ: เตาครัวใกล้ห้องน้ำ (\(dStr)m)")
-                    case .id:     findings.append("⚠️ Air-Api Bentrok: Kompor dekat kamar mandi (\(dStr)m)")
-                    }
-                    break
-                }
-            }
-        }
-
-        return findings
+    private static func computeOpeningDimensions(for rooms: [CapturedRoom], entranceID: UUID? = nil) -> [String] {
+        let doors = deduplicated(rooms.flatMap { $0.doors }, id: { $0.identifier })
+        let windows = deduplicated(rooms.flatMap { $0.windows }, id: { $0.identifier })
+        return doors.map { LocalizationManager.shared.t("ar_spatial_door") + String(format: ": %.2f m × %.2f m", $0.dimensions.x, $0.dimensions.y) }
+            + windows.map { LocalizationManager.shared.t("ar_spatial_window") + String(format: ": %.2f m × %.2f m", $0.dimensions.x, $0.dimensions.y) }
     }
 
     public static func buildSpatialSurvey(from rooms: [CapturedRoom], heading: Double, entranceID: UUID? = nil) -> HouseSpatialSurvey? {
@@ -1070,7 +940,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         let depth = envelope.map { max(0, $0.maxZ - $0.minZ) } ?? 0
         let polyArea = Self.computeWallPolygonMetrics(for: combined)?.areaSqMeters
         let area = polyArea.map { min(width * depth, max(0.5, $0)) } ?? (width * depth)
-        let findings = Self.computeSpatialFengshuiFindings(for: combined, entranceID: confirmedEntranceID)
+        let findings = Self.computeOpeningDimensions(for: combined, entranceID: confirmedEntranceID)
         let survey = coordinateHeading.flatMap { Self.buildSpatialSurvey(from: combined, heading: $0, entranceID: confirmedEntranceID) }
         let apply: () -> Void = { [weak self] in
             guard let self = self else { return }
@@ -1117,7 +987,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
         }
     }
 
-    /// 结算页罗盘校准旋钮回调：以实测罗盘度数为准微调大门朝向，立即重算报告并同步全景档案
+    /// 模型坐标朝向修正回调：以输入角度为准微调大门朝向，立即重算报告并同步全景档案
     public func applyHeadingOffset(_ offsetDegrees: Double) {
         headingOffsetDegrees = offsetDegrees
         rebuildCompletedSurvey()
@@ -1126,7 +996,7 @@ public final class ARRoomPlanModel: NSObject, ObservableObject, RoomCaptureSessi
     private func rebuildCompletedSurvey() {
         guard !isCapturing, !capturedRoomsHistory.isEmpty else { return }
         let combined = capturedRoomsHistory
-        spatialFindings = Self.computeSpatialFengshuiFindings(for: combined, entranceID: confirmedEntranceID)
+        spatialFindings = Self.computeOpeningDimensions(for: combined, entranceID: confirmedEntranceID)
         let survey = coordinateHeading.flatMap {
             Self.buildSpatialSurvey(from: combined, heading: $0, entranceID: confirmedEntranceID)
         }
@@ -1304,7 +1174,7 @@ public struct ARRoomPlanSurveyView: View {
                                             .adaptiveFont(size: 11).foregroundColor(.yanGold)
                                     }
                                 }
-                                // 大门朝向罗盘校准旋钮：以实测罗盘度数为准微调，立即刷新报告
+                                // 模型坐标朝向修正：以输入角度为准微调，立即刷新报告
                                 VStack(spacing: 2) {
                                     Text("\(lang.t(model.currentSpatialSurvey?.resolvedHouseFacing == nil ? "ar_roomplan_coordinate_heading" : "ar_roomplan_door_heading")) \(model.effectiveHeadingForDisplay.map { String(format: "%.1f°", $0) } ?? "--")")
                                         .adaptiveFont(size: 9, weight: .bold, design: .monospaced)

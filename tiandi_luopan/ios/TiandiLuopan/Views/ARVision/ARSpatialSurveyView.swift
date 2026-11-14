@@ -433,17 +433,14 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     @Published public private(set) var lidarAvailable = false
     @Published public private(set) var hasSavedWorldMap = false
     @Published public private(set) var meshVisible = true
-    @Published public private(set) var lubanPointA: SIMD3<Float>?
-    @Published public private(set) var lubanPointB: SIMD3<Float>?
-    @Published public private(set) var lubanSpanMeters: Float?
-    @Published public private(set) var lubanEvaluation: LubanRulerEvaluation?
+    @Published public private(set) var measurePointA: SIMD3<Float>?
+    @Published public private(set) var measurePointB: SIMD3<Float>?
+    @Published public private(set) var measureSpanMeters: Float?
     @Published public private(set) var savedAnchorCount: Int = 0
     @Published public private(set) var cameraElevationDegrees: Double = 0.0
     @Published public private(set) var cameraHorizontalFOVDegrees: Double?
     @Published private(set) var currentCameraPose: ARCapturePose?
     @Published public private(set) var cameraRollDegrees: Double = 0.0
-    @Published public private(set) var groundBaguaProjected: Bool = false
-    @Published public private(set) var currentStandingPalace: String?
     @Published public private(set) var estimatedRoomHeightMeters: Float?
     @Published public private(set) var hasLowBeamWarning: Bool = false
     /// 手动角落打点测绘（Corner-pin Polygon）：弱纹理墙面辅助精准房间
@@ -453,7 +450,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
     private weak var sceneView: ARSCNView?
     private var cornerRoomAnchors: [ARAnchor] = []
-    private var lubanAnchors: [ARAnchor] = []
+    private var measureAnchors: [ARAnchor] = []
     private var cornerPinNodes: [SCNNode] = []
     private var cornerRooms: [SpatialRoom3D] = []
     private var surveyHeadingDegrees: Double?
@@ -469,13 +466,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     private var rendersSpatialMesh = true
     private var lastCapturedTimestamp: TimeInterval = 0
     private var retryCount: Int = 0
-    private var lubanNodeA: SCNNode?
-    private var lubanNodeB: SCNNode?
-    private var lubanLineNode: SCNNode?
-    private var groundBaguaNode: SCNNode?
-    private var groundBaguaCenter: SIMD3<Float>?
-    private var groundBaguaSpan: Float = 2.4
-    private var groundBaguaNorthYawRadians: Float = 0.0
+    private var measureNodeA: SCNNode?
+    private var measureNodeB: SCNNode?
+    private var measureLineNode: SCNNode?
 
     /// AR 命中检测使用的屏幕中心点。优先取 AR 视图自身 bounds —— 该值随
     /// iPhone Duo 折叠/展开实时变化，与窗口尺寸保持一致；仅当视图尚未完成
@@ -608,9 +601,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         currentCameraPose = nil
         cameraHorizontalFOVDegrees = nil
         hasHeadingReference = false
-        clearLubanPoints()
+        clearMeasurementPoints()
         clearCornerRooms()
-        clearGroundBaguaOverlay()
         sceneView.session.pause()
         sceneView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
         activeConfiguration = configuration
@@ -635,340 +627,16 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
     }
 
-    public func clearGroundBaguaOverlay() {
-        groundBaguaProjected = false
-        currentStandingPalace = nil
-        groundBaguaNode?.removeFromParentNode()
-        groundBaguaNode = nil
-        groundBaguaCenter = nil
-    }
+
 
     /// Projects or removes a 3D True-North-aligned Nine-Palace Bagua & Luopan
     /// holographic array on the detected floor plane.
     @discardableResult
-    public func toggleGroundBaguaOverlay() -> Bool {
-        if groundBaguaProjected {
-            clearGroundBaguaOverlay()
-            return false
-        }
-        guard let sceneView = sceneView,
-              let frame = sceneView.session.currentFrame else { return false }
 
-        let center = projectionCenter(of: sceneView)
 
-        var floorPos: SIMD3<Float>?
-        var resolvedSpan: Float = 2.4
 
-        if let hit = sceneView.raycastQuery(from: center, allowing: .existingPlaneGeometry, alignment: .horizontal)
-            .flatMap({ sceneView.session.raycast($0).first })
-            ?? sceneView.raycastQuery(from: center, allowing: .estimatedPlane, alignment: .horizontal)
-                .flatMap({ sceneView.session.raycast($0).first }) {
-            let col = hit.worldTransform.columns.3
-            floorPos = SIMD3<Float>(col.x, col.y, col.z)
-            if let plane = hit.anchor as? ARPlaneAnchor {
-                resolvedSpan = min(4.2, max(1.8, min(plane.planeExtent.width, plane.planeExtent.height) * 0.92))
-            }
-        } else if let largestHoriz = frame.anchors
-            .compactMap({ $0 as? ARPlaneAnchor })
-            .filter({ $0.alignment == .horizontal })
-            .max(by: { $0.planeExtent.width * $0.planeExtent.height < $1.planeExtent.width * $1.planeExtent.height }) {
-            let col = largestHoriz.transform.columns.3
-            floorPos = SIMD3<Float>(col.x, col.y, col.z)
-            resolvedSpan = min(4.2, max(1.8, min(largestHoriz.planeExtent.width, largestHoriz.planeExtent.height) * 0.92))
-        } else {
-            let cam = frame.camera.transform
-            let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
-            let forward = -SIMD3<Float>(cam.columns.2.x, 0, cam.columns.2.z)
-            let horizDir = simd_length(forward) > 0.01 ? simd_normalize(forward) : SIMD3<Float>(0, 0, -1)
-            floorPos = SIMD3<Float>(camPos.x + horizDir.x * 1.6, camPos.y - 1.25, camPos.z + horizDir.z * 1.6)
-        }
 
-        guard let centerPos = floorPos else { return false }
 
-        guard let coordinateHeading = surveyHeadingDegrees else { return false }
-        let northYaw = -Float(coordinateHeading * .pi / 180)
-
-        let plane = SCNPlane(width: CGFloat(resolvedSpan), height: CGFloat(resolvedSpan))
-        let mat = SCNMaterial()
-        mat.diffuse.contents = Self.renderGroundBaguaTexture()
-        mat.lightingModel = .constant
-        mat.isDoubleSided = true
-        mat.writesToDepthBuffer = false
-        plane.materials = [mat]
-
-        let node = SCNNode(geometry: plane)
-        node.name = "ar-ground-bagua"
-        node.position = SCNVector3(centerPos.x, centerPos.y + 0.008, centerPos.z)
-        node.eulerAngles = SCNVector3(-Float.pi / 2.0, northYaw, 0)
-        sceneView.scene.rootNode.addChildNode(node)
-
-        groundBaguaNode = node
-        groundBaguaCenter = centerPos
-        groundBaguaSpan = resolvedSpan
-        groundBaguaNorthYawRadians = northYaw
-        groundBaguaProjected = true
-        updateStandingPalace(cameraTransform: frame.camera.transform)
-        return true
-    }
-
-    private func updateStandingPalace(cameraTransform: simd_float4x4) {
-        guard groundBaguaProjected, let center = groundBaguaCenter else {
-            currentStandingPalace = nil
-            return
-        }
-        let camPos = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
-        let dx = camPos.x - center.x
-        let dz = camPos.z - center.z
-        let cosY = cos(-groundBaguaNorthYawRadians)
-        let sinY = sin(-groundBaguaNorthYawRadians)
-        let localX = dx * cosY - dz * sinY
-        let localZ = dx * sinY + dz * cosY
-        let halfSpan = max(0.5, groundBaguaSpan * 0.5)
-        let normX = localX / halfSpan
-        let normZ = localZ / halfSpan
-        let lang = LocalizationManager.shared.effectiveLanguage
-
-        if abs(normX) <= 0.33 && abs(normZ) <= 0.33 {
-            switch lang {
-            case .en: currentStandingPalace = "Center Palace · 9 Purple (Auspicious)"
-            case .vi: currentStandingPalace = "Trung Cung Lập Cực · Cửu Tử Đương Lệnh (Đại Cát)"
-            case .th: currentStandingPalace = "จงกง (จุดศูนย์กลาง) · ดาว 9 ม่วงประจำยุค (มงคลยิ่ง)"
-            case .id: currentStandingPalace = "Istana Pusat · 9 Ungu Berkuasa (Sangat Baik)"
-            case .ja: currentStandingPalace = "中宮立極 · 九紫右弼当令（大吉）"
-            case .ko: currentStandingPalace = "중궁 입극 · 구자우필 당령 (대길)"
-            case .zhHant: currentStandingPalace = "中宮立極 · 九紫右弼當令（大吉）"
-            case .auto, .zhHans: currentStandingPalace = "中宫立极 · 九紫右弼当令（大吉）"
-            }
-            return
-        }
-        // Standard South-at-top / North-at-bottom Lo Shu orientation:
-        // local -Z is North (Kan), +Z is South (Li), +X is East (Zhen), -X is West (Dui)
-        let angleDeg = (Double(atan2(localX, -localZ)) * 180.0 / .pi + 360.0).truncatingRemainder(dividingBy: 360.0)
-        let index = Int(((angleDeg + 22.5).truncatingRemainder(dividingBy: 360.0)) / 45.0)
-        let labelsHans = [
-            "正北坎宫 · 五黄廉贞（宜静不宜动）",
-            "东北艮宫 · 三碧禄存（是非位）",
-            "正东震宫 · 七赤破军（退气位）",
-            "东南巽宫 · 八白左辅（次财位·吉）",
-            "正南离宫 · 四绿文昌（功名位·吉）",
-            "西南坤宫 · 六白武曲（偏财权印·吉）",
-            "正西兑宫 · 二黑巨门（病符象征·《紫白诀》）",
-            "西北乾宫 · 一白贪狼（未来生气·大吉）"
-        ]
-        let labelsHant = [
-            "正北坎宮 · 五黃廉貞（宜靜不宜動）",
-            "東北艮宮 · 三碧祿存（是非位）",
-            "正東震宮 · 七赤破軍（退氣位）",
-            "東南巽宮 · 八白左輔（次財位·吉）",
-            "正南離宮 · 四綠文昌（功名位·吉）",
-            "西南坤宮 · 六白武曲（偏財權印·吉）",
-            "正西兌宮 · 二黑巨門（病符象徵·《紫白訣》）",
-            "西北乾宮 · 一白貪狼（未來生氣·大吉）"
-        ]
-        let labelsEn = [
-            "North (Kan) · 5 Yellow",
-            "Northeast (Gen) · 3 Jade",
-            "East (Zhen) · 7 Red",
-            "Southeast (Xun) · 8 White (Wealth)",
-            "South (Li) · 4 Green (Academic)",
-            "Southwest (Kun) · 6 White (Career)",
-            "West (Dui) · 2 Black (classical illness symbol · Zi Bai Jue)",
-            "Northwest (Qian) · 1 White (Noble)"
-        ]
-        let labelsVi = [
-            "Chính Bắc (Khảm) · Ngũ Hoàng Liêm Trinh (Nên tĩnh)",
-            "Đông Bắc (Cấn) · Tam Bích Lộc Tồn (Thị phi)",
-            "Chính Đông (Chấn) · Thất Xích Phá Quân (Thoái khí)",
-            "Đông Nam (Tốn) · Bát Bạch Tả Phù (Tài vị · Cát)",
-            "Chính Nam (Ly) · Tứ Lục Văn Xương (Công danh · Cát)",
-            "Tây Nam (Khôn) · Lục Bạch Vũ Khúc (Quyền ấn · Cát)",
-            "Chính Tây (Đoài) · Nhị Hắc Cự Môn (Biểu tượng bệnh phù)",
-            "Tây Bắc (Càn) · Nhất Bạch Tham Lang (Sinh khí · Đại Cát)"
-        ]
-        let labelsTh = [
-            "ทิศเหนือ (ข่าน) · ดาว 5 เหลือง (ควรสงบนิ่ง)",
-            "ทิศตะวันออกเฉียงเหนือ (เกิ้น) · ดาว 3 เขียว (ระวังปากเสียง)",
-            "ทิศตะวันออก (เจิ้น) · ดาว 7 แดง (พลังถดถอย)",
-            "ทิศตะวันออกเฉียงใต้ (ซวิ่น) · ดาว 8 ขาว (โชคลาภ · มงคล)",
-            "ทิศใต้ (หลี) · ดาว 4 เขียวเหวินชาง (การเรียน/ชื่อเสียง · มงคล)",
-            "ทิศตะวันตกเฉียงใต้ (คุน) · ดาว 6 ขาว (บารมี/การงาน · มงคล)",
-            "ทิศตะวันตก (ตุ้ย) · ดาว 2 ดำ (สัญลักษณ์สุขภาพตามตำรา)",
-            "ทิศตะวันตกเฉียงเหนือ (เฉียน) · ดาว 1 ขาว (พลังรุ่งเรือง · มงคลยิ่ง)"
-        ]
-        let labelsId = [
-            "Utara (Kan) · 5 Kuning (Jaga Ketenangan)",
-            "Timur Laut (Gen) · 3 Giok (Rawan Selisih)",
-            "Timur (Zhen) · 7 Merah (Energi Surut)",
-            "Tenggara (Xun) · 8 Putih (Rezeki · Baik)",
-            "Selatan (Li) · 4 Hijau WenChang (Akademik · Baik)",
-            "Barat Daya (Kun) · 6 Putih (Karier/Wibawa · Baik)",
-            "Barat (Dui) · 2 Hitam (Simbol klasik Zi Bai Jue)",
-            "Barat Laut (Qian) · 1 Putih (Energi Maju · Sangat Baik)"
-        ]
-        let labelsJa = [
-            "正北坎宮 · 五黄廉貞（静を宜しとす）",
-            "北東艮宮 · 三碧禄存（是非位）",
-            "正東震宮 · 七赤破軍（退気位）",
-            "南東巽宮 · 八白左輔（次財位・吉）",
-            "正南離宮 · 四緑文昌（功名位・吉）",
-            "南西坤宮 · 六白武曲（偏財権印・吉）",
-            "正西兌宮 · 二黒巨門（病符象徴・『紫白訣』）",
-            "北西乾宮 · 一白貪狼（未来生気・大吉）"
-        ]
-        let labelsKo = [
-            "정북 감궁 · 오황염정 (정숙 권장)",
-            "북동 간궁 · 삼벽록존 (시비위)",
-            "정동 진궁 · 칠적파군 (퇴기위)",
-            "남동 손궁 · 팔백좌보 (차재위·길)",
-            "정남 리궁 · 사록문창 (공명위·길)",
-            "남서 곤궁 · 육백무곡 (편재권인·길)",
-            "정서 태궁 · 이흑거문 (병부 상징·『자백결』)",
-            "북서 건궁 · 일백탐랑 (미래생기·대길)"
-        ]
-        let safeIdx = min(7, max(0, index))
-        switch lang {
-        case .en: currentStandingPalace = labelsEn[safeIdx]
-        case .vi: currentStandingPalace = labelsVi[safeIdx]
-        case .th: currentStandingPalace = labelsTh[safeIdx]
-        case .id: currentStandingPalace = labelsId[safeIdx]
-        case .ja: currentStandingPalace = labelsJa[safeIdx]
-        case .ko: currentStandingPalace = labelsKo[safeIdx]
-        case .zhHant: currentStandingPalace = labelsHant[safeIdx]
-        case .auto, .zhHans: currentStandingPalace = labelsHans[safeIdx]
-        }
-    }
-
-    private static func renderGroundBaguaTexture() -> UIImage {
-        let size = CGSize(width: 768, height: 768)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        return renderer.image { ctx in
-            let cg = ctx.cgContext
-            let rect = CGRect(origin: .zero, size: size)
-            cg.clear(rect)
-
-            // Outer translucent dark gold disk
-            let insetRect = rect.insetBy(dx: 12, dy: 12)
-            cg.setFillColor(UIColor(red: 0.06, green: 0.08, blue: 0.12, alpha: 0.58).cgColor)
-            cg.fillEllipse(in: insetRect)
-
-            cg.setStrokeColor(UIColor(red: 0.95, green: 0.80, blue: 0.30, alpha: 0.88).cgColor)
-            cg.setLineWidth(4)
-            cg.strokeEllipse(in: insetRect)
-            cg.strokeEllipse(in: rect.insetBy(dx: 64, dy: 64))
-
-            // 3x3 Nine-Palace grid inside the circle
-            let gridBox = rect.insetBy(dx: 128, dy: 128)
-            cg.setStrokeColor(UIColor(red: 0.0, green: 0.85, blue: 0.96, alpha: 0.78).cgColor)
-            cg.setLineWidth(2.5)
-            cg.stroke(gridBox)
-
-            let cellW = gridBox.width / 3.0
-            let cellH = gridBox.height / 3.0
-            for idx in 1...2 {
-                let x = gridBox.minX + CGFloat(idx) * cellW
-                let y = gridBox.minY + CGFloat(idx) * cellH
-                cg.move(to: CGPoint(x: x, y: gridBox.minY))
-                cg.addLine(to: CGPoint(x: x, y: gridBox.maxY))
-                cg.move(to: CGPoint(x: gridBox.minX, y: y))
-                cg.addLine(to: CGPoint(x: gridBox.maxX, y: y))
-            }
-            cg.strokePath()
-
-            // Draw Period 9 Lo Shu cells (North at top of texture so -Z aligns with North)
-            // Row 0 (North): NW(一白乾), N(五黄坎), NE(三碧艮)
-            // Row 1 (Center): W(二黑兑), Center(九紫中), E(七赤震)
-            // Row 2 (South): SW(六白坤), S(四绿离), SE(八白巽)
-            let cGreen = UIColor(red: 0.35, green: 0.95, blue: 0.65, alpha: 0.95)
-            let cRed = UIColor(red: 1.0, green: 0.45, blue: 0.40, alpha: 0.95)
-            let cAmber = UIColor(red: 0.95, green: 0.75, blue: 0.35, alpha: 0.95)
-            let cOrange = UIColor(red: 1.0, green: 0.55, blue: 0.35, alpha: 0.95)
-            let cGold = UIColor(red: 1.0, green: 0.88, blue: 0.35, alpha: 1.0)
-            let cSilver = UIColor(red: 0.85, green: 0.85, blue: 0.92, alpha: 0.95)
-            let cells: [[(title: String, sub: String, color: UIColor)]]
-            switch LocalizationManager.shared.effectiveLanguage {
-            case .zhHans, .auto:
-                cells = [
-                    [("乾 · 一白", "西北生旺", cGreen), ("坎 · 五黄", "正北廉贞", cRed), ("艮 · 三碧", "东北禄存", cAmber)],
-                    [("兑 · 二黑", "正西病符", cOrange), ("中宫 · 九紫", "天心太极", cGold), ("震 · 七赤", "正东破军", cSilver)],
-                    [("坤 · 六白", "西南武曲", cGreen), ("离 · 四绿", "正南文昌", cGreen), ("巽 · 八白", "东南左辅", cGreen)]
-                ]
-            case .zhHant:
-                cells = [
-                    [("乾 · 一白", "西北生旺", cGreen), ("坎 · 五黃", "正北廉貞", cRed), ("艮 · 三碧", "東北祿存", cAmber)],
-                    [("兌 · 二黑", "正西病符", cOrange), ("中宮 · 九紫", "天心太極", cGold), ("震 · 七赤", "正東破軍", cSilver)],
-                    [("坤 · 六白", "西南武曲", cGreen), ("離 · 四綠", "正南文昌", cGreen), ("巽 · 八白", "東南左輔", cGreen)]
-                ]
-            case .en:
-                cells = [
-                    [("Qian · 1W", "NW Future Qi", cGreen), ("Kan · 5Y", "N 5-Yellow", cRed), ("Gen · 3J", "NE 3-Jade", cAmber)],
-                    [("Dui · 2B", "W 2-Black", cOrange), ("Center · 9P", "Taiji Heart", cGold), ("Zhen · 7R", "E 7-Red", cSilver)],
-                    [("Kun · 6W", "SW 6-White", cGreen), ("Li · 4G", "S Wenchang", cGreen), ("Xun · 8W", "SE Wealth", cGreen)]
-                ]
-            case .ja:
-                cells = [
-                    [("乾・一白", "北西生旺", cGreen), ("坎・五黄", "正北廉貞", cRed), ("艮・三碧", "北東禄存", cAmber)],
-                    [("兌・二黒", "正西病符", cOrange), ("中宮・九紫", "天心太極", cGold), ("震・七赤", "正東破軍", cSilver)],
-                    [("坤・六白", "南西武曲", cGreen), ("離・四緑", "正南文昌", cGreen), ("巽・八白", "南東左輔", cGreen)]
-                ]
-            case .ko:
-                cells = [
-                    [("건 · 일백", "서북 생왕", cGreen), ("감 · 오황", "정북 염정", cRed), ("간 · 삼벽", "동북 녹존", cAmber)],
-                    [("태 · 이흑", "정서 병부", cOrange), ("중궁 · 구자", "천심 태극", cGold), ("진 · 칠적", "정동 파군", cSilver)],
-                    [("곤 · 육백", "서남 무곡", cGreen), ("리 · 사록", "정남 문창", cGreen), ("손 · 팔백", "동남 좌보", cGreen)]
-                ]
-            case .vi:
-                cells = [
-                    [("Càn · 1 Bạch", "Tây Bắc Sinh Khí", cGreen), ("Khảm · 5 Hoàng", "Chính Bắc Ngũ Hoàng", cRed), ("Cấn · 3 Bích", "Đông Bắc Lộc Tồn", cAmber)],
-                    [("Đoài · 2 Hắc", "Chính Tây Nhị Hắc", cOrange), ("Trung Cung · 9 Tử", "Thiên Tâm Thái Cực", cGold), ("Chấn · 7 Xích", "Chính Đông Phá Quân", cSilver)],
-                    [("Khôn · 6 Bạch", "Tây Nam Vũ Khúc", cGreen), ("Ly · 4 Lục", "Chính Nam Văn Xương", cGreen), ("Tốn · 8 Bạch", "Đông Nam Tả Phụ", cGreen)]
-                ]
-            case .th:
-                cells = [
-                    [("เฉียน · 1 ขาว", "พายัพเจริญ", cGreen), ("ข่าน · 5 เหลือง", "เหนือเบญจเหลือง", cRed), ("เกิ้น · 3 เขียว", "อีสานลู่ฉุน", cAmber)],
-                    [("ตุ้ย · 2 ดำ", "ตะวันตกดาวสองดำ", cOrange), ("กลาง · 9 ม่วง", "ศูนย์กลางไท่จี๋", cGold), ("เจิ้น · 7 แดง", "ตะวันออกโพ่จวิน", cSilver)],
-                    [("คุน · 6 ขาว", "หรดีอู่ชวี", cGreen), ("หลี · 4 เขียว", "ใต้เหวินชาง", cGreen), ("ซวิ่น · 8 ขาว", "อาคเนย์โชคลาภ", cGreen)]
-                ]
-            case .id:
-                cells = [
-                    [("Qian · 1-Putih", "BL Energi Maju", cGreen), ("Kan · 5-Kuning", "U 5-Kuning", cRed), ("Gen · 3-Giok", "TL 3-Giok", cAmber)],
-                    [("Dui · 2-Hitam", "B 2-Hitam", cOrange), ("Pusat · 9-Ungu", "Jantung Taiji", cGold), ("Zhen · 7-Merah", "T 7-Merah", cSilver)],
-                    [("Kun · 6-Putih", "BD 6-Putih", cGreen), ("Li · 4-Hijau", "S Wenchang", cGreen), ("Xun · 8-Putih", "TG Rezeki", cGreen)]
-                ]
-            }
-
-            for r in 0..<3 {
-                for c in 0..<3 {
-                    let item = cells[r][c]
-                    let cellRect = CGRect(
-                        x: gridBox.minX + CGFloat(c) * cellW,
-                        y: gridBox.minY + CGFloat(r) * cellH,
-                        width: cellW,
-                        height: cellH
-                    )
-                    let pStyle = NSMutableParagraphStyle()
-                    pStyle.alignment = .center
-                    item.title.draw(
-                        in: CGRect(x: cellRect.minX + 6, y: cellRect.midY - 28, width: cellW - 12, height: 32),
-                        withAttributes: [
-                            .font: UIFont.boldSystemFont(ofSize: 24),
-                            .foregroundColor: item.color,
-                            .paragraphStyle: pStyle
-                        ]
-                    )
-                    item.sub.draw(
-                        in: CGRect(x: cellRect.minX + 6, y: cellRect.midY + 6, width: cellW - 12, height: 26),
-                        withAttributes: [
-                            .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
-                            .foregroundColor: UIColor.white.withAlphaComponent(0.9),
-                            .paragraphStyle: pStyle
-                        ]
-                    )
-                }
-            }
-        }
-    }
 
     public func toggleMeshVisibility() {
         meshVisible.toggle()
@@ -1267,176 +935,33 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     }
 
     /// Captures a 1080×1920 holographic AR survey report image combining the live
-    /// `ARSCNView` 3D scene (LiDAR mesh, 3D Lu Ban ruler, ground Bagua array) with
-    /// full compass & spatial fengshui telemetry.
+    /// `ARSCNView` 3D scene (LiDAR mesh, 3D Lu Ban ruler, reference grid) with
+    /// physical geometry and capture metadata.
     public func captureSurveySnapshotReport() -> UIImage? {
-        guard let view = sceneView else { return nil }
-        let baseSnapshot = view.snapshot()
-        guard baseSnapshot.size.width > 0, baseSnapshot.size.height > 0 else { return nil }
-
-        let size = CGSize(width: 1080, height: 1920)
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: size, format: format)
-        let motion = CompassMotionManager.shared
-        let state = motion.headingState
-        let lang = LocalizationManager.shared
-
-        return renderer.image { ctx in
-            let cg = ctx.cgContext
-            let scale = max(size.width / baseSnapshot.size.width, size.height / baseSnapshot.size.height)
-            let drawW = baseSnapshot.size.width * scale
-            let drawH = baseSnapshot.size.height * scale
-            baseSnapshot.draw(in: CGRect(x: (size.width - drawW) * 0.5, y: (size.height - drawH) * 0.5, width: drawW, height: drawH))
-
-            let cardRect = CGRect(x: 40, y: size.height - 420, width: size.width - 80, height: 360)
-            UIColor(red: 0.05, green: 0.06, blue: 0.09, alpha: 0.88).setFill()
-            UIBezierPath(roundedRect: cardRect, cornerRadius: 18).fill()
-            UIColor(red: 0.85, green: 0.70, blue: 0.24, alpha: 0.85).setStroke()
-            let border = UIBezierPath(roundedRect: cardRect, cornerRadius: 18)
-            border.lineWidth = 2.5
-            border.stroke()
-
-            let curLang = lang.effectiveLanguage
-            let imgTitle: String
-            switch curLang {
-            case .zhHans, .auto: imgTitle = "演象 · AR 三维全息空间与 LiDAR 勘舆存证"
-            case .zhHant: imgTitle = "演象 · AR 三維全息空間與 LiDAR 勘輿存證"
-            case .en:     imgTitle = "TianJi · 3D AR & LiDAR Spatial Survey Certificate"
-            case .ja:     imgTitle = "天機演象・AR 3D空間＆LiDAR風水計測証憑"
-            case .ko:     imgTitle = "천기연상 · AR 3D 공간 및 LiDAR 풍수 측량 증빙"
-            case .vi:     imgTitle = "Thiên Cơ · Chứng Thực Đo Đạc Không Gian 3D AR & LiDAR"
-            case .th:     imgTitle = "เทียนจี · หลักฐานการสำรวจมิติ 3D AR & LiDAR"
-            case .id:     imgTitle = "TianJi · Bukti Survei Ruang 3D AR & LiDAR"
-            }
-            imgTitle.draw(
-                at: CGPoint(x: 70, y: size.height - 392),
-                withAttributes: [
-                    .font: UIFont.boldSystemFont(ofSize: 32),
-                    .foregroundColor: UIColor(red: 0.96, green: 0.86, blue: 0.45, alpha: 1.0)
-                ]
-            )
-
-            var lines: [String] = []
-            let sitM = state.sittingMountain.localizedName
-            let facM = state.facingMountain.localizedName
-            let degS = String(format: "%.1f°", state.facingAngle)
-            let kwS = state.kongWangLevel.localizedTitle
-            switch curLang {
-            case .zhHans, .auto:
-                lines.append("坐向山度: \(sitM)\(lang.t("mountain_suffix"))\(facM)\(lang.t("facing_suffix")) (\(degS)) · \(kwS)")
-            case .zhHant:
-                lines.append("坐向山度: \(sitM)\(lang.t("mountain_suffix"))\(facM)\(lang.t("facing_suffix")) (\(degS)) · \(kwS)")
-            case .en:
-                lines.append("Orientation: Sit \(sitM) Face \(facM) (\(degS)) · \(kwS)")
-            case .ja:
-                lines.append("座向角度: \(sitM)山\(facM)向 (\(degS)) ・ \(kwS)")
-            case .ko:
-                lines.append("좌향 각도: \(sitM)산 \(facM)향 (\(degS)) · \(kwS)")
-            case .vi:
-                lines.append("Tọa hướng: Tọa \(sitM) Hướng \(facM) (\(degS)) · \(kwS)")
-            case .th:
-                lines.append("ทิศนั่ง-หัน: พิง\(sitM) หัน\(facM) (\(degS)) · \(kwS)")
-            case .id:
-                lines.append("Orientasi: Duduk \(sitM) Hadap \(facM) (\(degS)) · \(kwS)")
-            }
-            if let d = distance {
-                let sensorTag = lidarAvailable ? "LiDAR" : "AR"
-                let dStr = String(format: "%.2f m", d)
-                switch curLang {
-                case .zhHans, .auto: lines.append("天心测距: \(sensorTag) \(dStr) · 识别平面: \(planeCount) 处 (网格 \(meshAnchorCount))")
-                case .zhHant: lines.append("天心測距: \(sensorTag) \(dStr) · 識別平面: \(planeCount) 處 (網格 \(meshAnchorCount))")
-                case .en:     lines.append("Center Range: \(sensorTag) \(dStr) · Planes: \(planeCount) (Mesh \(meshAnchorCount))")
-                case .ja:     lines.append("天心測距: \(sensorTag) \(dStr) ・ 検出平面: \(planeCount)箇所 (メッシュ \(meshAnchorCount))")
-                case .ko:     lines.append("천심 거리: \(sensorTag) \(dStr) · 감지 평면: \(planeCount)곳 (메시 \(meshAnchorCount))")
-                case .vi:     lines.append("Đo tâm: \(sensorTag) \(dStr) · Mặt phẳng: \(planeCount) (Lưới \(meshAnchorCount))")
-                case .th:     lines.append("ระยะจุดกลาง: \(sensorTag) \(dStr) · ระนาบ: \(planeCount) จุด (เมช \(meshAnchorCount))")
-                case .id:     lines.append("Jarak Pusat: \(sensorTag) \(dStr) · Bidang: \(planeCount) (Mesh \(meshAnchorCount))")
-                }
-            }
-            if let standing = currentStandingPalace {
-                switch curLang {
-                case .zhHans, .auto: lines.append("九宫踏勘: \(standing)")
-                case .zhHant: lines.append("九宮踏勘: \(standing)")
-                case .en:     lines.append("9-Palace Sector: \(standing)")
-                case .ja:     lines.append("九宮踏査: \(standing)")
-                case .ko:     lines.append("구궁 답사: \(standing)")
-                case .vi:     lines.append("Cửu cung hiện tại: \(standing)")
-                case .th:     lines.append("ตำแหน่งเก้าเรือน: \(standing)")
-                case .id:     lines.append("Sektor 9-Istana: \(standing)")
-                }
-            }
-            if let eval = lubanEvaluation {
-                let evalStr = eval.localizedSummary(for: lang.effectiveLanguage)
-                switch curLang {
-                case .zhHans, .auto: lines.append("三维鲁班: \(evalStr)")
-                case .zhHant: lines.append("三維魯班: \(evalStr)")
-                case .en:     lines.append("3D Lu Ban: \(evalStr)")
-                case .ja:     lines.append("3D魯班尺: \(evalStr)")
-                case .ko:     lines.append("3D 노반척: \(evalStr)")
-                case .vi:     lines.append("Lỗ Ban 3D: \(evalStr)")
-                case .th:     lines.append("หลู่ปาน 3D: \(evalStr)")
-                case .id:     lines.append("Lu Ban 3D: \(evalStr)")
-                }
-            }
-            if let h = estimatedRoomHeightMeters {
-                let beamTag = hasLowBeamWarning ? lang.t("ar_spatial_beam_warning") : lang.t("ar_spatial_ceiling_good")
-                let hStr = String(format: "%.2f m", h)
-                switch curLang {
-                case .zhHans, .auto: lines.append("空间净高: \(hStr) (\(beamTag))")
-                case .zhHant: lines.append("空間淨高: \(hStr) (\(beamTag))")
-                case .en:     lines.append("Clear Height: \(hStr) (\(beamTag))")
-                case .ja:     lines.append("有効天井高: \(hStr) (\(beamTag))")
-                case .ko:     lines.append("실내 유효 층고: \(hStr) (\(beamTag))")
-                case .vi:     lines.append("Cao thông thủy: \(hStr) (\(beamTag))")
-                case .th:     lines.append("ความสูงเพดาน: \(hStr) (\(beamTag))")
-                case .id:     lines.append("Tinggi Plafon: \(hStr) (\(beamTag))")
-                }
-            }
-            switch curLang {
-            case .zhHans, .auto: lines.append("定位与真太阳时: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .zhHant: lines.append("定位與真太陽時: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .en:     lines.append("GPS & True Solar Time: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .ja:     lines.append("測位・真太陽時: \(motion.coordsDesc) ・ \(motion.trueSolarTimeStr)")
-            case .ko:     lines.append("위치 및 진태양시: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .vi:     lines.append("Tọa độ & Giờ Mặt Trời: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .th:     lines.append("พิกัดและเวลาสุริยะจริง: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            case .id:     lines.append("GPS & Waktu Surya Sejati: \(motion.coordsDesc) · \(motion.trueSolarTimeStr)")
-            }
-
-            let bodyText = lines.joined(separator: "\n")
-            bodyText.draw(
-                in: CGRect(x: 70, y: size.height - 336, width: size.width - 140, height: 260),
-                withAttributes: [
-                    .font: UIFont.monospacedSystemFont(ofSize: 22, weight: .semibold),
-                    .foregroundColor: UIColor.white
-                ]
-            )
-            _ = cg
-        }
+        guard let view = sceneView, let survey = buildSpatialSurvey() else { return nil }
+        return SurveyReportRenderer.renderReportImage(survey: survey, snapshot: view.snapshot())
     }
 
-    public func clearLubanPoints() {
-        lubanPointA = nil
-        lubanPointB = nil
-        lubanSpanMeters = nil
-        lubanEvaluation = nil
-        lubanNodeA?.removeFromParentNode()
-        lubanNodeB?.removeFromParentNode()
-        lubanLineNode?.removeFromParentNode()
-        lubanNodeA = nil
-        lubanNodeB = nil
-        lubanLineNode = nil
-        for anchor in lubanAnchors {
+    public func clearMeasurementPoints() {
+        measurePointA = nil
+        measurePointB = nil
+        measureSpanMeters = nil
+        measureNodeA?.removeFromParentNode()
+        measureNodeB?.removeFromParentNode()
+        measureLineNode?.removeFromParentNode()
+        measureNodeA = nil
+        measureNodeB = nil
+        measureLineNode = nil
+        for anchor in measureAnchors {
             sceneView?.session.remove(anchor: anchor)
         }
-        lubanAnchors.removeAll()
+        measureAnchors.removeAll()
     }
 
     /// Places a 3D Lu Ban ruler endpoint at the current center reticle hit position
     /// and persists a corresponding ARAnchor so saved ARWorldMaps retain the survey point.
     @discardableResult
-    public func placeLubanPoint() -> Bool {
+    public func placeMeasurementPoint() -> Bool {
         guard let sceneView = sceneView,
               let frame = sceneView.session.currentFrame else { return false }
         let center = projectionCenter(of: sceneView)
@@ -1458,33 +983,29 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
 
         guard let worldPos = resolvedWorldPos else { return false }
 
-        let isNewMeasurement = lubanPointA == nil || (lubanPointA != nil && lubanPointB != nil)
+        let isNewMeasurement = measurePointA == nil || (measurePointA != nil && measurePointB != nil)
         if isNewMeasurement {
-            clearLubanPoints()
+            clearMeasurementPoints()
         }
 
         var anchorTransform = matrix_identity_float4x4
         anchorTransform.columns.3 = SIMD4<Float>(worldPos.x, worldPos.y, worldPos.z, 1.0)
         let anchor = ARAnchor(name: "luban-anchor", transform: anchorTransform)
         sceneView.session.add(anchor: anchor)
-        lubanAnchors.append(anchor)
+        measureAnchors.append(anchor)
 
         if isNewMeasurement {
-            lubanPointA = worldPos
-        } else if let pointA = lubanPointA {
-            lubanPointB = worldPos
+            measurePointA = worldPos
+        } else if let pointA = measurePointA {
+            measurePointB = worldPos
 
             let span = simd_distance(pointA, worldPos)
-            lubanSpanMeters = span
-            let eval = LubanRulerEvaluation.evaluate(meters: span)
-            lubanEvaluation = eval
+            measureSpanMeters = span
 
-            let lineColor = eval.yangIsAuspicious
-                ? UIColor(red: 0.18, green: 0.88, blue: 0.48, alpha: 0.92)
-                : UIColor(red: 0.96, green: 0.32, blue: 0.28, alpha: 0.92)
+            let lineColor = UIColor.cyan
             let lineNode = Self.makeLineNode(from: pointA, to: worldPos, color: lineColor)
             sceneView.scene.rootNode.addChildNode(lineNode)
-            lubanLineNode = lineNode
+            measureLineNode = lineNode
         }
         return true
     }
@@ -1733,27 +1254,25 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
                 completion(.failure(ARSpatialSurveyError.sessionUnavailable))
                 return
             }
-            clearLubanPoints()
+            clearMeasurementPoints()
             clearCornerRooms()
-            clearGroundBaguaOverlay()
             let annotations = archive.annotations ?? SpatialMapAnnotations()
             cornerRooms = annotations.cornerRooms
             cornerRoomCount = cornerRooms.count
             cornerPoints = annotations.cornerPoints.map(\.position)
             cornerPinActive = !cornerPoints.isEmpty
             cornerRoomAnchors = worldMap.anchors.filter { $0.name == "corner-pin" }
-            lubanAnchors = worldMap.anchors.filter { $0.name == "luban-anchor" }
+            measureAnchors = worldMap.anchors.filter { $0.name == "luban-anchor" }
             let rulerPoints = annotations.lubanPoints.map(\.position)
-            lubanPointA = rulerPoints.first
-            lubanPointB = rulerPoints.dropFirst().first
-            if let a = lubanPointA, let b = lubanPointB {
+            measurePointA = rulerPoints.first
+            measurePointB = rulerPoints.dropFirst().first
+            if let a = measurePointA, let b = measurePointB {
                 let span = simd_distance(a, b)
-                lubanSpanMeters = span
-                let evaluation = LubanRulerEvaluation.evaluate(meters: span)
-                lubanEvaluation = evaluation
-                let line = Self.makeLineNode(from: a, to: b, color: evaluation.yangIsAuspicious ? .green : .red)
+                measureSpanMeters = span
+
+                let line = Self.makeLineNode(from: a, to: b, color: .cyan)
                 sceneView.scene.rootNode.addChildNode(line)
-                lubanLineNode = line
+                measureLineNode = line
             }
             sessionGeneration += 1
             surveyHeadingDegrees = archive.coordinateHeading
@@ -1899,7 +1418,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
         }
         let generation = sessionGeneration
         let annotations = SpatialMapAnnotations(cornerRooms: cornerRooms, cornerPoints: cornerPoints,
-                                                 lubanPoints: [lubanPointA, lubanPointB].compactMap { $0 })
+                                                 lubanPoints: [measurePointA, measurePointB].compactMap { $0 })
         session.getCurrentWorldMap { worldMap, error in
             DispatchQueue.main.async {
                 guard self.sessionGeneration == generation else {
@@ -1940,9 +1459,8 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
     public func stop() {
         isSessionPaused = true
         sessionGeneration += 1
-        clearLubanPoints()
+        clearMeasurementPoints()
         clearCornerRooms()
-        clearGroundBaguaOverlay()
         sceneView?.session.pause()
         sceneView?.session.delegate = nil
         sceneView?.delegate = nil
@@ -1998,11 +1516,9 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             self.retryCount = 0
             self.trackingState = state
             if state == .normal, self.surveyHeadingDegrees == nil {
-                let forward = -SIMD3<Float>(frame.camera.transform.columns.2.x,
-                                           frame.camera.transform.columns.2.y,
-                                           frame.camera.transform.columns.2.z)
-                self.surveyHeadingDegrees = SurveyCoordinateReference.heading(
-                    cameraHeading: CompassMotionManager.shared.physicalHeading(), cameraForward: forward)
+                // ARKit gravity alignment defines a local model frame. It
+                // does not require a compass or a location permission.
+                self.surveyHeadingDegrees = 0
                 self.hasHeadingReference = self.surveyHeadingDegrees != nil
             }
             self.updateMeasurements(frame: frame, sceneView: sceneView)
@@ -2080,9 +1596,7 @@ public final class ARSpatialSurveyModel: NSObject, ObservableObject, ARSessionDe
             currentCameraPose = ARCapturePose(worldFromCamera: frame.camera.viewMatrix(for: orientation).inverse,
                                              coordinateHeading: baseline, projection: projection)
         } else { currentCameraPose = nil }
-        if groundBaguaProjected {
-            updateStandingPalace(cameraTransform: frame.camera.transform)
-        }
+
 
         switch frame.worldMappingStatus {
         case .notAvailable: mappingState = .unavailable
@@ -2934,24 +2448,13 @@ public struct ARSpatialSurveyView: View {
                     }
                     .accessibilityLabel(lang.t("vr_survey_title"))
                     Button(action: {
-                        _ = model.toggleGroundBaguaOverlay()
-                    }) {
-                        Image(systemName: "square.grid.3x3.fill")
-                            .adaptiveFont(size: 13, weight: .bold)
-                            .foregroundColor(model.groundBaguaProjected ? .black : .white)
-                            .padding(9)
-                            .background(model.groundBaguaProjected ? Color(red: 0.95, green: 0.80, blue: 0.25) : Color.black.opacity(0.55))
-                            .clipShape(Circle())
-                    }
-                    .accessibilityLabel(lang.t("xuankong_stars"))
-                    Button(action: {
-                        _ = model.placeLubanPoint()
+                        _ = model.placeMeasurementPoint()
                     }) {
                         Image(systemName: "ruler.fill")
                             .adaptiveFont(size: 13, weight: .bold)
-                            .foregroundColor(model.lubanPointA != nil ? .black : .white)
+                            .foregroundColor(model.measurePointA != nil ? .black : .white)
                             .padding(9)
-                            .background(model.lubanPointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
+                            .background(model.measurePointA != nil ? Color.yanCyan : Color.black.opacity(0.55))
                             .clipShape(Circle())
                     }
                     .accessibilityLabel(lang.t("ar_spatial_measure"))
@@ -3127,8 +2630,8 @@ public struct ARSpatialSurveyView: View {
                         .minimumScaleFactor(0.75)
                 }
                 Spacer()
-                Button(action: { _ = model.placeLubanPoint() }) {
-                    Text(lubanActionTitle)
+                Button(action: { _ = model.placeMeasurementPoint() }) {
+                    Text(measureActionTitle)
                         .adaptiveFont(size: 10, weight: .bold)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -3140,49 +2643,10 @@ public struct ARSpatialSurveyView: View {
             .adaptiveFont(size: 13, weight: .bold, design: .monospaced)
             .foregroundColor(.white)
 
-            if let standing = model.currentStandingPalace {
-                HStack(spacing: 6) {
-                    Image(systemName: "safari.fill")
-                        .foregroundColor(Color(red: 0.95, green: 0.80, blue: 0.25))
-                        .adaptiveFont(size: 11)
-                    Text(standing)
-                        .adaptiveFont(size: 10, weight: .bold)
-                        .foregroundColor(Color(red: 0.95, green: 0.85, blue: 0.45))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Spacer()
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.08))
-                .cornerRadius(8)
-            }
 
-            if let eval = model.lubanEvaluation {
-                HStack(spacing: 6) {
-                    Image(systemName: eval.yangIsAuspicious ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                        .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
-                        .adaptiveFont(size: 11)
-                    Text(eval.localizedSummary(for: lang.effectiveLanguage))
-                        .adaptiveFont(size: 10, weight: .bold, design: .monospaced)
-                        .foregroundColor(eval.yangIsAuspicious ? .green : .orange)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                    Spacer()
-                    Button(action: { model.clearLubanPoints() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .adaptiveFont(size: 12)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.white.opacity(0.08))
-                .cornerRadius(8)
-            } else if model.lubanPointA != nil {
-                Text(lubanPendingHint)
-                    .adaptiveFont(size: 10, weight: .medium)
-                    .foregroundColor(.yanCyan)
+
+            if let a = model.measurePointA, let b = model.measurePointB {
+                Text(String(format: "%.3f m", simd_distance(a, b))).monospacedDigit()
             }
 
             if let width = model.largestPlaneWidth, let depth = model.largestPlaneDepth {
@@ -3313,12 +2777,12 @@ public struct ARSpatialSurveyView: View {
         }
     }
 
-    private var lubanActionTitle: String {
-        let isWaitingSecond = (model.lubanPointA != nil && model.lubanPointB == nil)
+    private var measureActionTitle: String {
+        let isWaitingSecond = (model.measurePointA != nil && model.measurePointB == nil)
         return isWaitingSecond ? lang.t("ar_luban_point_b") : lang.t("ar_luban_point_a")
     }
 
-    private var lubanPendingHint: String {
+    private var measurePendingHint: String {
         return lang.t("ar_luban_pending_hint")
     }
 

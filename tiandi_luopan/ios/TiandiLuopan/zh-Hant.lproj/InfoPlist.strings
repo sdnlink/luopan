@@ -1,11 +1,6 @@
-/* App Display Name */
 "CFBundleDisplayName" = "天機演象";
 "CFBundleName" = "天機演象";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "天機演象需要使用您的位置資訊以計算當地精確經緯度、海拔高程與地磁偏角。";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "天機演象需要使用您的位置資訊以計算當地精確經緯度、海拔高程與地磁偏角。";
-"NSMotionUsageDescription" = "天機演象需要使用高精度運動感測器以驅動雙軸太極水準儀與指南針。";
-"NSCameraUsageDescription" = "天機演象需要使用相機以提供AR實景天心透視、形煞測量與實地立向功能。";
-"NSPhotoLibraryAddUsageDescription" = "天機演象需要將實景勘測長圖與水印存證快照保存至您的相簿。";
-"NSPhotoLibraryUsageDescription" = "天機演象需要存取相簿以導入戶型圖，並保存實景勘測長圖與水印存證相片。";
+"NSCameraUsageDescription" = "用於掃描室內牆體、門窗和空間尺寸。";
+"NSMotionUsageDescription" = "用於 AR 空間追蹤和穩定測量畫面。";
+"NSPhotoLibraryUsageDescription" = "用於匯入戶型底圖或儲存使用者選擇匯出的空間記錄。";
+"NSPhotoLibraryAddUsageDescription" = "用於匯入戶型底圖或儲存使用者選擇匯出的空間記錄。";

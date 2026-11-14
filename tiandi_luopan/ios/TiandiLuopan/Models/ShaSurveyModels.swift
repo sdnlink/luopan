@@ -254,6 +254,18 @@ public final class ShaSurveyStore: ObservableObject {
         defaults.set(data, forKey: storageKey)
     }
 
+    /// Both sources belong to the active property. Saving a project must keep
+    /// the measured original even after a manual correction has been created.
+    func projectModels() -> (measured: HouseSpatialSurvey?, manual: HouseSpatialSurvey?) {
+        let measured = defaults.data(forKey: SpatialSurveyArchiveKeys.measured).flatMap {
+            try? JSONDecoder().decode(HouseSpatialSurvey.self, from: $0)
+        } ?? (interiorSource == .measured ? latestInterior : nil)
+        let manual = defaults.data(forKey: SpatialSurveyArchiveKeys.virtual).flatMap {
+            try? JSONDecoder().decode(HouseSpatialSurvey.self, from: $0)
+        } ?? (interiorSource == .virtual ? latestInterior : nil)
+        return (measured, manual)
+    }
+
     /// A property switch replaces the entire archive, including empty slots.
     /// Updating one slot in isolation would retain another property's model.
     @discardableResult

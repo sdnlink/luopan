@@ -1,11 +1,6 @@
-/* App Display Name */
-"CFBundleDisplayName" = "เทียนจี";
-"CFBundleName" = "เทียนจี";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้ข้อมูลตำแหน่งเพื่อคำนวณพิกัด ความสูง มุมเบี่ยงแม่เหล็กโลก และเวลาสุริยะจริงอย่างแม่นยำ";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้ข้อมูลตำแหน่งเพื่อคำนวณพิกัด ความสูง มุมเบี่ยงแม่เหล็กโลก และเวลาสุริยะจริงอย่างแม่นยำ";
-"NSMotionUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้เซ็นเซอร์การเคลื่อนไหวความแม่นยำสูงสำหรับระดับน้ำสองแกนและเข็มทิศ";
-"NSCameraUsageDescription" = "เทียนจีเหยียนเซี่ยงใช้กล้องสำหรับมุมมอง AR สำรวจพื้นที่ และวิเคราะห์ทิศทางหน้างาน";
-"NSPhotoLibraryAddUsageDescription" = "เทียนจีเหยียนเซี่ยงต้องการสิทธิ์บันทึกภาพถ่ายสำรวจหน้างานและม้วนภาพอ้างอิงลงในอัลบั้มรูปของคุณ";
-"NSPhotoLibraryUsageDescription" = "เทียนจีเหยียนเซี่ยงต้องการเข้าถึงคลังรูปภาพเพื่อนำเข้าผังบ้านและบันทึกภาพรายงานสำรวจ";
+"CFBundleDisplayName" = "เทียนจีเหยี่ยนเซี่ยง";
+"CFBundleName" = "เทียนจีเหยี่ยนเซี่ยง";
+"NSCameraUsageDescription" = "สแกนผนัง ช่องเปิดและขนาดภายในห้อง";
+"NSMotionUsageDescription" = "ติดตามพื้นที่ AR และปรับภาพการวัดให้เสถียร";
+"NSPhotoLibraryUsageDescription" = "นำเข้าภาพผังบ้านหรือบันทึกพื้นที่ที่คุณเลือกส่งออก";
+"NSPhotoLibraryAddUsageDescription" = "นำเข้าภาพผังบ้านหรือบันทึกพื้นที่ที่คุณเลือกส่งออก";

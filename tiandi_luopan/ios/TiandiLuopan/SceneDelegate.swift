@@ -160,85 +160,24 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// 通知仅作热启动时的即时补充。
     public static func routeWidgetURL(_ url: URL) {
         guard url.scheme == "tiandiluopan" else { return }
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        let queryItems = components?.queryItems ?? []
-        let sheetParam = queryItems.first(where: { $0.name == "sheet" })?.value
-        let indexParam = queryItems.first(where: { $0.name == "index" })?.value
-        let subParam = queryItems.first(where: { $0.name == "sub" })?.value
-
         switch url.host {
-        case "almanac":
-            AppNavigationRouter.shared.requestAlmanac()
-        case "compass":
-            CompassLayerManager.shared.showDailyGodMarkers = true
-            let shouldOpenDailyCard = (sheetParam == "dailySign" || sheetParam == "dailyCard")
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: shouldOpenDailyCard)
-        case "floorplan":
-            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
-        case "analysis":
-            let rawFeature = queryItems.first(where: { $0.name == "feature" })?.value
-            guard let rawFeature, let feature = AnalysisFeature(rawValue: rawFeature) else { return }
-            AppNavigationRouter.shared.requestRoute(tab: 3, feature: feature)
-        case "qimen":
-            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
-        case "tab":
-            if subParam == "qimen" {
-                AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
-            } else if indexParam == "3" {
-                AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
-            } else if let idxStr = indexParam, let idx = Int(idxStr) {
-                AppNavigationRouter.shared.requestRoute(tab: max(0, min(4, idx)), subTab: nil, openDailyCard: false)
-            } else {
-                return
-            }
-        default:
-            return
+        case "floorplan": AppNavigationRouter.shared.requestRoute(tab: 2)
+        case "projects": AppNavigationRouter.shared.requestRoute(tab: 0)
+        case "measure": AppNavigationRouter.shared.requestRoute(tab: 1)
+        default: return
         }
-        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
     }
 
     public static func routeShortcutType(_ type: String) {
-        switch type {
-        case "com.yanxiang.compass.shortcut.dailygods":
-            CompassLayerManager.shared.showDailyGodMarkers = true
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
-        case "com.yanxiang.compass.shortcut.dailycard", "com.yanxiang.compass.shortcut.dailysign":
-            CompassLayerManager.shared.showDailyGodMarkers = true
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
-        case "com.yanxiang.compass.shortcut.zeri":
-            AppNavigationRouter.shared.requestRoute(tab: 3, feature: .dates)
-        case "com.yanxiang.compass.shortcut.floorplan":
-            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
-        case "com.yanxiang.compass.shortcut.qimen":
-            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
-        default:
-            return
+        if type == "com.yanxiang.compass.shortcut.floorplan" {
+            AppNavigationRouter.shared.requestRoute(tab: 2)
         }
-        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
     }
 
-    private static func routeUserActivity(_ userActivity: NSUserActivity) {
-        guard userActivity.activityType == CSSearchableItemActionType,
-              let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String else { return }
-        switch id {
-        case "spotlight.zeri":
-            AppNavigationRouter.shared.requestRoute(tab: 3, feature: .dates)
-        case "tiandiluopan://compass?guide=dailyGods":
-            CompassLayerManager.shared.showDailyGodMarkers = true
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: false)
-        case "tiandiluopan://compass?sheet=dailySign":
-            CompassLayerManager.shared.showDailyGodMarkers = true
-            AppNavigationRouter.shared.requestRoute(tab: 0, subTab: nil, openDailyCard: true)
-        case "spotlight.bazhai":
-            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 1, openDailyCard: false)
-        case "spotlight.qimen", "tiandiluopan://tab?index=2&sub=qimen":
-            AppNavigationRouter.shared.requestRoute(tab: 3, subTab: 3, openDailyCard: false)
-        case "spotlight.floorplan", "tiandiluopan://tab?index=3":
-            AppNavigationRouter.shared.requestRoute(tab: 2, subTab: nil, openDailyCard: false)
-        default:
-            return
-        }
-        NotificationCenter.default.post(name: .didTapAlmanacWidget, object: nil)
+    private static func routeUserActivity(_ activity: NSUserActivity) {
+        guard let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+              id == "spotlight.floorplan" else { return }
+        AppNavigationRouter.shared.requestRoute(tab: 2)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}
@@ -246,9 +185,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         StoreKitIAPManager.shared.refreshEntitlements()
         StoreKitIAPManager.shared.refreshProductsIfNeeded()
-        CompassMotionManager.shared.resumeIfSensorsEnabled()
-        CompassMotionManager.shared.refreshTimeAndSolarTerm()
-        RetentionServiceManager.shared.syncNotificationAuthorizationStatus()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -261,8 +197,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        CompassMotionManager.shared.resumeIfSensorsEnabled()
-        CompassMotionManager.shared.refreshTimeAndSolarTerm()
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

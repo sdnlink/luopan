@@ -1,11 +1,6 @@
-/* App Display Name */
 "CFBundleDisplayName" = "天機演象";
 "CFBundleName" = "天機演象";
-
-/* Privacy Descriptions */
-"NSLocationWhenInUseUsageDescription" = "天機演象は現在地の正確な経緯度・標高・磁気偏角および真太陽時を算出するために位置情報を使用します。";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "天機演象は現在地の正確な経緯度・標高・磁気偏角および真太陽時を算出するために位置情報を使用します。";
-"NSMotionUsageDescription" = "天機演象は二軸水準器と高精度コンパスの駆動にモーションセンサーを使用します。";
-"NSCameraUsageDescription" = "天機演象はAR実景方位測定・空間測量・形煞分析機能のためにカメラを使用します。";
-"NSPhotoLibraryAddUsageDescription" = "天機演象は実地測量の記録画像や宣紙長巻を写真ライブラリに保存するために権限を使用します。";
-"NSPhotoLibraryUsageDescription" = "天機演象は間取り図の読み込みおよび実地測量の記録画像・長巻の保存のために写真ライブラリへアクセスします。";
+"NSCameraUsageDescription" = "室内の壁・開口部・寸法をスキャンします。";
+"NSMotionUsageDescription" = "AR空間追跡と計測画面の安定化に使用します。";
+"NSPhotoLibraryUsageDescription" = "間取り画像の読み込みや選択した空間記録の保存に使用します。";
+"NSPhotoLibraryAddUsageDescription" = "間取り画像の読み込みや選択した空間記録の保存に使用します。";

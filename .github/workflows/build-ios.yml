@@ -740,7 +740,7 @@ jobs:
           name: TiandiLuopan-${{ github.event.inputs.build_target || 'development' }}-IPA
           path: tiandi_luopan/dist-ios/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       # --------------------------------------------------
       # 11. 上传至 App Store Connect / TestFlight (仅 app-store 模式生效)
@@ -805,7 +805,7 @@ jobs:
             tiandi_luopan/ExportOptions.plist
             tiandi_luopan/ExportOptions-upload.plist
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 30
 
       # --------------------------------------------------
       # 13. 清理签名材料（无论成败）

@@ -1,0 +1,284 @@
+name: Android & iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'tiandi_luopan/**'
+      - '.github/workflows/build-mobile.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'tiandi_luopan/**'
+      - '.github/workflows/build-mobile.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+# The jobs run independently: either platform keeps its results even if the
+# other fails. No signing secrets or store uploads are required for this CI.
+jobs:
+  android:
+    name: Android APK / AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+        working-directory: tiandi_luopan
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK and unsigned release APK / AAB
+        id: build
+        run: |
+          set -euo pipefail
+          mkdir -p build/mobile-ci/android
+          bash ./gradlew --no-daemon --console=plain \
+            :app:assembleDebug :app:assembleRelease :app:bundleRelease \
+            2>&1 | tee build/mobile-ci/android/build.log
+
+      - name: Collect Android packages and checksums
+        id: packages
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' }}
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          set -euo pipefail
+          OUT="build/mobile-ci/artifacts/android"
+          mkdir -p "$OUT/debug" "$OUT/release-unsigned"
+          shopt -s nullglob
+          DEBUG_APKS=(app/build/outputs/apk/debug/*.apk)
+          RELEASE_APKS=(app/build/outputs/apk/release/*.apk)
+          RELEASE_BUNDLES=(app/build/outputs/bundle/release/*.aab)
+          # Retain partial output too (for example debug succeeds, release fails).
+          test "$(( ${#DEBUG_APKS[@]} + ${#RELEASE_APKS[@]} + ${#RELEASE_BUNDLES[@]} ))" -gt 0
+          if [ "$BUILD_OUTCOME" = success ]; then
+            test "${#DEBUG_APKS[@]}" -gt 0
+            test "${#RELEASE_APKS[@]}" -gt 0
+            test "${#RELEASE_BUNDLES[@]}" -gt 0
+          fi
+          for package in "${DEBUG_APKS[@]}"; do cp "$package" "$OUT/debug/"; done
+          for package in "${RELEASE_APKS[@]}" "${RELEASE_BUNDLES[@]}"; do
+            cp "$package" "$OUT/release-unsigned/"
+          done
+          {
+            printf 'Commit: %s\nRun: %s\nAttempt: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            printf 'Build outcome: %s\n' "$BUILD_OUTCOME"
+            printf 'Debug APK: debug-signed, installable on Android.\n'
+            printf 'Release APK/AAB: unsigned, must be signed before distribution.\n'
+            printf 'Built without the optional Google Play purchase verification key.\n'
+          } > "$OUT/BUILD-INFO.txt"
+          (cd "$OUT" && sha256sum debug/*.apk release-unsigned/*.apk release-unsigned/*.aab > SHA256SUMS.txt)
+
+      - name: Run Android tests and lint
+        id: checks
+        run: |
+          set -euo pipefail
+          bash ./gradlew --no-daemon --console=plain \
+            :app:testDebugUnitTest :app:lintDebug \
+            2>&1 | tee build/mobile-ci/android/checks.log
+
+      - name: Upload Android build results
+        id: upload
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-Packages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tiandi_luopan/build/mobile-ci/artifacts/android/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Android logs, tests, lint and screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-Diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tiandi_luopan/build/mobile-ci/android/*.log
+            tiandi_luopan/app/build/reports/
+            tiandi_luopan/app/build/test-results/
+            tiandi_luopan/app/build/native-screenshots/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Android summary
+        if: ${{ !cancelled() }}
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          CHECKS_OUTCOME: ${{ steps.checks.outcome }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            printf '## Android build\n\n'
+            printf -- '- Build: **%s**\n- Tests / lint: **%s**\n' "$BUILD_OUTCOME" "$CHECKS_OUTCOME"
+            printf -- '- Commit: `%s`\n- Artifact retention: 30 days (subject to repository policy).\n' "$GITHUB_SHA"
+            if [ -n "$ARTIFACT_URL" ]; then
+              printf -- '- [Download APK / AAB](%s)\n' "$ARTIFACT_URL"
+            fi
+            printf '\nDebug APK is installable; release APK/AAB require signing.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    name: iOS device archive / simulator app
+    runs-on: ${{ vars.IOS_RUNNER_LABEL || 'xcode-27' }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: tiandi_luopan
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode and verify project
+        id: setup
+        run: |
+          set -euo pipefail
+          mkdir -p build/mobile-ci/ios build/mobile-ci/artifacts/ios
+          XCODE_APP="$(python3 - <<'PY'
+          import pathlib, re
+          apps = list(pathlib.Path('/Applications').glob('Xcode*.app'))
+          if not apps:
+              raise SystemExit('No Xcode installation found')
+          def version(path):
+              return tuple(map(int, re.findall(r'\d+', path.name)))
+          print(max(apps, key=version))
+          PY
+          )"
+          export DEVELOPER_DIR="$XCODE_APP/Contents/Developer"
+          printf 'DEVELOPER_DIR=%s\n' "$DEVELOPER_DIR" >> "$GITHUB_ENV"
+          {
+            xcodebuild -version
+            xcodebuild -showsdks
+            xcrun --sdk iphoneos --show-sdk-version
+            xcrun --sdk iphonesimulator --show-sdk-version
+          } 2>&1 | tee build/mobile-ci/ios/environment.log
+          # Match the existing project's minimum CI SDK for foldable layouts.
+          python3 - <<'PY'
+          import subprocess
+          for sdk in ('iphoneos', 'iphonesimulator'):
+              value = subprocess.check_output(['xcrun', '--sdk', sdk, '--show-sdk-version'], text=True).strip()
+              parts = tuple(map(int, value.split('.')))
+              if (parts + (0,))[:2] < (27, 1):
+                  raise SystemExit('iOS SDK 27.1+ required for {} (found {})'.format(sdk, value))
+          PY
+          python3 -m unittest discover -s tools -p 'test_check_swift_target_dependencies.py' \
+            2>&1 | tee build/mobile-ci/ios/project-tests.log
+          python3 tools/check_swift_target_dependencies.py \
+            2>&1 | tee build/mobile-ci/ios/project-check.log
+
+      - name: Build and package unsigned iOS device archive
+        id: device
+        run: |
+          set -euo pipefail
+          OUT="build/mobile-ci"
+          xcodebuild archive \
+            -project ios/TiandiLuopan.xcodeproj \
+            -scheme TiandiLuopan \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$OUT/device-derived-data" \
+            -archivePath "$OUT/ios/TiandiLuopan.xcarchive" \
+            -resultBundlePath "$OUT/ios/device-build.xcresult" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= WIDGET_CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$OUT/ios/device-build.log"
+          test -d "$OUT/ios/TiandiLuopan.xcarchive/Products/Applications/TiandiLuopan.app"
+          # tar preserves bundle symlinks and executable modes through Artifacts.
+          tar -czf "$OUT/artifacts/ios/TiandiLuopan-device-unsigned.xcarchive.tar.gz" \
+            -C "$OUT/ios" TiandiLuopan.xcarchive
+
+      - name: Build and package iOS simulator application
+        id: simulator
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          OUT="build/mobile-ci"
+          xcodebuild build \
+            -project ios/TiandiLuopan.xcodeproj \
+            -scheme TiandiLuopan \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$OUT/simulator-derived-data" \
+            -resultBundlePath "$OUT/ios/simulator-build.xcresult" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= WIDGET_CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$OUT/ios/simulator-build.log"
+          PRODUCTS="$OUT/simulator-derived-data/Build/Products/Debug-iphonesimulator"
+          test -d "$PRODUCTS/TiandiLuopan.app"
+          tar -czf "$OUT/artifacts/ios/TiandiLuopan-simulator.app.tar.gz" \
+            -C "$PRODUCTS" TiandiLuopan.app
+
+      - name: Write iOS build information and checksums
+        if: ${{ !cancelled() && (steps.device.outcome == 'success' || steps.simulator.outcome == 'success') }}
+        run: |
+          set -euo pipefail
+          OUT="build/mobile-ci/artifacts/ios"
+          {
+            printf 'Commit: %s\nRun: %s\nAttempt: %s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"
+            xcodebuild -version
+            printf 'Device archive: unsigned, not an installable IPA.\n'
+            printf 'Simulator app: only for the iOS Simulator, not physical devices.\n'
+            printf 'Use the existing iOS Multi-Mode Build & Deploy workflow for a signed IPA.\n'
+          } > "$OUT/BUILD-INFO.txt"
+          (cd "$OUT" && shasum -a 256 ./*.tar.gz > SHA256SUMS.txt)
+
+      - name: Upload iOS build results
+        id: upload
+        if: ${{ !cancelled() && (steps.device.outcome == 'success' || steps.simulator.outcome == 'success') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-Builds-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tiandi_luopan/build/mobile-ci/artifacts/ios/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Upload iOS build logs and result bundles
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-Diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            tiandi_luopan/build/mobile-ci/ios/*.log
+            tiandi_luopan/build/mobile-ci/ios/*.xcresult
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: iOS summary
+        if: ${{ !cancelled() }}
+        env:
+          DEVICE_OUTCOME: ${{ steps.device.outcome }}
+          SIMULATOR_OUTCOME: ${{ steps.simulator.outcome }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            printf '## iOS build\n\n'
+            printf -- '- Device archive: **%s**\n- Simulator app: **%s**\n' "$DEVICE_OUTCOME" "$SIMULATOR_OUTCOME"
+            printf -- '- Commit: `%s`\n- Artifact retention: 30 days (subject to repository policy).\n' "$GITHUB_SHA"
+            if [ -n "$ARTIFACT_URL" ]; then
+              printf -- '- [Download iOS archive / app](%s)\n' "$ARTIFACT_URL"
+            fi
+            printf '\nDevice archives are unsigned. A signed IPA is available through the existing iOS signing workflow.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
